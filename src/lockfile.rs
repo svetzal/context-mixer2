@@ -22,8 +22,8 @@ pub fn load(local: bool) -> Result<LockFile> {
             packages: BTreeMap::new(),
         });
     }
-    let content = fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
     let lock: LockFile = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse {}", path.display()))?;
     Ok(lock)
@@ -36,7 +36,6 @@ pub fn save(lock: &LockFile, local: bool) -> Result<()> {
             .with_context(|| format!("Failed to create {}", parent.display()))?;
     }
     let content = serde_json::to_string_pretty(lock)?;
-    fs::write(&path, content)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
+    fs::write(&path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }

@@ -89,8 +89,18 @@ pub enum SourceType {
 
 #[derive(Debug)]
 pub enum Artifact {
-    Agent { name: String, path: PathBuf, version: Option<String>, deprecation: Option<Deprecation> },
-    Skill { name: String, path: PathBuf, version: Option<String>, deprecation: Option<Deprecation> },
+    Agent {
+        name: String,
+        path: PathBuf,
+        version: Option<String>,
+        deprecation: Option<Deprecation>,
+    },
+    Skill {
+        name: String,
+        path: PathBuf,
+        version: Option<String>,
+        deprecation: Option<Deprecation>,
+    },
 }
 
 #[derive(Debug, Clone)]

@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::Utc;
 use std::path::PathBuf;
 use std::process::Command;
@@ -13,7 +13,10 @@ pub fn add(name: &str, path_or_url: &str) -> Result<()> {
     let mut sources = config::load_sources()?;
 
     if sources.sources.contains_key(name) {
-        bail!("Source '{}' already exists. Remove it first to re-register.", name);
+        bail!(
+            "Source '{}' already exists. Remove it first to re-register.",
+            name
+        );
     }
 
     let entry = if looks_like_url(path_or_url) {
@@ -66,10 +69,9 @@ pub fn browse(name: &str) -> Result<()> {
 
     let sources = config::load_sources()?;
 
-    let entry = sources
-        .sources
-        .get(name)
-        .with_context(|| format!("Source '{name}' not found. Run 'cmx source list' to see registered sources."))?;
+    let entry = sources.sources.get(name).with_context(|| {
+        format!("Source '{name}' not found. Run 'cmx source list' to see registered sources.")
+    })?;
 
     let local_path = config::resolve_local_path(entry);
     if !local_path.exists() {
@@ -265,9 +267,7 @@ fn pull_source(name: &str) -> Result<()> {
     sources.sources.insert(name.to_string(), entry);
     config::save_sources(&sources)?;
 
-    let local_path = config::resolve_local_path(
-        sources.sources.get(name).unwrap(),
-    );
+    let local_path = config::resolve_local_path(sources.sources.get(name).unwrap());
     let artifacts = scan::scan_source(&local_path)?;
     let (agents, skills) = count_artifacts(&artifacts);
     println!("Source '{name}': {agents} agent(s), {skills} skill(s).");

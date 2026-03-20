@@ -21,11 +21,11 @@ fn status_indicator(installed: &str, available: &str, deprecated: bool) -> &'sta
         return "⛔";
     }
     match (installed, available) {
-        ("-", "-") => " ",              // no source, unmanaged
-        ("-", _) => "⚠️",               // installed but no version tracked
-        (_, "-") => " ",               // no source version to compare
-        (i, a) if i == a => "✅",       // up to date
-        _ => "⚠️",                      // behind
+        ("-", "-") => " ",        // no source, unmanaged
+        ("-", _) => "⚠️",         // installed but no version tracked
+        (_, "-") => " ",          // no source version to compare
+        (i, a) if i == a => "✅", // up to date
+        _ => "⚠️",                // behind
     }
 }
 
@@ -104,7 +104,11 @@ fn build_rows(
             .to_string();
 
         let (source, available, deprecated) = match source_info {
-            Some(info) => (info.source_name.clone(), info.version.clone(), info.deprecated),
+            Some(info) => (
+                info.source_name.clone(),
+                info.version.clone(),
+                info.deprecated,
+            ),
             None => {
                 let src = lock_entry
                     .map(|e| e.source.repo.clone())
@@ -169,9 +173,24 @@ fn print_table(rows: &[Row]) {
     }
 
     let w_name = rows.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
-    let w_inst = rows.iter().map(|r| r.installed.len()).max().unwrap_or(9).max(9);
-    let w_src = rows.iter().map(|r| r.source.len()).max().unwrap_or(6).max(6);
-    let w_avail = rows.iter().map(|r| r.available.len()).max().unwrap_or(9).max(9);
+    let w_inst = rows
+        .iter()
+        .map(|r| r.installed.len())
+        .max()
+        .unwrap_or(9)
+        .max(9);
+    let w_src = rows
+        .iter()
+        .map(|r| r.source.len())
+        .max()
+        .unwrap_or(6)
+        .max(6);
+    let w_avail = rows
+        .iter()
+        .map(|r| r.available.len())
+        .max()
+        .unwrap_or(9)
+        .max(9);
 
     println!(
         "  {:<w_name$}  {:<w_inst$}  {:<w_src$}  {:<w_avail$}",
@@ -210,9 +229,7 @@ fn installed_names(kind: ArtifactKind, local: bool) -> Result<Vec<String>> {
     }
 
     let mut names = Vec::new();
-    for entry in fs::read_dir(&dir)
-        .with_context(|| format!("Failed to read {}", dir.display()))?
-    {
+    for entry in fs::read_dir(&dir).with_context(|| format!("Failed to read {}", dir.display()))? {
         let entry = entry?;
         let file_name = entry.file_name();
         let name_str = file_name.to_string_lossy();

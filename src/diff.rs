@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use mojentic::llm::gateways::{OllamaGateway, OpenAIGateway};
 use mojentic::llm::{LlmBroker, LlmGateway, LlmMessage};
 use std::fs;
@@ -61,7 +61,14 @@ pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
     println!("Analyzing differences...");
     println!();
 
-    let analysis = analyze_diff(name, kind, installed_version, source_ver_display, &diff_text).await?;
+    let analysis = analyze_diff(
+        name,
+        kind,
+        installed_version,
+        source_ver_display,
+        &diff_text,
+    )
+    .await?;
     println!("{analysis}");
 
     Ok(())

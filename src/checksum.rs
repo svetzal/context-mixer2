@@ -5,8 +5,7 @@ use std::path::Path;
 
 /// Compute SHA-256 checksum for an agent (single .md file).
 pub fn checksum_file(path: &Path) -> Result<String> {
-    let content = fs::read(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content = fs::read(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let hash = Sha256::digest(&content);
     Ok(format!("sha256:{:x}", hash))
 }
@@ -21,8 +20,8 @@ pub fn checksum_dir(path: &Path) -> Result<String> {
     for file in &files {
         let relative = file.strip_prefix(path).unwrap_or(file);
         hasher.update(relative.to_string_lossy().as_bytes());
-        let content = fs::read(file)
-            .with_context(|| format!("Failed to read {}", file.display()))?;
+        let content =
+            fs::read(file).with_context(|| format!("Failed to read {}", file.display()))?;
         hasher.update(&content);
     }
 

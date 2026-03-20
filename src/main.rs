@@ -11,7 +11,7 @@ mod scan;
 mod source;
 mod types;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 
 use cli::{ArtifactAction, Cli, Commands, ConfigAction, SourceAction};

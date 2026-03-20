@@ -29,10 +29,34 @@ pub fn outdated() -> Result<()> {
     let mut rows = Vec::new();
 
     // Check all installed artifacts (both tracked and untracked)
-    collect_outdated_for_scope(ArtifactKind::Agent, false, &global_lock, &source_artifacts, &mut rows)?;
-    collect_outdated_for_scope(ArtifactKind::Skill, false, &global_lock, &source_artifacts, &mut rows)?;
-    collect_outdated_for_scope(ArtifactKind::Agent, true, &local_lock, &source_artifacts, &mut rows)?;
-    collect_outdated_for_scope(ArtifactKind::Skill, true, &local_lock, &source_artifacts, &mut rows)?;
+    collect_outdated_for_scope(
+        ArtifactKind::Agent,
+        false,
+        &global_lock,
+        &source_artifacts,
+        &mut rows,
+    )?;
+    collect_outdated_for_scope(
+        ArtifactKind::Skill,
+        false,
+        &global_lock,
+        &source_artifacts,
+        &mut rows,
+    )?;
+    collect_outdated_for_scope(
+        ArtifactKind::Agent,
+        true,
+        &local_lock,
+        &source_artifacts,
+        &mut rows,
+    )?;
+    collect_outdated_for_scope(
+        ArtifactKind::Skill,
+        true,
+        &local_lock,
+        &source_artifacts,
+        &mut rows,
+    )?;
 
     // Deduplicate by name (in case both lock and disk scan find the same artifact)
     let mut seen = BTreeSet::new();
@@ -45,10 +69,30 @@ pub fn outdated() -> Result<()> {
 
     let w_name = rows.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
     let w_kind = 5;
-    let w_iv = rows.iter().map(|r| r.installed_version.len()).max().unwrap_or(9).max(9);
-    let w_av = rows.iter().map(|r| r.available_version.len()).max().unwrap_or(9).max(9);
-    let w_src = rows.iter().map(|r| r.source.len()).max().unwrap_or(6).max(6);
-    let w_st = rows.iter().map(|r| r.status.len()).max().unwrap_or(6).max(6);
+    let w_iv = rows
+        .iter()
+        .map(|r| r.installed_version.len())
+        .max()
+        .unwrap_or(9)
+        .max(9);
+    let w_av = rows
+        .iter()
+        .map(|r| r.available_version.len())
+        .max()
+        .unwrap_or(9)
+        .max(9);
+    let w_src = rows
+        .iter()
+        .map(|r| r.source.len())
+        .max()
+        .unwrap_or(6)
+        .max(6);
+    let w_st = rows
+        .iter()
+        .map(|r| r.status.len())
+        .max()
+        .unwrap_or(6)
+        .max(6);
 
     println!(
         "  {:<w_name$}  {:<w_kind$}  {:<w_iv$}  {:<w_av$}  {:<w_src$}  {:<w_st$}",
@@ -102,11 +146,7 @@ fn collect_outdated_for_scope(
             .unwrap_or("-")
             .to_string();
 
-        let available_v = source_info
-            .version
-            .as_deref()
-            .unwrap_or("-")
-            .to_string();
+        let available_v = source_info.version.as_deref().unwrap_or("-").to_string();
 
         // Determine if outdated
         let is_outdated = match lock_entry {
@@ -195,9 +235,7 @@ fn installed_names(kind: ArtifactKind, local: bool) -> Result<Vec<String>> {
     }
 
     let mut names = Vec::new();
-    for entry in fs::read_dir(&dir)
-        .with_context(|| format!("Failed to read {}", dir.display()))?
-    {
+    for entry in fs::read_dir(&dir).with_context(|| format!("Failed to read {}", dir.display()))? {
         let entry = entry?;
         let file_name = entry.file_name();
         let name_str = file_name.to_string_lossy();

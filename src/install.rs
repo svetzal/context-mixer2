@@ -166,9 +166,10 @@ pub fn install_all(kind: ArtifactKind, local: bool) -> Result<()> {
                 }
                 // Skip if already tracked in lock file with matching version
                 if let Some(lock_entry) = lock.packages.get(artifact.name())
-                    && lock_entry.version.as_deref() == artifact.version() {
-                        continue;
-                    }
+                    && lock_entry.version.as_deref() == artifact.version()
+                {
+                    continue;
+                }
                 let pinned = format!("{source_name}:{}", artifact.name());
                 install(&pinned, kind, local)?;
                 installed_count += 1;
@@ -202,11 +203,12 @@ pub fn update_all(kind: ArtifactKind) -> Result<()> {
             }
 
             if let Some(source_cs) = source_checksums.get(name)
-                && entry.source_checksum != *source_cs {
-                    let pinned = format!("{}:{name}", entry.source.repo);
-                    install(&pinned, kind, local)?;
-                    updated_count += 1;
-                }
+                && entry.source_checksum != *source_cs
+            {
+                let pinned = format!("{}:{name}", entry.source.repo);
+                install(&pinned, kind, local)?;
+                updated_count += 1;
+            }
         }
     }
 

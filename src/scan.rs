@@ -33,18 +33,19 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
                     if let Some(path_str) = agent_path.as_str() {
                         let full_path = root.join(path_str);
                         if full_path.exists()
-                            && let Some(fm) = parse_agent_frontmatter(&full_path) {
-                                let name = full_path
-                                    .file_stem()
-                                    .map(|s| s.to_string_lossy().to_string())
-                                    .unwrap_or_default();
-                                artifacts.push(Artifact::Agent {
-                                    name,
-                                    path: full_path,
-                                    version: fm.version,
-                                    deprecation: fm.deprecation,
-                                });
-                            }
+                            && let Some(fm) = parse_agent_frontmatter(&full_path)
+                        {
+                            let name = full_path
+                                .file_stem()
+                                .map(|s| s.to_string_lossy().to_string())
+                                .unwrap_or_default();
+                            artifacts.push(Artifact::Agent {
+                                name,
+                                path: full_path,
+                                version: fm.version,
+                                deprecation: fm.deprecation,
+                            });
+                        }
                     }
                 }
             }
@@ -56,18 +57,19 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
                         let full_path = root.join(path_str);
                         let skill_md = full_path.join("SKILL.md");
                         if skill_md.exists()
-                            && let Some(fm) = parse_frontmatter(&skill_md) {
-                                let name = full_path
-                                    .file_name()
-                                    .map(|s| s.to_string_lossy().to_string())
-                                    .unwrap_or_default();
-                                artifacts.push(Artifact::Skill {
-                                    name,
-                                    path: full_path,
-                                    version: fm.version,
-                                    deprecation: fm.deprecation,
-                                });
-                            }
+                            && let Some(fm) = parse_frontmatter(&skill_md)
+                        {
+                            let name = full_path
+                                .file_name()
+                                .map(|s| s.to_string_lossy().to_string())
+                                .unwrap_or_default();
+                            artifacts.push(Artifact::Skill {
+                                name,
+                                path: full_path,
+                                version: fm.version,
+                                deprecation: fm.deprecation,
+                            });
+                        }
                     }
                 }
             }
@@ -97,25 +99,28 @@ fn walk_dir(dir: &Path, artifacts: &mut Vec<Artifact>) -> Result<()> {
         if path.is_dir() {
             let skill_md = path.join("SKILL.md");
             if skill_md.exists()
-                && let Some(fm) = parse_frontmatter(&skill_md) {
-                    artifacts.push(Artifact::Skill {
-                        name: name_str.into_owned(),
-                        path: path.clone(),
-                        version: fm.version,
-                        deprecation: fm.deprecation,
-                    });
-                }
-            walk_dir(&path, artifacts)?;
-        } else if path.extension().is_some_and(|ext| ext == "md") && name_str != "SKILL.md"
-            && let Some(fm) = parse_agent_frontmatter(&path) {
-                let agent_name = name_str.trim_end_matches(".md").to_string();
-                artifacts.push(Artifact::Agent {
-                    name: agent_name,
+                && let Some(fm) = parse_frontmatter(&skill_md)
+            {
+                artifacts.push(Artifact::Skill {
+                    name: name_str.into_owned(),
                     path: path.clone(),
                     version: fm.version,
                     deprecation: fm.deprecation,
                 });
             }
+            walk_dir(&path, artifacts)?;
+        } else if path.extension().is_some_and(|ext| ext == "md")
+            && name_str != "SKILL.md"
+            && let Some(fm) = parse_agent_frontmatter(&path)
+        {
+            let agent_name = name_str.trim_end_matches(".md").to_string();
+            artifacts.push(Artifact::Agent {
+                name: agent_name,
+                path: path.clone(),
+                version: fm.version,
+                deprecation: fm.deprecation,
+            });
+        }
     }
 
     Ok(())
