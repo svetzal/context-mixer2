@@ -32,6 +32,11 @@ pub enum Commands {
     List,
     /// Show installed artifacts that have updates available
     Outdated,
+    /// Search all sources for agents and skills by keyword
+    Search {
+        /// Keyword to search for in artifact names and descriptions
+        query: String,
+    },
     /// View or modify cmx configuration
     Config {
         #[command(subcommand)]

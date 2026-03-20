@@ -41,6 +41,7 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
                                 .unwrap_or_default();
                             artifacts.push(Artifact::Agent {
                                 name,
+                                description: fm.description,
                                 path: full_path,
                                 version: fm.version,
                                 deprecation: fm.deprecation,
@@ -65,6 +66,7 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
                                 .unwrap_or_default();
                             artifacts.push(Artifact::Skill {
                                 name,
+                                description: fm.description,
                                 path: full_path,
                                 version: fm.version,
                                 deprecation: fm.deprecation,
@@ -103,6 +105,7 @@ fn walk_dir(dir: &Path, artifacts: &mut Vec<Artifact>) -> Result<()> {
             {
                 artifacts.push(Artifact::Skill {
                     name: name_str.into_owned(),
+                    description: fm.description,
                     path: path.clone(),
                     version: fm.version,
                     deprecation: fm.deprecation,
@@ -116,6 +119,7 @@ fn walk_dir(dir: &Path, artifacts: &mut Vec<Artifact>) -> Result<()> {
             let agent_name = name_str.trim_end_matches(".md").to_string();
             artifacts.push(Artifact::Agent {
                 name: agent_name,
+                description: fm.description,
                 path: path.clone(),
                 version: fm.version,
                 deprecation: fm.deprecation,
@@ -127,6 +131,7 @@ fn walk_dir(dir: &Path, artifacts: &mut Vec<Artifact>) -> Result<()> {
 }
 
 struct Frontmatter {
+    description: String,
     version: Option<String>,
     deprecation: Option<Deprecation>,
 }
@@ -151,6 +156,7 @@ fn parse_frontmatter(path: &Path) -> Option<Frontmatter> {
     let end = rest.find("---")?;
     let fm_text = &rest[..end];
     Some(Frontmatter {
+        description: extract_field(fm_text, "description").unwrap_or_default(),
         version: extract_field(fm_text, "version"),
         deprecation: parse_deprecation(fm_text),
     })
@@ -172,6 +178,7 @@ fn parse_agent_frontmatter(path: &Path) -> Option<Frontmatter> {
     }
 
     Some(Frontmatter {
+        description: extract_field(fm_text, "description").unwrap_or_default(),
         version: extract_field(fm_text, "version"),
         deprecation: parse_deprecation(fm_text),
     })

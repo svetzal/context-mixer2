@@ -8,6 +8,7 @@ mod list;
 mod lockfile;
 mod outdated;
 mod scan;
+mod search;
 mod source;
 mod types;
 
@@ -33,6 +34,7 @@ async fn main() -> Result<()> {
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill).await,
         Commands::List => list::list_all(),
         Commands::Outdated => outdated::outdated(),
+        Commands::Search { query } => search::search(&query),
         Commands::Config { action } => match action {
             ConfigAction::Show => cmx_config::show(),
             ConfigAction::Gateway { value } => cmx_config::set_gateway(&value),

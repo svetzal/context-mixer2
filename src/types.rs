@@ -91,12 +91,14 @@ pub enum SourceType {
 pub enum Artifact {
     Agent {
         name: String,
+        description: String,
         path: PathBuf,
         version: Option<String>,
         deprecation: Option<Deprecation>,
     },
     Skill {
         name: String,
+        description: String,
         path: PathBuf,
         version: Option<String>,
         deprecation: Option<Deprecation>,
@@ -160,6 +162,13 @@ impl Artifact {
         match self {
             Artifact::Agent { name, .. } => name,
             Artifact::Skill { name, .. } => name,
+        }
+    }
+
+    pub fn description(&self) -> &str {
+        match self {
+            Artifact::Agent { description, .. } => description,
+            Artifact::Skill { description, .. } => description,
         }
     }
 
