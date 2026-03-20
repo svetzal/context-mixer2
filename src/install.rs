@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::Utc;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -53,9 +53,7 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool) -> Result<()> {
     }
 
     if found.is_empty() {
-        bail!(
-            "No {kind} named '{artifact_name}' found in registered sources.",
-        );
+        bail!("No {kind} named '{artifact_name}' found in registered sources.",);
     }
 
     if found.len() > 1 {
@@ -167,11 +165,10 @@ pub fn install_all(kind: ArtifactKind, local: bool) -> Result<()> {
                     continue;
                 }
                 // Skip if already tracked in lock file with matching version
-                if let Some(lock_entry) = lock.packages.get(artifact.name()) {
-                    if lock_entry.version.as_deref() == artifact.version() {
+                if let Some(lock_entry) = lock.packages.get(artifact.name())
+                    && lock_entry.version.as_deref() == artifact.version() {
                         continue;
                     }
-                }
                 let pinned = format!("{source_name}:{}", artifact.name());
                 install(&pinned, kind, local)?;
                 installed_count += 1;
@@ -204,13 +201,12 @@ pub fn update_all(kind: ArtifactKind) -> Result<()> {
                 continue;
             }
 
-            if let Some(source_cs) = source_checksums.get(name) {
-                if entry.source_checksum != *source_cs {
+            if let Some(source_cs) = source_checksums.get(name)
+                && entry.source_checksum != *source_cs {
                     let pinned = format!("{}:{name}", entry.source.repo);
                     install(&pinned, kind, local)?;
                     updated_count += 1;
                 }
-            }
         }
     }
 
@@ -226,7 +222,7 @@ fn scan_source_checksums(kind: ArtifactKind) -> Result<std::collections::BTreeMa
     let sources = config::load_sources()?;
     let mut checksums = std::collections::BTreeMap::new();
 
-    for (_source_name, entry) in &sources.sources {
+    for entry in sources.sources.values() {
         let local_path = config::resolve_local_path(entry);
         if !local_path.exists() {
             continue;
@@ -246,7 +242,6 @@ fn scan_source_checksums(kind: ArtifactKind) -> Result<std::collections::BTreeMa
 
     Ok(checksums)
 }
-
 
 fn install_dir(kind: ArtifactKind, local: bool) -> Result<PathBuf> {
     let subdir = match kind {
@@ -271,8 +266,7 @@ fn parse_name(name: &str) -> (Option<&str>, &str) {
 }
 
 fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<()> {
-    fs::create_dir_all(dest)
-        .with_context(|| format!("Failed to create {}", dest.display()))?;
+    fs::create_dir_all(dest).with_context(|| format!("Failed to create {}", dest.display()))?;
 
     for entry in fs::read_dir(src)? {
         let entry = entry?;
