@@ -1,0 +1,15 @@
+[book]
+title = "cmx — Package Manager for Curated Agentic Context"
+authors = ["Stacey Vetzal"]
+description = "Manage agents and skills across AI coding assistants"
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+no-section-label = true
+
+[build]
+build-dir = "book"
+create-missing = true
