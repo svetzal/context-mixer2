@@ -1,0 +1,14 @@
+[package]
+name = "cmx"
+version = "2.0.0"
+edition = "2024"
+description = "A package manager for curated agentic context — agents and skills"
+authors = ["Stacey Vetzal <stacey@vetzal.com>"]
+license = "MIT"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "6"
+anyhow = "1"
