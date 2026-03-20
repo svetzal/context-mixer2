@@ -1,0 +1,197 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: quality-gate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            archive: cmx-darwin-x64.tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            archive: cmx-darwin-arm64.tar.gz
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: cmx-linux-x64.tar.gz
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package archive
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../${{ matrix.archive }} cmx
+          cd ../../..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive }}
+          path: ${{ matrix.archive }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            artifacts/*
+
+  homebrew:
+    name: Update Homebrew Tap
+    needs: [release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Compute SHA256 checksums
+        id: sha
+        run: |
+          echo "darwin_arm64=$(sha256sum artifacts/cmx-darwin-arm64.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "darwin_x64=$(sha256sum artifacts/cmx-darwin-x64.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "linux_x64=$(sha256sum artifacts/cmx-linux-x64.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Homebrew formula
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA_ARM64="${{ steps.sha.outputs.darwin_arm64 }}"
+          SHA_X64="${{ steps.sha.outputs.darwin_x64 }}"
+          SHA_LINUX="${{ steps.sha.outputs.linux_x64 }}"
+          GH_BASE="https://github.com/svetzal/context-mixer2/releases/download/v${VERSION}"
+
+          cat > cmx.rb <<'FORMULA'
+          # typed: false
+          # frozen_string_literal: true
+
+          class Cmx < Formula
+            desc "Package manager for curated agentic context — agents and skills"
+            homepage "https://github.com/svetzal/context-mixer2"
+            version "VERSION_PLACEHOLDER"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "GH_BASE_PLACEHOLDER/cmx-darwin-arm64.tar.gz"
+                sha256 "SHA_ARM64_PLACEHOLDER"
+
+                def install
+                  bin.install "cmx"
+                end
+              end
+
+              on_intel do
+                url "GH_BASE_PLACEHOLDER/cmx-darwin-x64.tar.gz"
+                sha256 "SHA_X64_PLACEHOLDER"
+
+                def install
+                  bin.install "cmx"
+                end
+              end
+            end
+
+            on_linux do
+              on_intel do
+                url "GH_BASE_PLACEHOLDER/cmx-linux-x64.tar.gz"
+                sha256 "SHA_LINUX_PLACEHOLDER"
+
+                def install
+                  bin.install "cmx"
+                end
+              end
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/cmx --version")
+            end
+          end
+          FORMULA
+
+          # Remove leading whitespace from heredoc indentation
+          sed -i 's/^          //' cmx.rb
+
+          # Substitute placeholders
+          sed -i "s|VERSION_PLACEHOLDER|${VERSION}|g" cmx.rb
+          sed -i "s|GH_BASE_PLACEHOLDER|${GH_BASE}|g" cmx.rb
+          sed -i "s|SHA_ARM64_PLACEHOLDER|${SHA_ARM64}|g" cmx.rb
+          sed -i "s|SHA_X64_PLACEHOLDER|${SHA_X64}|g" cmx.rb
+          sed -i "s|SHA_LINUX_PLACEHOLDER|${SHA_LINUX}|g" cmx.rb
+
+      - name: Push to Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/svetzal/homebrew-tap.git" homebrew-tap
+          cp cmx.rb homebrew-tap/Formula/cmx.rb
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/cmx.rb
+          git commit -m "Update cmx to ${{ steps.version.outputs.version }}"
+          git push

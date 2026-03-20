@@ -1,10 +1,13 @@
 use anyhow::{bail, Context, Result};
+use chrono::Utc;
 use std::path::PathBuf;
 use std::process::Command;
 
 use crate::config;
 use crate::scan;
 use crate::types::{Artifact, SourceEntry, SourceType};
+
+const AUTO_UPDATE_MINUTES: i64 = 60;
 
 pub fn add(name: &str, path_or_url: &str) -> Result<()> {
     let mut sources = config::load_sources()?;
@@ -59,6 +62,8 @@ pub fn list() -> Result<()> {
 }
 
 pub fn browse(name: &str) -> Result<()> {
+    auto_update_source(name)?;
+
     let sources = config::load_sources()?;
 
     let entry = sources
@@ -72,7 +77,7 @@ pub fn browse(name: &str) -> Result<()> {
             "Source path {} does not exist. {}",
             local_path.display(),
             match entry.source_type {
-                SourceType::Git => "Try 'cmx source pull' to fetch it.",
+                SourceType::Git => "Try 'cmx source update' to fetch it.",
                 SourceType::Local => "Check that the directory still exists.",
             }
         );
@@ -91,7 +96,9 @@ pub fn browse(name: &str) -> Result<()> {
     if !agents.is_empty() {
         println!("Agents:");
         for a in &agents {
-            println!("  {}", a.name());
+            let v = a.version().map(|v| format!("  v{v}")).unwrap_or_default();
+            let dep = format_deprecation(a);
+            println!("  {}{v}{dep}", a.name());
         }
     }
 
@@ -101,59 +108,43 @@ pub fn browse(name: &str) -> Result<()> {
         }
         println!("Skills:");
         for s in &skills {
-            println!("  {}", s.name());
+            let v = s.version().map(|v| format!("  v{v}")).unwrap_or_default();
+            let dep = format_deprecation(s);
+            println!("  {}{v}{dep}", s.name());
         }
     }
 
     Ok(())
 }
 
-pub fn pull(name: &str) -> Result<()> {
+pub fn update(name: Option<&str>) -> Result<()> {
     let sources = config::load_sources()?;
 
-    let entry = sources
-        .sources
-        .get(name)
-        .with_context(|| format!("Source '{name}' not found."))?;
-
-    match entry.source_type {
-        SourceType::Local => {
-            println!("Source '{name}' is local — nothing to pull.");
-            return Ok(());
+    match name {
+        Some(n) => {
+            if !sources.sources.contains_key(n) {
+                bail!("Source '{n}' not found.");
+            }
+            pull_source(n)?;
         }
-        SourceType::Git => {}
+        None => {
+            let git_sources: Vec<_> = sources
+                .sources
+                .iter()
+                .filter(|(_, e)| matches!(e.source_type, SourceType::Git))
+                .map(|(n, _)| n.clone())
+                .collect();
+
+            if git_sources.is_empty() {
+                println!("No git-backed sources to update.");
+                return Ok(());
+            }
+
+            for source_name in &git_sources {
+                pull_source(source_name)?;
+            }
+        }
     }
-
-    let clone_path = entry
-        .local_clone
-        .as_ref()
-        .context("Git source has no local clone path")?;
-
-    if !clone_path.exists() {
-        bail!(
-            "Clone directory {} does not exist. Try removing and re-adding the source.",
-            clone_path.display()
-        );
-    }
-
-    println!("Pulling latest for '{name}'...");
-
-    let output = Command::new("git")
-        .args(["-C", &clone_path.display().to_string(), "pull"])
-        .output()
-        .context("Failed to run git pull")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("git pull failed: {stderr}");
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    print!("{stdout}");
-
-    let artifacts = scan::scan_source(clone_path)?;
-    let (agents, skills) = count_artifacts(&artifacts);
-    println!("Source '{name}': {agents} agent(s), {skills} skill(s) found.");
 
     Ok(())
 }
@@ -184,6 +175,106 @@ pub fn remove(name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Auto-update a git source if it hasn't been updated recently.
+pub fn auto_update_source(name: &str) -> Result<()> {
+    let sources = config::load_sources()?;
+    let entry = match sources.sources.get(name) {
+        Some(e) => e,
+        None => return Ok(()),
+    };
+
+    if !matches!(entry.source_type, SourceType::Git) {
+        return Ok(());
+    }
+
+    if is_stale(entry) {
+        pull_source(name)?;
+    }
+
+    Ok(())
+}
+
+/// Auto-update all stale git sources.
+pub fn auto_update_all() -> Result<()> {
+    let sources = config::load_sources()?;
+    for (name, entry) in &sources.sources {
+        if matches!(entry.source_type, SourceType::Git) && is_stale(entry) {
+            pull_source(name)?;
+        }
+    }
+    Ok(())
+}
+
+fn is_stale(entry: &SourceEntry) -> bool {
+    let Some(last) = &entry.last_updated else {
+        return true;
+    };
+    let Ok(last_time) = chrono::DateTime::parse_from_rfc3339(last) else {
+        return true;
+    };
+    let age = Utc::now().signed_duration_since(last_time);
+    age.num_minutes() >= AUTO_UPDATE_MINUTES
+}
+
+fn pull_source(name: &str) -> Result<()> {
+    let mut sources = config::load_sources()?;
+    let entry = sources
+        .sources
+        .get(name)
+        .with_context(|| format!("Source '{name}' not found."))?;
+
+    match entry.source_type {
+        SourceType::Local => {
+            // Update timestamp for local sources too
+            let mut entry = entry.clone();
+            entry.last_updated = Some(Utc::now().to_rfc3339());
+            sources.sources.insert(name.to_string(), entry);
+            config::save_sources(&sources)?;
+            return Ok(());
+        }
+        SourceType::Git => {}
+    }
+
+    let clone_path = entry
+        .local_clone
+        .as_ref()
+        .context("Git source has no local clone path")?;
+
+    if !clone_path.exists() {
+        bail!(
+            "Clone directory {} does not exist. Try removing and re-adding the source.",
+            clone_path.display()
+        );
+    }
+
+    println!("Updating '{name}'...");
+
+    let output = Command::new("git")
+        .args(["-C", &clone_path.display().to_string(), "pull", "--quiet"])
+        .output()
+        .context("Failed to run git pull")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("git pull failed: {stderr}");
+    }
+
+    // Update timestamp
+    let mut entry = entry.clone();
+    entry.last_updated = Some(Utc::now().to_rfc3339());
+    sources.sources.insert(name.to_string(), entry);
+    config::save_sources(&sources)?;
+
+    let local_path = config::resolve_local_path(
+        sources.sources.get(name).unwrap(),
+    );
+    let artifacts = scan::scan_source(&local_path)?;
+    let (agents, skills) = count_artifacts(&artifacts);
+    println!("Source '{name}': {agents} agent(s), {skills} skill(s).");
+
+    Ok(())
+}
+
 fn add_local_source(path_str: &str) -> Result<SourceEntry> {
     let path = PathBuf::from(path_str);
     let path = path
@@ -200,6 +291,7 @@ fn add_local_source(path_str: &str) -> Result<SourceEntry> {
         url: None,
         local_clone: None,
         branch: None,
+        last_updated: Some(Utc::now().to_rfc3339()),
     })
 }
 
@@ -231,6 +323,7 @@ fn add_git_source(name: &str, url: &str) -> Result<SourceEntry> {
         url: Some(url.to_string()),
         local_clone: Some(clone_dir),
         branch: Some("main".to_string()),
+        last_updated: Some(Utc::now().to_rfc3339()),
     })
 }
 
@@ -238,6 +331,24 @@ fn count_artifacts(artifacts: &[Artifact]) -> (usize, usize) {
     let agents = artifacts.iter().filter(|a| a.kind() == "agent").count();
     let skills = artifacts.iter().filter(|a| a.kind() == "skill").count();
     (agents, skills)
+}
+
+fn format_deprecation(artifact: &Artifact) -> String {
+    let Some(dep) = artifact.deprecation() else {
+        return String::new();
+    };
+
+    let mut parts = vec!["  ⛔ DEPRECATED".to_string()];
+
+    if let Some(reason) = &dep.reason {
+        parts.push(format!(": {reason}"));
+    }
+
+    if let Some(replacement) = &dep.replacement {
+        parts.push(format!(" (use {replacement} instead)"));
+    }
+
+    parts.join("")
 }
 
 fn looks_like_url(s: &str) -> bool {

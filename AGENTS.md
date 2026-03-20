@@ -5,16 +5,25 @@ A package manager for curated agentic context (agents and skills), written in Ru
 ## Reference repositories
 
 - **guidelines**: `~/Work/Projects/Personal/guidelines` — the reference source repository used for local testing of cmx features (artifact scanning, install, versioning, upgrades).
+- **mojentic**: published crate (`mojentic` on crates.io), source at `~/Work/Projects/Personal/mojentic-unify/mojentic-ru` for reference. Used for LLM-powered analysis features (e.g. diff analysis between source and installed artifacts). Key usage patterns:
+  - `OllamaGateway::new()` for local LLM access
+  - `LlmBroker::new(model, gateway, None)` to create a broker
+  - `broker.generate(&messages, None, None, None).await` for completions
+  - `LlmMessage::system(...)` / `LlmMessage::user(...)` for message construction
+  - Async-only (requires tokio runtime)
 
 ## Architecture
 
 - `src/cli.rs` — clap CLI definition
 - `src/config.rs` — config dir paths, sources.json read/write
-- `src/source.rs` — `cmx source` subcommands
+- `src/source.rs` — `cmx source` subcommands (add, list, browse, update, remove)
 - `src/install.rs` — `cmx agent install` / `cmx skill install`
 - `src/list.rs` — `cmx agent list` / `cmx skill list` / `cmx list`
+- `src/outdated.rs` — `cmx outdated` (compare installed vs source)
 - `src/scan.rs` — artifact detection (walks source repos, matches agents/skills by frontmatter)
-- `src/types.rs` — shared types (SourceEntry, Artifact, ArtifactKind)
+- `src/checksum.rs` — SHA-256 checksums for files and directories
+- `src/lockfile.rs` — lock file read/write
+- `src/types.rs` — shared types (SourceEntry, Artifact, ArtifactKind, LockFile, etc.)
 
 ## Spec
 

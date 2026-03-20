@@ -30,11 +30,18 @@ pub enum Commands {
     },
     /// List all installed agents and skills
     List,
+    /// Show installed artifacts that have updates available
+    Outdated,
+    /// View or modify cmx configuration
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
 }
 
 #[derive(Subcommand)]
 pub enum SourceAction {
-    /// Register a source repository (local path or git:url)
+    /// Register a source repository (local path or git URL)
     Add {
         /// Name to identify this source
         name: String,
@@ -48,10 +55,10 @@ pub enum SourceAction {
         /// Name of the source to browse
         name: String,
     },
-    /// Pull latest changes for a git-backed source
-    Pull {
-        /// Name of the source to pull
-        name: String,
+    /// Fetch latest changes for git-backed sources
+    Update {
+        /// Name of a specific source to update (default: all)
+        name: Option<String>,
     },
     /// Unregister a source (does not delete artifacts)
     Remove {
@@ -65,11 +72,43 @@ pub enum ArtifactAction {
     /// Install an artifact from a source
     Install {
         /// Artifact name, or source:name to pin to a specific source
-        name: String,
+        name: Option<String>,
+        /// Install all available artifacts from sources
+        #[arg(long, conflicts_with = "name")]
+        all: bool,
         /// Install into the current project instead of globally
         #[arg(long)]
         local: bool,
     },
     /// List installed artifacts
     List,
+    /// Compare installed artifact with source version using LLM analysis
+    Diff {
+        /// Artifact name
+        name: String,
+    },
+    /// Update an installed artifact from its source
+    Update {
+        /// Artifact name
+        name: Option<String>,
+        /// Update all tracked artifacts
+        #[arg(long, conflicts_with = "name")]
+        all: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ConfigAction {
+    /// Show current configuration
+    Show,
+    /// Set LLM gateway (openai or ollama)
+    Gateway {
+        /// Gateway type: openai or ollama
+        value: String,
+    },
+    /// Set LLM model name
+    Model {
+        /// Model name (e.g. gpt-5.4, qwen3.5:27b)
+        value: String,
+    },
 }

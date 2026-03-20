@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
 
-use crate::types::{SourceEntry, SourceType, SourcesFile};
+use crate::types::{CmxConfig, SourceEntry, SourceType, SourcesFile};
 
 pub fn config_dir() -> Result<PathBuf> {
     let home = dirs::home_dir().context("Could not determine home directory")?;
@@ -36,6 +36,34 @@ pub fn save_sources(sources: &SourcesFile) -> Result<()> {
             .with_context(|| format!("Failed to create {}", parent.display()))?;
     }
     let content = serde_json::to_string_pretty(sources)?;
+    fs::write(&path, content)
+        .with_context(|| format!("Failed to write {}", path.display()))?;
+    Ok(())
+}
+
+pub fn config_path() -> Result<PathBuf> {
+    Ok(config_dir()?.join("config.json"))
+}
+
+pub fn load_config() -> Result<CmxConfig> {
+    let path = config_path()?;
+    if !path.exists() {
+        return Ok(CmxConfig::default());
+    }
+    let content = fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let config: CmxConfig = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
+    Ok(config)
+}
+
+pub fn save_config(config: &CmxConfig) -> Result<()> {
+    let path = config_path()?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    }
+    let content = serde_json::to_string_pretty(config)?;
     fs::write(&path, content)
         .with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
