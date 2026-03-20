@@ -23,7 +23,10 @@ cmx manages the lifecycle of **agents** and **skills** for AI coding assistants 
 # Add a source marketplace
 cmx source add guidelines https://github.com/svetzal/guidelines
 
-# Browse what's available
+# Search across all sources
+cmx search python
+
+# Browse a specific source
 cmx source browse guidelines
 
 # Install an agent globally

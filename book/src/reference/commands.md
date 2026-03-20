@@ -33,6 +33,7 @@ Same commands as agent, using `cmx skill` instead of `cmx agent`.
 |---------|-------------|
 | `cmx list` | List all installed agents and skills |
 | `cmx outdated` | Show artifacts needing attention |
+| `cmx search <keyword>` | Search all sources by name and description |
 
 ## Configuration
 

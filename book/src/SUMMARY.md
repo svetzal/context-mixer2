@@ -10,6 +10,7 @@
 # User Guide
 
 - [Sources](./guide/sources.md)
+- [Searching](./guide/searching.md)
 - [Installing Artifacts](./guide/installing.md)
 - [Listing & Status](./guide/listing.md)
 - [Updating Artifacts](./guide/updating.md)
