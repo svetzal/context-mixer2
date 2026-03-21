@@ -3,6 +3,8 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 
+use crate::fs_util;
+
 /// Compute SHA-256 checksum for an agent (single .md file).
 pub fn checksum_file(path: &Path) -> Result<String> {
     let content = fs::read(path).with_context(|| format!("Failed to read {}", path.display()))?;
@@ -14,7 +16,7 @@ pub fn checksum_file(path: &Path) -> Result<String> {
 /// Hashes all files in sorted order for determinism.
 pub fn checksum_dir(path: &Path) -> Result<String> {
     let mut hasher = Sha256::new();
-    let mut files = collect_files(path)?;
+    let mut files = fs_util::collect_files(path)?;
     files.sort();
 
     for file in &files {
@@ -27,26 +29,4 @@ pub fn checksum_dir(path: &Path) -> Result<String> {
 
     let hash = hasher.finalize();
     Ok(format!("sha256:{:x}", hash))
-}
-
-fn collect_files(dir: &Path) -> Result<Vec<std::path::PathBuf>> {
-    let mut files = Vec::new();
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        // Skip dotfiles and dot-directories (.DS_Store, .gitignore, etc.)
-        if let Some(name) = path.file_name()
-            && name.to_string_lossy().starts_with('.')
-        {
-            continue;
-        }
-
-        if path.is_dir() {
-            files.extend(collect_files(&path)?);
-        } else {
-            files.push(path);
-        }
-    }
-    Ok(files)
 }

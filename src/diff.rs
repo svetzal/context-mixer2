@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::checksum;
 use crate::config;
+use crate::fs_util;
 use crate::lockfile;
 use crate::scan;
 use crate::source;
@@ -154,24 +155,12 @@ fn diff_dirs(installed: &Path, source: &Path) -> Result<String> {
 }
 
 fn collect_relative_files(dir: &Path) -> Result<Vec<String>> {
-    let mut files = Vec::new();
-    collect_files_recursive(dir, dir, &mut files)?;
+    let mut files = fs_util::collect_files(dir)?
+        .into_iter()
+        .map(|p| p.strip_prefix(dir).unwrap_or(&p).to_string_lossy().to_string())
+        .collect::<Vec<_>>();
     files.sort();
     Ok(files)
-}
-
-fn collect_files_recursive(base: &Path, dir: &Path, files: &mut Vec<String>) -> Result<()> {
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            collect_files_recursive(base, &path, files)?;
-        } else {
-            let relative = path.strip_prefix(base).unwrap_or(&path).to_string_lossy().to_string();
-            files.push(relative);
-        }
-    }
-    Ok(())
 }
 
 async fn analyze_diff(

@@ -3,6 +3,7 @@ pub mod cli;
 pub mod cmx_config;
 pub mod config;
 pub mod diff;
+pub mod fs_util;
 pub mod info;
 pub mod install;
 pub mod list;
