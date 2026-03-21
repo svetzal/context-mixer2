@@ -1,24 +1,8 @@
-mod checksum;
-mod cli;
-mod cmx_config;
-mod config;
-mod diff;
-mod info;
-mod install;
-mod list;
-mod lockfile;
-mod outdated;
-mod scan;
-mod search;
-mod source;
-mod types;
-mod uninstall;
-
 use anyhow::{Result, bail};
 use clap::Parser;
 
-use cli::{ArtifactAction, Cli, Commands, ConfigAction, SourceAction};
-use types::ArtifactKind;
+use cmx::cli::{ArtifactAction, Cli, Commands, ConfigAction, SourceAction};
+use cmx::types::ArtifactKind;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,22 +10,22 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Source { action } => match action {
-            SourceAction::Add { name, path_or_url } => source::add(&name, &path_or_url),
-            SourceAction::List => source::list(),
-            SourceAction::Browse { name } => source::browse(&name),
-            SourceAction::Update { name } => source::update(name.as_deref()),
-            SourceAction::Remove { name } => source::remove(&name),
+            SourceAction::Add { name, path_or_url } => cmx::source::add(&name, &path_or_url),
+            SourceAction::List => cmx::source::list(),
+            SourceAction::Browse { name } => cmx::source::browse(&name),
+            SourceAction::Update { name } => cmx::source::update(name.as_deref()),
+            SourceAction::Remove { name } => cmx::source::remove(&name),
         },
         Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent).await,
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill).await,
-        Commands::List => list::list_all(),
-        Commands::Info { name } => info::info(&name),
-        Commands::Outdated => outdated::outdated(),
-        Commands::Search { query } => search::search(&query),
+        Commands::List => cmx::list::list_all(),
+        Commands::Info { name } => cmx::info::info(&name),
+        Commands::Outdated => cmx::outdated::outdated(),
+        Commands::Search { query } => cmx::search::search(&query),
         Commands::Config { action } => match action {
-            ConfigAction::Show => cmx_config::show(),
-            ConfigAction::Gateway { value } => cmx_config::set_gateway(&value),
-            ConfigAction::Model { value } => cmx_config::set_model(&value),
+            ConfigAction::Show => cmx::cmx_config::show(),
+            ConfigAction::Gateway { value } => cmx::cmx_config::set_gateway(&value),
+            ConfigAction::Model { value } => cmx::cmx_config::set_model(&value),
         },
     }
 }
@@ -55,24 +39,24 @@ async fn handle_artifact(action: ArtifactAction, kind: ArtifactKind) -> Result<(
             force,
         } => {
             if all {
-                install::install_all(kind, local, force)
+                cmx::install::install_all(kind, local, force)
             } else if let Some(name) = name {
-                install::install(&name, kind, local, force)
+                cmx::install::install(&name, kind, local, force)
             } else {
                 bail!("Provide an artifact name or use --all")
             }
         }
-        ArtifactAction::List => list::list_kind(kind),
-        ArtifactAction::Diff { name } => diff::diff(&name, kind).await,
+        ArtifactAction::List => cmx::list::list_kind(kind),
+        ArtifactAction::Diff { name } => cmx::diff::diff(&name, kind).await,
         ArtifactAction::Update { name, all, force } => {
             if all {
-                install::update_all(kind, force)
+                cmx::install::update_all(kind, force)
             } else if let Some(name) = name {
-                install::update(&name, kind, force)
+                cmx::install::update(&name, kind, force)
             } else {
                 bail!("Provide an artifact name or use --all")
             }
         }
-        ArtifactAction::Uninstall { name, local } => uninstall::uninstall(&name, kind, local),
+        ArtifactAction::Uninstall { name, local } => cmx::uninstall::uninstall(&name, kind, local),
     }
 }
