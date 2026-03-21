@@ -368,3 +368,198 @@ fn looks_like_url(s: &str) -> bool {
         || s.starts_with("git@")
         || s.starts_with("ssh://")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{Deprecation, SourceType};
+    use std::path::PathBuf;
+
+    // --- looks_like_url ---
+
+    #[test]
+    fn looks_like_url_https() {
+        assert!(looks_like_url("https://github.com/foo/bar"));
+    }
+
+    #[test]
+    fn looks_like_url_http() {
+        assert!(looks_like_url("http://example.com"));
+    }
+
+    #[test]
+    fn looks_like_url_git_at() {
+        assert!(looks_like_url("git@github.com:foo/bar.git"));
+    }
+
+    #[test]
+    fn looks_like_url_ssh() {
+        assert!(looks_like_url("ssh://git@example.com/repo.git"));
+    }
+
+    #[test]
+    fn looks_like_url_absolute_path() {
+        assert!(!looks_like_url("/home/user/repos/guidelines"));
+    }
+
+    #[test]
+    fn looks_like_url_relative_path() {
+        assert!(!looks_like_url("./relative/path"));
+    }
+
+    #[test]
+    fn looks_like_url_plain_name() {
+        assert!(!looks_like_url("just-a-name"));
+    }
+
+    // --- is_stale ---
+
+    fn make_local_entry(last_updated: Option<String>) -> SourceEntry {
+        SourceEntry {
+            source_type: SourceType::Local,
+            path: Some(PathBuf::from("/some/path")),
+            url: None,
+            local_clone: None,
+            branch: None,
+            last_updated,
+        }
+    }
+
+    #[test]
+    fn is_stale_never_updated() {
+        let entry = make_local_entry(None);
+        assert!(is_stale(&entry));
+    }
+
+    #[test]
+    fn is_stale_recent_update_is_fresh() {
+        // Just updated right now — should not be stale
+        let now = chrono::Utc::now().to_rfc3339();
+        let entry = make_local_entry(Some(now));
+        assert!(!is_stale(&entry));
+    }
+
+    #[test]
+    fn is_stale_old_update_is_stale() {
+        // Updated 2 hours ago — well past the 60-minute threshold
+        let old = (chrono::Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
+        let entry = make_local_entry(Some(old));
+        assert!(is_stale(&entry));
+    }
+
+    #[test]
+    fn is_stale_invalid_timestamp_is_stale() {
+        let entry = make_local_entry(Some("not-a-timestamp".to_string()));
+        assert!(is_stale(&entry));
+    }
+
+    // --- count_artifacts ---
+
+    fn make_agent(name: &str) -> Artifact {
+        Artifact::Agent {
+            name: name.to_string(),
+            description: String::new(),
+            path: PathBuf::from(format!("{name}.md")),
+            version: None,
+            deprecation: None,
+        }
+    }
+
+    fn make_skill(name: &str) -> Artifact {
+        Artifact::Skill {
+            name: name.to_string(),
+            description: String::new(),
+            path: PathBuf::from(name),
+            version: None,
+            deprecation: None,
+        }
+    }
+
+    #[test]
+    fn count_artifacts_empty() {
+        assert_eq!(count_artifacts(&[]), (0, 0));
+    }
+
+    #[test]
+    fn count_artifacts_only_agents() {
+        let arts = vec![make_agent("alpha"), make_agent("beta")];
+        assert_eq!(count_artifacts(&arts), (2, 0));
+    }
+
+    #[test]
+    fn count_artifacts_mixed() {
+        let arts = vec![make_agent("alpha"), make_skill("zap"), make_skill("zip")];
+        assert_eq!(count_artifacts(&arts), (1, 2));
+    }
+
+    // --- format_deprecation ---
+
+    #[test]
+    fn format_deprecation_not_deprecated() {
+        let artifact = make_agent("alpha");
+        assert_eq!(format_deprecation(&artifact), "");
+    }
+
+    #[test]
+    fn format_deprecation_deprecated_no_extras() {
+        let artifact = Artifact::Agent {
+            name: "alpha".to_string(),
+            description: String::new(),
+            path: PathBuf::from("alpha.md"),
+            version: None,
+            deprecation: Some(Deprecation {
+                reason: None,
+                replacement: None,
+            }),
+        };
+        assert_eq!(format_deprecation(&artifact), "  ⛔ DEPRECATED");
+    }
+
+    #[test]
+    fn format_deprecation_deprecated_with_reason() {
+        let artifact = Artifact::Agent {
+            name: "alpha".to_string(),
+            description: String::new(),
+            path: PathBuf::from("alpha.md"),
+            version: None,
+            deprecation: Some(Deprecation {
+                reason: Some("Too old".to_string()),
+                replacement: None,
+            }),
+        };
+        assert_eq!(format_deprecation(&artifact), "  ⛔ DEPRECATED: Too old");
+    }
+
+    #[test]
+    fn format_deprecation_deprecated_with_reason_and_replacement() {
+        let artifact = Artifact::Agent {
+            name: "alpha".to_string(),
+            description: String::new(),
+            path: PathBuf::from("alpha.md"),
+            version: None,
+            deprecation: Some(Deprecation {
+                reason: Some("Too old".to_string()),
+                replacement: Some("new-agent".to_string()),
+            }),
+        };
+        assert_eq!(
+            format_deprecation(&artifact),
+            "  ⛔ DEPRECATED: Too old (use new-agent instead)"
+        );
+    }
+
+    #[test]
+    fn format_deprecation_deprecated_with_replacement_only() {
+        let artifact = Artifact::Agent {
+            name: "alpha".to_string(),
+            description: String::new(),
+            path: PathBuf::from("alpha.md"),
+            version: None,
+            deprecation: Some(Deprecation {
+                reason: None,
+                replacement: Some("new-agent".to_string()),
+            }),
+        };
+        assert_eq!(format_deprecation(&artifact), "  ⛔ DEPRECATED (use new-agent instead)");
+    }
+}
