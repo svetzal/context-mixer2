@@ -12,5 +12,6 @@ pub mod outdated;
 pub mod scan;
 pub mod search;
 pub mod source;
+pub mod source_iter;
 pub mod types;
 pub mod uninstall;

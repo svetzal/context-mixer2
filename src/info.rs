@@ -5,8 +5,8 @@ use std::path::Path;
 use crate::checksum;
 use crate::config;
 use crate::lockfile;
-use crate::scan;
 use crate::source;
+use crate::source_iter;
 use crate::types::ArtifactKind;
 
 pub fn info(name: &str) -> Result<()> {
@@ -55,30 +55,21 @@ fn show_info(name: &str, kind: ArtifactKind, local: bool, path: &Path) -> Result
     // Check source for deprecation and available version
     source::auto_update_all().ok();
     let sources = config::load_sources()?;
-    for entry in sources.sources.values() {
-        let local_path = config::resolve_local_path(entry);
-        if !local_path.exists() {
-            continue;
-        }
-        if let Ok(artifacts) = scan::scan_source(&local_path) {
-            for artifact in &artifacts {
-                if artifact.name == name && artifact.kind == kind {
-                    if let Some(dep) = &artifact.deprecation {
-                        println!("Status:      DEPRECATED");
-                        if let Some(reason) = &dep.reason {
-                            println!("  Reason:    {reason}");
-                        }
-                        if let Some(repl) = &dep.replacement {
-                            println!("  Replace:   {repl}");
-                        }
-                    }
-                    if let Some(v) = artifact.version.as_deref() {
-                        let installed_v =
-                            lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-");
-                        if v != installed_v {
-                            println!("Available:   v{v} (update available)");
-                        }
-                    }
+    for sa in source_iter::each_source_artifact(&sources.sources) {
+        if sa.artifact.name == name && sa.artifact.kind == kind {
+            if let Some(dep) = &sa.artifact.deprecation {
+                println!("Status:      DEPRECATED");
+                if let Some(reason) = &dep.reason {
+                    println!("  Reason:    {reason}");
+                }
+                if let Some(repl) = &dep.replacement {
+                    println!("  Replace:   {repl}");
+                }
+            }
+            if let Some(v) = sa.artifact.version.as_deref() {
+                let installed_v = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-");
+                if v != installed_v {
+                    println!("Available:   v{v} (update available)");
                 }
             }
         }

@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::checksum;
 use crate::config;
 use crate::lockfile;
-use crate::scan;
 use crate::source;
+use crate::source_iter;
 use crate::types::{ArtifactKind, LockFile};
 
 struct OutdatedRow {
@@ -199,24 +199,16 @@ fn scan_all_sources() -> Result<BTreeMap<String, SourceArtifactInfo>> {
     let sources = config::load_sources()?;
     let mut result = BTreeMap::new();
 
-    for (source_name, entry) in &sources.sources {
-        let local_path = config::resolve_local_path(entry);
-        if !local_path.exists() {
-            continue;
-        }
-        if let Ok(artifacts) = scan::scan_source(&local_path) {
-            for artifact in &artifacts {
-                let cs = checksum::checksum_artifact(&artifact.path, artifact.kind)?;
-                result.insert(
-                    artifact.name.clone(),
-                    SourceArtifactInfo {
-                        source_name: source_name.clone(),
-                        version: artifact.version.clone(),
-                        checksum: cs,
-                    },
-                );
-            }
-        }
+    for sa in source_iter::each_source_artifact(&sources.sources) {
+        let cs = checksum::checksum_artifact(&sa.artifact.path, sa.artifact.kind)?;
+        result.insert(
+            sa.artifact.name,
+            SourceArtifactInfo {
+                source_name: sa.source_name,
+                version: sa.artifact.version,
+                checksum: cs,
+            },
+        );
     }
 
     Ok(result)

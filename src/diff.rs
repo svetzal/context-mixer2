@@ -9,8 +9,8 @@ use crate::checksum;
 use crate::config;
 use crate::fs_util;
 use crate::lockfile;
-use crate::scan;
 use crate::source;
+use crate::source_iter;
 use crate::types::{ArtifactKind, LlmGatewayType};
 
 pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
@@ -78,21 +78,9 @@ fn find_installed_on_disk(name: &str, kind: ArtifactKind) -> Result<(PathBuf, bo
 fn find_in_sources(name: &str, kind: ArtifactKind) -> Result<(PathBuf, String, Option<String>)> {
     let sources = config::load_sources()?;
 
-    for (source_name, entry) in &sources.sources {
-        let source_root = config::resolve_local_path(entry);
-        if !source_root.exists() {
-            continue;
-        }
-        if let Ok(artifacts) = scan::scan_source(&source_root) {
-            for artifact in &artifacts {
-                if artifact.name == name && artifact.kind == kind {
-                    return Ok((
-                        artifact.path.clone(),
-                        source_name.clone(),
-                        artifact.version.clone(),
-                    ));
-                }
-            }
+    for sa in source_iter::each_source_artifact(&sources.sources) {
+        if sa.artifact.name == name && sa.artifact.kind == kind {
+            return Ok((sa.artifact.path, sa.source_name, sa.artifact.version));
         }
     }
 

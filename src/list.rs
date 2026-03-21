@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 
 use crate::config;
 use crate::lockfile;
-use crate::scan;
+use crate::source_iter;
 use crate::types::{ArtifactKind, LockFile};
 
 struct Row {
@@ -131,26 +131,18 @@ fn build_source_versions(kind: ArtifactKind) -> Result<BTreeMap<String, SourceIn
     let mut versions = BTreeMap::new();
     let sources = config::load_sources()?;
 
-    for (source_name, entry) in &sources.sources {
-        let local_path = config::resolve_local_path(entry);
-        if !local_path.exists() {
-            continue;
-        }
-        if let Ok(artifacts) = scan::scan_source(&local_path) {
-            for artifact in artifacts {
-                if artifact.kind == kind {
-                    let version = artifact.version.as_deref().unwrap_or("-").to_string();
-                    let deprecated = artifact.is_deprecated();
-                    versions.insert(
-                        artifact.name,
-                        SourceInfo {
-                            source_name: source_name.clone(),
-                            version,
-                            deprecated,
-                        },
-                    );
-                }
-            }
+    for sa in source_iter::each_source_artifact(&sources.sources) {
+        if sa.artifact.kind == kind {
+            let version = sa.artifact.version.as_deref().unwrap_or("-").to_string();
+            let deprecated = sa.artifact.is_deprecated();
+            versions.insert(
+                sa.artifact.name,
+                SourceInfo {
+                    source_name: sa.source_name,
+                    version,
+                    deprecated,
+                },
+            );
         }
     }
 

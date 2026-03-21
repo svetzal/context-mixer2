@@ -1,8 +1,8 @@
 use anyhow::Result;
 
 use crate::config;
-use crate::scan;
 use crate::source;
+use crate::source_iter;
 
 struct SearchResult {
     name: String,
@@ -19,29 +19,21 @@ pub fn search(query: &str) -> Result<()> {
     let sources = config::load_sources()?;
     let mut results = Vec::new();
 
-    for (source_name, entry) in &sources.sources {
-        let local_path = config::resolve_local_path(entry);
-        if !local_path.exists() {
-            continue;
-        }
-        if let Ok(artifacts) = scan::scan_source(&local_path) {
-            for artifact in artifacts {
-                let name_lower = artifact.name.to_lowercase();
-                let desc_lower = artifact.description.to_lowercase();
+    for sa in source_iter::each_source_artifact(&sources.sources) {
+        let name_lower = sa.artifact.name.to_lowercase();
+        let desc_lower = sa.artifact.description.to_lowercase();
 
-                if name_lower.contains(&query_lower) || desc_lower.contains(&query_lower) {
-                    // Truncate description to first meaningful chunk
-                    let short_desc = truncate_description(&artifact.description, 80);
+        if name_lower.contains(&query_lower) || desc_lower.contains(&query_lower) {
+            // Truncate description to first meaningful chunk
+            let short_desc = truncate_description(&sa.artifact.description, 80);
 
-                    results.push(SearchResult {
-                        name: artifact.name,
-                        kind: artifact.kind.to_string(),
-                        version: artifact.version.as_deref().unwrap_or("-").to_string(),
-                        source: source_name.clone(),
-                        description: short_desc,
-                    });
-                }
-            }
+            results.push(SearchResult {
+                name: sa.artifact.name,
+                kind: sa.artifact.kind.to_string(),
+                version: sa.artifact.version.as_deref().unwrap_or("-").to_string(),
+                source: sa.source_name,
+                description: short_desc,
+            });
         }
     }
 
