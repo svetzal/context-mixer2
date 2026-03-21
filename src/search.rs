@@ -97,3 +97,51 @@ fn truncate_description(desc: &str, max_len: usize) -> String {
         format!("{}...", &first_part[..max_len - 3])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn truncate_description_short_returned_as_is() {
+        let s = "Short description";
+        assert_eq!(truncate_description(s, 80), s);
+    }
+
+    #[test]
+    fn truncate_description_exactly_at_limit_returned_as_is() {
+        let s = "a".repeat(80);
+        assert_eq!(truncate_description(&s, 80), s);
+    }
+
+    #[test]
+    fn truncate_description_long_gets_ellipsis() {
+        let s = "a".repeat(100);
+        let result = truncate_description(&s, 80);
+        assert!(result.ends_with("..."));
+        assert_eq!(result.len(), 80);
+    }
+
+    #[test]
+    fn truncate_description_newline_takes_first_line() {
+        let s = "First line\nSecond line\nThird line";
+        assert_eq!(truncate_description(s, 80), "First line");
+    }
+
+    #[test]
+    fn truncate_description_escaped_newline_takes_first_part() {
+        let s = "First part\\nSecond part";
+        assert_eq!(truncate_description(s, 80), "First part");
+    }
+
+    #[test]
+    fn truncate_description_empty_string() {
+        assert_eq!(truncate_description("", 80), "");
+    }
+
+    #[test]
+    fn truncate_description_trims_whitespace() {
+        let s = "  leading and trailing  ";
+        assert_eq!(truncate_description(s, 80), "leading and trailing");
+    }
+}

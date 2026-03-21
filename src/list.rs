@@ -196,3 +196,43 @@ fn print_section(label: &str, rows: &[Row]) {
     }
     println!();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn status_indicator_deprecated_always_stops() {
+        assert_eq!(status_indicator("1.0", "1.0", true), "⛔");
+        assert_eq!(status_indicator("-", "-", true), "⛔");
+        assert_eq!(status_indicator("1.0", "2.0", true), "⛔");
+    }
+
+    #[test]
+    fn status_indicator_unmanaged_no_versions() {
+        // Both are "-" and not deprecated — unmanaged
+        assert_eq!(status_indicator("-", "-", false), " ");
+    }
+
+    #[test]
+    fn status_indicator_installed_no_version_tracked() {
+        // installed="-" means no version tracked but artifact is installed
+        assert_eq!(status_indicator("-", "1.0", false), "⚠️");
+    }
+
+    #[test]
+    fn status_indicator_no_source_version() {
+        // available="-" means no upstream version to compare
+        assert_eq!(status_indicator("1.0", "-", false), " ");
+    }
+
+    #[test]
+    fn status_indicator_up_to_date() {
+        assert_eq!(status_indicator("1.0", "1.0", false), "✅");
+    }
+
+    #[test]
+    fn status_indicator_behind() {
+        assert_eq!(status_indicator("1.0", "2.0", false), "⚠️");
+    }
+}
