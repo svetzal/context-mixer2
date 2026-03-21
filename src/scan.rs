@@ -1,17 +1,22 @@
 use anyhow::Result;
-use std::fs;
 use std::path::Path;
 
+use crate::gateway::filesystem::Filesystem;
+use crate::gateway::real::RealFilesystem;
 use crate::types::{Artifact, ArtifactKind, Deprecation};
 
-pub fn scan_source(root: &Path) -> Result<Vec<Artifact>> {
+// ---------------------------------------------------------------------------
+// Testable variant (accepts injected Filesystem)
+// ---------------------------------------------------------------------------
+
+pub fn scan_source_with(root: &Path, fs: &dyn Filesystem) -> Result<Vec<Artifact>> {
     let marketplace = root.join(".claude-plugin").join("marketplace.json");
 
-    let mut artifacts = if marketplace.exists() {
-        scan_marketplace(root, &marketplace)?
+    let mut artifacts = if fs.exists(&marketplace) {
+        scan_marketplace_with(root, &marketplace, fs)?
     } else {
         let mut arts = Vec::new();
-        walk_dir(root, &mut arts)?;
+        walk_dir_with(root, &mut arts, fs)?;
         arts
     };
 
@@ -19,8 +24,12 @@ pub fn scan_source(root: &Path) -> Result<Vec<Artifact>> {
     Ok(artifacts)
 }
 
-fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact>> {
-    let content = fs::read_to_string(marketplace_path)?;
+fn scan_marketplace_with(
+    root: &Path,
+    marketplace_path: &Path,
+    fs: &dyn Filesystem,
+) -> Result<Vec<Artifact>> {
+    let content = fs.read_to_string(marketplace_path)?;
     let manifest: serde_json::Value = serde_json::from_str(&content)?;
 
     let mut artifacts = Vec::new();
@@ -32,14 +41,15 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
                 for agent_path in agents {
                     if let Some(path_str) = agent_path.as_str() {
                         let full_path = root.join(path_str);
-                        if !full_path.exists() {
+                        if !fs.exists(&full_path) {
                             eprintln!(
-                                "Warning: marketplace declares agent '{}' but path does not exist",
-                                path_str
+                                "Warning: marketplace declares agent '{path_str}' but path does not exist"
                             );
                             continue;
                         }
-                        if let Some(fm) = parse_agent_frontmatter(&full_path) {
+                        if let Ok(content) = fs.read_to_string(&full_path)
+                            && let Some(fm) = parse_agent_frontmatter_str(&content)
+                        {
                             let name = full_path
                                 .file_stem()
                                 .map(|s| s.to_string_lossy().to_string())
@@ -62,22 +72,22 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
                 for skill_path in skills {
                     if let Some(path_str) = skill_path.as_str() {
                         let full_path = root.join(path_str);
-                        if !full_path.exists() {
+                        if !fs.exists(&full_path) {
                             eprintln!(
-                                "Warning: marketplace declares skill '{}' but path does not exist",
-                                path_str
+                                "Warning: marketplace declares skill '{path_str}' but path does not exist"
                             );
                             continue;
                         }
                         let skill_md = full_path.join("SKILL.md");
-                        if !skill_md.exists() {
+                        if !fs.exists(&skill_md) {
                             eprintln!(
-                                "Warning: marketplace declares skill '{}' but SKILL.md is missing",
-                                path_str
+                                "Warning: marketplace declares skill '{path_str}' but SKILL.md is missing"
                             );
                             continue;
                         }
-                        if let Some(fm) = parse_frontmatter(&skill_md) {
+                        if let Ok(content) = fs.read_to_string(&skill_md)
+                            && let Some(fm) = parse_frontmatter_str(&content)
+                        {
                             let name = full_path
                                 .file_name()
                                 .map(|s| s.to_string_lossy().to_string())
@@ -100,48 +110,46 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
     Ok(artifacts)
 }
 
-fn walk_dir(dir: &Path, artifacts: &mut Vec<Artifact>) -> Result<()> {
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(_) => return Ok(()),
+fn walk_dir_with(dir: &Path, artifacts: &mut Vec<Artifact>, fs: &dyn Filesystem) -> Result<()> {
+    let Ok(entries) = fs.read_dir(dir) else {
+        return Ok(());
     };
 
     for entry in entries {
-        let entry = entry?;
-        let path = entry.path();
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
+        let name_str = entry.file_name.clone();
 
         // Skip hidden directories
         if name_str.starts_with('.') {
             continue;
         }
 
-        if path.is_dir() {
-            let skill_md = path.join("SKILL.md");
-            if skill_md.exists()
-                && let Some(fm) = parse_frontmatter(&skill_md)
+        if entry.is_dir {
+            let skill_md = entry.path.join("SKILL.md");
+            if fs.exists(&skill_md)
+                && let Ok(content) = fs.read_to_string(&skill_md)
+                && let Some(fm) = parse_frontmatter_str(&content)
             {
                 artifacts.push(Artifact {
                     kind: ArtifactKind::Skill,
-                    name: name_str.into_owned(),
+                    name: name_str.clone(),
                     description: fm.description,
-                    path: path.clone(),
+                    path: entry.path.clone(),
                     version: fm.version,
                     deprecation: fm.deprecation,
                 });
             }
-            walk_dir(&path, artifacts)?;
-        } else if path.extension().is_some_and(|ext| ext == "md")
+            walk_dir_with(&entry.path, artifacts, fs)?;
+        } else if entry.path.extension().is_some_and(|ext| ext == "md")
             && name_str != "SKILL.md"
-            && let Some(fm) = parse_agent_frontmatter(&path)
+            && let Ok(content) = fs.read_to_string(&entry.path)
+            && let Some(fm) = parse_agent_frontmatter_str(&content)
         {
             let agent_name = name_str.trim_end_matches(".md").to_string();
             artifacts.push(Artifact {
                 kind: ArtifactKind::Agent,
                 name: agent_name,
                 description: fm.description,
-                path: path.clone(),
+                path: entry.path.clone(),
                 version: fm.version,
                 deprecation: fm.deprecation,
             });
@@ -150,6 +158,18 @@ fn walk_dir(dir: &Path, artifacts: &mut Vec<Artifact>) -> Result<()> {
 
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Legacy free-function API — delegate to real implementations
+// ---------------------------------------------------------------------------
+
+pub fn scan_source(root: &Path) -> Result<Vec<Artifact>> {
+    scan_source_with(root, &RealFilesystem)
+}
+
+// ---------------------------------------------------------------------------
+// Pure frontmatter parsing (unchanged — no I/O)
+// ---------------------------------------------------------------------------
 
 struct Frontmatter {
     description: String,
@@ -168,11 +188,6 @@ fn parse_deprecation(fm_text: &str) -> Option<Deprecation> {
     })
 }
 
-fn parse_frontmatter(path: &Path) -> Option<Frontmatter> {
-    let content = fs::read_to_string(path).ok()?;
-    parse_frontmatter_str(&content)
-}
-
 fn parse_frontmatter_str(content: &str) -> Option<Frontmatter> {
     if !content.starts_with("---") {
         return None;
@@ -185,11 +200,6 @@ fn parse_frontmatter_str(content: &str) -> Option<Frontmatter> {
         version: extract_field(fm_text, "version"),
         deprecation: parse_deprecation(fm_text),
     })
-}
-
-fn parse_agent_frontmatter(path: &Path) -> Option<Frontmatter> {
-    let content = fs::read_to_string(path).ok()?;
-    parse_agent_frontmatter_str(&content)
 }
 
 fn parse_agent_frontmatter_str(content: &str) -> Option<Frontmatter> {
@@ -225,6 +235,12 @@ fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gateway::fakes::FakeFilesystem;
+    use std::path::PathBuf;
+
+    // ---------------------------------------------------------------------------
+    // Pure parsing tests (unchanged)
+    // ---------------------------------------------------------------------------
 
     // --- extract_field ---
 
@@ -368,5 +384,96 @@ mod tests {
     fn parse_agent_frontmatter_str_no_delimiters_returns_none() {
         let content = "name: my-agent\ndescription: Does things\n# body";
         assert!(parse_agent_frontmatter_str(content).is_none());
+    }
+
+    // ---------------------------------------------------------------------------
+    // scan_source_with tests using FakeFilesystem
+    // ---------------------------------------------------------------------------
+
+    fn agent_content(name: &str, desc: &str) -> String {
+        format!("---\nname: {name}\ndescription: {desc}\n---\n# {name}\n")
+    }
+
+    fn skill_content(desc: &str) -> String {
+        format!("---\ndescription: {desc}\n---\n# skill\n")
+    }
+
+    #[test]
+    fn scan_empty_directory_returns_empty() {
+        let fs = FakeFilesystem::new();
+        fs.add_dir("/repo");
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn scan_ignores_md_file_without_any_frontmatter() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/repo/plain.md", "# No frontmatter here");
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn scan_ignores_md_file_without_agent_frontmatter() {
+        let fs = FakeFilesystem::new();
+        // Has frontmatter but no 'name:' field — not an agent
+        fs.add_file("/repo/not-agent.md", "---\ndescription: only desc\n---\n");
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn scan_finds_agent_with_valid_frontmatter() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/repo/my-agent.md", agent_content("my-agent", "Does things"));
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "my-agent");
+        assert_eq!(result[0].kind, ArtifactKind::Agent);
+        assert_eq!(result[0].description, "Does things");
+        assert_eq!(result[0].path, PathBuf::from("/repo/my-agent.md"));
+    }
+
+    #[test]
+    fn scan_skips_hidden_directories() {
+        let fs = FakeFilesystem::new();
+        // File inside a hidden dir — should be ignored
+        fs.add_file("/repo/.hidden/secret.md", agent_content("secret", "Hidden"));
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn scan_finds_multiple_agents_sorted_by_name() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/repo/zebra.md", agent_content("zebra", "Z agent"));
+        fs.add_file("/repo/alpha.md", agent_content("alpha", "A agent"));
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].name, "alpha");
+        assert_eq!(result[1].name, "zebra");
+    }
+
+    #[test]
+    fn scan_finds_skill_with_skill_md() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/repo/my-skill/SKILL.md", skill_content("A skill"));
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "my-skill");
+        assert_eq!(result[0].kind, ArtifactKind::Skill);
+    }
+
+    #[test]
+    fn scan_finds_both_agents_and_skills() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/repo/alpha.md", agent_content("alpha", "An agent"));
+        fs.add_file("/repo/my-skill/SKILL.md", skill_content("A skill"));
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.len(), 2);
+        let kinds: Vec<_> = result.iter().map(|a| a.kind).collect();
+        assert!(kinds.contains(&ArtifactKind::Agent));
+        assert!(kinds.contains(&ArtifactKind::Skill));
     }
 }

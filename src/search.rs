@@ -1,6 +1,9 @@
 use anyhow::Result;
 
 use crate::config;
+use crate::context::AppContext;
+use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
+use crate::paths::ConfigPaths;
 use crate::source;
 use crate::source_iter;
 
@@ -12,14 +15,14 @@ struct SearchResult {
     description: String,
 }
 
-pub fn search(query: &str) -> Result<()> {
-    source::auto_update_all()?;
+pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<()> {
+    source::auto_update_all_with(ctx)?;
 
     let query_lower = query.to_lowercase();
-    let sources = config::load_sources()?;
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
     let mut results = Vec::new();
 
-    for sa in source_iter::each_source_artifact(&sources.sources) {
+    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
         let name_lower = sa.artifact.name.to_lowercase();
         let desc_lower = sa.artifact.description.to_lowercase();
 
@@ -89,6 +92,26 @@ fn truncate_description(desc: &str, max_len: usize) -> String {
         format!("{}...", &first_part[..max_len - 3])
     }
 }
+
+// ---------------------------------------------------------------------------
+// Legacy free-function API
+// ---------------------------------------------------------------------------
+
+pub fn search(query: &str) -> Result<()> {
+    let paths = ConfigPaths::from_env()?;
+    let ctx = AppContext {
+        fs: &RealFilesystem,
+        git: &RealGitClient,
+        clock: &SystemClock,
+        paths: &paths,
+        llm: None,
+    };
+    search_with(query, &ctx)
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

@@ -3,7 +3,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::checksum;
 use crate::config;
+use crate::context::AppContext;
+use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use crate::lockfile;
+use crate::paths::ConfigPaths;
 use crate::source;
 use crate::source_iter;
 use crate::types::{ArtifactKind, LockFile};
@@ -17,43 +20,46 @@ struct OutdatedRow {
     status: String,
 }
 
-pub fn outdated() -> Result<()> {
-    source::auto_update_all()?;
+pub fn outdated_with(ctx: &AppContext<'_>) -> Result<()> {
+    source::auto_update_all_with(ctx)?;
 
-    let source_artifacts = scan_all_sources()?;
-    let global_lock = lockfile::load(false)?;
-    let local_lock = lockfile::load(true)?;
+    let source_artifacts = scan_all_sources_with(ctx)?;
+    let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;
+    let local_lock = lockfile::load_with(true, ctx.fs, ctx.paths)?;
 
     let mut rows = Vec::new();
 
-    // Check all installed artifacts (both tracked and untracked)
-    collect_outdated_for_scope(
+    collect_outdated_for_scope_with(
         ArtifactKind::Agent,
         false,
         &global_lock,
         &source_artifacts,
         &mut rows,
+        ctx,
     )?;
-    collect_outdated_for_scope(
+    collect_outdated_for_scope_with(
         ArtifactKind::Skill,
         false,
         &global_lock,
         &source_artifacts,
         &mut rows,
+        ctx,
     )?;
-    collect_outdated_for_scope(
+    collect_outdated_for_scope_with(
         ArtifactKind::Agent,
         true,
         &local_lock,
         &source_artifacts,
         &mut rows,
+        ctx,
     )?;
-    collect_outdated_for_scope(
+    collect_outdated_for_scope_with(
         ArtifactKind::Skill,
         true,
         &local_lock,
         &source_artifacts,
         &mut rows,
+        ctx,
     )?;
 
     // Deduplicate by name (in case both lock and disk scan find the same artifact)
@@ -67,28 +73,28 @@ pub fn outdated() -> Result<()> {
 
     let w_name = rows.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
     let w_kind = 5;
-    let w_iv = rows.iter().map(|r| r.installed_version.len()).max().unwrap_or(9).max(9);
-    let w_av = rows.iter().map(|r| r.available_version.len()).max().unwrap_or(9).max(9);
+    let w_installed = rows.iter().map(|r| r.installed_version.len()).max().unwrap_or(9).max(9);
+    let w_available = rows.iter().map(|r| r.available_version.len()).max().unwrap_or(9).max(9);
     let w_src = rows.iter().map(|r| r.source.len()).max().unwrap_or(6).max(6);
     let w_st = rows.iter().map(|r| r.status.len()).max().unwrap_or(6).max(6);
 
     println!(
-        "  {:<w_name$}  {:<w_kind$}  {:<w_iv$}  {:<w_av$}  {:<w_src$}  {:<w_st$}",
+        "  {:<w_name$}  {:<w_kind$}  {:<w_installed$}  {:<w_available$}  {:<w_src$}  {:<w_st$}",
         "Name", "Type", "Installed", "Available", "Source", "Status",
     );
     println!(
-        "  {:<w_name$}  {:<w_kind$}  {:<w_iv$}  {:<w_av$}  {:<w_src$}  {:<w_st$}",
+        "  {:<w_name$}  {:<w_kind$}  {:<w_installed$}  {:<w_available$}  {:<w_src$}  {:<w_st$}",
         "-".repeat(w_name),
         "-".repeat(w_kind),
-        "-".repeat(w_iv),
-        "-".repeat(w_av),
+        "-".repeat(w_installed),
+        "-".repeat(w_available),
         "-".repeat(w_src),
         "-".repeat(w_st),
     );
 
     for row in &rows {
         println!(
-            "  {:<w_name$}  {:<w_kind$}  {:<w_iv$}  {:<w_av$}  {:<w_src$}  {:<w_st$}",
+            "  {:<w_name$}  {:<w_kind$}  {:<w_installed$}  {:<w_available$}  {:<w_src$}  {:<w_st$}",
             row.name,
             row.kind,
             row.installed_version,
@@ -137,14 +143,15 @@ fn outdated_status_label(installed_v: &str, available_v: &str) -> &'static str {
     }
 }
 
-fn collect_outdated_for_scope(
+fn collect_outdated_for_scope_with(
     kind: ArtifactKind,
     local: bool,
     lock: &LockFile,
     source_artifacts: &BTreeMap<String, SourceArtifactInfo>,
     rows: &mut Vec<OutdatedRow>,
+    ctx: &AppContext<'_>,
 ) -> Result<()> {
-    let installed = config::installed_names(kind, local)?;
+    let installed = config::installed_names_with(kind, local, ctx.fs, ctx.paths)?;
 
     for name in &installed {
         let lock_entry = lock.packages.get(name);
@@ -167,9 +174,9 @@ fn collect_outdated_for_scope(
 
         // Check for local modifications
         if let Some(entry) = lock_entry {
-            let install_path = kind.installed_path(name, &config::install_dir(kind, local)?);
-            if install_path.exists() {
-                let current_cs = checksum::checksum_artifact(&install_path, kind)?;
+            let install_path = kind.installed_path(name, &ctx.paths.install_dir(kind, local));
+            if ctx.fs.exists(&install_path) {
+                let current_cs = checksum::checksum_artifact_with(&install_path, kind, ctx.fs)?;
                 if current_cs != entry.installed_checksum {
                     status = format!("{status} (modified)");
                 }
@@ -195,12 +202,12 @@ struct SourceArtifactInfo {
     checksum: String,
 }
 
-fn scan_all_sources() -> Result<BTreeMap<String, SourceArtifactInfo>> {
-    let sources = config::load_sources()?;
+fn scan_all_sources_with(ctx: &AppContext<'_>) -> Result<BTreeMap<String, SourceArtifactInfo>> {
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
     let mut result = BTreeMap::new();
 
-    for sa in source_iter::each_source_artifact(&sources.sources) {
-        let cs = checksum::checksum_artifact(&sa.artifact.path, sa.artifact.kind)?;
+    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
+        let cs = checksum::checksum_artifact_with(&sa.artifact.path, sa.artifact.kind, ctx.fs)?;
         result.insert(
             sa.artifact.name,
             SourceArtifactInfo {
@@ -214,6 +221,26 @@ fn scan_all_sources() -> Result<BTreeMap<String, SourceArtifactInfo>> {
     Ok(result)
 }
 
+// ---------------------------------------------------------------------------
+// Legacy free-function API
+// ---------------------------------------------------------------------------
+
+pub fn outdated() -> Result<()> {
+    let paths = ConfigPaths::from_env()?;
+    let ctx = AppContext {
+        fs: &RealFilesystem,
+        git: &RealGitClient,
+        clock: &SystemClock,
+        paths: &paths,
+        llm: None,
+    };
+    outdated_with(&ctx)
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,7 +249,7 @@ mod tests {
     fn make_lock_entry(source_checksum: &str, version: Option<&str>) -> LockEntry {
         LockEntry {
             artifact_type: ArtifactKind::Agent,
-            version: version.map(|v| v.to_string()),
+            version: version.map(std::string::ToString::to_string),
             installed_at: "2024-01-01T00:00:00Z".to_string(),
             source: LockSource {
                 repo: "guidelines".to_string(),

@@ -1,22 +1,24 @@
 use anyhow::{Result, bail};
-use std::fs;
 use std::path::Path;
 
 use crate::checksum;
 use crate::config;
+use crate::context::AppContext;
+use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use crate::lockfile;
+use crate::paths::ConfigPaths;
 use crate::source;
 use crate::source_iter;
 use crate::types::ArtifactKind;
 
-pub fn info(name: &str) -> Result<()> {
+pub fn info_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
     // Search both scopes and both kinds
     for local in [false, true] {
         for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-            let dir = config::install_dir(kind, local)?;
+            let dir = ctx.paths.install_dir(kind, local);
             let path = kind.installed_path(name, &dir);
-            if path.exists() {
-                return show_info(name, kind, local, &path);
+            if ctx.fs.exists(&path) {
+                return show_info_with(name, kind, local, &path, ctx);
             }
         }
     }
@@ -24,9 +26,15 @@ pub fn info(name: &str) -> Result<()> {
     bail!("No installed artifact named '{name}' found.");
 }
 
-fn show_info(name: &str, kind: ArtifactKind, local: bool, path: &Path) -> Result<()> {
+fn show_info_with(
+    name: &str,
+    kind: ArtifactKind,
+    local: bool,
+    path: &Path,
+    ctx: &AppContext<'_>,
+) -> Result<()> {
     let scope = if local { "local" } else { "global" };
-    let lock = lockfile::load(local)?;
+    let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
     let lock_entry = lock.packages.get(name);
 
     println!("Name:        {name}");
@@ -44,7 +52,7 @@ fn show_info(name: &str, kind: ArtifactKind, local: bool, path: &Path) -> Result
         println!("Install SHA: {}", entry.installed_checksum);
 
         // Check for local modifications
-        let current_checksum = checksum::checksum_artifact(path, kind)?;
+        let current_checksum = checksum::checksum_artifact_with(path, kind, ctx.fs)?;
         if current_checksum != entry.installed_checksum {
             println!("Disk SHA:    {current_checksum}  (locally modified)");
         }
@@ -53,9 +61,9 @@ fn show_info(name: &str, kind: ArtifactKind, local: bool, path: &Path) -> Result
     }
 
     // Check source for deprecation and available version
-    source::auto_update_all().ok();
-    let sources = config::load_sources()?;
-    for sa in source_iter::each_source_artifact(&sources.sources) {
+    source::auto_update_all_with(ctx).ok();
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
         if sa.artifact.name == name && sa.artifact.kind == kind {
             if let Some(dep) = &sa.artifact.deprecation {
                 println!("Status:      DEPRECATED");
@@ -76,32 +84,47 @@ fn show_info(name: &str, kind: ArtifactKind, local: bool, path: &Path) -> Result
     }
 
     // For skills: list files
-    if kind == ArtifactKind::Skill && path.is_dir() {
+    if kind == ArtifactKind::Skill && ctx.fs.is_dir(path) {
         println!();
         println!("Files:");
-        list_skill_files(path, "  ")?;
+        list_skill_files_with(path, "  ", ctx)?;
     }
 
     Ok(())
 }
 
-fn list_skill_files(dir: &Path, indent: &str) -> Result<()> {
-    let mut entries: Vec<_> = fs::read_dir(dir)?.collect::<Result<Vec<_>, _>>()?;
-    entries.sort_by_key(|e| e.file_name());
+fn list_skill_files_with(dir: &Path, indent: &str, ctx: &AppContext<'_>) -> Result<()> {
+    let mut entries = ctx.fs.read_dir(dir)?;
+    entries.sort_by(|a, b| a.file_name.cmp(&b.file_name));
 
     for entry in entries {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
+        let name_str = &entry.file_name;
         if name_str.starts_with('.') {
             continue;
         }
 
-        if entry.path().is_dir() {
+        if entry.is_dir {
             println!("{indent}{name_str}/");
-            list_skill_files(&entry.path(), &format!("{indent}  "))?;
+            list_skill_files_with(&entry.path, &format!("{indent}  "), ctx)?;
         } else {
             println!("{indent}{name_str}");
         }
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Legacy free-function API
+// ---------------------------------------------------------------------------
+
+pub fn info(name: &str) -> Result<()> {
+    let paths = ConfigPaths::from_env()?;
+    let ctx = AppContext {
+        fs: &RealFilesystem,
+        git: &RealGitClient,
+        clock: &SystemClock,
+        paths: &paths,
+        llm: None,
+    };
+    info_with(name, &ctx)
 }

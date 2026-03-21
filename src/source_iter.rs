@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::config;
+use crate::gateway::filesystem::Filesystem;
+use crate::gateway::real::RealFilesystem;
 use crate::scan;
 use crate::types::{Artifact, SourceEntry};
 
@@ -12,20 +14,23 @@ pub struct SourceArtifact {
     pub artifact: Artifact,
 }
 
-/// Iterate over all artifacts across a set of registered sources.
+/// Iterate over all artifacts across a set of registered sources via the given filesystem.
 ///
 /// Resolves local paths, scans each source, and returns every artifact found
 /// with its source context. Silently skips sources whose local paths do not
 /// exist or that fail to scan (sources may be unavailable during normal use).
-pub fn each_source_artifact(sources: &BTreeMap<String, SourceEntry>) -> Vec<SourceArtifact> {
+pub fn each_source_artifact_with(
+    sources: &BTreeMap<String, SourceEntry>,
+    fs: &dyn Filesystem,
+) -> Vec<SourceArtifact> {
     let mut results = Vec::new();
 
     for (source_name, entry) in sources {
         let local_path = config::resolve_local_path(entry);
-        if !local_path.exists() {
+        if !fs.exists(&local_path) {
             continue;
         }
-        if let Ok(artifacts) = scan::scan_source(&local_path) {
+        if let Ok(artifacts) = scan::scan_source_with(&local_path, fs) {
             for artifact in artifacts {
                 results.push(SourceArtifact {
                     source_name: source_name.clone(),
@@ -37,6 +42,15 @@ pub fn each_source_artifact(sources: &BTreeMap<String, SourceEntry>) -> Vec<Sour
     }
 
     results
+}
+
+/// Iterate over all artifacts across a set of registered sources.
+///
+/// Resolves local paths, scans each source, and returns every artifact found
+/// with its source context. Silently skips sources whose local paths do not
+/// exist or that fail to scan (sources may be unavailable during normal use).
+pub fn each_source_artifact(sources: &BTreeMap<String, SourceEntry>) -> Vec<SourceArtifact> {
+    each_source_artifact_with(sources, &RealFilesystem)
 }
 
 #[cfg(test)]

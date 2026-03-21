@@ -1,30 +1,29 @@
 use anyhow::{Context, Result, bail};
-use mojentic::llm::gateways::{OllamaGateway, OpenAIGateway};
-use mojentic::llm::{LlmBroker, LlmGateway, LlmMessage};
-use std::fs;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use crate::checksum;
 use crate::config;
-use crate::fs_util;
+use crate::context::AppContext;
+use crate::gateway::real::{MojenticLlmClient, RealFilesystem, RealGitClient, SystemClock};
 use crate::lockfile;
+use crate::paths::ConfigPaths;
 use crate::source;
 use crate::source_iter;
-use crate::types::{ArtifactKind, LlmGatewayType};
+use crate::types::ArtifactKind;
 
-pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
-    source::auto_update_all()?;
+pub async fn diff_with(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {
+    source::auto_update_all_with(ctx)?;
 
     // Find the installed file on disk (global then local)
-    let (installed_path, local) = find_installed_on_disk(name, kind)?;
+    let (installed_path, local) = find_installed_on_disk_with(name, kind, ctx)?;
 
     // Find the source artifact by scanning all sources
-    let (source_path, source_name, source_version) = find_in_sources(name, kind)?;
+    let (source_path, source_name, source_version) = find_in_sources_with(name, kind, ctx)?;
 
     // Compare checksums
-    let installed_checksum = checksum::checksum_artifact(&installed_path, kind)?;
-    let source_checksum = checksum::checksum_artifact(&source_path, kind)?;
+    let installed_checksum = checksum::checksum_artifact_with(&installed_path, kind, ctx.fs)?;
+    let source_checksum = checksum::checksum_artifact_with(&source_path, kind, ctx.fs)?;
 
     if installed_checksum == source_checksum {
         println!("{name} is up to date with source.");
@@ -32,7 +31,7 @@ pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
     }
 
     // Get installed version from lock file if available
-    let lock = lockfile::load(local)?;
+    let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
     let installed_version = lock
         .packages
         .get(name)
@@ -49,114 +48,12 @@ pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
 
     // Build diff text
     let diff_text = match kind {
-        ArtifactKind::Agent => diff_files(&installed_path, &source_path)?,
-        ArtifactKind::Skill => diff_dirs(&installed_path, &source_path)?,
+        ArtifactKind::Agent => diff_files_with(&installed_path, &source_path, ctx)?,
+        ArtifactKind::Skill => diff_dirs_with(&installed_path, &source_path, ctx)?,
     };
 
     println!("Analyzing differences...");
     println!();
-
-    let analysis =
-        analyze_diff(name, kind, installed_version, source_ver_display, &diff_text).await?;
-    println!("{analysis}");
-
-    Ok(())
-}
-
-fn find_installed_on_disk(name: &str, kind: ArtifactKind) -> Result<(PathBuf, bool)> {
-    for local in [false, true] {
-        let dir = config::install_dir(kind, local)?;
-        let path = kind.installed_path(name, &dir);
-        if path.exists() {
-            return Ok((path, local));
-        }
-    }
-
-    bail!("No installed {kind} named '{name}' found on disk.");
-}
-
-fn find_in_sources(name: &str, kind: ArtifactKind) -> Result<(PathBuf, String, Option<String>)> {
-    let sources = config::load_sources()?;
-
-    for sa in source_iter::each_source_artifact(&sources.sources) {
-        if sa.artifact.name == name && sa.artifact.kind == kind {
-            return Ok((sa.artifact.path, sa.source_name, sa.artifact.version));
-        }
-    }
-
-    bail!("No {kind} named '{name}' found in any registered source.");
-}
-
-fn diff_files(installed: &Path, source: &Path) -> Result<String> {
-    let installed_content = fs::read_to_string(installed)
-        .with_context(|| format!("Failed to read {}", installed.display()))?;
-    let source_content = fs::read_to_string(source)
-        .with_context(|| format!("Failed to read {}", source.display()))?;
-
-    Ok(format!(
-        "=== INSTALLED VERSION ===\n{installed_content}\n\n=== SOURCE VERSION ===\n{source_content}"
-    ))
-}
-
-fn diff_dirs(installed: &Path, source: &Path) -> Result<String> {
-    let mut result = String::new();
-
-    let installed_files = collect_relative_files(installed)?;
-    let source_files = collect_relative_files(source)?;
-
-    for f in &installed_files {
-        if !source_files.contains(f) {
-            result.push_str(&format!("--- Only in installed: {f}\n"));
-        }
-    }
-
-    for f in &source_files {
-        if !installed_files.contains(f) {
-            result.push_str(&format!("+++ Only in source: {f}\n"));
-        }
-    }
-
-    for f in &installed_files {
-        if source_files.contains(f) {
-            let i_path = installed.join(f);
-            let s_path = source.join(f);
-            let i_content = fs::read_to_string(&i_path).unwrap_or_default();
-            let s_content = fs::read_to_string(&s_path).unwrap_or_default();
-            if i_content != s_content {
-                result.push_str(&format!(
-                    "\n=== {f} (INSTALLED) ===\n{i_content}\n=== {f} (SOURCE) ===\n{s_content}\n"
-                ));
-            }
-        }
-    }
-
-    Ok(result)
-}
-
-fn collect_relative_files(dir: &Path) -> Result<Vec<String>> {
-    let mut files = fs_util::collect_files(dir)?
-        .into_iter()
-        .map(|p| p.strip_prefix(dir).unwrap_or(&p).to_string_lossy().to_string())
-        .collect::<Vec<_>>();
-    files.sort();
-    Ok(files)
-}
-
-async fn analyze_diff(
-    name: &str,
-    kind: ArtifactKind,
-    installed_version: &str,
-    source_version: &str,
-    diff_text: &str,
-) -> Result<String> {
-    let cfg = config::load_config()?;
-
-    let gateway: Arc<dyn LlmGateway + Send + Sync> = match cfg.llm.gateway {
-        LlmGatewayType::OpenAI => Arc::new(OpenAIGateway::default()),
-        LlmGatewayType::Ollama => Arc::new(OllamaGateway::new()),
-    };
-
-    let broker = LlmBroker::new(&cfg.llm.model, gateway, None);
 
     let system_prompt = "You are a technical analyst comparing two versions of an AI coding assistant artifact (an agent definition or skill definition written in markdown). \
         Provide a clear, concise summary of the differences. Focus on:\n\
@@ -168,19 +65,141 @@ async fn analyze_diff(
     let user_prompt = format!(
         "Compare these two versions of the {kind} '{name}':\n\
         - Installed version: {installed_version}\n\
-        - Source version: {source_version}\n\n\
+        - Source version: {source_ver_display}\n\n\
         {diff_text}"
     );
 
-    let messages = vec![
-        LlmMessage::system(system_prompt),
-        LlmMessage::user(&user_prompt),
-    ];
+    let analysis = match ctx.llm {
+        Some(llm) => llm.analyze(system_prompt, &user_prompt).await?,
+        None => bail!("LLM client not configured for diff analysis"),
+    };
+    println!("{analysis}");
 
-    let response = broker
-        .generate(&messages, None, None, None)
-        .await
-        .context("LLM analysis failed")?;
+    Ok(())
+}
 
-    Ok(response)
+fn find_installed_on_disk_with(
+    name: &str,
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<(PathBuf, bool)> {
+    for local in [false, true] {
+        let dir = ctx.paths.install_dir(kind, local);
+        let path = kind.installed_path(name, &dir);
+        if ctx.fs.exists(&path) {
+            return Ok((path, local));
+        }
+    }
+
+    bail!("No installed {kind} named '{name}' found on disk.");
+}
+
+fn find_in_sources_with(
+    name: &str,
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<(PathBuf, String, Option<String>)> {
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+
+    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
+        if sa.artifact.name == name && sa.artifact.kind == kind {
+            return Ok((sa.artifact.path, sa.source_name, sa.artifact.version));
+        }
+    }
+
+    bail!("No {kind} named '{name}' found in any registered source.");
+}
+
+fn diff_files_with(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Result<String> {
+    let installed_content = ctx
+        .fs
+        .read_to_string(installed)
+        .with_context(|| format!("Failed to read {}", installed.display()))?;
+    let source_content = ctx
+        .fs
+        .read_to_string(source)
+        .with_context(|| format!("Failed to read {}", source.display()))?;
+
+    Ok(format!(
+        "=== INSTALLED VERSION ===\n{installed_content}\n\n=== SOURCE VERSION ===\n{source_content}"
+    ))
+}
+
+fn diff_dirs_with(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Result<String> {
+    let mut result = String::new();
+
+    let installed_files = collect_relative_files_with(installed, ctx)?;
+    let source_files = collect_relative_files_with(source, ctx)?;
+
+    for f in &installed_files {
+        if !source_files.contains(f) {
+            let _ = writeln!(result, "--- Only in installed: {f}");
+        }
+    }
+
+    for f in &source_files {
+        if !installed_files.contains(f) {
+            let _ = writeln!(result, "+++ Only in source: {f}");
+        }
+    }
+
+    for f in &installed_files {
+        if source_files.contains(f) {
+            let i_path = installed.join(f);
+            let s_path = source.join(f);
+            let i_content = ctx.fs.read_to_string(&i_path).unwrap_or_default();
+            let s_content = ctx.fs.read_to_string(&s_path).unwrap_or_default();
+            if i_content != s_content {
+                let _ = write!(
+                    result,
+                    "\n=== {f} (INSTALLED) ===\n{i_content}\n=== {f} (SOURCE) ===\n{s_content}\n"
+                );
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+fn collect_relative_files_with(dir: &Path, ctx: &AppContext<'_>) -> Result<Vec<String>> {
+    let mut files = collect_files_with(dir, ctx)?
+        .into_iter()
+        .map(|p| p.strip_prefix(dir).unwrap_or(&p).to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+    files.sort();
+    Ok(files)
+}
+
+fn collect_files_with(dir: &Path, ctx: &AppContext<'_>) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    let entries = ctx.fs.read_dir(dir)?;
+    for entry in entries {
+        if entry.file_name.starts_with('.') {
+            continue;
+        }
+        if entry.is_dir {
+            files.extend(collect_files_with(&entry.path, ctx)?);
+        } else {
+            files.push(entry.path);
+        }
+    }
+    Ok(files)
+}
+
+// ---------------------------------------------------------------------------
+// Legacy free-function API
+// ---------------------------------------------------------------------------
+
+pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
+    let paths = ConfigPaths::from_env()?;
+    let cfg = config::load_config()?;
+    let llm = MojenticLlmClient::new(cfg.llm);
+    let ctx = AppContext {
+        fs: &RealFilesystem,
+        git: &RealGitClient,
+        clock: &SystemClock,
+        paths: &paths,
+        llm: Some(&llm),
+    };
+    diff_with(name, kind, &ctx).await
 }

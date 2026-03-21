@@ -2,7 +2,10 @@ use anyhow::Result;
 use std::collections::BTreeMap;
 
 use crate::config;
+use crate::context::AppContext;
+use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use crate::lockfile;
+use crate::paths::ConfigPaths;
 use crate::source_iter;
 use crate::types::{ArtifactKind, LockFile};
 
@@ -27,12 +30,12 @@ fn status_indicator(installed: &str, available: &str, deprecated: bool) -> &'sta
     }
 }
 
-pub fn list_kind(kind: ArtifactKind) -> Result<()> {
-    let source_versions = build_source_versions(kind)?;
-    let global_lock = lockfile::load(false)?;
-    let local_lock = lockfile::load(true)?;
-    let global = build_rows(kind, false, &global_lock, &source_versions)?;
-    let local = build_rows(kind, true, &local_lock, &source_versions)?;
+pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {
+    let source_versions = build_source_versions_with(kind, ctx)?;
+    let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;
+    let local_lock = lockfile::load_with(true, ctx.fs, ctx.paths)?;
+    let global = build_rows_with(kind, false, &global_lock, &source_versions, ctx)?;
+    let local = build_rows_with(kind, true, &local_lock, &source_versions, ctx)?;
 
     if global.is_empty() && local.is_empty() {
         println!("No {kind}s installed.");
@@ -55,16 +58,20 @@ pub fn list_kind(kind: ArtifactKind) -> Result<()> {
     Ok(())
 }
 
-pub fn list_all() -> Result<()> {
-    let agent_versions = build_source_versions(ArtifactKind::Agent)?;
-    let skill_versions = build_source_versions(ArtifactKind::Skill)?;
-    let global_lock = lockfile::load(false)?;
-    let local_lock = lockfile::load(true)?;
+pub fn list_all_with(ctx: &AppContext<'_>) -> Result<()> {
+    let agent_versions = build_source_versions_with(ArtifactKind::Agent, ctx)?;
+    let skill_versions = build_source_versions_with(ArtifactKind::Skill, ctx)?;
+    let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;
+    let local_lock = lockfile::load_with(true, ctx.fs, ctx.paths)?;
 
-    let global_agents = build_rows(ArtifactKind::Agent, false, &global_lock, &agent_versions)?;
-    let local_agents = build_rows(ArtifactKind::Agent, true, &local_lock, &agent_versions)?;
-    let global_skills = build_rows(ArtifactKind::Skill, false, &global_lock, &skill_versions)?;
-    let local_skills = build_rows(ArtifactKind::Skill, true, &local_lock, &skill_versions)?;
+    let global_agents =
+        build_rows_with(ArtifactKind::Agent, false, &global_lock, &agent_versions, ctx)?;
+    let local_agents =
+        build_rows_with(ArtifactKind::Agent, true, &local_lock, &agent_versions, ctx)?;
+    let global_skills =
+        build_rows_with(ArtifactKind::Skill, false, &global_lock, &skill_versions, ctx)?;
+    let local_skills =
+        build_rows_with(ArtifactKind::Skill, true, &local_lock, &skill_versions, ctx)?;
 
     if global_agents.is_empty()
         && local_agents.is_empty()
@@ -83,13 +90,14 @@ pub fn list_all() -> Result<()> {
     Ok(())
 }
 
-fn build_rows(
+fn build_rows_with(
     kind: ArtifactKind,
     local: bool,
     lock: &LockFile,
     source_versions: &BTreeMap<String, SourceInfo>,
+    ctx: &AppContext<'_>,
 ) -> Result<Vec<Row>> {
-    let names = config::installed_names(kind, local)?;
+    let names = config::installed_names_with(kind, local, ctx.fs, ctx.paths)?;
     let mut rows = Vec::new();
 
     for name in names {
@@ -98,13 +106,11 @@ fn build_rows(
 
         let installed = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-").to_string();
 
-        let (source, available, deprecated) = match source_info {
-            Some(info) => (info.source_name.clone(), info.version.clone(), info.deprecated),
-            None => {
-                let src =
-                    lock_entry.map(|e| e.source.repo.clone()).unwrap_or_else(|| "-".to_string());
-                (src, "-".to_string(), false)
-            }
+        let (source, available, deprecated) = if let Some(info) = source_info {
+            (info.source_name.clone(), info.version.clone(), info.deprecated)
+        } else {
+            let src = lock_entry.map_or_else(|| "-".to_string(), |e| e.source.repo.clone());
+            (src, "-".to_string(), false)
         };
 
         let status = status_indicator(&installed, &available, deprecated);
@@ -127,11 +133,14 @@ struct SourceInfo {
     deprecated: bool,
 }
 
-fn build_source_versions(kind: ArtifactKind) -> Result<BTreeMap<String, SourceInfo>> {
+fn build_source_versions_with(
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<BTreeMap<String, SourceInfo>> {
     let mut versions = BTreeMap::new();
-    let sources = config::load_sources()?;
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
-    for sa in source_iter::each_source_artifact(&sources.sources) {
+    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
         if sa.artifact.kind == kind {
             let version = sa.artifact.version.as_deref().unwrap_or("-").to_string();
             let deprecated = sa.artifact.is_deprecated();
@@ -188,6 +197,38 @@ fn print_section(label: &str, rows: &[Row]) {
     }
     println!();
 }
+
+// ---------------------------------------------------------------------------
+// Legacy free-function API
+// ---------------------------------------------------------------------------
+
+pub fn list_kind(kind: ArtifactKind) -> Result<()> {
+    let paths = ConfigPaths::from_env()?;
+    let ctx = AppContext {
+        fs: &RealFilesystem,
+        git: &RealGitClient,
+        clock: &SystemClock,
+        paths: &paths,
+        llm: None,
+    };
+    list_kind_with(kind, &ctx)
+}
+
+pub fn list_all() -> Result<()> {
+    let paths = ConfigPaths::from_env()?;
+    let ctx = AppContext {
+        fs: &RealFilesystem,
+        git: &RealGitClient,
+        clock: &SystemClock,
+        paths: &paths,
+        llm: None,
+    };
+    list_all_with(&ctx)
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
