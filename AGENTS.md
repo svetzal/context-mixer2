@@ -1,5 +1,7 @@
 # cmx — Context Mixer
 
+Why this project exists and what problem does it solve: @CHARTER.md
+
 A package manager for curated agentic context (agents and skills), written in Rust.
 
 ## Quality Gates
