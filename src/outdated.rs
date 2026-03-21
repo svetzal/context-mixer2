@@ -167,15 +167,9 @@ fn collect_outdated_for_scope(
 
         // Check for local modifications
         if let Some(entry) = lock_entry {
-            let install_path = match kind {
-                ArtifactKind::Agent => config::install_dir(kind, local)?.join(format!("{name}.md")),
-                ArtifactKind::Skill => config::install_dir(kind, local)?.join(name),
-            };
+            let install_path = kind.installed_path(name, &config::install_dir(kind, local)?);
             if install_path.exists() {
-                let current_cs = match kind {
-                    ArtifactKind::Agent => checksum::checksum_file(&install_path)?,
-                    ArtifactKind::Skill => checksum::checksum_dir(&install_path)?,
-                };
+                let current_cs = checksum::checksum_artifact(&install_path, kind)?;
                 if current_cs != entry.installed_checksum {
                     status = format!("{status} (modified)");
                 }
@@ -212,10 +206,7 @@ fn scan_all_sources() -> Result<BTreeMap<String, SourceArtifactInfo>> {
         }
         if let Ok(artifacts) = scan::scan_source(&local_path) {
             for artifact in &artifacts {
-                let cs = match artifact.artifact_kind() {
-                    ArtifactKind::Agent => checksum::checksum_file(artifact.path())?,
-                    ArtifactKind::Skill => checksum::checksum_dir(artifact.path())?,
-                };
+                let cs = checksum::checksum_artifact(artifact.path(), artifact.artifact_kind())?;
                 result.insert(
                     artifact.name().to_string(),
                     SourceArtifactInfo {

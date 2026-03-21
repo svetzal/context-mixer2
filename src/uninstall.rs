@@ -8,10 +8,7 @@ use crate::types::ArtifactKind;
 pub fn uninstall(name: &str, kind: ArtifactKind, local: bool) -> Result<()> {
     let dir = config::install_dir(kind, local)?;
 
-    let target = match kind {
-        ArtifactKind::Agent => dir.join(format!("{name}.md")),
-        ArtifactKind::Skill => dir.join(name),
-    };
+    let target = kind.installed_path(name, &dir);
 
     if !target.exists() {
         let scope = if local { "local" } else { "global" };

@@ -157,6 +157,17 @@ impl std::fmt::Display for ArtifactKind {
     }
 }
 
+impl ArtifactKind {
+    /// Compute the expected filesystem path for an installed artifact within a
+    /// given install directory.
+    pub fn installed_path(&self, name: &str, dir: &Path) -> PathBuf {
+        match self {
+            ArtifactKind::Agent => dir.join(format!("{name}.md")),
+            ArtifactKind::Skill => dir.join(name),
+        }
+    }
+}
+
 impl Artifact {
     pub fn name(&self) -> &str {
         match self {
@@ -344,6 +355,22 @@ mod tests {
     #[test]
     fn artifact_kind_display_skill() {
         assert_eq!(format!("{}", ArtifactKind::Skill), "skill");
+    }
+
+    // --- ArtifactKind installed_path ---
+
+    #[test]
+    fn installed_path_agent_appends_md_extension() {
+        let dir = Path::new("/home/user/.claude/agents");
+        let path = ArtifactKind::Agent.installed_path("my-agent", dir);
+        assert_eq!(path, PathBuf::from("/home/user/.claude/agents/my-agent.md"));
+    }
+
+    #[test]
+    fn installed_path_skill_uses_bare_name() {
+        let dir = Path::new("/home/user/.claude/skills");
+        let path = ArtifactKind::Skill.installed_path("my-skill", dir);
+        assert_eq!(path, PathBuf::from("/home/user/.claude/skills/my-skill"));
     }
 
     // --- Artifact accessors ---

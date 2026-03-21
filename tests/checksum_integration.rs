@@ -1,4 +1,5 @@
-use cmx::checksum::{checksum_dir, checksum_file};
+use cmx::checksum::{checksum_artifact, checksum_dir, checksum_file};
+use cmx::types::ArtifactKind;
 use std::fs;
 use tempfile::TempDir;
 
@@ -98,4 +99,30 @@ fn checksum_dir_changes_when_new_file_added() {
     let cs_after = checksum_dir(dir.path()).unwrap();
 
     assert_ne!(cs_before, cs_after);
+}
+
+// --- checksum_artifact dispatch ---
+
+#[test]
+fn checksum_artifact_agent_dispatches_to_checksum_file() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("my-agent.md");
+    fs::write(&path, b"# Agent\n").unwrap();
+
+    let via_artifact = checksum_artifact(&path, ArtifactKind::Agent).unwrap();
+    let via_file = checksum_file(&path).unwrap();
+
+    assert_eq!(via_artifact, via_file, "checksum_artifact(Agent) must match checksum_file");
+}
+
+#[test]
+fn checksum_artifact_skill_dispatches_to_checksum_dir() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("SKILL.md"), b"# Skill\n").unwrap();
+    fs::write(dir.path().join("prompt.md"), b"# Prompt\n").unwrap();
+
+    let via_artifact = checksum_artifact(dir.path(), ArtifactKind::Skill).unwrap();
+    let via_dir = checksum_dir(dir.path()).unwrap();
+
+    assert_eq!(via_artifact, via_dir, "checksum_artifact(Skill) must match checksum_dir");
 }

@@ -23,14 +23,8 @@ pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
     let (source_path, source_name, source_version) = find_in_sources(name, kind)?;
 
     // Compare checksums
-    let installed_checksum = match kind {
-        ArtifactKind::Agent => checksum::checksum_file(&installed_path)?,
-        ArtifactKind::Skill => checksum::checksum_dir(&installed_path)?,
-    };
-    let source_checksum = match kind {
-        ArtifactKind::Agent => checksum::checksum_file(&source_path)?,
-        ArtifactKind::Skill => checksum::checksum_dir(&source_path)?,
-    };
+    let installed_checksum = checksum::checksum_artifact(&installed_path, kind)?;
+    let source_checksum = checksum::checksum_artifact(&source_path, kind)?;
 
     if installed_checksum == source_checksum {
         println!("{name} is up to date with source.");
@@ -72,10 +66,7 @@ pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
 fn find_installed_on_disk(name: &str, kind: ArtifactKind) -> Result<(PathBuf, bool)> {
     for local in [false, true] {
         let dir = config::install_dir(kind, local)?;
-        let path = match kind {
-            ArtifactKind::Agent => dir.join(format!("{name}.md")),
-            ArtifactKind::Skill => dir.join(name),
-        };
+        let path = kind.installed_path(name, &dir);
         if path.exists() {
             return Ok((path, local));
         }

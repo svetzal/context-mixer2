@@ -14,10 +14,7 @@ pub fn info(name: &str) -> Result<()> {
     for local in [false, true] {
         for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
             let dir = config::install_dir(kind, local)?;
-            let path = match kind {
-                ArtifactKind::Agent => dir.join(format!("{name}.md")),
-                ArtifactKind::Skill => dir.join(name),
-            };
+            let path = kind.installed_path(name, &dir);
             if path.exists() {
                 return show_info(name, kind, local, &path);
             }
@@ -47,10 +44,7 @@ fn show_info(name: &str, kind: ArtifactKind, local: bool, path: &Path) -> Result
         println!("Install SHA: {}", entry.installed_checksum);
 
         // Check for local modifications
-        let current_checksum = match kind {
-            ArtifactKind::Agent => checksum::checksum_file(path)?,
-            ArtifactKind::Skill => checksum::checksum_dir(path)?,
-        };
+        let current_checksum = checksum::checksum_artifact(path, kind)?;
         if current_checksum != entry.installed_checksum {
             println!("Disk SHA:    {current_checksum}  (locally modified)");
         }

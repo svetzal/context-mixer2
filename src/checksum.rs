@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::fs_util;
+use crate::types::ArtifactKind;
 
 /// Compute SHA-256 checksum for an agent (single .md file).
 pub fn checksum_file(path: &Path) -> Result<String> {
@@ -29,4 +30,13 @@ pub fn checksum_dir(path: &Path) -> Result<String> {
 
     let hash = hasher.finalize();
     Ok(format!("sha256:{:x}", hash))
+}
+
+/// Compute the checksum for an artifact, dispatching to the correct strategy
+/// based on its kind: file checksum for agents, directory checksum for skills.
+pub fn checksum_artifact(path: &Path, kind: ArtifactKind) -> Result<String> {
+    match kind {
+        ArtifactKind::Agent => checksum_file(path),
+        ArtifactKind::Skill => checksum_dir(path),
+    }
 }

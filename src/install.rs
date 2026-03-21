@@ -65,10 +65,7 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Resu
         .with_context(|| format!("Failed to create {}", dest_dir.display()))?;
 
     // Compute source checksum before copying
-    let source_checksum = match &artifact {
-        Artifact::Agent { path, .. } => checksum::checksum_file(path)?,
-        Artifact::Skill { path, .. } => checksum::checksum_dir(path)?,
-    };
+    let source_checksum = checksum::checksum_artifact(artifact.path(), kind)?;
 
     // Compute relative path within the source repo
     let relative_path = artifact
@@ -80,17 +77,11 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Resu
 
     // Check for local modifications before overwriting
     if !force {
-        let dest_check = match kind {
-            ArtifactKind::Agent => dest_dir.join(format!("{artifact_name}.md")),
-            ArtifactKind::Skill => dest_dir.join(artifact_name),
-        };
+        let dest_check = kind.installed_path(artifact_name, &dest_dir);
         if dest_check.exists() {
             let lock = lockfile::load(local)?;
             if let Some(entry) = lock.packages.get(artifact_name) {
-                let current_cs = match kind {
-                    ArtifactKind::Agent => checksum::checksum_file(&dest_check)?,
-                    ArtifactKind::Skill => checksum::checksum_dir(&dest_check)?,
-                };
+                let current_cs = checksum::checksum_artifact(&dest_check, kind)?;
                 if current_cs != entry.installed_checksum {
                     bail!(
                         "'{artifact_name}' has local modifications. Use --force to overwrite, \
@@ -128,10 +119,7 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Resu
     }
 
     // Compute installed checksum from what was actually written to disk
-    let installed_checksum = match kind {
-        ArtifactKind::Agent => checksum::checksum_file(&dest_path)?,
-        ArtifactKind::Skill => checksum::checksum_dir(&dest_path)?,
-    };
+    let installed_checksum = checksum::checksum_artifact(&dest_path, kind)?;
 
     // Record in lock file
     let mut lock = lockfile::load(local)?;
@@ -197,10 +185,7 @@ pub fn install_all(kind: ArtifactKind, local: bool, force: bool) -> Result<()> {
                 }
                 // Skip if already tracked with matching version AND checksum
                 if let Some(lock_entry) = lock.packages.get(artifact.name()) {
-                    let source_cs = match kind {
-                        ArtifactKind::Agent => checksum::checksum_file(artifact.path())?,
-                        ArtifactKind::Skill => checksum::checksum_dir(artifact.path())?,
-                    };
+                    let source_cs = checksum::checksum_artifact(artifact.path(), kind)?;
                     if lock_entry.version.as_deref() == artifact.version()
                         && lock_entry.source_checksum == source_cs
                     {
@@ -269,10 +254,7 @@ fn scan_source_checksums(kind: ArtifactKind) -> Result<std::collections::BTreeMa
         if let Ok(artifacts) = scan::scan_source(&local_path) {
             for artifact in &artifacts {
                 if artifact.artifact_kind() == kind {
-                    let cs = match kind {
-                        ArtifactKind::Agent => checksum::checksum_file(artifact.path())?,
-                        ArtifactKind::Skill => checksum::checksum_dir(artifact.path())?,
-                    };
+                    let cs = checksum::checksum_artifact(artifact.path(), kind)?;
                     checksums.insert(artifact.name().to_string(), cs);
                 }
             }
