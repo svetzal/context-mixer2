@@ -166,6 +166,10 @@ fn parse_deprecation(fm_text: &str) -> Option<Deprecation> {
 
 fn parse_frontmatter(path: &Path) -> Option<Frontmatter> {
     let content = fs::read_to_string(path).ok()?;
+    parse_frontmatter_str(&content)
+}
+
+fn parse_frontmatter_str(content: &str) -> Option<Frontmatter> {
     if !content.starts_with("---") {
         return None;
     }
@@ -181,6 +185,10 @@ fn parse_frontmatter(path: &Path) -> Option<Frontmatter> {
 
 fn parse_agent_frontmatter(path: &Path) -> Option<Frontmatter> {
     let content = fs::read_to_string(path).ok()?;
+    parse_agent_frontmatter_str(&content)
+}
+
+fn parse_agent_frontmatter_str(content: &str) -> Option<Frontmatter> {
     if !content.starts_with("---") {
         return None;
     }
@@ -208,4 +216,153 @@ fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
         .find(|l| l.starts_with(&prefix))
         .map(|l| l[prefix.len()..].trim().trim_matches('"').to_string())
         .filter(|v| !v.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- extract_field ---
+
+    #[test]
+    fn extract_field_basic() {
+        let text = "name: my-agent\ndescription: A thing";
+        assert_eq!(extract_field(text, "name"), Some("my-agent".to_string()));
+    }
+
+    #[test]
+    fn extract_field_quoted_value() {
+        let text = "name: \"my-agent\"";
+        assert_eq!(extract_field(text, "name"), Some("my-agent".to_string()));
+    }
+
+    #[test]
+    fn extract_field_not_present() {
+        let text = "name: my-agent";
+        assert_eq!(extract_field(text, "version"), None);
+    }
+
+    #[test]
+    fn extract_field_empty_value_filtered() {
+        let text = "name: ";
+        assert_eq!(extract_field(text, "name"), None);
+    }
+
+    #[test]
+    fn extract_field_extra_whitespace_trimmed() {
+        let text = "name:   spaced-value   ";
+        assert_eq!(extract_field(text, "name"), Some("spaced-value".to_string()));
+    }
+
+    #[test]
+    fn extract_field_multiple_fields_picks_correct_one() {
+        let text = "name: my-agent\ndescription: A thing\nversion: 1.0.0";
+        assert_eq!(extract_field(text, "description"), Some("A thing".to_string()));
+    }
+
+    #[test]
+    fn extract_field_no_prefix_collision() {
+        // key "name" must not match line "namespace: foo"
+        let text = "namespace: foo";
+        assert_eq!(extract_field(text, "name"), None);
+    }
+
+    // --- parse_deprecation ---
+
+    #[test]
+    fn parse_deprecation_true_with_reason_and_replacement() {
+        let text =
+            "deprecated: true\ndeprecated_reason: Too old\ndeprecated_replacement: new-agent";
+        let dep = parse_deprecation(text).expect("expected Some");
+        assert_eq!(dep.reason.as_deref(), Some("Too old"));
+        assert_eq!(dep.replacement.as_deref(), Some("new-agent"));
+    }
+
+    #[test]
+    fn parse_deprecation_true_no_reason_or_replacement() {
+        let text = "deprecated: true";
+        let dep = parse_deprecation(text).expect("expected Some");
+        assert!(dep.reason.is_none());
+        assert!(dep.replacement.is_none());
+    }
+
+    #[test]
+    fn parse_deprecation_false_returns_none() {
+        let text = "deprecated: false";
+        assert!(parse_deprecation(text).is_none());
+    }
+
+    #[test]
+    fn parse_deprecation_absent_returns_none() {
+        let text = "name: my-agent\ndescription: A thing";
+        assert!(parse_deprecation(text).is_none());
+    }
+
+    // --- parse_frontmatter_str ---
+
+    #[test]
+    fn parse_frontmatter_str_valid_all_fields() {
+        let content = "---\ndescription: Test skill\nversion: 1.2.3\n---\n# content";
+        let fm = parse_frontmatter_str(content).expect("expected Some");
+        assert_eq!(fm.description, "Test skill");
+        assert_eq!(fm.version.as_deref(), Some("1.2.3"));
+        assert!(fm.deprecation.is_none());
+    }
+
+    #[test]
+    fn parse_frontmatter_str_no_delimiters_returns_none() {
+        let content = "description: Test skill\n# content";
+        assert!(parse_frontmatter_str(content).is_none());
+    }
+
+    #[test]
+    fn parse_frontmatter_str_missing_closing_delimiter_returns_none() {
+        let content = "---\ndescription: Test skill\n# content";
+        // "---\n" then rest="description: Test skill\n# content", no "---" found
+        assert!(parse_frontmatter_str(content).is_none());
+    }
+
+    #[test]
+    fn parse_frontmatter_str_without_version() {
+        let content = "---\ndescription: No version here\n---\n";
+        let fm = parse_frontmatter_str(content).expect("expected Some");
+        assert_eq!(fm.description, "No version here");
+        assert!(fm.version.is_none());
+    }
+
+    #[test]
+    fn parse_frontmatter_str_with_deprecation() {
+        let content =
+            "---\ndescription: Old skill\ndeprecated: true\ndeprecated_reason: Replaced\n---\n";
+        let fm = parse_frontmatter_str(content).expect("expected Some");
+        let dep = fm.deprecation.expect("expected deprecation");
+        assert_eq!(dep.reason.as_deref(), Some("Replaced"));
+    }
+
+    // --- parse_agent_frontmatter_str ---
+
+    #[test]
+    fn parse_agent_frontmatter_str_valid() {
+        let content = "---\nname: my-agent\ndescription: Does things\n---\n# body";
+        let fm = parse_agent_frontmatter_str(content).expect("expected Some");
+        assert_eq!(fm.description, "Does things");
+    }
+
+    #[test]
+    fn parse_agent_frontmatter_str_missing_name_returns_none() {
+        let content = "---\ndescription: Does things\n---\n# body";
+        assert!(parse_agent_frontmatter_str(content).is_none());
+    }
+
+    #[test]
+    fn parse_agent_frontmatter_str_missing_description_returns_none() {
+        let content = "---\nname: my-agent\n---\n# body";
+        assert!(parse_agent_frontmatter_str(content).is_none());
+    }
+
+    #[test]
+    fn parse_agent_frontmatter_str_no_delimiters_returns_none() {
+        let content = "name: my-agent\ndescription: Does things\n# body";
+        assert!(parse_agent_frontmatter_str(content).is_none());
+    }
 }
