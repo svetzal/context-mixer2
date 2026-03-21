@@ -16,3 +16,6 @@ sha2 = "0.10.9"
 chrono = "0.4.44"
 tokio = { version = "1", features = ["full"] }
 mojentic = { version = "1.2", features = ["full"] }
+
+[dev-dependencies]
+tempfile = "3"
