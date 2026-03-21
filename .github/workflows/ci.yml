@@ -27,7 +27,13 @@ jobs:
         run: cargo fmt --check
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Tests
-        run: cargo test
+        run: cargo test --all-features
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Cargo deny
+        run: cargo deny check

@@ -2,6 +2,28 @@
 
 A package manager for curated agentic context (agents and skills), written in Rust.
 
+## Quality Gates
+
+MANDATORY pre-commit quality checks — run ALL before committing:
+
+```bash
+cargo fmt --check && \
+cargo clippy --all-targets --all-features -- -D warnings && \
+cargo test --all-features && \
+cargo deny check
+```
+
+Additional recommended checks:
+
+```bash
+cargo audit          # security vulnerability scanning
+cargo tarpaulin      # code coverage (target >80%)
+```
+
+- `--all-targets` is mandatory (ensures examples, tests, and benchmarks are checked)
+- If any check fails, STOP immediately, fix the root cause (don't suppress), and re-run all checks
+- Never use `#[allow(clippy::lint_name)]` without documenting why
+
 ## Reference repositories
 
 - **guidelines**: `~/Work/Projects/Personal/guidelines` — the reference source repository used for local testing of cmx features (artifact scanning, install, versioning, upgrades).

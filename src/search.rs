@@ -50,25 +50,10 @@ pub fn search(query: &str) -> Result<()> {
         return Ok(());
     }
 
-    let w_name = results
-        .iter()
-        .map(|r| r.name.len())
-        .max()
-        .unwrap_or(4)
-        .max(4);
+    let w_name = results.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
     let w_kind = 5;
-    let w_ver = results
-        .iter()
-        .map(|r| r.version.len())
-        .max()
-        .unwrap_or(7)
-        .max(7);
-    let w_src = results
-        .iter()
-        .map(|r| r.source.len())
-        .max()
-        .unwrap_or(6)
-        .max(6);
+    let w_ver = results.iter().map(|r| r.version.len()).max().unwrap_or(7).max(7);
+    let w_src = results.iter().map(|r| r.source.len()).max().unwrap_or(6).max(6);
 
     println!(
         "  {:<w_name$}  {:<w_kind$}  {:<w_ver$}  {:<w_src$}  Description",

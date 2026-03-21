@@ -1,7 +1,5 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
-use std::path::PathBuf;
 
 use crate::checksum;
 use crate::config;
@@ -69,30 +67,10 @@ pub fn outdated() -> Result<()> {
 
     let w_name = rows.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
     let w_kind = 5;
-    let w_iv = rows
-        .iter()
-        .map(|r| r.installed_version.len())
-        .max()
-        .unwrap_or(9)
-        .max(9);
-    let w_av = rows
-        .iter()
-        .map(|r| r.available_version.len())
-        .max()
-        .unwrap_or(9)
-        .max(9);
-    let w_src = rows
-        .iter()
-        .map(|r| r.source.len())
-        .max()
-        .unwrap_or(6)
-        .max(6);
-    let w_st = rows
-        .iter()
-        .map(|r| r.status.len())
-        .max()
-        .unwrap_or(6)
-        .max(6);
+    let w_iv = rows.iter().map(|r| r.installed_version.len()).max().unwrap_or(9).max(9);
+    let w_av = rows.iter().map(|r| r.available_version.len()).max().unwrap_or(9).max(9);
+    let w_src = rows.iter().map(|r| r.source.len()).max().unwrap_or(6).max(6);
+    let w_st = rows.iter().map(|r| r.status.len()).max().unwrap_or(6).max(6);
 
     println!(
         "  {:<w_name$}  {:<w_kind$}  {:<w_iv$}  {:<w_av$}  {:<w_src$}  {:<w_st$}",
@@ -130,7 +108,7 @@ fn collect_outdated_for_scope(
     source_artifacts: &BTreeMap<String, SourceArtifactInfo>,
     rows: &mut Vec<OutdatedRow>,
 ) -> Result<()> {
-    let installed = installed_names(kind, local)?;
+    let installed = config::installed_names(kind, local)?;
 
     for name in &installed {
         let lock_entry = lock.packages.get(name);
@@ -141,10 +119,7 @@ fn collect_outdated_for_scope(
             continue;
         };
 
-        let installed_v = lock_entry
-            .and_then(|e| e.version.as_deref())
-            .unwrap_or("-")
-            .to_string();
+        let installed_v = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-").to_string();
 
         let available_v = source_info.version.as_deref().unwrap_or("-").to_string();
 
@@ -171,13 +146,30 @@ fn collect_outdated_for_scope(
             continue;
         }
 
-        let status = if installed_v == "-" && available_v != "-" {
+        let mut status = if installed_v == "-" && available_v != "-" {
             "untracked".to_string()
         } else if installed_v != "-" && available_v != "-" && installed_v != available_v {
             "update".to_string()
         } else {
             "changed".to_string()
         };
+
+        // Check for local modifications
+        if let Some(entry) = lock_entry {
+            let install_path = match kind {
+                ArtifactKind::Agent => config::install_dir(kind, local)?.join(format!("{name}.md")),
+                ArtifactKind::Skill => config::install_dir(kind, local)?.join(name),
+            };
+            if install_path.exists() {
+                let current_cs = match kind {
+                    ArtifactKind::Agent => checksum::checksum_file(&install_path)?,
+                    ArtifactKind::Skill => checksum::checksum_dir(&install_path)?,
+                };
+                if current_cs != entry.installed_checksum {
+                    status = format!("{status} (modified)");
+                }
+            }
+        }
 
         rows.push(OutdatedRow {
             name: name.clone(),
@@ -226,52 +218,4 @@ fn scan_all_sources() -> Result<BTreeMap<String, SourceArtifactInfo>> {
     }
 
     Ok(result)
-}
-
-fn installed_names(kind: ArtifactKind, local: bool) -> Result<Vec<String>> {
-    let dir = install_dir(kind, local)?;
-    if !dir.exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut names = Vec::new();
-    for entry in fs::read_dir(&dir).with_context(|| format!("Failed to read {}", dir.display()))? {
-        let entry = entry?;
-        let file_name = entry.file_name();
-        let name_str = file_name.to_string_lossy();
-
-        if name_str.starts_with('.') {
-            continue;
-        }
-
-        match kind {
-            ArtifactKind::Agent => {
-                if name_str.ends_with(".md") {
-                    names.push(name_str.trim_end_matches(".md").to_string());
-                }
-            }
-            ArtifactKind::Skill => {
-                if entry.path().is_dir() {
-                    names.push(name_str.into_owned());
-                }
-            }
-        }
-    }
-
-    names.sort();
-    Ok(names)
-}
-
-fn install_dir(kind: ArtifactKind, local: bool) -> Result<PathBuf> {
-    let subdir = match kind {
-        ArtifactKind::Agent => "agents",
-        ArtifactKind::Skill => "skills",
-    };
-
-    if local {
-        Ok(PathBuf::from(".claude").join(subdir))
-    } else {
-        let home = dirs::home_dir().context("Could not determine home directory")?;
-        Ok(home.join(".claude").join(subdir))
-    }
 }

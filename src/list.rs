@@ -1,7 +1,5 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::collections::BTreeMap;
-use std::fs;
-use std::path::PathBuf;
 
 use crate::config;
 use crate::lockfile;
@@ -91,28 +89,20 @@ fn build_rows(
     lock: &LockFile,
     source_versions: &BTreeMap<String, SourceInfo>,
 ) -> Result<Vec<Row>> {
-    let names = installed_names(kind, local)?;
+    let names = config::installed_names(kind, local)?;
     let mut rows = Vec::new();
 
     for name in names {
         let lock_entry = lock.packages.get(&name);
         let source_info = source_versions.get(&name);
 
-        let installed = lock_entry
-            .and_then(|e| e.version.as_deref())
-            .unwrap_or("-")
-            .to_string();
+        let installed = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-").to_string();
 
         let (source, available, deprecated) = match source_info {
-            Some(info) => (
-                info.source_name.clone(),
-                info.version.clone(),
-                info.deprecated,
-            ),
+            Some(info) => (info.source_name.clone(), info.version.clone(), info.deprecated),
             None => {
-                let src = lock_entry
-                    .map(|e| e.source.repo.clone())
-                    .unwrap_or_else(|| "-".to_string());
+                let src =
+                    lock_entry.map(|e| e.source.repo.clone()).unwrap_or_else(|| "-".to_string());
                 (src, "-".to_string(), false)
             }
         };
@@ -173,24 +163,9 @@ fn print_table(rows: &[Row]) {
     }
 
     let w_name = rows.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
-    let w_inst = rows
-        .iter()
-        .map(|r| r.installed.len())
-        .max()
-        .unwrap_or(9)
-        .max(9);
-    let w_src = rows
-        .iter()
-        .map(|r| r.source.len())
-        .max()
-        .unwrap_or(6)
-        .max(6);
-    let w_avail = rows
-        .iter()
-        .map(|r| r.available.len())
-        .max()
-        .unwrap_or(9)
-        .max(9);
+    let w_inst = rows.iter().map(|r| r.installed.len()).max().unwrap_or(9).max(9);
+    let w_src = rows.iter().map(|r| r.source.len()).max().unwrap_or(6).max(6);
+    let w_avail = rows.iter().map(|r| r.available.len()).max().unwrap_or(9).max(9);
 
     println!(
         "  {:<w_name$}  {:<w_inst$}  {:<w_src$}  {:<w_avail$}",
@@ -220,52 +195,4 @@ fn print_section(label: &str, rows: &[Row]) {
         print_table(rows);
     }
     println!();
-}
-
-fn installed_names(kind: ArtifactKind, local: bool) -> Result<Vec<String>> {
-    let dir = install_dir(kind, local)?;
-    if !dir.exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut names = Vec::new();
-    for entry in fs::read_dir(&dir).with_context(|| format!("Failed to read {}", dir.display()))? {
-        let entry = entry?;
-        let file_name = entry.file_name();
-        let name_str = file_name.to_string_lossy();
-
-        if name_str.starts_with('.') {
-            continue;
-        }
-
-        match kind {
-            ArtifactKind::Agent => {
-                if name_str.ends_with(".md") {
-                    names.push(name_str.trim_end_matches(".md").to_string());
-                }
-            }
-            ArtifactKind::Skill => {
-                if entry.path().is_dir() {
-                    names.push(name_str.into_owned());
-                }
-            }
-        }
-    }
-
-    names.sort();
-    Ok(names)
-}
-
-fn install_dir(kind: ArtifactKind, local: bool) -> Result<PathBuf> {
-    let subdir = match kind {
-        ArtifactKind::Agent => "agents",
-        ArtifactKind::Skill => "skills",
-    };
-
-    if local {
-        Ok(PathBuf::from(".claude").join(subdir))
-    } else {
-        let home = dirs::home_dir().context("Could not determine home directory")?;
-        Ok(home.join(".claude").join(subdir))
-    }
 }

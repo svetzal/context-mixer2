@@ -61,14 +61,8 @@ pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
     println!("Analyzing differences...");
     println!();
 
-    let analysis = analyze_diff(
-        name,
-        kind,
-        installed_version,
-        source_ver_display,
-        &diff_text,
-    )
-    .await?;
+    let analysis =
+        analyze_diff(name, kind, installed_version, source_ver_display, &diff_text).await?;
     println!("{analysis}");
 
     Ok(())
@@ -76,7 +70,7 @@ pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
 
 fn find_installed_on_disk(name: &str, kind: ArtifactKind) -> Result<(PathBuf, bool)> {
     for local in [false, true] {
-        let dir = install_dir(kind, local)?;
+        let dir = config::install_dir(kind, local)?;
         let path = match kind {
             ArtifactKind::Agent => dir.join(format!("{name}.md")),
             ArtifactKind::Skill => dir.join(name),
@@ -173,11 +167,7 @@ fn collect_files_recursive(base: &Path, dir: &Path, files: &mut Vec<String>) -> 
         if path.is_dir() {
             collect_files_recursive(base, &path, files)?;
         } else {
-            let relative = path
-                .strip_prefix(base)
-                .unwrap_or(&path)
-                .to_string_lossy()
-                .to_string();
+            let relative = path.strip_prefix(base).unwrap_or(&path).to_string_lossy().to_string();
             files.push(relative);
         }
     }
@@ -225,18 +215,4 @@ async fn analyze_diff(
         .context("LLM analysis failed")?;
 
     Ok(response)
-}
-
-fn install_dir(kind: ArtifactKind, local: bool) -> Result<PathBuf> {
-    let subdir = match kind {
-        ArtifactKind::Agent => "agents",
-        ArtifactKind::Skill => "skills",
-    };
-
-    if local {
-        Ok(PathBuf::from(".claude").join(subdir))
-    } else {
-        let home = dirs::home_dir().context("Could not determine home directory")?;
-        Ok(home.join(".claude").join(subdir))
-    }
 }

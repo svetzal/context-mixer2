@@ -32,9 +32,14 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
                 for agent_path in agents {
                     if let Some(path_str) = agent_path.as_str() {
                         let full_path = root.join(path_str);
-                        if full_path.exists()
-                            && let Some(fm) = parse_agent_frontmatter(&full_path)
-                        {
+                        if !full_path.exists() {
+                            eprintln!(
+                                "Warning: marketplace declares agent '{}' but path does not exist",
+                                path_str
+                            );
+                            continue;
+                        }
+                        if let Some(fm) = parse_agent_frontmatter(&full_path) {
                             let name = full_path
                                 .file_stem()
                                 .map(|s| s.to_string_lossy().to_string())
@@ -56,10 +61,22 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
                 for skill_path in skills {
                     if let Some(path_str) = skill_path.as_str() {
                         let full_path = root.join(path_str);
+                        if !full_path.exists() {
+                            eprintln!(
+                                "Warning: marketplace declares skill '{}' but path does not exist",
+                                path_str
+                            );
+                            continue;
+                        }
                         let skill_md = full_path.join("SKILL.md");
-                        if skill_md.exists()
-                            && let Some(fm) = parse_frontmatter(&skill_md)
-                        {
+                        if !skill_md.exists() {
+                            eprintln!(
+                                "Warning: marketplace declares skill '{}' but SKILL.md is missing",
+                                path_str
+                            );
+                            continue;
+                        }
+                        if let Some(fm) = parse_frontmatter(&skill_md) {
                             let name = full_path
                                 .file_name()
                                 .map(|s| s.to_string_lossy().to_string())

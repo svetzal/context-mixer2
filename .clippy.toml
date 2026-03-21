@@ -1,0 +1,7 @@
+# Clippy configuration for strict code quality checks
+# Run with: cargo clippy --all-targets --all-features -- -D warnings
+
+# Complexity checks
+too-many-arguments-threshold = 7
+type-complexity-threshold = 250
+cognitive-complexity-threshold = 25

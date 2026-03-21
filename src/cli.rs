@@ -37,6 +37,11 @@ pub enum Commands {
         /// Keyword to search for in artifact names and descriptions
         query: String,
     },
+    /// Show detailed metadata for an installed artifact
+    Info {
+        /// Artifact name
+        name: String,
+    },
     /// View or modify cmx configuration
     Config {
         #[command(subcommand)]
@@ -84,6 +89,9 @@ pub enum ArtifactAction {
         /// Install into the current project instead of globally
         #[arg(long)]
         local: bool,
+        /// Force overwrite even if locally modified
+        #[arg(long)]
+        force: bool,
     },
     /// List installed artifacts
     List,
@@ -99,6 +107,17 @@ pub enum ArtifactAction {
         /// Update all tracked artifacts
         #[arg(long, conflicts_with = "name")]
         all: bool,
+        /// Force overwrite even if locally modified
+        #[arg(long)]
+        force: bool,
+    },
+    /// Uninstall an installed artifact
+    Uninstall {
+        /// Artifact name
+        name: String,
+        /// Uninstall from project scope instead of global
+        #[arg(long)]
+        local: bool,
     },
 }
 

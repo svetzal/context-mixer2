@@ -10,7 +10,7 @@ use crate::scan;
 use crate::source;
 use crate::types::{Artifact, ArtifactKind, ArtifactKindSerde, LockEntry, LockSource};
 
-pub fn install(name: &str, kind: ArtifactKind, local: bool) -> Result<()> {
+pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Result<()> {
     let (source_name, artifact_name) = parse_name(name);
 
     // Auto-update stale sources before searching
@@ -26,17 +26,11 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool) -> Result<()> {
     let mut found: Vec<(String, Artifact, PathBuf)> = Vec::new();
 
     let search_sources: Vec<_> = if let Some(src) = source_name {
-        let entry = sources
-            .sources
-            .get(src)
-            .with_context(|| format!("Source '{src}' not found."))?;
+        let entry =
+            sources.sources.get(src).with_context(|| format!("Source '{src}' not found."))?;
         vec![(src.to_string(), entry.clone())]
     } else {
-        sources
-            .sources
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect()
+        sources.sources.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
     };
 
     for (sname, entry) in &search_sources {
@@ -65,7 +59,7 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool) -> Result<()> {
     }
 
     let (source_name, artifact, source_root) = found.remove(0);
-    let dest_dir = install_dir(kind, local)?;
+    let dest_dir = config::install_dir(kind, local)?;
 
     fs::create_dir_all(&dest_dir)
         .with_context(|| format!("Failed to create {}", dest_dir.display()))?;
@@ -84,20 +78,60 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool) -> Result<()> {
         .to_string_lossy()
         .to_string();
 
-    match &artifact {
+    // Check for local modifications before overwriting
+    if !force {
+        let dest_check = match kind {
+            ArtifactKind::Agent => dest_dir.join(format!("{artifact_name}.md")),
+            ArtifactKind::Skill => dest_dir.join(artifact_name),
+        };
+        if dest_check.exists() {
+            let lock = lockfile::load(local)?;
+            if let Some(entry) = lock.packages.get(artifact_name) {
+                let current_cs = match kind {
+                    ArtifactKind::Agent => checksum::checksum_file(&dest_check)?,
+                    ArtifactKind::Skill => checksum::checksum_dir(&dest_check)?,
+                };
+                if current_cs != entry.installed_checksum {
+                    bail!(
+                        "'{artifact_name}' has local modifications. Use --force to overwrite, \
+                         or 'cmx {kind} diff {artifact_name}' to review changes first."
+                    );
+                }
+            }
+        }
+    }
+
+    let dest_path = match &artifact {
         Artifact::Agent { path, .. } => {
             let filename = path.file_name().context("Invalid agent path")?;
             let dest = dest_dir.join(filename);
             fs::copy(path, &dest).with_context(|| {
                 format!("Failed to copy {} to {}", path.display(), dest.display())
             })?;
+            dest
         }
         Artifact::Skill { path, .. } => {
             let dir_name = path.file_name().context("Invalid skill path")?;
             let dest = dest_dir.join(dir_name);
             copy_dir_recursive(path, &dest)?;
+            dest
+        }
+    };
+
+    // Validate skill installation
+    if matches!(kind, ArtifactKind::Skill) {
+        let skill_md = dest_path.join("SKILL.md");
+        if !skill_md.exists() {
+            let _ = fs::remove_dir_all(&dest_path);
+            bail!("Skill '{}' is missing SKILL.md. Partial install removed.", artifact_name);
         }
     }
+
+    // Compute installed checksum from what was actually written to disk
+    let installed_checksum = match kind {
+        ArtifactKind::Agent => checksum::checksum_file(&dest_path)?,
+        ArtifactKind::Skill => checksum::checksum_dir(&dest_path)?,
+    };
 
     // Record in lock file
     let mut lock = lockfile::load(local)?;
@@ -114,16 +148,13 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool) -> Result<()> {
                 repo: source_name.clone(),
                 path: relative_path,
             },
-            source_checksum: source_checksum.clone(),
-            installed_checksum: source_checksum,
+            source_checksum,
+            installed_checksum,
         },
     );
     lockfile::save(&lock, local)?;
 
-    let version_info = artifact
-        .version()
-        .map(|v| format!(" v{v}"))
-        .unwrap_or_default();
+    let version_info = artifact.version().map(|v| format!(" v{v}")).unwrap_or_default();
     println!(
         "Installed {artifact_name}{version_info} ({kind}) from '{source_name}' -> {}",
         dest_dir.display()
@@ -132,13 +163,13 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn update(name: &str, kind: ArtifactKind) -> Result<()> {
+pub fn update(name: &str, kind: ArtifactKind, force: bool) -> Result<()> {
     // Find which scope it's installed in
     for local in [false, true] {
         let lock = lockfile::load(local)?;
         if let Some(entry) = lock.packages.get(name) {
             let pinned = format!("{}:{}", entry.source.repo, name);
-            return install(&pinned, kind, local);
+            return install(&pinned, kind, local, force);
         }
     }
 
@@ -147,7 +178,7 @@ pub fn update(name: &str, kind: ArtifactKind) -> Result<()> {
     );
 }
 
-pub fn install_all(kind: ArtifactKind, local: bool) -> Result<()> {
+pub fn install_all(kind: ArtifactKind, local: bool, force: bool) -> Result<()> {
     source::auto_update_all()?;
 
     let sources = config::load_sources()?;
@@ -164,14 +195,20 @@ pub fn install_all(kind: ArtifactKind, local: bool) -> Result<()> {
                 if artifact.artifact_kind() != kind {
                     continue;
                 }
-                // Skip if already tracked in lock file with matching version
-                if let Some(lock_entry) = lock.packages.get(artifact.name())
-                    && lock_entry.version.as_deref() == artifact.version()
-                {
-                    continue;
+                // Skip if already tracked with matching version AND checksum
+                if let Some(lock_entry) = lock.packages.get(artifact.name()) {
+                    let source_cs = match kind {
+                        ArtifactKind::Agent => checksum::checksum_file(artifact.path())?,
+                        ArtifactKind::Skill => checksum::checksum_dir(artifact.path())?,
+                    };
+                    if lock_entry.version.as_deref() == artifact.version()
+                        && lock_entry.source_checksum == source_cs
+                    {
+                        continue;
+                    }
                 }
                 let pinned = format!("{source_name}:{}", artifact.name());
-                install(&pinned, kind, local)?;
+                install(&pinned, kind, local, force)?;
                 installed_count += 1;
             }
         }
@@ -184,7 +221,7 @@ pub fn install_all(kind: ArtifactKind, local: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn update_all(kind: ArtifactKind) -> Result<()> {
+pub fn update_all(kind: ArtifactKind, force: bool) -> Result<()> {
     source::auto_update_all()?;
 
     // Scan sources for current checksums
@@ -206,7 +243,7 @@ pub fn update_all(kind: ArtifactKind) -> Result<()> {
                 && entry.source_checksum != *source_cs
             {
                 let pinned = format!("{}:{name}", entry.source.repo);
-                install(&pinned, kind, local)?;
+                install(&pinned, kind, local, force)?;
                 updated_count += 1;
             }
         }
@@ -243,20 +280,6 @@ fn scan_source_checksums(kind: ArtifactKind) -> Result<std::collections::BTreeMa
     }
 
     Ok(checksums)
-}
-
-fn install_dir(kind: ArtifactKind, local: bool) -> Result<PathBuf> {
-    let subdir = match kind {
-        ArtifactKind::Agent => "agents",
-        ArtifactKind::Skill => "skills",
-    };
-
-    if local {
-        Ok(PathBuf::from(".claude").join(subdir))
-    } else {
-        let home = dirs::home_dir().context("Could not determine home directory")?;
-        Ok(home.join(".claude").join(subdir))
-    }
 }
 
 fn parse_name(name: &str) -> (Option<&str>, &str) {

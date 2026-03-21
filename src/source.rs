@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use chrono::Utc;
+use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -13,10 +14,7 @@ pub fn add(name: &str, path_or_url: &str) -> Result<()> {
     let mut sources = config::load_sources()?;
 
     if sources.sources.contains_key(name) {
-        bail!(
-            "Source '{}' already exists. Remove it first to re-register.",
-            name
-        );
+        bail!("Source '{}' already exists. Remove it first to re-register.", name);
     }
 
     let entry = if looks_like_url(path_or_url) {
@@ -55,10 +53,7 @@ pub fn list() -> Result<()> {
             SourceType::Local => "local",
             SourceType::Git => "git",
         };
-        println!(
-            "  {name:<28} ({kind}) {loc}",
-            loc = location.unwrap_or_default()
-        );
+        println!("  {name:<28} ({kind}) {loc}", loc = location.unwrap_or_default());
     }
 
     Ok(())
@@ -113,6 +108,25 @@ pub fn browse(name: &str) -> Result<()> {
             let v = s.version().map(|v| format!("  v{v}")).unwrap_or_default();
             let dep = format_deprecation(s);
             println!("  {}{v}{dep}", s.name());
+            // Show shallow file listing for the skill directory
+            if let Ok(entries) = fs::read_dir(s.path()) {
+                let mut names: Vec<_> = entries
+                    .filter_map(|e| e.ok())
+                    .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
+                    .map(|e| {
+                        let n = e.file_name().to_string_lossy().to_string();
+                        if e.path().is_dir() {
+                            format!("{n}/")
+                        } else {
+                            n
+                        }
+                    })
+                    .collect();
+                names.sort();
+                for n in &names {
+                    println!("    {n}");
+                }
+            }
         }
     }
 
@@ -237,10 +251,7 @@ fn pull_source(name: &str) -> Result<()> {
         SourceType::Git => {}
     }
 
-    let clone_path = entry
-        .local_clone
-        .as_ref()
-        .context("Git source has no local clone path")?;
+    let clone_path = entry.local_clone.as_ref().context("Git source has no local clone path")?;
 
     if !clone_path.exists() {
         bail!(
