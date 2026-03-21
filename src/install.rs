@@ -307,3 +307,45 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_name_with_source_prefix() {
+        let (source, artifact) = parse_name("guidelines:rust-craftsperson");
+        assert_eq!(source, Some("guidelines"));
+        assert_eq!(artifact, "rust-craftsperson");
+    }
+
+    #[test]
+    fn parse_name_without_source_prefix() {
+        let (source, artifact) = parse_name("rust-craftsperson");
+        assert_eq!(source, None);
+        assert_eq!(artifact, "rust-craftsperson");
+    }
+
+    #[test]
+    fn parse_name_splits_on_first_colon_only() {
+        // "a:b:c" — split_once splits only at the first colon
+        let (source, artifact) = parse_name("a:b:c");
+        assert_eq!(source, Some("a"));
+        assert_eq!(artifact, "b:c");
+    }
+
+    #[test]
+    fn parse_name_empty_source() {
+        let (source, artifact) = parse_name(":artifact");
+        // split_once(":") returns Some(("", "artifact"))
+        assert_eq!(source, Some(""));
+        assert_eq!(artifact, "artifact");
+    }
+
+    #[test]
+    fn parse_name_empty_artifact() {
+        let (source, artifact) = parse_name("source:");
+        assert_eq!(source, Some("source"));
+        assert_eq!(artifact, "");
+    }
+}
