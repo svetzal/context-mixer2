@@ -87,15 +87,21 @@ pub fn browse(name: &str) -> Result<()> {
         return Ok(());
     }
 
-    let agents: Vec<_> = artifacts.iter().filter(|a| a.kind() == "agent").collect();
-    let skills: Vec<_> = artifacts.iter().filter(|a| a.kind() == "skill").collect();
+    let agents: Vec<_> = artifacts
+        .iter()
+        .filter(|a| a.kind == crate::types::ArtifactKind::Agent)
+        .collect();
+    let skills: Vec<_> = artifacts
+        .iter()
+        .filter(|a| a.kind == crate::types::ArtifactKind::Skill)
+        .collect();
 
     if !agents.is_empty() {
         println!("Agents:");
         for a in &agents {
-            let v = a.version().map(|v| format!("  v{v}")).unwrap_or_default();
+            let v = a.version.as_deref().map(|v| format!("  v{v}")).unwrap_or_default();
             let dep = format_deprecation(a);
-            println!("  {}{v}{dep}", a.name());
+            println!("  {}{v}{dep}", a.name);
         }
     }
 
@@ -105,11 +111,11 @@ pub fn browse(name: &str) -> Result<()> {
         }
         println!("Skills:");
         for s in &skills {
-            let v = s.version().map(|v| format!("  v{v}")).unwrap_or_default();
+            let v = s.version.as_deref().map(|v| format!("  v{v}")).unwrap_or_default();
             let dep = format_deprecation(s);
-            println!("  {}{v}{dep}", s.name());
+            println!("  {}{v}{dep}", s.name);
             // Show shallow file listing for the skill directory
-            if let Ok(entries) = fs::read_dir(s.path()) {
+            if let Ok(entries) = fs::read_dir(&s.path) {
                 let mut names: Vec<_> = entries
                     .filter_map(|e| e.ok())
                     .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
@@ -339,13 +345,13 @@ fn add_git_source(name: &str, url: &str) -> Result<SourceEntry> {
 }
 
 fn count_artifacts(artifacts: &[Artifact]) -> (usize, usize) {
-    let agents = artifacts.iter().filter(|a| a.kind() == "agent").count();
-    let skills = artifacts.iter().filter(|a| a.kind() == "skill").count();
+    let agents = artifacts.iter().filter(|a| a.kind == crate::types::ArtifactKind::Agent).count();
+    let skills = artifacts.iter().filter(|a| a.kind == crate::types::ArtifactKind::Skill).count();
     (agents, skills)
 }
 
 fn format_deprecation(artifact: &Artifact) -> String {
-    let Some(dep) = artifact.deprecation() else {
+    let Some(dep) = &artifact.deprecation else {
         return String::new();
     };
 
@@ -372,7 +378,7 @@ fn looks_like_url(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Deprecation, SourceType};
+    use crate::types::{ArtifactKind, Deprecation, SourceType};
     use std::path::PathBuf;
 
     // --- looks_like_url ---
@@ -456,7 +462,8 @@ mod tests {
     // --- count_artifacts ---
 
     fn make_agent(name: &str) -> Artifact {
-        Artifact::Agent {
+        Artifact {
+            kind: ArtifactKind::Agent,
             name: name.to_string(),
             description: String::new(),
             path: PathBuf::from(format!("{name}.md")),
@@ -466,7 +473,8 @@ mod tests {
     }
 
     fn make_skill(name: &str) -> Artifact {
-        Artifact::Skill {
+        Artifact {
+            kind: ArtifactKind::Skill,
             name: name.to_string(),
             description: String::new(),
             path: PathBuf::from(name),
@@ -502,7 +510,8 @@ mod tests {
 
     #[test]
     fn format_deprecation_deprecated_no_extras() {
-        let artifact = Artifact::Agent {
+        let artifact = Artifact {
+            kind: ArtifactKind::Agent,
             name: "alpha".to_string(),
             description: String::new(),
             path: PathBuf::from("alpha.md"),
@@ -517,7 +526,8 @@ mod tests {
 
     #[test]
     fn format_deprecation_deprecated_with_reason() {
-        let artifact = Artifact::Agent {
+        let artifact = Artifact {
+            kind: ArtifactKind::Agent,
             name: "alpha".to_string(),
             description: String::new(),
             path: PathBuf::from("alpha.md"),
@@ -532,7 +542,8 @@ mod tests {
 
     #[test]
     fn format_deprecation_deprecated_with_reason_and_replacement() {
-        let artifact = Artifact::Agent {
+        let artifact = Artifact {
+            kind: ArtifactKind::Agent,
             name: "alpha".to_string(),
             description: String::new(),
             path: PathBuf::from("alpha.md"),
@@ -550,7 +561,8 @@ mod tests {
 
     #[test]
     fn format_deprecation_deprecated_with_replacement_only() {
-        let artifact = Artifact::Agent {
+        let artifact = Artifact {
+            kind: ArtifactKind::Agent,
             name: "alpha".to_string(),
             description: String::new(),
             path: PathBuf::from("alpha.md"),

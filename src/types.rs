@@ -88,21 +88,13 @@ pub enum SourceType {
 }
 
 #[derive(Debug)]
-pub enum Artifact {
-    Agent {
-        name: String,
-        description: String,
-        path: PathBuf,
-        version: Option<String>,
-        deprecation: Option<Deprecation>,
-    },
-    Skill {
-        name: String,
-        description: String,
-        path: PathBuf,
-        version: Option<String>,
-        deprecation: Option<Deprecation>,
-    },
+pub struct Artifact {
+    pub kind: ArtifactKind,
+    pub name: String,
+    pub description: String,
+    pub path: PathBuf,
+    pub version: Option<String>,
+    pub deprecation: Option<Deprecation>,
 }
 
 #[derive(Debug, Clone)]
@@ -120,7 +112,7 @@ pub struct LockFile {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LockEntry {
     #[serde(rename = "type")]
-    pub artifact_type: ArtifactKindSerde,
+    pub artifact_type: ArtifactKind,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     pub installed_at: String,
@@ -135,14 +127,8 @@ pub struct LockSource {
     pub path: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum ArtifactKindSerde {
-    Agent,
-    Skill,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArtifactKind {
     Agent,
     Skill,
@@ -169,57 +155,8 @@ impl ArtifactKind {
 }
 
 impl Artifact {
-    pub fn name(&self) -> &str {
-        match self {
-            Artifact::Agent { name, .. } => name,
-            Artifact::Skill { name, .. } => name,
-        }
-    }
-
-    pub fn description(&self) -> &str {
-        match self {
-            Artifact::Agent { description, .. } => description,
-            Artifact::Skill { description, .. } => description,
-        }
-    }
-
-    pub fn kind(&self) -> &str {
-        match self {
-            Artifact::Agent { .. } => "agent",
-            Artifact::Skill { .. } => "skill",
-        }
-    }
-
-    pub fn artifact_kind(&self) -> ArtifactKind {
-        match self {
-            Artifact::Agent { .. } => ArtifactKind::Agent,
-            Artifact::Skill { .. } => ArtifactKind::Skill,
-        }
-    }
-
-    pub fn path(&self) -> &Path {
-        match self {
-            Artifact::Agent { path, .. } => path,
-            Artifact::Skill { path, .. } => path,
-        }
-    }
-
-    pub fn version(&self) -> Option<&str> {
-        match self {
-            Artifact::Agent { version, .. } => version.as_deref(),
-            Artifact::Skill { version, .. } => version.as_deref(),
-        }
-    }
-
-    pub fn deprecation(&self) -> Option<&Deprecation> {
-        match self {
-            Artifact::Agent { deprecation, .. } => deprecation.as_ref(),
-            Artifact::Skill { deprecation, .. } => deprecation.as_ref(),
-        }
-    }
-
     pub fn is_deprecated(&self) -> bool {
-        self.deprecation().is_some()
+        self.deprecation.is_some()
     }
 }
 
@@ -235,7 +172,7 @@ mod tests {
         packages.insert(
             "my-agent".to_string(),
             LockEntry {
-                artifact_type: ArtifactKindSerde::Agent,
+                artifact_type: ArtifactKind::Agent,
                 version: Some("1.0.0".to_string()),
                 installed_at: "2024-01-01T00:00:00Z".to_string(),
                 source: LockSource {
@@ -268,7 +205,7 @@ mod tests {
     fn lockfile_artifact_type_serializes_as_agent() {
         let lock = sample_lock_file();
         let json = serde_json::to_string(&lock).expect("serialize");
-        // ArtifactKindSerde::Agent with rename_all="lowercase" should serialize as "agent"
+        // ArtifactKind::Agent with rename_all="lowercase" should serialize as "agent"
         assert!(json.contains("\"agent\""), "expected \"agent\" in JSON: {json}");
     }
 
@@ -376,7 +313,8 @@ mod tests {
     // --- Artifact accessors ---
 
     fn make_agent() -> Artifact {
-        Artifact::Agent {
+        Artifact {
+            kind: ArtifactKind::Agent,
             name: "test-agent".to_string(),
             description: "Agent description".to_string(),
             path: PathBuf::from("test-agent.md"),
@@ -386,7 +324,8 @@ mod tests {
     }
 
     fn make_skill() -> Artifact {
-        Artifact::Skill {
+        Artifact {
+            kind: ArtifactKind::Skill,
             name: "test-skill".to_string(),
             description: "Skill description".to_string(),
             path: PathBuf::from("test-skill"),
@@ -401,27 +340,27 @@ mod tests {
     #[test]
     fn artifact_agent_accessors() {
         let a = make_agent();
-        assert_eq!(a.name(), "test-agent");
-        assert_eq!(a.description(), "Agent description");
-        assert_eq!(a.kind(), "agent");
-        assert_eq!(a.artifact_kind(), ArtifactKind::Agent);
-        assert_eq!(a.path(), std::path::Path::new("test-agent.md"));
-        assert_eq!(a.version(), Some("2.0.0"));
+        assert_eq!(a.name, "test-agent");
+        assert_eq!(a.description, "Agent description");
+        assert_eq!(a.kind.to_string(), "agent");
+        assert_eq!(a.kind, ArtifactKind::Agent);
+        assert_eq!(a.path, PathBuf::from("test-agent.md"));
+        assert_eq!(a.version.as_deref(), Some("2.0.0"));
         assert!(!a.is_deprecated());
-        assert!(a.deprecation().is_none());
+        assert!(a.deprecation.is_none());
     }
 
     #[test]
     fn artifact_skill_accessors() {
         let s = make_skill();
-        assert_eq!(s.name(), "test-skill");
-        assert_eq!(s.description(), "Skill description");
-        assert_eq!(s.kind(), "skill");
-        assert_eq!(s.artifact_kind(), ArtifactKind::Skill);
-        assert_eq!(s.path(), std::path::Path::new("test-skill"));
-        assert_eq!(s.version(), Some("1.0.0"));
+        assert_eq!(s.name, "test-skill");
+        assert_eq!(s.description, "Skill description");
+        assert_eq!(s.kind.to_string(), "skill");
+        assert_eq!(s.kind, ArtifactKind::Skill);
+        assert_eq!(s.path, PathBuf::from("test-skill"));
+        assert_eq!(s.version.as_deref(), Some("1.0.0"));
         assert!(s.is_deprecated());
-        let dep = s.deprecation().unwrap();
+        let dep = s.deprecation.as_ref().unwrap();
         assert_eq!(dep.reason.as_deref(), Some("Old"));
         assert_eq!(dep.replacement.as_deref(), Some("new-skill"));
     }
@@ -449,7 +388,7 @@ mod tests {
         let lock: LockFile = serde_json::from_str(json).expect("golden JSON must parse");
         assert_eq!(lock.version, 1);
         let entry = lock.packages.get("rust-craftsperson").expect("entry present");
-        assert!(matches!(entry.artifact_type, ArtifactKindSerde::Agent));
+        assert_eq!(entry.artifact_type, ArtifactKind::Agent);
         assert_eq!(entry.version.as_deref(), Some("3.1.0"));
         assert_eq!(entry.source.repo, "guidelines");
         assert_eq!(entry.source_checksum, "sha256:aabbcc");

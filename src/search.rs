@@ -25,18 +25,18 @@ pub fn search(query: &str) -> Result<()> {
             continue;
         }
         if let Ok(artifacts) = scan::scan_source(&local_path) {
-            for artifact in &artifacts {
-                let name_lower = artifact.name().to_lowercase();
-                let desc_lower = artifact.description().to_lowercase();
+            for artifact in artifacts {
+                let name_lower = artifact.name.to_lowercase();
+                let desc_lower = artifact.description.to_lowercase();
 
                 if name_lower.contains(&query_lower) || desc_lower.contains(&query_lower) {
                     // Truncate description to first meaningful chunk
-                    let short_desc = truncate_description(artifact.description(), 80);
+                    let short_desc = truncate_description(&artifact.description, 80);
 
                     results.push(SearchResult {
-                        name: artifact.name().to_string(),
-                        kind: artifact.kind().to_string(),
-                        version: artifact.version().unwrap_or("-").to_string(),
+                        name: artifact.name,
+                        kind: artifact.kind.to_string(),
+                        version: artifact.version.as_deref().unwrap_or("-").to_string(),
                         source: source_name.clone(),
                         description: short_desc,
                     });

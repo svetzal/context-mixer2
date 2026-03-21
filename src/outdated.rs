@@ -206,12 +206,12 @@ fn scan_all_sources() -> Result<BTreeMap<String, SourceArtifactInfo>> {
         }
         if let Ok(artifacts) = scan::scan_source(&local_path) {
             for artifact in &artifacts {
-                let cs = checksum::checksum_artifact(artifact.path(), artifact.artifact_kind())?;
+                let cs = checksum::checksum_artifact(&artifact.path, artifact.kind)?;
                 result.insert(
-                    artifact.name().to_string(),
+                    artifact.name.clone(),
                     SourceArtifactInfo {
                         source_name: source_name.clone(),
-                        version: artifact.version().map(|v| v.to_string()),
+                        version: artifact.version.clone(),
                         checksum: cs,
                     },
                 );
@@ -225,11 +225,11 @@ fn scan_all_sources() -> Result<BTreeMap<String, SourceArtifactInfo>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ArtifactKindSerde, LockEntry, LockSource};
+    use crate::types::{ArtifactKind, LockEntry, LockSource};
 
     fn make_lock_entry(source_checksum: &str, version: Option<&str>) -> LockEntry {
         LockEntry {
-            artifact_type: ArtifactKindSerde::Agent,
+            artifact_type: ArtifactKind::Agent,
             version: version.map(|v| v.to_string()),
             installed_at: "2024-01-01T00:00:00Z".to_string(),
             source: LockSource {

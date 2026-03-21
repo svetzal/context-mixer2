@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::fs;
 use std::path::Path;
 
-use crate::types::{Artifact, Deprecation};
+use crate::types::{Artifact, ArtifactKind, Deprecation};
 
 pub fn scan_source(root: &Path) -> Result<Vec<Artifact>> {
     let marketplace = root.join(".claude-plugin").join("marketplace.json");
@@ -15,7 +15,7 @@ pub fn scan_source(root: &Path) -> Result<Vec<Artifact>> {
         arts
     };
 
-    artifacts.sort_by(|a, b| a.name().cmp(b.name()));
+    artifacts.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(artifacts)
 }
 
@@ -44,7 +44,8 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
                                 .file_stem()
                                 .map(|s| s.to_string_lossy().to_string())
                                 .unwrap_or_default();
-                            artifacts.push(Artifact::Agent {
+                            artifacts.push(Artifact {
+                                kind: ArtifactKind::Agent,
                                 name,
                                 description: fm.description,
                                 path: full_path,
@@ -81,7 +82,8 @@ fn scan_marketplace(root: &Path, marketplace_path: &Path) -> Result<Vec<Artifact
                                 .file_name()
                                 .map(|s| s.to_string_lossy().to_string())
                                 .unwrap_or_default();
-                            artifacts.push(Artifact::Skill {
+                            artifacts.push(Artifact {
+                                kind: ArtifactKind::Skill,
                                 name,
                                 description: fm.description,
                                 path: full_path,
@@ -120,7 +122,8 @@ fn walk_dir(dir: &Path, artifacts: &mut Vec<Artifact>) -> Result<()> {
             if skill_md.exists()
                 && let Some(fm) = parse_frontmatter(&skill_md)
             {
-                artifacts.push(Artifact::Skill {
+                artifacts.push(Artifact {
+                    kind: ArtifactKind::Skill,
                     name: name_str.into_owned(),
                     description: fm.description,
                     path: path.clone(),
@@ -134,7 +137,8 @@ fn walk_dir(dir: &Path, artifacts: &mut Vec<Artifact>) -> Result<()> {
             && let Some(fm) = parse_agent_frontmatter(&path)
         {
             let agent_name = name_str.trim_end_matches(".md").to_string();
-            artifacts.push(Artifact::Agent {
+            artifacts.push(Artifact {
+                kind: ArtifactKind::Agent,
                 name: agent_name,
                 description: fm.description,
                 path: path.clone(),

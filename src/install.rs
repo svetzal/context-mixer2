@@ -8,7 +8,7 @@ use crate::config;
 use crate::lockfile;
 use crate::scan;
 use crate::source;
-use crate::types::{Artifact, ArtifactKind, ArtifactKindSerde, LockEntry, LockSource};
+use crate::types::{Artifact, ArtifactKind, LockEntry, LockSource};
 
 pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Result<()> {
     let (source_name, artifact_name) = parse_name(name);
@@ -40,7 +40,7 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Resu
         }
         let artifacts = scan::scan_source(&local_path)?;
         for artifact in artifacts {
-            if artifact.name() == artifact_name && artifact.artifact_kind() == kind {
+            if artifact.name == artifact_name && artifact.kind == kind {
                 found.push((sname.clone(), artifact, local_path.clone()));
             }
         }
@@ -65,13 +65,13 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Resu
         .with_context(|| format!("Failed to create {}", dest_dir.display()))?;
 
     // Compute source checksum before copying
-    let source_checksum = checksum::checksum_artifact(artifact.path(), kind)?;
+    let source_checksum = checksum::checksum_artifact(&artifact.path, kind)?;
 
     // Compute relative path within the source repo
     let relative_path = artifact
-        .path()
+        .path
         .strip_prefix(&source_root)
-        .unwrap_or(artifact.path())
+        .unwrap_or(&artifact.path)
         .to_string_lossy()
         .to_string();
 
@@ -92,19 +92,19 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Resu
         }
     }
 
-    let dest_path = match &artifact {
-        Artifact::Agent { path, .. } => {
-            let filename = path.file_name().context("Invalid agent path")?;
+    let dest_path = match kind {
+        ArtifactKind::Agent => {
+            let filename = artifact.path.file_name().context("Invalid agent path")?;
             let dest = dest_dir.join(filename);
-            fs::copy(path, &dest).with_context(|| {
-                format!("Failed to copy {} to {}", path.display(), dest.display())
+            fs::copy(&artifact.path, &dest).with_context(|| {
+                format!("Failed to copy {} to {}", artifact.path.display(), dest.display())
             })?;
             dest
         }
-        Artifact::Skill { path, .. } => {
-            let dir_name = path.file_name().context("Invalid skill path")?;
+        ArtifactKind::Skill => {
+            let dir_name = artifact.path.file_name().context("Invalid skill path")?;
             let dest = dest_dir.join(dir_name);
-            copy_dir_recursive(path, &dest)?;
+            copy_dir_recursive(&artifact.path, &dest)?;
             dest
         }
     };
@@ -126,11 +126,8 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Resu
     lock.packages.insert(
         artifact_name.to_string(),
         LockEntry {
-            artifact_type: match kind {
-                ArtifactKind::Agent => ArtifactKindSerde::Agent,
-                ArtifactKind::Skill => ArtifactKindSerde::Skill,
-            },
-            version: artifact.version().map(|v| v.to_string()),
+            artifact_type: kind,
+            version: artifact.version.clone(),
             installed_at: Utc::now().to_rfc3339(),
             source: LockSource {
                 repo: source_name.clone(),
@@ -142,7 +139,7 @@ pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Resu
     );
     lockfile::save(&lock, local)?;
 
-    let version_info = artifact.version().map(|v| format!(" v{v}")).unwrap_or_default();
+    let version_info = artifact.version.as_deref().map(|v| format!(" v{v}")).unwrap_or_default();
     println!(
         "Installed {artifact_name}{version_info} ({kind}) from '{source_name}' -> {}",
         dest_dir.display()
@@ -180,19 +177,19 @@ pub fn install_all(kind: ArtifactKind, local: bool, force: bool) -> Result<()> {
         }
         if let Ok(artifacts) = scan::scan_source(&local_path) {
             for artifact in &artifacts {
-                if artifact.artifact_kind() != kind {
+                if artifact.kind != kind {
                     continue;
                 }
                 // Skip if already tracked with matching version AND checksum
-                if let Some(lock_entry) = lock.packages.get(artifact.name()) {
-                    let source_cs = checksum::checksum_artifact(artifact.path(), kind)?;
-                    if lock_entry.version.as_deref() == artifact.version()
+                if let Some(lock_entry) = lock.packages.get(&artifact.name) {
+                    let source_cs = checksum::checksum_artifact(&artifact.path, kind)?;
+                    if lock_entry.version.as_deref() == artifact.version.as_deref()
                         && lock_entry.source_checksum == source_cs
                     {
                         continue;
                     }
                 }
-                let pinned = format!("{source_name}:{}", artifact.name());
+                let pinned = format!("{source_name}:{}", artifact.name);
                 install(&pinned, kind, local, force)?;
                 installed_count += 1;
             }
@@ -216,11 +213,7 @@ pub fn update_all(kind: ArtifactKind, force: bool) -> Result<()> {
     for local in [false, true] {
         let lock = lockfile::load(local)?;
         for (name, entry) in &lock.packages {
-            let entry_kind = match entry.artifact_type {
-                ArtifactKindSerde::Agent => ArtifactKind::Agent,
-                ArtifactKindSerde::Skill => ArtifactKind::Skill,
-            };
-            if entry_kind != kind {
+            if entry.artifact_type != kind {
                 continue;
             }
 
@@ -253,9 +246,9 @@ fn scan_source_checksums(kind: ArtifactKind) -> Result<std::collections::BTreeMa
         }
         if let Ok(artifacts) = scan::scan_source(&local_path) {
             for artifact in &artifacts {
-                if artifact.artifact_kind() == kind {
-                    let cs = checksum::checksum_artifact(artifact.path(), kind)?;
-                    checksums.insert(artifact.name().to_string(), cs);
+                if artifact.kind == kind {
+                    let cs = checksum::checksum_artifact(&artifact.path, kind)?;
+                    checksums.insert(artifact.name.clone(), cs);
                 }
             }
         }

@@ -138,11 +138,11 @@ fn build_source_versions(kind: ArtifactKind) -> Result<BTreeMap<String, SourceIn
         }
         if let Ok(artifacts) = scan::scan_source(&local_path) {
             for artifact in artifacts {
-                if artifact.artifact_kind() == kind {
-                    let version = artifact.version().unwrap_or("-").to_string();
+                if artifact.kind == kind {
+                    let version = artifact.version.as_deref().unwrap_or("-").to_string();
                     let deprecated = artifact.is_deprecated();
                     versions.insert(
-                        artifact.name().to_string(),
+                        artifact.name,
                         SourceInfo {
                             source_name: source_name.clone(),
                             version,

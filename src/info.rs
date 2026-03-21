@@ -62,8 +62,8 @@ fn show_info(name: &str, kind: ArtifactKind, local: bool, path: &Path) -> Result
         }
         if let Ok(artifacts) = scan::scan_source(&local_path) {
             for artifact in &artifacts {
-                if artifact.name() == name && artifact.artifact_kind() == kind {
-                    if let Some(dep) = artifact.deprecation() {
+                if artifact.name == name && artifact.kind == kind {
+                    if let Some(dep) = &artifact.deprecation {
                         println!("Status:      DEPRECATED");
                         if let Some(reason) = &dep.reason {
                             println!("  Reason:    {reason}");
@@ -72,7 +72,7 @@ fn show_info(name: &str, kind: ArtifactKind, local: bool, path: &Path) -> Result
                             println!("  Replace:   {repl}");
                         }
                     }
-                    if let Some(v) = artifact.version() {
+                    if let Some(v) = artifact.version.as_deref() {
                         let installed_v =
                             lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-");
                         if v != installed_v {

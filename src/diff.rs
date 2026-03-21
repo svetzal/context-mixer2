@@ -85,11 +85,11 @@ fn find_in_sources(name: &str, kind: ArtifactKind) -> Result<(PathBuf, String, O
         }
         if let Ok(artifacts) = scan::scan_source(&source_root) {
             for artifact in &artifacts {
-                if artifact.name() == name && artifact.artifact_kind() == kind {
+                if artifact.name == name && artifact.kind == kind {
                     return Ok((
-                        artifact.path().to_path_buf(),
+                        artifact.path.clone(),
                         source_name.clone(),
-                        artifact.version().map(|v| v.to_string()),
+                        artifact.version.clone(),
                     ));
                 }
             }

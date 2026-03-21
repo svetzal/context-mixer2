@@ -1,5 +1,5 @@
 use cmx::lockfile::{load_from, save_to};
-use cmx::types::{ArtifactKindSerde, LockEntry, LockFile, LockSource};
+use cmx::types::{ArtifactKind, LockEntry, LockFile, LockSource};
 use std::collections::BTreeMap;
 use tempfile::TempDir;
 
@@ -8,7 +8,7 @@ fn sample_lock_file() -> LockFile {
     packages.insert(
         "rust-craftsperson".to_string(),
         LockEntry {
-            artifact_type: ArtifactKindSerde::Agent,
+            artifact_type: ArtifactKind::Agent,
             version: Some("1.0.0".to_string()),
             installed_at: "2024-01-01T00:00:00Z".to_string(),
             source: LockSource {
@@ -41,7 +41,7 @@ fn save_and_load_round_trips_all_fields() {
     assert_eq!(entry.source.path, "agents/rust-craftsperson.md");
     assert_eq!(entry.source_checksum, "sha256:abc123");
     assert_eq!(entry.installed_checksum, "sha256:def456");
-    assert!(matches!(entry.artifact_type, ArtifactKindSerde::Agent));
+    assert_eq!(entry.artifact_type, ArtifactKind::Agent);
 }
 
 #[test]

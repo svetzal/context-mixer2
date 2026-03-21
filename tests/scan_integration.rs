@@ -1,4 +1,5 @@
 use cmx::scan::scan_source;
+use cmx::types::ArtifactKind;
 use std::fs;
 use tempfile::TempDir;
 
@@ -29,9 +30,9 @@ fn scan_finds_agent_with_valid_frontmatter() {
     write_file(dir.path(), "my-agent.md", &agent_frontmatter("my-agent", "Does something"));
     let artifacts = scan_source(dir.path()).unwrap();
     assert_eq!(artifacts.len(), 1);
-    assert_eq!(artifacts[0].name(), "my-agent");
-    assert_eq!(artifacts[0].description(), "Does something");
-    assert_eq!(artifacts[0].kind(), "agent");
+    assert_eq!(artifacts[0].name, "my-agent");
+    assert_eq!(artifacts[0].description, "Does something");
+    assert_eq!(artifacts[0].kind, ArtifactKind::Agent);
 }
 
 #[test]
@@ -61,9 +62,9 @@ fn scan_finds_skill_with_skill_md() {
 
     let artifacts = scan_source(dir.path()).unwrap();
     assert_eq!(artifacts.len(), 1);
-    assert_eq!(artifacts[0].name(), "my-skill");
-    assert_eq!(artifacts[0].description(), "A useful skill");
-    assert_eq!(artifacts[0].kind(), "skill");
+    assert_eq!(artifacts[0].name, "my-skill");
+    assert_eq!(artifacts[0].description, "A useful skill");
+    assert_eq!(artifacts[0].kind, ArtifactKind::Skill);
 }
 
 #[test]
@@ -86,7 +87,7 @@ fn scan_finds_multiple_agents_sorted_by_name() {
 
     let artifacts = scan_source(dir.path()).unwrap();
     assert_eq!(artifacts.len(), 3);
-    let names: Vec<_> = artifacts.iter().map(|a| a.name()).collect();
+    let names: Vec<_> = artifacts.iter().map(|a| a.name.as_str()).collect();
     assert_eq!(names, ["alpha", "middle", "zebra"]);
 }
 
@@ -100,9 +101,9 @@ fn scan_finds_both_agents_and_skills() {
 
     let artifacts = scan_source(dir.path()).unwrap();
     assert_eq!(artifacts.len(), 2);
-    let kinds: Vec<_> = artifacts.iter().map(|a| a.kind()).collect();
-    assert!(kinds.contains(&"agent"));
-    assert!(kinds.contains(&"skill"));
+    let kinds: Vec<_> = artifacts.iter().map(|a| a.kind).collect();
+    assert!(kinds.contains(&ArtifactKind::Agent));
+    assert!(kinds.contains(&ArtifactKind::Skill));
 }
 
 // --- Marketplace scan (with .claude-plugin/marketplace.json) ---
@@ -127,8 +128,8 @@ fn scan_marketplace_finds_declared_agents() {
 
     let artifacts = scan_source(dir.path()).unwrap();
     assert_eq!(artifacts.len(), 1);
-    assert_eq!(artifacts[0].name(), "my-agent");
-    assert_eq!(artifacts[0].kind(), "agent");
+    assert_eq!(artifacts[0].name, "my-agent");
+    assert_eq!(artifacts[0].kind, ArtifactKind::Agent);
 }
 
 #[test]
@@ -153,6 +154,6 @@ fn scan_marketplace_finds_declared_skills() {
 
     let artifacts = scan_source(dir.path()).unwrap();
     assert_eq!(artifacts.len(), 1);
-    assert_eq!(artifacts[0].name(), "my-skill");
-    assert_eq!(artifacts[0].kind(), "skill");
+    assert_eq!(artifacts[0].name, "my-skill");
+    assert_eq!(artifacts[0].kind, ArtifactKind::Skill);
 }
