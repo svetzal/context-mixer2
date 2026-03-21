@@ -101,6 +101,42 @@ pub fn outdated() -> Result<()> {
     Ok(())
 }
 
+/// Returns `true` if an installed artifact is considered outdated relative to
+/// the source.  Pure function — no I/O.
+fn is_outdated(
+    lock_entry: Option<&crate::types::LockEntry>,
+    source_checksum: &str,
+    source_version: Option<&str>,
+) -> bool {
+    match lock_entry {
+        Some(entry) => {
+            // Checksum changed
+            if entry.source_checksum != source_checksum {
+                return true;
+            }
+            // Installed without a version but source now has one
+            if entry.version.is_none() && source_version.is_some() {
+                return true;
+            }
+            false
+        }
+        // No lock entry — untracked
+        None => true,
+    }
+}
+
+/// Derives the human-readable status label given installed and available version
+/// strings.  Pure function — no I/O.
+fn outdated_status_label(installed_v: &str, available_v: &str) -> &'static str {
+    if installed_v == "-" && available_v != "-" {
+        "untracked"
+    } else if installed_v != "-" && available_v != "-" && installed_v != available_v {
+        "update"
+    } else {
+        "changed"
+    }
+}
+
 fn collect_outdated_for_scope(
     kind: ArtifactKind,
     local: bool,
@@ -123,36 +159,11 @@ fn collect_outdated_for_scope(
 
         let available_v = source_info.version.as_deref().unwrap_or("-").to_string();
 
-        // Determine if outdated
-        let is_outdated = match lock_entry {
-            Some(entry) => {
-                // Has lock entry — check checksum
-                if entry.source_checksum != source_info.checksum {
-                    true
-                } else if entry.version.is_none() && source_info.version.is_some() {
-                    // Installed without version, source now has one
-                    true
-                } else {
-                    false
-                }
-            }
-            None => {
-                // No lock entry at all — untracked, source has a versioned copy
-                true
-            }
-        };
-
-        if !is_outdated {
+        if !is_outdated(lock_entry, &source_info.checksum, source_info.version.as_deref()) {
             continue;
         }
 
-        let mut status = if installed_v == "-" && available_v != "-" {
-            "untracked".to_string()
-        } else if installed_v != "-" && available_v != "-" && installed_v != available_v {
-            "update".to_string()
-        } else {
-            "changed".to_string()
-        };
+        let mut status = outdated_status_label(&installed_v, &available_v).to_string();
 
         // Check for local modifications
         if let Some(entry) = lock_entry {
@@ -218,4 +229,78 @@ fn scan_all_sources() -> Result<BTreeMap<String, SourceArtifactInfo>> {
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{ArtifactKindSerde, LockEntry, LockSource};
+
+    fn make_lock_entry(source_checksum: &str, version: Option<&str>) -> LockEntry {
+        LockEntry {
+            artifact_type: ArtifactKindSerde::Agent,
+            version: version.map(|v| v.to_string()),
+            installed_at: "2024-01-01T00:00:00Z".to_string(),
+            source: LockSource {
+                repo: "guidelines".to_string(),
+                path: "agents/my-agent.md".to_string(),
+            },
+            source_checksum: source_checksum.to_string(),
+            installed_checksum: source_checksum.to_string(),
+        }
+    }
+
+    // --- is_outdated ---
+
+    #[test]
+    fn is_outdated_matching_checksum_not_outdated() {
+        let entry = make_lock_entry("sha256:abc", Some("1.0.0"));
+        assert!(!is_outdated(Some(&entry), "sha256:abc", Some("1.0.0")));
+    }
+
+    #[test]
+    fn is_outdated_changed_checksum_is_outdated() {
+        let entry = make_lock_entry("sha256:abc", Some("1.0.0"));
+        assert!(is_outdated(Some(&entry), "sha256:xyz", Some("1.0.0")));
+    }
+
+    #[test]
+    fn is_outdated_no_lock_entry_is_outdated() {
+        assert!(is_outdated(None, "sha256:abc", Some("1.0.0")));
+    }
+
+    #[test]
+    fn is_outdated_version_appeared_in_source_is_outdated() {
+        // Installed without a version; source now carries one
+        let entry = make_lock_entry("sha256:abc", None);
+        assert!(is_outdated(Some(&entry), "sha256:abc", Some("1.0.0")));
+    }
+
+    #[test]
+    fn is_outdated_both_unversioned_same_checksum_not_outdated() {
+        let entry = make_lock_entry("sha256:abc", None);
+        assert!(!is_outdated(Some(&entry), "sha256:abc", None));
+    }
+
+    // --- outdated_status_label ---
+
+    #[test]
+    fn status_label_untracked() {
+        assert_eq!(outdated_status_label("-", "1.0.0"), "untracked");
+    }
+
+    #[test]
+    fn status_label_update_available() {
+        assert_eq!(outdated_status_label("1.0.0", "2.0.0"), "update");
+    }
+
+    #[test]
+    fn status_label_changed_same_version() {
+        assert_eq!(outdated_status_label("1.0.0", "1.0.0"), "changed");
+    }
+
+    #[test]
+    fn status_label_changed_no_versions() {
+        assert_eq!(outdated_status_label("-", "-"), "changed");
+    }
 }
