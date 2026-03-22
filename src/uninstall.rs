@@ -1,9 +1,7 @@
 use anyhow::{Result, bail};
 
 use crate::context::AppContext;
-use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use crate::lockfile;
-use crate::paths::ConfigPaths;
 use crate::types::ArtifactKind;
 
 pub fn uninstall_with(
@@ -45,57 +43,17 @@ pub fn uninstall_with(
 }
 
 // ---------------------------------------------------------------------------
-// Legacy free-function API
-// ---------------------------------------------------------------------------
-
-pub fn uninstall(name: &str, kind: ArtifactKind, local: bool) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    uninstall_with(name, kind, local, &ctx)
-}
-
-// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::AppContext;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::paths::ConfigPaths;
+    use crate::test_support::{make_ctx, test_paths};
     use crate::types::{ArtifactKind, LockEntry, LockFile, LockSource};
     use chrono::Utc;
     use std::collections::BTreeMap;
-    use std::path::PathBuf;
-
-    fn test_paths() -> ConfigPaths {
-        ConfigPaths::for_test(
-            PathBuf::from("/home/testuser"),
-            PathBuf::from("/home/testuser/.config/context-mixer"),
-        )
-    }
-
-    fn make_ctx<'a>(
-        fs: &'a FakeFilesystem,
-        git: &'a FakeGitClient,
-        clock: &'a FakeClock,
-        paths: &'a ConfigPaths,
-    ) -> AppContext<'a> {
-        AppContext {
-            fs,
-            git,
-            clock,
-            paths,
-            llm: None,
-        }
-    }
 
     fn sample_lock_entry() -> LockEntry {
         LockEntry {

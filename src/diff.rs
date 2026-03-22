@@ -5,9 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
-use crate::gateway::real::{MojenticLlmClient, RealFilesystem, RealGitClient, SystemClock};
 use crate::lockfile;
-use crate::paths::ConfigPaths;
 use crate::source;
 use crate::source_iter;
 use crate::types::ArtifactKind;
@@ -184,22 +182,4 @@ fn collect_files_with(dir: &Path, ctx: &AppContext<'_>) -> Result<Vec<PathBuf>> 
         }
     }
     Ok(files)
-}
-
-// ---------------------------------------------------------------------------
-// Legacy free-function API
-// ---------------------------------------------------------------------------
-
-pub async fn diff(name: &str, kind: ArtifactKind) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let cfg = config::load_config()?;
-    let llm = MojenticLlmClient::new(cfg.llm);
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: Some(&llm),
-    };
-    diff_with(name, kind, &ctx).await
 }

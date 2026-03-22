@@ -4,9 +4,7 @@ use std::path::Path;
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
-use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use crate::lockfile;
-use crate::paths::ConfigPaths;
 use crate::source;
 use crate::source_iter;
 use crate::types::ArtifactKind;
@@ -111,20 +109,4 @@ fn list_skill_files_with(dir: &Path, indent: &str, ctx: &AppContext<'_>) -> Resu
         }
     }
     Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Legacy free-function API
-// ---------------------------------------------------------------------------
-
-pub fn info(name: &str) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    info_with(name, &ctx)
 }

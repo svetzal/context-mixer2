@@ -4,9 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
-use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use crate::lockfile;
-use crate::paths::ConfigPaths;
 use crate::source;
 use crate::source_iter;
 use crate::types::{ArtifactKind, LockFile};
@@ -219,22 +217,6 @@ fn scan_all_sources_with(ctx: &AppContext<'_>) -> Result<BTreeMap<String, Source
     }
 
     Ok(result)
-}
-
-// ---------------------------------------------------------------------------
-// Legacy free-function API
-// ---------------------------------------------------------------------------
-
-pub fn outdated() -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    outdated_with(&ctx)
 }
 
 // ---------------------------------------------------------------------------

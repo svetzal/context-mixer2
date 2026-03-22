@@ -4,7 +4,6 @@ pub mod cmx_config;
 pub mod config;
 pub mod context;
 pub mod diff;
-pub mod fs_util;
 pub mod gateway;
 pub mod info;
 pub mod install;
@@ -16,5 +15,7 @@ pub mod scan;
 pub mod search;
 pub mod source;
 pub mod source_iter;
+#[cfg(test)]
+mod test_support;
 pub mod types;
 pub mod uninstall;

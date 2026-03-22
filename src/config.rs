@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use std::path::PathBuf;
 
 use crate::gateway::filesystem::Filesystem;
-use crate::gateway::real::RealFilesystem;
 use crate::paths::ConfigPaths;
 use crate::types::{ArtifactKind, CmxConfig, SourceEntry, SourceType, SourcesFile};
 
@@ -106,62 +105,11 @@ pub fn installed_names_with(
     Ok(names)
 }
 
-// ---------------------------------------------------------------------------
-// Legacy free-function API — delegate to real implementations
-// ---------------------------------------------------------------------------
-
-pub fn config_dir() -> Result<PathBuf> {
-    let home = dirs::home_dir().context("Could not determine home directory")?;
-    Ok(home.join(".config").join("context-mixer"))
-}
-
-pub fn sources_path() -> Result<PathBuf> {
-    Ok(config_dir()?.join("sources.json"))
-}
-
-pub fn git_clones_dir() -> Result<PathBuf> {
-    Ok(config_dir()?.join("sources"))
-}
-
-pub fn load_sources() -> Result<SourcesFile> {
-    let paths = ConfigPaths::from_env()?;
-    load_sources_with(&RealFilesystem, &paths)
-}
-
-pub fn save_sources(sources: &SourcesFile) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    save_sources_with(sources, &RealFilesystem, &paths)
-}
-
-pub fn config_path() -> Result<PathBuf> {
-    Ok(config_dir()?.join("config.json"))
-}
-
-pub fn load_config() -> Result<CmxConfig> {
-    let paths = ConfigPaths::from_env()?;
-    load_config_with(&RealFilesystem, &paths)
-}
-
-pub fn save_config(config: &CmxConfig) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    save_config_with(config, &RealFilesystem, &paths)
-}
-
 pub fn resolve_local_path(entry: &SourceEntry) -> PathBuf {
     match entry.source_type {
         SourceType::Local => entry.path.clone().unwrap_or_default(),
         SourceType::Git => entry.local_clone.clone().unwrap_or_default(),
     }
-}
-
-pub fn install_dir(kind: ArtifactKind, local: bool) -> Result<PathBuf> {
-    let paths = ConfigPaths::from_env()?;
-    Ok(paths.install_dir(kind, local))
-}
-
-pub fn installed_names(kind: ArtifactKind, local: bool) -> Result<Vec<String>> {
-    let paths = ConfigPaths::from_env()?;
-    installed_names_with(kind, local, &RealFilesystem, &paths)
 }
 
 // ---------------------------------------------------------------------------
@@ -172,16 +120,9 @@ pub fn installed_names(kind: ArtifactKind, local: bool) -> Result<Vec<String>> {
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
-    use crate::paths::ConfigPaths;
+    use crate::test_support::test_paths;
     use crate::types::{SourceEntry, SourceType};
     use std::path::PathBuf;
-
-    fn test_paths() -> ConfigPaths {
-        ConfigPaths::for_test(
-            PathBuf::from("/home/testuser"),
-            PathBuf::from("/home/testuser/.config/context-mixer"),
-        )
-    }
 
     // --- load_sources_with ---
 

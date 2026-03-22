@@ -2,7 +2,6 @@ use anyhow::Result;
 use std::path::Path;
 
 use crate::gateway::filesystem::Filesystem;
-use crate::gateway::real::RealFilesystem;
 use crate::types::{Artifact, ArtifactKind, Deprecation};
 
 // ---------------------------------------------------------------------------
@@ -157,14 +156,6 @@ fn walk_dir_with(dir: &Path, artifacts: &mut Vec<Artifact>, fs: &dyn Filesystem)
     }
 
     Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Legacy free-function API — delegate to real implementations
-// ---------------------------------------------------------------------------
-
-pub fn scan_source(root: &Path) -> Result<Vec<Artifact>> {
-    scan_source_with(root, &RealFilesystem)
 }
 
 // ---------------------------------------------------------------------------

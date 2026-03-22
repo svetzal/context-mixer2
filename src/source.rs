@@ -4,8 +4,6 @@ use std::path::PathBuf;
 
 use crate::config;
 use crate::context::AppContext;
-use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
-use crate::paths::ConfigPaths;
 use crate::scan;
 use crate::source_iter;
 use crate::types::{Artifact, SourceEntry, SourceType};
@@ -341,94 +339,6 @@ fn add_git_source_with(name: &str, url: &str, ctx: &AppContext<'_>) -> Result<So
 }
 
 // ---------------------------------------------------------------------------
-// Legacy free-function API — delegate to real implementations
-// ---------------------------------------------------------------------------
-
-pub fn add(name: &str, path_or_url: &str) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    add_with(name, path_or_url, &ctx)
-}
-
-pub fn list() -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    list_with(&ctx)
-}
-
-pub fn browse(name: &str) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    browse_with(name, &ctx)
-}
-
-pub fn update(name: Option<&str>) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    update_with(name, &ctx)
-}
-
-pub fn remove(name: &str) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    remove_with(name, &ctx)
-}
-
-pub fn auto_update_source(name: &str) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    auto_update_source_with(name, &ctx)
-}
-
-pub fn auto_update_all() -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    auto_update_all_with(&ctx)
-}
-
-// ---------------------------------------------------------------------------
 // Pure helpers (no I/O)
 // ---------------------------------------------------------------------------
 
@@ -470,35 +380,13 @@ fn looks_like_url(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::AppContext;
     use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::paths::ConfigPaths;
+    use crate::test_support::{make_ctx, test_paths};
     use crate::types::{ArtifactKind, Deprecation, SourceType};
     use chrono::Utc;
     use std::path::PathBuf;
-
-    fn test_paths() -> ConfigPaths {
-        ConfigPaths::for_test(
-            PathBuf::from("/home/testuser"),
-            PathBuf::from("/home/testuser/.config/context-mixer"),
-        )
-    }
-
-    fn make_ctx<'a>(
-        fs: &'a FakeFilesystem,
-        git: &'a FakeGitClient,
-        clock: &'a FakeClock,
-        paths: &'a ConfigPaths,
-    ) -> AppContext<'a> {
-        AppContext {
-            fs,
-            git,
-            clock,
-            paths,
-            llm: None,
-        }
-    }
 
     // --- looks_like_url ---
 

@@ -5,9 +5,7 @@ use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
 use crate::gateway::filesystem::Filesystem;
-use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use crate::lockfile;
-use crate::paths::ConfigPaths;
 use crate::source;
 use crate::source_iter;
 use crate::types::{ArtifactKind, LockEntry, LockSource};
@@ -293,58 +291,6 @@ fn copy_dir_recursive_with(src: &Path, dest: &Path, fs: &dyn Filesystem) -> Resu
 }
 
 // ---------------------------------------------------------------------------
-// Legacy free-function API — delegate to real implementations
-// ---------------------------------------------------------------------------
-
-pub fn install(name: &str, kind: ArtifactKind, local: bool, force: bool) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    install_with(name, kind, local, force, &ctx)
-}
-
-pub fn update(name: &str, kind: ArtifactKind, force: bool) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    update_with(name, kind, force, &ctx)
-}
-
-pub fn install_all(kind: ArtifactKind, local: bool, force: bool) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    install_all_with(kind, local, force, &ctx)
-}
-
-pub fn update_all(kind: ArtifactKind, force: bool) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    update_all_with(kind, force, &ctx)
-}
-
-// ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
 
@@ -363,35 +309,13 @@ fn parse_name(name: &str) -> (Option<&str>, &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::AppContext;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::paths::ConfigPaths;
+    use crate::test_support::{make_ctx, test_paths};
     use crate::types::{ArtifactKind, LockFile, SourceEntry, SourceType, SourcesFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
     use std::path::PathBuf;
-
-    fn test_paths() -> ConfigPaths {
-        ConfigPaths::for_test(
-            PathBuf::from("/home/testuser"),
-            PathBuf::from("/home/testuser/.config/context-mixer"),
-        )
-    }
-
-    fn make_ctx<'a>(
-        fs: &'a FakeFilesystem,
-        git: &'a FakeGitClient,
-        clock: &'a FakeClock,
-        paths: &'a ConfigPaths,
-    ) -> AppContext<'a> {
-        AppContext {
-            fs,
-            git,
-            clock,
-            paths,
-            llm: None,
-        }
-    }
 
     fn agent_content(name: &str, desc: &str) -> String {
         format!("---\nname: {name}\ndescription: {desc}\n---\n# {name}\n")

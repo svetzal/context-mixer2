@@ -3,9 +3,7 @@ use std::collections::BTreeMap;
 
 use crate::config;
 use crate::context::AppContext;
-use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use crate::lockfile;
-use crate::paths::ConfigPaths;
 use crate::source_iter;
 use crate::types::{ArtifactKind, LockFile};
 
@@ -196,34 +194,6 @@ fn print_section(label: &str, rows: &[Row]) {
         print_table(rows);
     }
     println!();
-}
-
-// ---------------------------------------------------------------------------
-// Legacy free-function API
-// ---------------------------------------------------------------------------
-
-pub fn list_kind(kind: ArtifactKind) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    list_kind_with(kind, &ctx)
-}
-
-pub fn list_all() -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    list_all_with(&ctx)
 }
 
 // ---------------------------------------------------------------------------

@@ -1,10 +1,8 @@
 use anyhow::{Context, Result};
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use crate::config;
 use crate::gateway::filesystem::Filesystem;
-use crate::gateway::real::RealFilesystem;
 use crate::paths::ConfigPaths;
 use crate::types::LockFile;
 
@@ -58,40 +56,6 @@ pub fn save_with(
 }
 
 // ---------------------------------------------------------------------------
-// Legacy free-function API — delegate to real implementations
-// ---------------------------------------------------------------------------
-
-pub fn lock_path(local: bool) -> Result<PathBuf> {
-    if local {
-        Ok(PathBuf::from(".context-mixer").join("cmx-lock.json"))
-    } else {
-        Ok(config::config_dir()?.join("cmx-lock.json"))
-    }
-}
-
-/// Load a `LockFile` from an explicit path.  Returns a default (empty) lock
-/// file if the path does not exist.
-pub fn load_from(path: &Path) -> Result<LockFile> {
-    load_from_with(path, &RealFilesystem)
-}
-
-/// Save a `LockFile` to an explicit path, creating parent directories as
-/// needed.
-pub fn save_to(lock: &LockFile, path: &Path) -> Result<()> {
-    save_to_with(lock, path, &RealFilesystem)
-}
-
-pub fn load(local: bool) -> Result<LockFile> {
-    let path = lock_path(local)?;
-    load_from(&path)
-}
-
-pub fn save(lock: &LockFile, local: bool) -> Result<()> {
-    let path = lock_path(local)?;
-    save_to(lock, &path)
-}
-
-// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 
@@ -99,16 +63,9 @@ pub fn save(lock: &LockFile, local: bool) -> Result<()> {
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
-    use crate::paths::ConfigPaths;
+    use crate::test_support::test_paths;
     use crate::types::{ArtifactKind, LockEntry, LockSource};
     use std::path::PathBuf;
-
-    fn test_paths() -> ConfigPaths {
-        ConfigPaths::for_test(
-            PathBuf::from("/home/testuser"),
-            PathBuf::from("/home/testuser/.config/context-mixer"),
-        )
-    }
 
     fn sample_lock() -> LockFile {
         let mut packages = BTreeMap::new();

@@ -2,8 +2,6 @@ use anyhow::{Result, bail};
 
 use crate::config;
 use crate::context::AppContext;
-use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
-use crate::paths::ConfigPaths;
 use crate::types::LlmGatewayType;
 
 pub fn show_with(ctx: &AppContext<'_>) -> Result<()> {
@@ -31,44 +29,4 @@ pub fn set_model_with(value: &str, ctx: &AppContext<'_>) -> Result<()> {
     config::save_config_with(&cfg, ctx.fs, ctx.paths)?;
     println!("LLM model set to: {value}");
     Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Legacy free-function API
-// ---------------------------------------------------------------------------
-
-pub fn show() -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    show_with(&ctx)
-}
-
-pub fn set_gateway(value: &str) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    set_gateway_with(value, &ctx)
-}
-
-pub fn set_model(value: &str) -> Result<()> {
-    let paths = ConfigPaths::from_env()?;
-    let ctx = AppContext {
-        fs: &RealFilesystem,
-        git: &RealGitClient,
-        clock: &SystemClock,
-        paths: &paths,
-        llm: None,
-    };
-    set_model_with(value, &ctx)
 }
