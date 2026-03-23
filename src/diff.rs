@@ -183,3 +183,521 @@ fn collect_files_with(dir: &Path, ctx: &AppContext<'_>) -> Result<Vec<PathBuf>> 
     }
     Ok(files)
 }
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::AppContext;
+    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient, FakeLlmClient};
+    use crate::lockfile;
+    use crate::paths::ConfigPaths;
+    use crate::test_support::{make_ctx, test_paths};
+    use crate::types::{
+        ArtifactKind, LockEntry, LockFile, LockSource, SourceEntry, SourceType, SourcesFile,
+    };
+    use chrono::Utc;
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+
+    fn agent_content(name: &str, desc: &str) -> String {
+        format!("---\nname: {name}\ndescription: {desc}\n---\n# {name}\n")
+    }
+
+    fn setup_source_with_agent(
+        fs: &FakeFilesystem,
+        paths: &ConfigPaths,
+        source_name: &str,
+        source_path: &str,
+        agent_name: &str,
+    ) {
+        let sources = SourcesFile {
+            version: 1,
+            sources: {
+                let mut m = BTreeMap::new();
+                m.insert(
+                    source_name.to_string(),
+                    SourceEntry {
+                        source_type: SourceType::Local,
+                        path: Some(PathBuf::from(source_path)),
+                        url: None,
+                        local_clone: None,
+                        branch: None,
+                        last_updated: Some(Utc::now().to_rfc3339()),
+                    },
+                );
+                m
+            },
+        };
+        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        fs.add_file(
+            format!("{source_path}/{agent_name}.md"),
+            agent_content(agent_name, "A test agent"),
+        );
+    }
+
+    fn install_agent_on_disk(
+        fs: &FakeFilesystem,
+        paths: &ConfigPaths,
+        name: &str,
+        content: &str,
+        local: bool,
+    ) {
+        let dir = paths.install_dir(ArtifactKind::Agent, local);
+        let path = ArtifactKind::Agent.installed_path(name, &dir);
+        fs.add_file(path, content);
+    }
+
+    fn install_skill_on_disk(
+        fs: &FakeFilesystem,
+        paths: &ConfigPaths,
+        name: &str,
+        files: &[(&str, &str)],
+        local: bool,
+    ) {
+        let dir = paths.install_dir(ArtifactKind::Skill, local);
+        let skill_dir = dir.join(name);
+        for (file_name, content) in files {
+            fs.add_file(skill_dir.join(file_name), *content);
+        }
+    }
+
+    // --- collect_relative_files_with ---
+
+    #[test]
+    fn collect_relative_files_returns_sorted_relative_paths() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        fs.add_file("/dir/b.md", "b");
+        fs.add_file("/dir/a.md", "a");
+        fs.add_file("/dir/sub/c.md", "c");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = collect_relative_files_with(std::path::Path::new("/dir"), &ctx).unwrap();
+
+        assert_eq!(result, vec!["a.md", "b.md", "sub/c.md"]);
+    }
+
+    #[test]
+    fn collect_relative_files_empty_dir_returns_empty() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        fs.add_dir("/empty");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = collect_relative_files_with(std::path::Path::new("/empty"), &ctx).unwrap();
+
+        assert!(result.is_empty());
+    }
+
+    // --- diff_files_with ---
+
+    #[test]
+    fn diff_files_builds_comparison_text() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        fs.add_file("/installed/agent.md", "installed content");
+        fs.add_file("/source/agent.md", "source content");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = diff_files_with(
+            std::path::Path::new("/installed/agent.md"),
+            std::path::Path::new("/source/agent.md"),
+            &ctx,
+        )
+        .unwrap();
+
+        assert!(
+            result.contains("=== INSTALLED VERSION ==="),
+            "missing installed header: {result}"
+        );
+        assert!(result.contains("=== SOURCE VERSION ==="), "missing source header: {result}");
+        assert!(result.contains("installed content"), "missing installed content: {result}");
+        assert!(result.contains("source content"), "missing source content: {result}");
+    }
+
+    #[test]
+    fn diff_files_errors_on_missing_installed() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        fs.add_file("/source/agent.md", "source content");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = diff_files_with(
+            std::path::Path::new("/installed/agent.md"),
+            std::path::Path::new("/source/agent.md"),
+            &ctx,
+        );
+
+        assert!(result.is_err());
+    }
+
+    // --- diff_dirs_with ---
+
+    #[test]
+    fn diff_dirs_identical_directories_returns_empty() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        let content = "---\ndescription: My skill\n---\n";
+        fs.add_file("/installed/my-skill/SKILL.md", content);
+        fs.add_file("/source/my-skill/SKILL.md", content);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = diff_dirs_with(
+            std::path::Path::new("/installed/my-skill"),
+            std::path::Path::new("/source/my-skill"),
+            &ctx,
+        )
+        .unwrap();
+
+        assert!(result.is_empty(), "expected empty diff for identical dirs, got: {result}");
+    }
+
+    #[test]
+    fn diff_dirs_shows_files_only_in_installed() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        fs.add_file("/installed/my-skill/SKILL.md", "skill");
+        fs.add_file("/installed/my-skill/extra.md", "extra");
+        fs.add_file("/source/my-skill/SKILL.md", "skill");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = diff_dirs_with(
+            std::path::Path::new("/installed/my-skill"),
+            std::path::Path::new("/source/my-skill"),
+            &ctx,
+        )
+        .unwrap();
+
+        assert!(result.contains("Only in installed"), "expected 'Only in installed': {result}");
+        assert!(result.contains("extra.md"), "expected extra.md: {result}");
+    }
+
+    #[test]
+    fn diff_dirs_shows_files_only_in_source() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        fs.add_file("/installed/my-skill/SKILL.md", "skill");
+        fs.add_file("/source/my-skill/SKILL.md", "skill");
+        fs.add_file("/source/my-skill/new-file.md", "new");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = diff_dirs_with(
+            std::path::Path::new("/installed/my-skill"),
+            std::path::Path::new("/source/my-skill"),
+            &ctx,
+        )
+        .unwrap();
+
+        assert!(result.contains("Only in source"), "expected 'Only in source': {result}");
+        assert!(result.contains("new-file.md"), "expected new-file.md: {result}");
+    }
+
+    #[test]
+    fn diff_dirs_shows_changed_file_content() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        fs.add_file("/installed/my-skill/SKILL.md", "installed skill content");
+        fs.add_file("/source/my-skill/SKILL.md", "updated skill content");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = diff_dirs_with(
+            std::path::Path::new("/installed/my-skill"),
+            std::path::Path::new("/source/my-skill"),
+            &ctx,
+        )
+        .unwrap();
+
+        assert!(result.contains("INSTALLED"), "expected INSTALLED section: {result}");
+        assert!(result.contains("SOURCE"), "expected SOURCE section: {result}");
+        assert!(
+            result.contains("installed skill content"),
+            "missing installed content: {result}"
+        );
+        assert!(result.contains("updated skill content"), "missing source content: {result}");
+    }
+
+    // --- find_installed_on_disk_with ---
+
+    #[test]
+    fn find_installed_finds_global_agent() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        install_agent_on_disk(&fs, &paths, "my-agent", "content", false);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = find_installed_on_disk_with("my-agent", ArtifactKind::Agent, &ctx);
+
+        assert!(result.is_ok(), "expected Ok: {:?}", result.err());
+        let (_, local) = result.unwrap();
+        assert!(!local, "expected global (local=false)");
+    }
+
+    #[test]
+    fn find_installed_finds_local_agent() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        install_agent_on_disk(&fs, &paths, "my-agent", "content", true);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = find_installed_on_disk_with("my-agent", ArtifactKind::Agent, &ctx);
+
+        assert!(result.is_ok(), "expected Ok: {:?}", result.err());
+        let (_, local) = result.unwrap();
+        assert!(local, "expected local (local=true)");
+    }
+
+    #[test]
+    fn find_installed_prefers_global_over_local() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        install_agent_on_disk(&fs, &paths, "my-agent", "global content", false);
+        install_agent_on_disk(&fs, &paths, "my-agent", "local content", true);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let (_, local) =
+            find_installed_on_disk_with("my-agent", ArtifactKind::Agent, &ctx).unwrap();
+
+        assert!(!local, "expected global to be preferred over local");
+    }
+
+    #[test]
+    fn find_installed_errors_when_not_found() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = find_installed_on_disk_with("nonexistent", ArtifactKind::Agent, &ctx);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn find_installed_finds_skill_directory() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        install_skill_on_disk(&fs, &paths, "my-skill", &[("SKILL.md", "skill content")], false);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = find_installed_on_disk_with("my-skill", ArtifactKind::Skill, &ctx);
+
+        assert!(result.is_ok(), "expected Ok: {:?}", result.err());
+        let (_, local) = result.unwrap();
+        assert!(!local, "expected global (local=false)");
+    }
+
+    // --- find_in_sources_with ---
+
+    #[test]
+    fn find_in_sources_locates_agent() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = find_in_sources_with("my-agent", ArtifactKind::Agent, &ctx);
+
+        assert!(result.is_ok(), "expected Ok: {:?}", result.err());
+    }
+
+    #[test]
+    fn find_in_sources_errors_when_not_found() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "other-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = find_in_sources_with("my-agent", ArtifactKind::Agent, &ctx);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn find_in_sources_matches_kind() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Source has an agent named "my-agent"; searching for a skill with same name should fail
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = find_in_sources_with("my-agent", ArtifactKind::Skill, &ctx);
+
+        assert!(result.is_err(), "expected Err when kind doesn't match");
+    }
+
+    // --- diff_with (top-level async) ---
+
+    #[tokio::test]
+    async fn diff_with_reports_up_to_date_when_checksums_match() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        let content = agent_content("my-agent", "A test agent");
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        // Override the source file with specific content
+        fs.add_file("/sources/my-source/my-agent.md", content.clone());
+        install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
+
+        // Write a lock file entry so load_with succeeds
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-agent".to_string(),
+            LockEntry {
+                artifact_type: ArtifactKind::Agent,
+                version: Some("1.0.0".to_string()),
+                installed_at: Utc::now().to_rfc3339(),
+                source: LockSource {
+                    repo: "my-source".to_string(),
+                    path: "my-agent.md".to_string(),
+                },
+                source_checksum: "sha256:placeholder".to_string(),
+                installed_checksum: "sha256:placeholder".to_string(),
+            },
+        );
+        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
+
+        // Same content => checksums match => returns Ok immediately (no LLM needed)
+        assert!(result.is_ok(), "expected Ok for up-to-date artifact: {:?}", result.err());
+    }
+
+    #[tokio::test]
+    async fn diff_with_errors_without_llm_when_checksums_differ() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        // Install a different version so checksums differ
+        install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
+
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-agent".to_string(),
+            LockEntry {
+                artifact_type: ArtifactKind::Agent,
+                version: Some("1.0.0".to_string()),
+                installed_at: Utc::now().to_rfc3339(),
+                source: LockSource {
+                    repo: "my-source".to_string(),
+                    path: "my-agent.md".to_string(),
+                },
+                source_checksum: "sha256:placeholder".to_string(),
+                installed_checksum: "sha256:placeholder".to_string(),
+            },
+        );
+        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        // No LLM configured — should bail when it tries to analyze
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
+
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("LLM"), "expected LLM error, got: {msg}");
+    }
+
+    #[tokio::test]
+    async fn diff_with_succeeds_with_llm_when_checksums_differ() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+        let llm = FakeLlmClient::new("LLM analysis result");
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
+
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-agent".to_string(),
+            LockEntry {
+                artifact_type: ArtifactKind::Agent,
+                version: Some("1.0.0".to_string()),
+                installed_at: Utc::now().to_rfc3339(),
+                source: LockSource {
+                    repo: "my-source".to_string(),
+                    path: "my-agent.md".to_string(),
+                },
+                source_checksum: "sha256:placeholder".to_string(),
+                installed_checksum: "sha256:placeholder".to_string(),
+            },
+        );
+        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = AppContext {
+            fs: &fs,
+            git: &git,
+            clock: &clock,
+            paths: &paths,
+            llm: Some(&llm),
+        };
+        let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
+
+        assert!(result.is_ok(), "expected Ok with LLM configured: {:?}", result.err());
+    }
+}
