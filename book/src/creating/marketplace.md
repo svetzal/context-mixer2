@@ -1,10 +1,16 @@
 # Marketplace Structure
 
-A marketplace is a git repository that distributes agents and skills. cmx supports two formats.
+A marketplace is a git repository that distributes agents and skills. cmx supports the Claude Code plugin marketplace format and a simple fallback.
 
 ## Plugin marketplace (recommended)
 
 Add a `.claude-plugin/marketplace.json` to your repo. This is compatible with Claude Code's native plugin system.
+
+cmx supports three plugin declaration styles within `marketplace.json`, matching the formats used across Anthropic's own repositories.
+
+### Format 1: Explicit `agents`/`skills` arrays
+
+Best when you want precise control over which artifacts are exposed:
 
 ```
 my-marketplace/
@@ -21,19 +27,10 @@ my-marketplace/
 └── README.md
 ```
 
-### marketplace.json
-
 ```json
 {
   "name": "my-marketplace",
-  "owner": {
-    "name": "Your Name",
-    "email": "you@example.com"
-  },
-  "metadata": {
-    "description": "My curated agents and skills",
-    "version": "1.0.0"
-  },
+  "owner": { "name": "Your Name" },
   "plugins": [
     {
       "name": "my-plugin",
@@ -52,11 +49,75 @@ my-marketplace/
 }
 ```
 
-When `marketplace.json` is present, cmx reads it to discover artifacts rather than walking the directory tree.
+Paths in `agents` and `skills` arrays are resolved relative to the repository root.
+
+### Format 2: Source path without explicit arrays
+
+Best when each plugin lives in its own subdirectory. cmx walks the directory to discover artifacts automatically:
+
+```
+my-marketplace/
+├── .claude-plugin/
+│   └── marketplace.json
+├── plugins/
+│   ├── code-review/
+│   │   ├── reviewer.md
+│   │   └── review-skill/
+│   │       └── SKILL.md
+│   └── commit-tools/
+│       └── committer.md
+└── README.md
+```
+
+```json
+{
+  "name": "my-marketplace",
+  "owner": { "name": "Your Name" },
+  "plugins": [
+    {
+      "name": "code-review",
+      "description": "Automated code review",
+      "source": "./plugins/code-review"
+    },
+    {
+      "name": "commit-tools",
+      "description": "Git commit workflows",
+      "source": "./plugins/commit-tools"
+    }
+  ]
+}
+```
+
+When no `agents`/`skills` arrays are present, cmx resolves the `source` path and walks that directory to find `.md` agents and `SKILL.md` skills.
+
+### Format 3: Remote source objects (not yet supported)
+
+The official Claude Code plugin format also supports remote sources (`url`, `github`, `git-subdir`, `npm`). cmx recognizes these entries and emits a warning. Future versions may add support for fetching remote plugin sources.
+
+```json
+{
+  "plugins": [
+    {
+      "name": "some-plugin",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/example/plugin.git",
+        "sha": "a1b2c3d4..."
+      }
+    }
+  ]
+}
+```
+
+### Scanning priority
+
+1. If `agents`/`skills` arrays exist on a plugin entry, cmx uses them directly.
+2. If only a `source` path string is present, cmx walks that directory.
+3. If `source` is an object (remote), cmx warns and skips.
 
 ## Simple directory (fallback)
 
-Without `marketplace.json`, cmx walks the tree looking for:
+Without `marketplace.json`, cmx walks the entire tree looking for:
 
 - `.md` files with frontmatter containing `name` and `description` → agents
 - Directories containing `SKILL.md` with frontmatter → skills

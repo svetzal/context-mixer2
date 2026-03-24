@@ -78,21 +78,19 @@ my-marketplace/
 
 ### marketplace.json
 
+cmx supports multiple plugin declaration styles within `marketplace.json`, matching the formats used by Anthropic's own repositories.
+
+#### Format 1: Explicit `agents`/`skills` arrays
+
+Used when the marketplace author wants precise control over which artifacts are exposed (e.g. `anthropics/skills`):
+
 ```json
 {
   "name": "my-marketplace",
-  "owner": {
-    "name": "Author Name",
-    "email": "author@example.com"
-  },
-  "metadata": {
-    "description": "Curated agents and skills for software craftspeople",
-    "version": "1.0.0"
-  },
+  "owner": { "name": "Author Name" },
   "plugins": [
     {
       "name": "craftsperson-agents",
-      "description": "Production-grade craftsperson agents for multiple tech stacks",
       "source": "./",
       "agents": [
         "./agents/python-craftsperson.md",
@@ -107,7 +105,56 @@ my-marketplace/
 }
 ```
 
-cmx scans marketplace repos by reading `marketplace.json` to discover plugins, then scans the declared agent/skill paths. If no `marketplace.json` is present, cmx falls back to walking the tree for `.md` files with agent frontmatter and directories with `SKILL.md`.
+When `agents` or `skills` arrays are present, cmx uses them directly. Paths are resolved relative to the repository root.
+
+#### Format 2: `source` path without explicit arrays
+
+Used when each plugin lives in its own subdirectory and cmx should discover artifacts by walking (e.g. `anthropics/claude-code` bundled plugins):
+
+```json
+{
+  "plugins": [
+    {
+      "name": "code-review",
+      "description": "Automated code review",
+      "source": "./plugins/code-review"
+    },
+    {
+      "name": "commit-commands",
+      "description": "Git commit workflows",
+      "source": "./plugins/commit-commands"
+    }
+  ]
+}
+```
+
+When no `agents`/`skills` arrays are present but `source` is a relative path, cmx resolves the path and walks the directory tree to discover `.md` agents and `SKILL.md` skills — the same logic used for repos without a marketplace.json.
+
+#### Format 3: Remote `source` objects (not yet supported)
+
+The official Claude Code plugin format also supports remote sources (`url`, `github`, `git-subdir`, `npm`), as seen in `anthropics/claude-plugins-official`:
+
+```json
+{
+  "plugins": [
+    {
+      "name": "some-plugin",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/example/plugin.git",
+        "sha": "a1b2c3d4..."
+      }
+    }
+  ]
+}
+```
+
+cmx recognizes these entries and emits a warning that remote sources are not yet supported. Future versions may add support for fetching and scanning remote plugin sources.
+
+### Scanning priority
+
+1. If `.claude-plugin/marketplace.json` exists, cmx reads it and processes each plugin entry using the format rules above.
+2. If no `marketplace.json` is present, cmx falls back to walking the entire tree for `.md` files with agent frontmatter and directories with `SKILL.md`.
 
 ### Compatibility with Claude Code plugins
 

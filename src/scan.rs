@@ -35,78 +35,122 @@ fn scan_marketplace_with(
 
     if let Some(plugins) = manifest.get("plugins").and_then(|p| p.as_array()) {
         for plugin in plugins {
-            // Scan declared agents
-            if let Some(agents) = plugin.get("agents").and_then(|a| a.as_array()) {
-                for agent_path in agents {
-                    if let Some(path_str) = agent_path.as_str() {
-                        let full_path = root.join(path_str);
-                        if !fs.exists(&full_path) {
-                            eprintln!(
-                                "Warning: marketplace declares agent '{path_str}' but path does not exist"
-                            );
-                            continue;
-                        }
-                        if let Ok(content) = fs.read_to_string(&full_path)
-                            && let Some(fm) = parse_agent_frontmatter_str(&content)
-                        {
-                            let name = full_path
-                                .file_stem()
-                                .map(|s| s.to_string_lossy().to_string())
-                                .unwrap_or_default();
-                            artifacts.push(Artifact {
-                                kind: ArtifactKind::Agent,
-                                name,
-                                description: fm.description,
-                                path: full_path,
-                                version: fm.version,
-                                deprecation: fm.deprecation,
-                            });
-                        }
-                    }
-                }
+            let has_agents =
+                plugin.get("agents").and_then(|a| a.as_array()).is_some_and(|a| !a.is_empty());
+            let has_skills =
+                plugin.get("skills").and_then(|s| s.as_array()).is_some_and(|s| !s.is_empty());
+
+            // If explicit agents/skills arrays are present, use them directly
+            if has_agents || has_skills {
+                scan_marketplace_explicit_arrays(root, plugin, &mut artifacts, fs);
+                continue;
             }
 
-            // Scan declared skills
-            if let Some(skills) = plugin.get("skills").and_then(|s| s.as_array()) {
-                for skill_path in skills {
-                    if let Some(path_str) = skill_path.as_str() {
-                        let full_path = root.join(path_str);
-                        if !fs.exists(&full_path) {
-                            eprintln!(
-                                "Warning: marketplace declares skill '{path_str}' but path does not exist"
-                            );
-                            continue;
-                        }
-                        let skill_md = full_path.join("SKILL.md");
-                        if !fs.exists(&skill_md) {
-                            eprintln!(
-                                "Warning: marketplace declares skill '{path_str}' but SKILL.md is missing"
-                            );
-                            continue;
-                        }
-                        if let Ok(content) = fs.read_to_string(&skill_md)
-                            && let Some(fm) = parse_frontmatter_str(&content)
-                        {
-                            let name = full_path
-                                .file_name()
-                                .map(|s| s.to_string_lossy().to_string())
-                                .unwrap_or_default();
-                            artifacts.push(Artifact {
-                                kind: ArtifactKind::Skill,
-                                name,
-                                description: fm.description,
-                                path: full_path,
-                                version: fm.version,
-                                deprecation: fm.deprecation,
-                            });
-                        }
+            // Otherwise, resolve the source field and walk the directory
+            if let Some(source) = plugin.get("source") {
+                if let Some(source_path) = source.as_str() {
+                    // Relative path source — walk the resolved directory
+                    let resolved = root.join(source_path);
+                    if fs.exists(&resolved) {
+                        walk_dir_with(&resolved, &mut artifacts, fs)?;
+                    } else {
+                        let plugin_name =
+                            plugin.get("name").and_then(|n| n.as_str()).unwrap_or("<unnamed>");
+                        eprintln!(
+                            "Warning: plugin '{plugin_name}' source path '{source_path}' does not exist"
+                        );
                     }
+                } else if source.is_object() {
+                    // Remote source (github, url, git-subdir, npm) — not yet supported
+                    let plugin_name =
+                        plugin.get("name").and_then(|n| n.as_str()).unwrap_or("<unnamed>");
+                    let source_type =
+                        source.get("source").and_then(|s| s.as_str()).unwrap_or("unknown");
+                    eprintln!(
+                        "Warning: plugin '{plugin_name}' uses remote source type '{source_type}' which is not yet supported"
+                    );
                 }
             }
         }
     }
 
     Ok(artifacts)
+}
+
+fn scan_marketplace_explicit_arrays(
+    root: &Path,
+    plugin: &serde_json::Value,
+    artifacts: &mut Vec<Artifact>,
+    fs: &dyn Filesystem,
+) {
+    // Scan declared agents
+    if let Some(agents) = plugin.get("agents").and_then(|a| a.as_array()) {
+        for agent_path in agents {
+            if let Some(path_str) = agent_path.as_str() {
+                let full_path = root.join(path_str);
+                if !fs.exists(&full_path) {
+                    eprintln!(
+                        "Warning: marketplace declares agent '{path_str}' but path does not exist"
+                    );
+                    continue;
+                }
+                if let Ok(content) = fs.read_to_string(&full_path)
+                    && let Some(fm) = parse_agent_frontmatter_str(&content)
+                {
+                    let name = full_path
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    artifacts.push(Artifact {
+                        kind: ArtifactKind::Agent,
+                        name,
+                        description: fm.description,
+                        path: full_path,
+                        version: fm.version,
+                        deprecation: fm.deprecation,
+                    });
+                }
+            }
+        }
+    }
+
+    // Scan declared skills
+    if let Some(skills) = plugin.get("skills").and_then(|s| s.as_array()) {
+        for skill_path in skills {
+            if let Some(path_str) = skill_path.as_str() {
+                let full_path = root.join(path_str);
+                if !fs.exists(&full_path) {
+                    eprintln!(
+                        "Warning: marketplace declares skill '{path_str}' but path does not exist"
+                    );
+                    continue;
+                }
+                let skill_md = full_path.join("SKILL.md");
+                if !fs.exists(&skill_md) {
+                    eprintln!(
+                        "Warning: marketplace declares skill '{path_str}' but SKILL.md is missing"
+                    );
+                    continue;
+                }
+                if let Ok(content) = fs.read_to_string(&skill_md)
+                    && let Some(fm) = parse_frontmatter_str(&content)
+                {
+                    let name = full_path
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    artifacts.push(Artifact {
+                        kind: ArtifactKind::Skill,
+                        name,
+                        description: fm.description,
+                        path: full_path,
+                        version: fm.version,
+                        deprecation: fm.deprecation,
+                    });
+                }
+            }
+        }
+    }
 }
 
 fn walk_dir_with(dir: &Path, artifacts: &mut Vec<Artifact>, fs: &dyn Filesystem) -> Result<()> {
@@ -466,5 +510,141 @@ mod tests {
         let kinds: Vec<_> = result.iter().map(|a| a.kind).collect();
         assert!(kinds.contains(&ArtifactKind::Agent));
         assert!(kinds.contains(&ArtifactKind::Skill));
+    }
+
+    // ---------------------------------------------------------------------------
+    // Marketplace: source-path fallback (no explicit agents/skills arrays)
+    // ---------------------------------------------------------------------------
+
+    fn marketplace_json(plugins_json: &str) -> String {
+        format!(
+            r#"{{
+  "name": "test-marketplace",
+  "owner": {{ "name": "Test" }},
+  "plugins": [{plugins_json}]
+}}"#
+        )
+    }
+
+    #[test]
+    fn marketplace_source_path_walks_directory_for_agents() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            marketplace_json(r#"{ "name": "my-plugin", "source": "./plugins/my-plugin" }"#),
+        );
+        fs.add_file(
+            "/repo/plugins/my-plugin/reviewer.md",
+            agent_content("reviewer", "Reviews code"),
+        );
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "reviewer");
+        assert_eq!(result[0].kind, ArtifactKind::Agent);
+    }
+
+    #[test]
+    fn marketplace_source_path_walks_directory_for_skills() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            marketplace_json(r#"{ "name": "my-plugin", "source": "./plugins/my-plugin" }"#),
+        );
+        fs.add_file(
+            "/repo/plugins/my-plugin/my-skill/SKILL.md",
+            skill_content("A discovered skill"),
+        );
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "my-skill");
+        assert_eq!(result[0].kind, ArtifactKind::Skill);
+    }
+
+    #[test]
+    fn marketplace_source_path_finds_mixed_artifacts() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            marketplace_json(r#"{ "name": "my-plugin", "source": "./plugins/my-plugin" }"#),
+        );
+        fs.add_file(
+            "/repo/plugins/my-plugin/checker.md",
+            agent_content("checker", "Checks things"),
+        );
+        fs.add_file("/repo/plugins/my-plugin/pdf/SKILL.md", skill_content("PDF processing"));
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.len(), 2);
+        let names: Vec<_> = result.iter().map(|a| a.name.as_str()).collect();
+        assert!(names.contains(&"checker"));
+        assert!(names.contains(&"pdf"));
+    }
+
+    #[test]
+    fn marketplace_explicit_arrays_take_precedence_over_source_walk() {
+        let fs = FakeFilesystem::new();
+        // Plugin has both source AND explicit skills array — should use explicit only
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            marketplace_json(
+                r#"{
+                    "name": "doc-skills",
+                    "source": "./",
+                    "strict": false,
+                    "skills": ["./skills/pdf"]
+                }"#,
+            ),
+        );
+        fs.add_file("/repo/skills/pdf/SKILL.md", skill_content("PDF skill"));
+        // This agent exists in the repo but isn't in the explicit arrays
+        fs.add_file("/repo/extra-agent.md", agent_content("extra", "Should not appear"));
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "pdf");
+        assert_eq!(result[0].kind, ArtifactKind::Skill);
+    }
+
+    #[test]
+    fn marketplace_multiple_source_plugins_all_walked() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            marketplace_json(
+                r#"{ "name": "plugin-a", "source": "./plugins/a" },
+                   { "name": "plugin-b", "source": "./plugins/b" }"#,
+            ),
+        );
+        fs.add_file("/repo/plugins/a/agent-a.md", agent_content("agent-a", "From plugin A"));
+        fs.add_file("/repo/plugins/b/agent-b.md", agent_content("agent-b", "From plugin B"));
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.len(), 2);
+        let names: Vec<_> = result.iter().map(|a| a.name.as_str()).collect();
+        assert!(names.contains(&"agent-a"));
+        assert!(names.contains(&"agent-b"));
+    }
+
+    #[test]
+    fn marketplace_missing_source_path_warns_and_continues() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            marketplace_json(r#"{ "name": "ghost", "source": "./nonexistent" }"#),
+        );
+        // Should not error, just warn and return empty
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn marketplace_object_source_warns_and_continues() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            marketplace_json(
+                r#"{ "name": "remote-plugin", "source": { "source": "url", "url": "https://github.com/example/plugin.git" } }"#,
+            ),
+        );
+        // Remote sources are not supported — should warn and return empty
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert!(result.is_empty());
     }
 }
