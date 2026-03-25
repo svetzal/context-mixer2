@@ -310,53 +310,11 @@ fn parse_name(name: &str) -> (Option<&str>, &str) {
 mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::paths::ConfigPaths;
-    use crate::test_support::{make_ctx, test_paths};
+    use crate::test_support::{agent_content, make_ctx, setup_source_with_agent, test_paths};
     use crate::types::{ArtifactKind, LockFile, SourceEntry, SourceType, SourcesFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
     use std::path::PathBuf;
-
-    fn agent_content(name: &str, desc: &str) -> String {
-        format!("---\nname: {name}\ndescription: {desc}\n---\n# {name}\n")
-    }
-
-    /// Set up a fake filesystem with a source that has one agent.
-    fn setup_source_with_agent(
-        fs: &FakeFilesystem,
-        paths: &ConfigPaths,
-        source_name: &str,
-        source_path: &str,
-        agent_name: &str,
-    ) {
-        // Write sources.json
-        let sources = SourcesFile {
-            version: 1,
-            sources: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    source_name.to_string(),
-                    SourceEntry {
-                        source_type: SourceType::Local,
-                        path: Some(PathBuf::from(source_path)),
-                        url: None,
-                        local_clone: None,
-                        branch: None,
-                        last_updated: Some(Utc::now().to_rfc3339()),
-                    },
-                );
-                m
-            },
-        };
-        let sources_json = serde_json::to_string_pretty(&sources).unwrap();
-        fs.add_file(paths.sources_path(), sources_json);
-
-        // Write agent file
-        fs.add_file(
-            format!("{source_path}/{agent_name}.md"),
-            agent_content(agent_name, "A test agent"),
-        );
-    }
 
     // --- parse_name ---
 

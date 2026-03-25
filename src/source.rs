@@ -383,7 +383,7 @@ mod tests {
     use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::paths::ConfigPaths;
-    use crate::test_support::{make_ctx, test_paths};
+    use crate::test_support::{make_ctx, make_local_entry, test_paths};
     use crate::types::{ArtifactKind, Deprecation, SourceType};
     use chrono::Utc;
     use std::path::PathBuf;
@@ -427,27 +427,16 @@ mod tests {
 
     // --- is_stale_at ---
 
-    fn make_local_entry(last_updated: Option<String>) -> SourceEntry {
-        SourceEntry {
-            source_type: SourceType::Local,
-            path: Some(PathBuf::from("/some/path")),
-            url: None,
-            local_clone: None,
-            branch: None,
-            last_updated,
-        }
-    }
-
     #[test]
     fn is_stale_never_updated() {
-        let entry = make_local_entry(None);
+        let entry = make_local_entry("/some/path", None);
         assert!(is_stale_at(&entry, Utc::now()));
     }
 
     #[test]
     fn is_stale_recent_update_is_fresh() {
         let now = Utc::now();
-        let entry = make_local_entry(Some(now.to_rfc3339()));
+        let entry = make_local_entry("/some/path", Some(now.to_rfc3339()));
         assert!(!is_stale_at(&entry, now));
     }
 
@@ -455,13 +444,13 @@ mod tests {
     fn is_stale_old_update_is_stale() {
         let now = Utc::now();
         let old = (now - chrono::Duration::hours(2)).to_rfc3339();
-        let entry = make_local_entry(Some(old));
+        let entry = make_local_entry("/some/path", Some(old));
         assert!(is_stale_at(&entry, now));
     }
 
     #[test]
     fn is_stale_invalid_timestamp_is_stale() {
-        let entry = make_local_entry(Some("not-a-timestamp".to_string()));
+        let entry = make_local_entry("/some/path", Some("not-a-timestamp".to_string()));
         assert!(is_stale_at(&entry, Utc::now()));
     }
 

@@ -63,31 +63,8 @@ pub fn save_with(
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
-    use crate::test_support::test_paths;
-    use crate::types::{ArtifactKind, LockEntry, LockSource};
+    use crate::test_support::{sample_lock_file, test_paths};
     use std::path::PathBuf;
-
-    fn sample_lock() -> LockFile {
-        let mut packages = BTreeMap::new();
-        packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: "2024-01-01T00:00:00Z".to_string(),
-                source: LockSource {
-                    repo: "guidelines".to_string(),
-                    path: "agents/my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:aabbcc".to_string(),
-                installed_checksum: "sha256:ddeeff".to_string(),
-            },
-        );
-        LockFile {
-            version: 1,
-            packages,
-        }
-    }
 
     // --- load_from_with ---
 
@@ -103,7 +80,7 @@ mod tests {
     fn load_from_parses_valid_json() {
         let fs = FakeFilesystem::new();
         let path = PathBuf::from("/config/cmx-lock.json");
-        let json = serde_json::to_string(&sample_lock()).unwrap();
+        let json = serde_json::to_string(&sample_lock_file()).unwrap();
         fs.add_file(path.clone(), json);
         let lock = load_from_with(&path, &fs).unwrap();
         assert!(lock.packages.contains_key("my-agent"));
@@ -123,7 +100,7 @@ mod tests {
     fn save_to_creates_parent_dirs_and_writes() {
         let fs = FakeFilesystem::new();
         let path = PathBuf::from("/config/context-mixer/cmx-lock.json");
-        save_to_with(&sample_lock(), &path, &fs).unwrap();
+        save_to_with(&sample_lock_file(), &path, &fs).unwrap();
         assert!(fs.file_exists(&path));
     }
 
@@ -133,12 +110,12 @@ mod tests {
     fn save_and_load_with_round_trip() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let lock = sample_lock();
+        let lock = sample_lock_file();
         save_with(&lock, false, &fs, &paths).unwrap();
         let loaded = load_with(false, &fs, &paths).unwrap();
         assert_eq!(loaded.packages.len(), 1);
         let entry = loaded.packages.get("my-agent").unwrap();
         assert_eq!(entry.version.as_deref(), Some("1.0.0"));
-        assert_eq!(entry.source_checksum, "sha256:aabbcc");
+        assert_eq!(entry.source_checksum, "sha256:abc123");
     }
 }

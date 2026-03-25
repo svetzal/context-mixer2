@@ -50,24 +50,10 @@ pub fn uninstall_with(
 mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::test_support::{make_ctx, test_paths};
-    use crate::types::{ArtifactKind, LockEntry, LockFile, LockSource};
+    use crate::test_support::{make_ctx, sample_lock_entry, test_paths};
+    use crate::types::{ArtifactKind, LockFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
-
-    fn sample_lock_entry() -> LockEntry {
-        LockEntry {
-            artifact_type: ArtifactKind::Agent,
-            version: Some("1.0.0".to_string()),
-            installed_at: "2024-01-01T00:00:00Z".to_string(),
-            source: LockSource {
-                repo: "guidelines".to_string(),
-                path: "agents/my-agent.md".to_string(),
-            },
-            source_checksum: "sha256:aabbcc".to_string(),
-            installed_checksum: "sha256:ddeeff".to_string(),
-        }
-    }
 
     #[test]
     fn uninstall_bails_when_agent_not_installed() {

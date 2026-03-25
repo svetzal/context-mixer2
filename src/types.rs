@@ -163,31 +163,8 @@ impl Artifact {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::sample_lock_file;
     use std::collections::BTreeMap;
-
-    // --- LockFile round-trip ---
-
-    fn sample_lock_file() -> LockFile {
-        let mut packages = BTreeMap::new();
-        packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: "2024-01-01T00:00:00Z".to_string(),
-                source: LockSource {
-                    repo: "guidelines".to_string(),
-                    path: "agents/my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:abc123".to_string(),
-                installed_checksum: "sha256:def456".to_string(),
-            },
-        );
-        LockFile {
-            version: 1,
-            packages,
-        }
-    }
 
     #[test]
     fn lockfile_round_trip() {

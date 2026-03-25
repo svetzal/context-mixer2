@@ -121,61 +121,12 @@ mod tests {
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::lockfile;
     use crate::paths::ConfigPaths;
-    use crate::test_support::{make_ctx, test_paths};
-    use crate::types::{
-        ArtifactKind, LockEntry, LockFile, LockSource, SourceEntry, SourceType, SourcesFile,
+    use crate::test_support::{
+        agent_content, install_agent_on_disk, make_ctx, setup_source_with_agent, test_paths,
     };
+    use crate::types::{ArtifactKind, LockEntry, LockFile, LockSource, SourcesFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
-    use std::path::PathBuf;
-
-    fn agent_content(name: &str, desc: &str) -> String {
-        format!("---\nname: {name}\ndescription: {desc}\n---\n# {name}\n")
-    }
-
-    fn setup_source_with_agent(
-        fs: &FakeFilesystem,
-        paths: &ConfigPaths,
-        source_name: &str,
-        source_path: &str,
-        agent_name: &str,
-    ) {
-        let sources = SourcesFile {
-            version: 1,
-            sources: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    source_name.to_string(),
-                    SourceEntry {
-                        source_type: SourceType::Local,
-                        path: Some(PathBuf::from(source_path)),
-                        url: None,
-                        local_clone: None,
-                        branch: None,
-                        last_updated: Some(Utc::now().to_rfc3339()),
-                    },
-                );
-                m
-            },
-        };
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
-        fs.add_file(
-            format!("{source_path}/{agent_name}.md"),
-            agent_content(agent_name, "A test agent"),
-        );
-    }
-
-    fn install_agent_on_disk(
-        fs: &FakeFilesystem,
-        paths: &ConfigPaths,
-        name: &str,
-        content: &str,
-        local: bool,
-    ) {
-        let dir = paths.install_dir(ArtifactKind::Agent, local);
-        let path = ArtifactKind::Agent.installed_path(name, &dir);
-        fs.add_file(path, content);
-    }
 
     fn write_lock_entry(
         fs: &FakeFilesystem,

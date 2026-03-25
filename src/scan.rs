@@ -271,6 +271,7 @@ fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
+    use crate::test_support::{agent_content, skill_content};
     use std::path::PathBuf;
 
     // ---------------------------------------------------------------------------
@@ -424,14 +425,6 @@ mod tests {
     // ---------------------------------------------------------------------------
     // scan_source_with tests using FakeFilesystem
     // ---------------------------------------------------------------------------
-
-    fn agent_content(name: &str, desc: &str) -> String {
-        format!("---\nname: {name}\ndescription: {desc}\n---\n# {name}\n")
-    }
-
-    fn skill_content(desc: &str) -> String {
-        format!("---\ndescription: {desc}\n---\n# skill\n")
-    }
 
     #[test]
     fn scan_empty_directory_returns_empty() {
