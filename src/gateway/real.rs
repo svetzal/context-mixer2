@@ -1,17 +1,26 @@
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
-use mojentic::llm::gateways::{OllamaGateway, OpenAIGateway};
-use mojentic::llm::{LlmBroker, LlmGateway, LlmMessage};
-use std::future::Future;
 use std::path::{Path, PathBuf};
-use std::pin::Pin;
 use std::process::Command;
-use std::sync::Arc;
 
 use super::clock::Clock;
 use super::filesystem::{DirEntry, Filesystem};
 use super::git::GitClient;
+
+#[cfg(feature = "llm")]
+use mojentic::llm::gateways::{OllamaGateway, OpenAIGateway};
+#[cfg(feature = "llm")]
+use mojentic::llm::{LlmBroker, LlmGateway, LlmMessage};
+#[cfg(feature = "llm")]
+use std::future::Future;
+#[cfg(feature = "llm")]
+use std::pin::Pin;
+#[cfg(feature = "llm")]
+use std::sync::Arc;
+
+#[cfg(feature = "llm")]
 use super::llm::LlmClient;
+#[cfg(feature = "llm")]
 use crate::types::{LlmConfig, LlmGatewayType};
 
 // ---------------------------------------------------------------------------
@@ -155,10 +164,12 @@ impl Clock for SystemClock {
 // ---------------------------------------------------------------------------
 
 /// Production [`LlmClient`] that delegates to the mojentic LLM library.
+#[cfg(feature = "llm")]
 pub struct MojenticLlmClient {
     config: LlmConfig,
 }
 
+#[cfg(feature = "llm")]
 impl MojenticLlmClient {
     pub fn new(config: LlmConfig) -> Self {
         Self { config }
@@ -173,6 +184,7 @@ impl MojenticLlmClient {
     }
 }
 
+#[cfg(feature = "llm")]
 impl LlmClient for MojenticLlmClient {
     fn analyze(
         &self,

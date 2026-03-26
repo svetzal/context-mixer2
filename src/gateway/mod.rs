@@ -9,4 +9,6 @@ pub use clock::Clock;
 pub use filesystem::{DirEntry, Filesystem};
 pub use git::GitClient;
 pub use llm::LlmClient;
-pub use real::{MojenticLlmClient, RealFilesystem, RealGitClient, SystemClock};
+#[cfg(feature = "llm")]
+pub use real::MojenticLlmClient;
+pub use real::{RealFilesystem, RealGitClient, SystemClock};

@@ -7,8 +7,7 @@ use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use cmx::paths::ConfigPaths;
 use cmx::types::ArtifactKind;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let cli = Cli::parse();
     let paths = ConfigPaths::from_env()?;
 
@@ -30,8 +29,8 @@ async fn main() -> Result<()> {
             SourceAction::Update { name } => cmx::source::update_with(name.as_deref(), &ctx),
             SourceAction::Remove { name } => cmx::source::remove_with(&name, &ctx),
         },
-        Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, &ctx).await,
-        Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, &ctx).await,
+        Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, &ctx),
+        Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, &ctx),
         Commands::List => cmx::list::list_all_with(&ctx),
         Commands::Info { name } => cmx::info::info_with(&name, &ctx),
         Commands::Outdated => cmx::outdated::outdated_with(&ctx),
@@ -44,11 +43,7 @@ async fn main() -> Result<()> {
     }
 }
 
-async fn handle_artifact(
-    action: ArtifactAction,
-    kind: ArtifactKind,
-    ctx: &AppContext<'_>,
-) -> Result<()> {
+fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {
     match action {
         ArtifactAction::Install {
             name,
@@ -65,10 +60,13 @@ async fn handle_artifact(
             }
         }
         ArtifactAction::List => cmx::list::list_kind_with(kind, ctx),
+        #[cfg(feature = "llm")]
         ArtifactAction::Diff { name } => {
-            // Diff needs the LLM client — construct it from config
+            // Diff needs the LLM client — construct it from config and drive
+            // the async call with a single-threaded runtime built on demand.
+            use cmx::gateway::real::MojenticLlmClient;
             let cfg = cmx::config::load_config_with(ctx.fs, ctx.paths)?;
-            let llm = cmx::gateway::real::MojenticLlmClient::new(cfg.llm);
+            let llm = MojenticLlmClient::new(cfg.llm);
             let diff_ctx = AppContext {
                 fs: ctx.fs,
                 git: ctx.git,
@@ -76,7 +74,8 @@ async fn handle_artifact(
                 paths: ctx.paths,
                 llm: Some(&llm),
             };
-            cmx::diff::diff_with(&name, kind, &diff_ctx).await
+            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+            rt.block_on(cmx::diff::diff_with(&name, kind, &diff_ctx))
         }
         ArtifactAction::Update { name, all, force } => {
             if all {

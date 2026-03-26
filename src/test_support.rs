@@ -52,7 +52,7 @@ pub(crate) fn sample_lock_file() -> crate::types::LockFile {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "llm"))]
 pub(crate) fn install_skill_on_disk(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,

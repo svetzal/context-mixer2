@@ -9,10 +9,15 @@ A package manager for curated agentic context (agents and skills), written in Ru
 MANDATORY pre-commit quality checks — run ALL before committing:
 
 ```bash
+# Default build (lean, no LLM)
 cargo fmt --check && \
-cargo clippy --all-targets --all-features -- -D warnings && \
-cargo test --all-features && \
+cargo clippy --all-targets -- -D warnings && \
+cargo test && \
 cargo deny check
+
+# Full build (with LLM diff support)
+cargo clippy --all-targets --all-features -- -D warnings && \
+cargo test --all-features
 ```
 
 Additional recommended checks:
@@ -25,6 +30,7 @@ cargo tarpaulin      # code coverage (target >80%)
 - `--all-targets` is mandatory (ensures examples, tests, and benchmarks are checked)
 - If any check fails, STOP immediately, fix the root cause (don't suppress), and re-run all checks
 - Never use `#[allow(clippy::lint_name)]` without documenting why
+- The `llm` feature gates tokio and mojentic; default builds are lean with no RUSTSEC advisories
 
 ## Reference repositories
 

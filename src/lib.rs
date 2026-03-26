@@ -3,6 +3,7 @@ pub mod cli;
 pub mod cmx_config;
 pub mod config;
 pub mod context;
+#[cfg(feature = "llm")]
 pub mod diff;
 pub mod gateway;
 pub mod info;

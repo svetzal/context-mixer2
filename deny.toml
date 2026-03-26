@@ -1,11 +1,17 @@
 # cargo-deny configuration
 # https://embarkstudios.github.io/cargo-deny/
 
+# Always scan the full dependency graph (including optional features) so
+# advisory suppressions for transitive deps of `llm`-gated crates are
+# exercised and the check is comprehensive.
+[graph]
+all-features = true
+
 [advisories]
 version = 2
 ignore = [
-    "RUSTSEC-2021-0141", # dotenv unmaintained - transitive dep via mojentic
-    "RUSTSEC-2025-0057", # fxhash unmaintained - transitive dep via mojentic/scraper
+    "RUSTSEC-2021-0141", # dotenv unmaintained - transitive dep via mojentic (llm feature)
+    "RUSTSEC-2025-0057", # fxhash unmaintained - transitive dep via mojentic/scraper (llm feature)
 ]
 
 [licenses]

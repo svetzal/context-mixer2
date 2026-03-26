@@ -27,10 +27,16 @@ jobs:
       - name: Check formatting
         run: cargo fmt --check
 
-      - name: Clippy
+      - name: Clippy (default features)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Tests (default features)
+        run: cargo test
+
+      - name: Clippy (all features)
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Tests
+      - name: Tests (all features)
         run: cargo test --all-features
 
       - name: Install cargo-deny
@@ -68,7 +74,7 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --features llm --target ${{ matrix.target }}
 
       - name: Package archive
         run: |

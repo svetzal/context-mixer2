@@ -21,7 +21,7 @@
 | `cmx agent update <name>` | Update an agent from its source |
 | `cmx agent update --all` | Update all tracked agents |
 | `cmx agent list` | List installed agents |
-| `cmx agent diff <name>` | LLM-powered diff analysis |
+| `cmx agent diff <name>` | LLM-powered diff analysis (requires `llm` feature) |
 
 ## Skill management
 

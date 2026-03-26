@@ -95,6 +95,7 @@ pub enum ArtifactAction {
     },
     /// List installed artifacts
     List,
+    #[cfg(feature = "llm")]
     /// Compare installed artifact with source version using LLM analysis
     Diff {
         /// Artifact name
