@@ -9,6 +9,11 @@ pub(crate) fn skill_content(desc: &str) -> String {
 }
 
 #[cfg(test)]
+pub(crate) fn versioned_skill_content(desc: &str, version: &str) -> String {
+    format!("---\ndescription: {desc}\nversion: {version}\n---\n# skill\n")
+}
+
+#[cfg(test)]
 pub(crate) fn make_local_entry(
     path: impl Into<std::path::PathBuf>,
     last_updated: Option<String>,

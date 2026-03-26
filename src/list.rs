@@ -104,11 +104,16 @@ fn build_rows_with(
 
         let installed = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-").to_string();
 
-        let (source, available, deprecated) = if let Some(info) = source_info {
+        let (source_name, available, deprecated) = if let Some(info) = source_info {
             (info.source_name.clone(), info.version.clone(), info.deprecated)
         } else {
             let src = lock_entry.map_or_else(|| "-".to_string(), |e| e.source.repo.clone());
             (src, "-".to_string(), false)
+        };
+
+        let source = {
+            let path = lock_entry.map_or("", |e| e.source.path.as_str());
+            format_source(&source_name, path)
         };
 
         let status = status_indicator(&installed, &available, deprecated);
@@ -129,6 +134,15 @@ struct SourceInfo {
     source_name: String,
     version: String,
     deprecated: bool,
+}
+
+/// Format the Source column to include provenance path when available.
+fn format_source(repo: &str, path: &str) -> String {
+    if path.is_empty() || repo == "-" {
+        repo.to_string()
+    } else {
+        format!("{repo} ({path})")
+    }
 }
 
 fn build_source_versions_with(
@@ -203,6 +217,14 @@ fn print_section(label: &str, rows: &[Row]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::test_support::{make_ctx, test_paths, versioned_skill_content};
+    use crate::types::{ArtifactKind, LockEntry, LockSource, SourceEntry, SourceType, SourcesFile};
+    use chrono::Utc;
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+
+    // --- status_indicator ---
 
     #[test]
     fn status_indicator_deprecated_always_stops() {
@@ -237,5 +259,318 @@ mod tests {
     #[test]
     fn status_indicator_behind() {
         assert_eq!(status_indicator("1.0", "2.0", false), "⚠️");
+    }
+
+    // --- format_source ---
+
+    #[test]
+    fn format_source_with_path_shows_provenance() {
+        assert_eq!(format_source("guidelines", "skills/my-skill"), "guidelines (skills/my-skill)");
+    }
+
+    #[test]
+    fn format_source_empty_path_shows_repo_only() {
+        assert_eq!(format_source("guidelines", ""), "guidelines");
+    }
+
+    #[test]
+    fn format_source_dash_repo_stays_dash() {
+        assert_eq!(format_source("-", ""), "-");
+        assert_eq!(format_source("-", "some/path"), "-");
+    }
+
+    // --- build_rows_with: skill with distinct installed vs source version ---
+
+    fn setup_source_with_skill(
+        fs: &FakeFilesystem,
+        paths: &crate::paths::ConfigPaths,
+        source_name: &str,
+        source_path: &str,
+        skill_name: &str,
+        skill_version: &str,
+    ) {
+        let sources = SourcesFile {
+            version: 1,
+            sources: {
+                let mut m = BTreeMap::new();
+                m.insert(
+                    source_name.to_string(),
+                    SourceEntry {
+                        source_type: SourceType::Local,
+                        path: Some(PathBuf::from(source_path)),
+                        url: None,
+                        local_clone: None,
+                        branch: None,
+                        last_updated: Some(Utc::now().to_rfc3339()),
+                    },
+                );
+                m
+            },
+        };
+        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+
+        fs.add_file(
+            format!("{source_path}/{skill_name}/SKILL.md"),
+            versioned_skill_content("A test skill", skill_version),
+        );
+    }
+
+    fn install_skill_dir(
+        fs: &FakeFilesystem,
+        paths: &crate::paths::ConfigPaths,
+        skill_name: &str,
+        skill_version: &str,
+        local: bool,
+    ) {
+        let skill_dir = paths.install_dir(ArtifactKind::Skill, local);
+        fs.add_file(
+            skill_dir.join(skill_name).join("SKILL.md"),
+            versioned_skill_content("A test skill", skill_version),
+        );
+    }
+
+    fn make_skill_lock_entry(version: &str, repo: &str, path: &str) -> LockEntry {
+        LockEntry {
+            artifact_type: ArtifactKind::Skill,
+            version: Some(version.to_string()),
+            installed_at: "2024-01-01T00:00:00Z".to_string(),
+            source: LockSource {
+                repo: repo.to_string(),
+                path: path.to_string(),
+            },
+            source_checksum: "sha256:old".to_string(),
+            installed_checksum: "sha256:old".to_string(),
+        }
+    }
+
+    #[test]
+    fn skill_row_shows_source_provenance_and_both_versions() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Source has skill at version 2.0.0
+        setup_source_with_skill(
+            &fs,
+            &paths,
+            "guidelines",
+            "/sources/guidelines",
+            "my-skill",
+            "2.0.0",
+        );
+
+        // Installed skill at version 1.0.0
+        install_skill_dir(&fs, &paths, "my-skill", "1.0.0", false);
+
+        // Lockfile records installed version 1.0.0 from guidelines
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-skill".to_string(),
+            make_skill_lock_entry("1.0.0", "guidelines", "my-skill"),
+        );
+        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let source_versions = build_source_versions_with(ArtifactKind::Skill, &ctx).unwrap();
+        let rows =
+            build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
+
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        assert_eq!(row.name, "my-skill");
+        assert_eq!(row.installed, "1.0.0", "installed version from lockfile");
+        assert_eq!(row.available, "2.0.0", "available version from source");
+        assert!(
+            row.source.contains("guidelines"),
+            "source must show repo name, got: {}",
+            row.source
+        );
+        assert!(
+            row.source.contains("my-skill"),
+            "source must show provenance path, got: {}",
+            row.source
+        );
+    }
+
+    #[test]
+    fn skill_row_source_includes_full_provenance_path() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Source has skill at a nested path within the repo
+        setup_source_with_skill(
+            &fs,
+            &paths,
+            "marketplace",
+            "/sources/marketplace",
+            "pdf-tool",
+            "1.0.0",
+        );
+
+        // Install the skill
+        install_skill_dir(&fs, &paths, "pdf-tool", "1.0.0", false);
+
+        // Lockfile records source path as a nested marketplace location
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "pdf-tool".to_string(),
+            make_skill_lock_entry("1.0.0", "marketplace", "plugins/doc-tools/skills/pdf-tool"),
+        );
+        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let source_versions = build_source_versions_with(ArtifactKind::Skill, &ctx).unwrap();
+        let rows =
+            build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
+
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        assert_eq!(
+            row.source, "marketplace (plugins/doc-tools/skills/pdf-tool)",
+            "source should show repo name and full provenance path"
+        );
+    }
+
+    #[test]
+    fn skill_row_no_lockfile_shows_repo_name_only() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Source has skill
+        setup_source_with_skill(
+            &fs,
+            &paths,
+            "guidelines",
+            "/sources/guidelines",
+            "my-skill",
+            "1.0.0",
+        );
+
+        // Skill installed on disk but NOT in lockfile
+        install_skill_dir(&fs, &paths, "my-skill", "1.0.0", false);
+
+        let lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let source_versions = build_source_versions_with(ArtifactKind::Skill, &ctx).unwrap();
+        let rows =
+            build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
+
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        assert_eq!(row.source, "guidelines", "no lockfile entry means repo name only");
+        assert_eq!(row.installed, "-", "no lockfile means no installed version");
+        assert_eq!(row.available, "1.0.0", "source version still shown");
+    }
+
+    #[test]
+    fn skill_row_source_removed_shows_lockfile_provenance() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // No source registered — empty sources.json
+        let sources = SourcesFile::default();
+        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+
+        // Skill installed on disk
+        install_skill_dir(&fs, &paths, "my-skill", "1.0.0", false);
+
+        // Lockfile still has the provenance
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-skill".to_string(),
+            make_skill_lock_entry("1.0.0", "guidelines", "skills/my-skill"),
+        );
+        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let source_versions = build_source_versions_with(ArtifactKind::Skill, &ctx).unwrap();
+        let rows =
+            build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
+
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        assert_eq!(
+            row.source, "guidelines (skills/my-skill)",
+            "source removed: lockfile provenance (repo + path) should still show"
+        );
+        assert_eq!(row.installed, "1.0.0");
+        assert_eq!(row.available, "-", "no source means no available version");
+    }
+
+    #[test]
+    fn agent_row_also_shows_source_provenance() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Source with agent at version 2.0.0
+        crate::test_support::setup_source_with_agent(
+            &fs,
+            &paths,
+            "guidelines",
+            "/sources/guidelines",
+            "my-agent",
+        );
+
+        // Install agent on disk
+        crate::test_support::install_agent_on_disk(
+            &fs,
+            &paths,
+            "my-agent",
+            &crate::test_support::agent_content("my-agent", "A test agent"),
+            false,
+        );
+
+        // Lockfile records installed version 1.0.0
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-agent".to_string(),
+            LockEntry {
+                artifact_type: ArtifactKind::Agent,
+                version: Some("1.0.0".to_string()),
+                installed_at: "2024-01-01T00:00:00Z".to_string(),
+                source: LockSource {
+                    repo: "guidelines".to_string(),
+                    path: "my-agent.md".to_string(),
+                },
+                source_checksum: "sha256:old".to_string(),
+                installed_checksum: "sha256:old".to_string(),
+            },
+        );
+        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let source_versions = build_source_versions_with(ArtifactKind::Agent, &ctx).unwrap();
+        let rows =
+            build_rows_with(ArtifactKind::Agent, false, &lock, &source_versions, &ctx).unwrap();
+
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        assert!(row.source.contains("guidelines"), "agent row should show source repo");
+        assert!(row.source.contains("my-agent.md"), "agent row should show provenance path");
     }
 }
