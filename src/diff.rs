@@ -10,7 +10,40 @@ use crate::source;
 use crate::source_iter;
 use crate::types::ArtifactKind;
 
+// ---------------------------------------------------------------------------
+// Result types
+// ---------------------------------------------------------------------------
+
+pub(crate) struct DiffOutput {
+    pub artifact_name: String,
+    pub kind: ArtifactKind,
+    pub is_up_to_date: bool,
+    pub installed_version: Option<String>,
+    pub source_version: Option<String>,
+    pub source_name: String,
+    pub diff_text: Option<String>,
+    pub analysis: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
 pub async fn diff_with(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {
+    let output = gather_diff_with(name, kind, ctx).await?;
+    print_diff_output(&output);
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Gather (no println!)
+// ---------------------------------------------------------------------------
+
+pub(crate) async fn gather_diff_with(
+    name: &str,
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<DiffOutput> {
     source::auto_update_all_with(ctx)?;
 
     // Find the installed file on disk (global then local)
@@ -24,25 +57,21 @@ pub async fn diff_with(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> 
     let source_checksum = checksum::checksum_artifact_with(&source_path, kind, ctx.fs)?;
 
     if installed_checksum == source_checksum {
-        println!("{name} is up to date with source.");
-        return Ok(());
+        return Ok(DiffOutput {
+            artifact_name: name.to_string(),
+            kind,
+            is_up_to_date: true,
+            installed_version: None,
+            source_version,
+            source_name,
+            diff_text: None,
+            analysis: None,
+        });
     }
 
     // Get installed version from lock file if available
     let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
-    let installed_version = lock
-        .packages
-        .get(name)
-        .and_then(|e| e.version.as_deref())
-        .unwrap_or("unversioned");
-
-    let source_ver_display = source_version.as_deref().unwrap_or("unversioned");
-    let scope = if local { "local" } else { "global" };
-
-    println!("Comparing {name} ({kind})");
-    println!("  Installed ({scope}): {installed_version}");
-    println!("  Source ({source_name}): {source_ver_display}");
-    println!();
+    let installed_version = lock.packages.get(name).and_then(|e| e.version.clone());
 
     // Build diff text
     let diff_text = match kind {
@@ -50,8 +79,8 @@ pub async fn diff_with(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> 
         ArtifactKind::Skill => diff_dirs_with(&installed_path, &source_path, ctx)?,
     };
 
-    println!("Analyzing differences...");
-    println!();
+    let installed_ver_display = installed_version.as_deref().unwrap_or("unversioned");
+    let source_ver_display = source_version.as_deref().unwrap_or("unversioned");
 
     let system_prompt = "You are a technical analyst comparing two versions of an AI coding assistant artifact (an agent definition or skill definition written in markdown). \
         Provide a clear, concise summary of the differences. Focus on:\n\
@@ -62,7 +91,7 @@ pub async fn diff_with(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> 
 
     let user_prompt = format!(
         "Compare these two versions of the {kind} '{name}':\n\
-        - Installed version: {installed_version}\n\
+        - Installed version: {installed_ver_display}\n\
         - Source version: {source_ver_display}\n\n\
         {diff_text}"
     );
@@ -71,9 +100,46 @@ pub async fn diff_with(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> 
         Some(llm) => llm.analyze(system_prompt, &user_prompt).await?,
         None => bail!("LLM client not configured for diff analysis"),
     };
-    println!("{analysis}");
 
-    Ok(())
+    Ok(DiffOutput {
+        artifact_name: name.to_string(),
+        kind,
+        is_up_to_date: false,
+        installed_version,
+        source_version,
+        source_name,
+        diff_text: Some(diff_text),
+        analysis: Some(analysis),
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Print (no business logic)
+// ---------------------------------------------------------------------------
+
+fn print_diff_output(output: &DiffOutput) {
+    if output.is_up_to_date {
+        println!("{} is up to date with source.", output.artifact_name);
+        return;
+    }
+
+    let installed_ver = output.installed_version.as_deref().unwrap_or("unversioned");
+    let source_ver = output.source_version.as_deref().unwrap_or("unversioned");
+
+    println!("Comparing {} ({})", output.artifact_name, output.kind);
+    println!("  Installed: {installed_ver}");
+    println!("  Source ({}): {source_ver}", output.source_name);
+    println!();
+
+    if let Some(analysis) = &output.analysis {
+        println!("Analyzing differences...");
+        println!();
+        println!("{analysis}");
+    } else if let Some(diff) = &output.diff_text {
+        // No LLM analysis available — show raw diff
+        println!("Differences:");
+        println!("{diff}");
+    }
 }
 
 fn find_installed_on_disk_with(
@@ -636,5 +702,97 @@ mod tests {
         let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
 
         assert!(result.is_ok(), "expected Ok with LLM configured: {:?}", result.err());
+    }
+
+    // --- gather_diff_with: assert on DiffOutput struct fields ---
+
+    #[tokio::test]
+    async fn gather_diff_sets_is_up_to_date_when_checksums_match() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        let content = agent_content("my-agent", "A test agent");
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        fs.add_file("/sources/my-source/my-agent.md", content.clone());
+        install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
+
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-agent".to_string(),
+            LockEntry {
+                artifact_type: ArtifactKind::Agent,
+                version: Some("1.0.0".to_string()),
+                installed_at: Utc::now().to_rfc3339(),
+                source: LockSource {
+                    repo: "my-source".to_string(),
+                    path: "my-agent.md".to_string(),
+                },
+                source_checksum: "sha256:placeholder".to_string(),
+                installed_checksum: "sha256:placeholder".to_string(),
+            },
+        );
+        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let output = gather_diff_with("my-agent", ArtifactKind::Agent, &ctx).await.unwrap();
+
+        assert!(output.is_up_to_date, "expected is_up_to_date = true");
+        assert_eq!(output.artifact_name, "my-agent");
+        assert_eq!(output.kind, ArtifactKind::Agent);
+        assert_eq!(output.source_name, "my-source");
+        assert!(output.analysis.is_none(), "no analysis for up-to-date artifact");
+        assert!(output.diff_text.is_none(), "no diff_text for up-to-date artifact");
+    }
+
+    #[tokio::test]
+    async fn gather_diff_sets_analysis_when_checksums_differ_and_llm_present() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+        let llm = FakeLlmClient::new("LLM analysis result");
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
+
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-agent".to_string(),
+            LockEntry {
+                artifact_type: ArtifactKind::Agent,
+                version: Some("1.0.0".to_string()),
+                installed_at: Utc::now().to_rfc3339(),
+                source: LockSource {
+                    repo: "my-source".to_string(),
+                    path: "my-agent.md".to_string(),
+                },
+                source_checksum: "sha256:placeholder".to_string(),
+                installed_checksum: "sha256:placeholder".to_string(),
+            },
+        );
+        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = AppContext {
+            fs: &fs,
+            git: &git,
+            clock: &clock,
+            paths: &paths,
+            llm: Some(&llm),
+        };
+        let output = gather_diff_with("my-agent", ArtifactKind::Agent, &ctx).await.unwrap();
+
+        assert!(!output.is_up_to_date, "expected is_up_to_date = false");
+        assert!(output.analysis.is_some(), "expected analysis to be present");
+        assert_eq!(output.analysis.as_deref(), Some("LLM analysis result"));
+        assert!(output.diff_text.is_some(), "expected diff_text to be present");
+        assert_eq!(output.installed_version.as_deref(), Some("1.0.0"));
     }
 }

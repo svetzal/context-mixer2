@@ -7,12 +7,25 @@ use crate::lockfile;
 use crate::source_iter;
 use crate::types::{ArtifactKind, LockFile};
 
-struct Row {
-    name: String,
-    installed: String,
-    source: String,
-    available: String,
-    status: &'static str,
+pub(crate) struct Row {
+    pub name: String,
+    pub installed: String,
+    pub source: String,
+    pub available: String,
+    pub status: &'static str,
+}
+
+pub(crate) struct ListKindOutput {
+    pub kind: ArtifactKind,
+    pub global_rows: Vec<Row>,
+    pub local_rows: Vec<Row>,
+}
+
+pub(crate) struct ListOutput {
+    pub global_agents: Vec<Row>,
+    pub local_agents: Vec<Row>,
+    pub global_skills: Vec<Row>,
+    pub local_skills: Vec<Row>,
 }
 
 fn status_indicator(installed: &str, available: &str, deprecated: bool) -> &'static str {
@@ -29,34 +42,34 @@ fn status_indicator(installed: &str, available: &str, deprecated: bool) -> &'sta
 }
 
 pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {
-    let source_versions = build_source_versions_with(kind, ctx)?;
-    let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;
-    let local_lock = lockfile::load_with(true, ctx.fs, ctx.paths)?;
-    let global = build_rows_with(kind, false, &global_lock, &source_versions, ctx)?;
-    let local = build_rows_with(kind, true, &local_lock, &source_versions, ctx)?;
-
-    if global.is_empty() && local.is_empty() {
-        println!("No {kind}s installed.");
-        return Ok(());
-    }
-
-    if !global.is_empty() {
-        println!("Global {kind}s:");
-        print_table(&global);
-    }
-
-    if !local.is_empty() {
-        if !global.is_empty() {
-            println!();
-        }
-        println!("Local {kind}s:");
-        print_table(&local);
-    }
-
+    let output = gather_list_kind_with(kind, ctx)?;
+    print_list_kind_output(&output);
     Ok(())
 }
 
 pub fn list_all_with(ctx: &AppContext<'_>) -> Result<()> {
+    let output = gather_list_all_with(ctx)?;
+    print_list_all_output(&output);
+    Ok(())
+}
+
+pub(crate) fn gather_list_kind_with(
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<ListKindOutput> {
+    let source_versions = build_source_versions_with(kind, ctx)?;
+    let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;
+    let local_lock = lockfile::load_with(true, ctx.fs, ctx.paths)?;
+    let global_rows = build_rows_with(kind, false, &global_lock, &source_versions, ctx)?;
+    let local_rows = build_rows_with(kind, true, &local_lock, &source_versions, ctx)?;
+    Ok(ListKindOutput {
+        kind,
+        global_rows,
+        local_rows,
+    })
+}
+
+pub(crate) fn gather_list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
     let agent_versions = build_source_versions_with(ArtifactKind::Agent, ctx)?;
     let skill_versions = build_source_versions_with(ArtifactKind::Skill, ctx)?;
     let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;
@@ -71,21 +84,52 @@ pub fn list_all_with(ctx: &AppContext<'_>) -> Result<()> {
     let local_skills =
         build_rows_with(ArtifactKind::Skill, true, &local_lock, &skill_versions, ctx)?;
 
-    if global_agents.is_empty()
-        && local_agents.is_empty()
-        && global_skills.is_empty()
-        && local_skills.is_empty()
-    {
-        println!("Nothing installed.");
-        return Ok(());
+    Ok(ListOutput {
+        global_agents,
+        local_agents,
+        global_skills,
+        local_skills,
+    })
+}
+
+fn print_list_kind_output(output: &ListKindOutput) {
+    let kind = output.kind;
+    let global = &output.global_rows;
+    let local = &output.local_rows;
+
+    if global.is_empty() && local.is_empty() {
+        println!("No {kind}s installed.");
+        return;
     }
 
-    print_section("Global agents", &global_agents);
-    print_section("Local agents", &local_agents);
-    print_section("Global skills", &global_skills);
-    print_section("Local skills", &local_skills);
+    if !global.is_empty() {
+        println!("Global {kind}s:");
+        print_table(global);
+    }
 
-    Ok(())
+    if !local.is_empty() {
+        if !global.is_empty() {
+            println!();
+        }
+        println!("Local {kind}s:");
+        print_table(local);
+    }
+}
+
+fn print_list_all_output(output: &ListOutput) {
+    if output.global_agents.is_empty()
+        && output.local_agents.is_empty()
+        && output.global_skills.is_empty()
+        && output.local_skills.is_empty()
+    {
+        println!("Nothing installed.");
+        return;
+    }
+
+    print_section("Global agents", &output.global_agents);
+    print_section("Local agents", &output.local_agents);
+    print_section("Global skills", &output.global_skills);
+    print_section("Local skills", &output.local_skills);
 }
 
 fn build_rows_with(

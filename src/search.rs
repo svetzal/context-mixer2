@@ -5,15 +5,41 @@ use crate::context::AppContext;
 use crate::source;
 use crate::source_iter;
 
-struct SearchResult {
-    name: String,
-    kind: String,
-    version: String,
-    source: String,
-    description: String,
+// ---------------------------------------------------------------------------
+// Result types
+// ---------------------------------------------------------------------------
+
+pub(crate) struct SearchResult {
+    pub name: String,
+    pub kind: String,
+    pub version: String,
+    pub source: String,
+    pub description: String,
 }
 
+pub(crate) struct SearchOutput {
+    pub results: Vec<SearchResult>,
+    pub query: String,
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
 pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<()> {
+    let output = gather_search_results_with(query, ctx)?;
+    print_search_results(&output);
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Gather (pure logic, no println!)
+// ---------------------------------------------------------------------------
+
+pub(crate) fn gather_search_results_with(
+    query: &str,
+    ctx: &AppContext<'_>,
+) -> Result<SearchOutput> {
     source::auto_update_all_with(ctx)?;
 
     let query_lower = query.to_lowercase();
@@ -25,7 +51,6 @@ pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<()> {
         let desc_lower = sa.artifact.description.to_lowercase();
 
         if name_lower.contains(&query_lower) || desc_lower.contains(&query_lower) {
-            // Truncate description to first meaningful chunk
             let short_desc = truncate_description(&sa.artifact.description, 80);
 
             results.push(SearchResult {
@@ -38,9 +63,23 @@ pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<()> {
         }
     }
 
+    Ok(SearchOutput {
+        results,
+        query: query.to_string(),
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Print (no business logic)
+// ---------------------------------------------------------------------------
+
+fn print_search_results(output: &SearchOutput) {
+    let query = &output.query;
+    let results = &output.results;
+
     if results.is_empty() {
         println!("No results for '{query}'.");
-        return Ok(());
+        return;
     }
 
     let w_name = results.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
@@ -60,7 +99,7 @@ pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<()> {
         "-".repeat(w_src),
     );
 
-    for r in &results {
+    for r in results {
         println!(
             "  {:<w_name$}  {:<w_kind$}  {:<w_ver$}  {:<w_src$}  {}",
             r.name, r.kind, r.version, r.source, r.description,
@@ -69,9 +108,11 @@ pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<()> {
 
     println!();
     println!("{} result(s) found.", results.len());
-
-    Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Pure helpers
+// ---------------------------------------------------------------------------
 
 fn truncate_description(desc: &str, max_len: usize) -> String {
     // Take the first line or sentence, handling escaped \n
@@ -98,6 +139,11 @@ fn truncate_description(desc: &str, max_len: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::test_support::{make_ctx, setup_source_with_agent, test_paths};
+    use chrono::Utc;
+
+    // --- truncate_description ---
 
     #[test]
     fn truncate_description_short_returned_as_is() {
@@ -140,5 +186,78 @@ mod tests {
     fn truncate_description_trims_whitespace() {
         let s = "  leading and trailing  ";
         assert_eq!(truncate_description(s, 80), "leading and trailing");
+    }
+
+    // --- gather_search_results_with ---
+
+    #[test]
+    fn gather_search_results_matches_by_name() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(
+            &fs,
+            &paths,
+            "my-source",
+            "/sources/my-source",
+            "rust-craftsperson",
+        );
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let output = gather_search_results_with("rust", &ctx).unwrap();
+
+        assert_eq!(output.query, "rust");
+        assert_eq!(output.results.len(), 1);
+        assert_eq!(output.results[0].name, "rust-craftsperson");
+        assert_eq!(output.results[0].source, "my-source");
+    }
+
+    #[test]
+    fn gather_search_results_matches_by_description() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // agent_content uses "A test agent" as description
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let output = gather_search_results_with("test agent", &ctx).unwrap();
+
+        assert_eq!(output.results.len(), 1);
+        assert_eq!(output.results[0].name, "my-agent");
+    }
+
+    #[test]
+    fn gather_search_results_no_match_returns_empty() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let output = gather_search_results_with("nonexistent-xyz", &ctx).unwrap();
+
+        assert!(output.results.is_empty(), "expected no results for non-matching query");
+    }
+
+    #[test]
+    fn gather_search_results_case_insensitive() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let output = gather_search_results_with("MY-AGENT", &ctx).unwrap();
+
+        assert_eq!(output.results.len(), 1, "search should be case-insensitive");
     }
 }

@@ -11,10 +11,141 @@ use crate::types::{Artifact, SourceEntry, SourceType};
 const AUTO_UPDATE_MINUTES: i64 = 60;
 
 // ---------------------------------------------------------------------------
-// Testable variants (accept &AppContext)
+// Result types
+// ---------------------------------------------------------------------------
+
+pub(crate) struct SourceAddResult {
+    pub name: String,
+    pub agents_found: usize,
+    pub skills_found: usize,
+}
+
+pub(crate) struct SourceListEntry {
+    pub name: String,
+    pub kind: &'static str,
+    pub location: String,
+}
+
+pub(crate) struct SourceListResult {
+    pub entries: Vec<SourceListEntry>,
+}
+
+pub(crate) struct BrowseArtifact {
+    pub name: String,
+    pub version: Option<String>,
+    pub deprecation_display: String,
+}
+
+pub(crate) struct BrowseSkill {
+    pub name: String,
+    pub version: Option<String>,
+    pub deprecation_display: String,
+    pub files: Vec<String>,
+}
+
+pub(crate) struct SourceBrowseResult {
+    pub source_name: String,
+    pub agents: Vec<BrowseArtifact>,
+    pub skills: Vec<BrowseSkill>,
+}
+
+pub(crate) struct SourceRemoveResult {
+    pub name: String,
+    pub clone_deleted: bool,
+}
+
+pub(crate) struct SourceUpdateResult {
+    pub name: String,
+    pub agents_found: usize,
+    pub skills_found: usize,
+}
+
+// ---------------------------------------------------------------------------
+// Public entry points (thin orchestrators)
 // ---------------------------------------------------------------------------
 
 pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<()> {
+    // Show progress before the potentially long-running clone
+    if looks_like_url(path_or_url) {
+        let clone_dir = ctx.paths.git_clones_dir().join(name);
+        println!("Cloning {path_or_url} to {}...", clone_dir.display());
+    }
+    let result = perform_add_with(name, path_or_url, ctx)?;
+    println!(
+        "Source '{}' registered: {} agent(s), {} skill(s) found.",
+        result.name, result.agents_found, result.skills_found
+    );
+    Ok(())
+}
+
+pub fn list_with(ctx: &AppContext<'_>) -> Result<()> {
+    let result = gather_list_with(ctx)?;
+    print_source_list(&result);
+    Ok(())
+}
+
+pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
+    let result = gather_browse_with(name, ctx)?;
+    print_browse_result(&result);
+    Ok(())
+}
+
+pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<()> {
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+
+    if let Some(n) = name {
+        if !sources.sources.contains_key(n) {
+            bail!("Source '{n}' not found.");
+        }
+        let result = perform_pull_with(n, ctx)?;
+        println!(
+            "Source '{}': {} agent(s), {} skill(s).",
+            result.name, result.agents_found, result.skills_found
+        );
+    } else {
+        let git_sources: Vec<_> = sources
+            .sources
+            .iter()
+            .filter(|(_, e)| matches!(e.source_type, SourceType::Git))
+            .map(|(n, _)| n.clone())
+            .collect();
+
+        if git_sources.is_empty() {
+            println!("No git-backed sources to update.");
+            return Ok(());
+        }
+
+        for source_name in &git_sources {
+            let result = perform_pull_with(source_name, ctx)?;
+            println!(
+                "Source '{}': {} agent(s), {} skill(s).",
+                result.name, result.agents_found, result.skills_found
+            );
+        }
+    }
+
+    Ok(())
+}
+
+pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
+    let result = perform_remove_with(name, ctx)?;
+    if result.clone_deleted {
+        println!("Source '{}' removed (cloned repo deleted).", result.name);
+    } else {
+        println!("Source '{}' removed.", result.name);
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Gather / Perform functions (no println!)
+// ---------------------------------------------------------------------------
+
+pub(crate) fn perform_add_with(
+    name: &str,
+    path_or_url: &str,
+    ctx: &AppContext<'_>,
+) -> Result<SourceAddResult> {
     let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
     if sources.sources.contains_key(name) {
@@ -29,41 +160,45 @@ pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<(
 
     let local_path = config::resolve_local_path(&entry);
     let artifacts = scan::scan_source_with(&local_path, ctx.fs)?;
-    let (agents, skills) = count_artifacts(&artifacts);
+    let (agents_found, skills_found) = count_artifacts(&artifacts);
 
     sources.sources.insert(name.to_string(), entry);
     config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
 
-    println!("Source '{name}' registered: {agents} agent(s), {skills} skill(s) found.");
-    Ok(())
+    Ok(SourceAddResult {
+        name: name.to_string(),
+        agents_found,
+        skills_found,
+    })
 }
 
-pub fn list_with(ctx: &AppContext<'_>) -> Result<()> {
+pub(crate) fn gather_list_with(ctx: &AppContext<'_>) -> Result<SourceListResult> {
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
-    if sources.sources.is_empty() {
-        println!("No sources registered.");
-        println!();
-        println!("Add one with: cmx source add <name> <path-or-url>");
-        return Ok(());
-    }
+    let entries = sources
+        .sources
+        .iter()
+        .map(|(name, entry)| {
+            let location = match entry.source_type {
+                SourceType::Local => entry.path.as_ref().map(|p| p.display().to_string()),
+                SourceType::Git => entry.url.clone(),
+            };
+            let kind = match entry.source_type {
+                SourceType::Local => "local",
+                SourceType::Git => "git",
+            };
+            SourceListEntry {
+                name: name.clone(),
+                kind,
+                location: location.unwrap_or_default(),
+            }
+        })
+        .collect();
 
-    for (name, entry) in &sources.sources {
-        let location = match entry.source_type {
-            SourceType::Local => entry.path.as_ref().map(|p| p.display().to_string()),
-            SourceType::Git => entry.url.clone(),
-        };
-        let kind = match entry.source_type {
-            SourceType::Local => "local",
-            SourceType::Git => "git",
-        };
-        println!("  {name:<28} ({kind}) {loc}", loc = location.unwrap_or_default());
-    }
-
-    Ok(())
+    Ok(SourceListResult { entries })
 }
 
-pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
+pub(crate) fn gather_browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
     auto_update_source_with(name, ctx)?;
 
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
@@ -84,47 +219,28 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
         );
     }
 
-    let artifacts = source_iter::each_source_artifact_with(&sources.sources, ctx.fs);
-    let artifacts: Vec<_> = artifacts
+    let all_artifacts = source_iter::each_source_artifact_with(&sources.sources, ctx.fs);
+    let artifacts: Vec<_> = all_artifacts
         .into_iter()
         .filter(|sa| sa.source_name == name)
         .map(|sa| sa.artifact)
         .collect();
 
-    if artifacts.is_empty() {
-        println!("No agents or skills found in '{name}'.");
-        return Ok(());
-    }
-
-    let agents: Vec<_> = artifacts
+    let agents = artifacts
         .iter()
         .filter(|a| a.kind == crate::types::ArtifactKind::Agent)
+        .map(|a| BrowseArtifact {
+            name: a.name.clone(),
+            version: a.version.clone(),
+            deprecation_display: format_deprecation(a),
+        })
         .collect();
-    let skills: Vec<_> = artifacts
+
+    let skills = artifacts
         .iter()
         .filter(|a| a.kind == crate::types::ArtifactKind::Skill)
-        .collect();
-
-    if !agents.is_empty() {
-        println!("Agents:");
-        for a in &agents {
-            let v = a.version.as_deref().map(|v| format!("  v{v}")).unwrap_or_default();
-            let dep = format_deprecation(a);
-            println!("  {}{v}{dep}", a.name);
-        }
-    }
-
-    if !skills.is_empty() {
-        if !agents.is_empty() {
-            println!();
-        }
-        println!("Skills:");
-        for s in &skills {
-            let v = s.version.as_deref().map(|v| format!("  v{v}")).unwrap_or_default();
-            let dep = format_deprecation(s);
-            println!("  {}{v}{dep}", s.name);
-            // Show shallow file listing for the skill directory
-            if let Ok(entries) = ctx.fs.read_dir(&s.path) {
+        .map(|s| {
+            let files = if let Ok(entries) = ctx.fs.read_dir(&s.path) {
                 let mut names: Vec<_> = entries
                     .iter()
                     .filter(|e| !e.file_name.starts_with('.'))
@@ -137,46 +253,28 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
                     })
                     .collect();
                 names.sort();
-                for n in &names {
-                    println!("    {n}");
-                }
+                names
+            } else {
+                Vec::new()
+            };
+
+            BrowseSkill {
+                name: s.name.clone(),
+                version: s.version.clone(),
+                deprecation_display: format_deprecation(s),
+                files,
             }
-        }
-    }
+        })
+        .collect();
 
-    Ok(())
+    Ok(SourceBrowseResult {
+        source_name: name.to_string(),
+        agents,
+        skills,
+    })
 }
 
-pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<()> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-
-    if let Some(n) = name {
-        if !sources.sources.contains_key(n) {
-            bail!("Source '{n}' not found.");
-        }
-        pull_source_with(n, ctx)?;
-    } else {
-        let git_sources: Vec<_> = sources
-            .sources
-            .iter()
-            .filter(|(_, e)| matches!(e.source_type, SourceType::Git))
-            .map(|(n, _)| n.clone())
-            .collect();
-
-        if git_sources.is_empty() {
-            println!("No git-backed sources to update.");
-            return Ok(());
-        }
-
-        for source_name in &git_sources {
-            pull_source_with(source_name, ctx)?;
-        }
-    }
-
-    Ok(())
-}
-
-pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
+pub(crate) fn perform_remove_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
     let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
     let entry = sources
@@ -186,21 +284,142 @@ pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
 
     config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
 
-    if let Some(clone_path) = &entry.local_clone {
+    let clone_deleted = if let Some(clone_path) = &entry.local_clone {
         if ctx.fs.exists(clone_path) {
             ctx.fs.remove_dir_all(clone_path).with_context(|| {
                 format!("Failed to remove cloned repo at {}", clone_path.display())
             })?;
-            println!("Source '{name}' removed (cloned repo deleted).");
+            true
         } else {
-            println!("Source '{name}' removed.");
+            false
         }
     } else {
-        println!("Source '{name}' removed.");
+        false
+    };
+
+    Ok(SourceRemoveResult {
+        name: name.to_string(),
+        clone_deleted,
+    })
+}
+
+pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceUpdateResult> {
+    let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+
+    // Clone or borrow what we need before mutating the map
+    let source_type = sources
+        .sources
+        .get(name)
+        .with_context(|| format!("Source '{name}' not found."))?
+        .source_type
+        .clone();
+
+    match source_type {
+        SourceType::Local => {
+            // Update timestamp for local sources
+            if let Some(entry) = sources.sources.get_mut(name) {
+                entry.last_updated = Some(ctx.clock.now().to_rfc3339());
+            }
+            config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
+            let local_path =
+                config::resolve_local_path(sources.sources.get(name).expect("entry present"));
+            let artifacts = scan::scan_source_with(&local_path, ctx.fs)?;
+            let (agents_found, skills_found) = count_artifacts(&artifacts);
+            return Ok(SourceUpdateResult {
+                name: name.to_string(),
+                agents_found,
+                skills_found,
+            });
+        }
+        SourceType::Git => {}
     }
 
-    Ok(())
+    let clone_path = sources
+        .sources
+        .get(name)
+        .expect("entry present")
+        .local_clone
+        .as_ref()
+        .context("Git source has no local clone path")?
+        .clone();
+
+    if !ctx.fs.exists(&clone_path) {
+        bail!(
+            "Clone directory {} does not exist. Try removing and re-adding the source.",
+            clone_path.display()
+        );
+    }
+
+    ctx.git.pull(&clone_path)?;
+
+    // Update timestamp
+    if let Some(entry) = sources.sources.get_mut(name) {
+        entry.last_updated = Some(ctx.clock.now().to_rfc3339());
+    }
+    config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
+
+    let local_path = config::resolve_local_path(sources.sources.get(name).expect("entry present"));
+    let artifacts = scan::scan_source_with(&local_path, ctx.fs)?;
+    let (agents_found, skills_found) = count_artifacts(&artifacts);
+
+    Ok(SourceUpdateResult {
+        name: name.to_string(),
+        agents_found,
+        skills_found,
+    })
 }
+
+// ---------------------------------------------------------------------------
+// Print functions (no business logic)
+// ---------------------------------------------------------------------------
+
+fn print_source_list(result: &SourceListResult) {
+    if result.entries.is_empty() {
+        println!("No sources registered.");
+        println!();
+        println!("Add one with: cmx source add <name> <path-or-url>");
+        return;
+    }
+
+    for entry in &result.entries {
+        println!("  {:<28} ({}) {}", entry.name, entry.kind, entry.location);
+    }
+}
+
+fn print_browse_result(result: &SourceBrowseResult) {
+    let name = &result.source_name;
+
+    if result.agents.is_empty() && result.skills.is_empty() {
+        println!("No agents or skills found in '{name}'.");
+        return;
+    }
+
+    if !result.agents.is_empty() {
+        println!("Agents:");
+        for a in &result.agents {
+            let v = a.version.as_deref().map(|v| format!("  v{v}")).unwrap_or_default();
+            println!("  {}{v}{}", a.name, a.deprecation_display);
+        }
+    }
+
+    if !result.skills.is_empty() {
+        if !result.agents.is_empty() {
+            println!();
+        }
+        println!("Skills:");
+        for s in &result.skills {
+            let v = s.version.as_deref().map(|v| format!("  v{v}")).unwrap_or_default();
+            println!("  {}{v}{}", s.name, s.deprecation_display);
+            for f in &s.files {
+                println!("    {f}");
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-update helpers (no change in logic)
+// ---------------------------------------------------------------------------
 
 /// Auto-update a git source if it hasn't been updated recently.
 pub fn auto_update_source_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
@@ -214,7 +433,7 @@ pub fn auto_update_source_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
     }
 
     if is_stale_at(entry, ctx.clock.now()) {
-        pull_source_with(name, ctx)?;
+        perform_pull_with(name, ctx)?;
     }
 
     Ok(())
@@ -224,10 +443,16 @@ pub fn auto_update_source_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
 pub fn auto_update_all_with(ctx: &AppContext<'_>) -> Result<()> {
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
     let now = ctx.clock.now();
-    for (name, entry) in &sources.sources {
-        if matches!(entry.source_type, SourceType::Git) && is_stale_at(entry, now) {
-            pull_source_with(name, ctx)?;
-        }
+    let stale_names: Vec<String> = sources
+        .sources
+        .iter()
+        .filter(|(_, entry)| {
+            matches!(entry.source_type, SourceType::Git) && is_stale_at(entry, now)
+        })
+        .map(|(name, _)| name.clone())
+        .collect();
+    for name in stale_names {
+        perform_pull_with(&name, ctx)?;
     }
     Ok(())
 }
@@ -241,56 +466,6 @@ fn is_stale_at(entry: &SourceEntry, now: DateTime<Utc>) -> bool {
     };
     let age = now.signed_duration_since(last_time);
     age.num_minutes() >= AUTO_UPDATE_MINUTES
-}
-
-fn pull_source_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
-    let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-    let entry = sources
-        .sources
-        .get(name)
-        .with_context(|| format!("Source '{name}' not found."))?;
-
-    match entry.source_type {
-        SourceType::Local => {
-            // Update timestamp for local sources too
-            let mut entry = entry.clone();
-            entry.last_updated = Some(ctx.clock.now().to_rfc3339());
-            sources.sources.insert(name.to_string(), entry);
-            config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
-            return Ok(());
-        }
-        SourceType::Git => {}
-    }
-
-    let clone_path = entry
-        .local_clone
-        .as_ref()
-        .context("Git source has no local clone path")?
-        .clone();
-
-    if !ctx.fs.exists(&clone_path) {
-        bail!(
-            "Clone directory {} does not exist. Try removing and re-adding the source.",
-            clone_path.display()
-        );
-    }
-
-    println!("Updating '{name}'...");
-
-    ctx.git.pull(&clone_path)?;
-
-    // Update timestamp
-    let mut entry = sources.sources.get(name).unwrap().clone();
-    entry.last_updated = Some(ctx.clock.now().to_rfc3339());
-    sources.sources.insert(name.to_string(), entry);
-    config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
-
-    let local_path = config::resolve_local_path(sources.sources.get(name).unwrap());
-    let artifacts = scan::scan_source_with(&local_path, ctx.fs)?;
-    let (agents, skills) = count_artifacts(&artifacts);
-    println!("Source '{name}': {agents} agent(s), {skills} skill(s).");
-
-    Ok(())
 }
 
 fn add_local_source_with(path_str: &str, ctx: &AppContext<'_>) -> Result<SourceEntry> {
@@ -323,8 +498,6 @@ fn add_git_source_with(name: &str, url: &str, ctx: &AppContext<'_>) -> Result<So
             clone_dir.display()
         );
     }
-
-    println!("Cloning {url} to {}...", clone_dir.display());
 
     ctx.git.clone_repo(url, &clone_dir)?;
 
@@ -600,9 +773,9 @@ mod tests {
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = add_with("my-source", "/new/path", &ctx);
+        let result = perform_add_with("my-source", "/new/path", &ctx);
         assert!(result.is_err());
-        let msg = result.unwrap_err().to_string();
+        let msg = result.err().unwrap().to_string();
         assert!(msg.contains("already exists"), "unexpected: {msg}");
     }
 
@@ -619,11 +792,29 @@ mod tests {
         fs.add_dir("/local/repo");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = add_with("local-source", "/local/repo", &ctx);
+        let result = perform_add_with("local-source", "/local/repo", &ctx);
         assert!(result.is_ok(), "expected ok: {:?}", result.err());
 
         // No git clone should have been called
         assert!(git.cloned.borrow().is_empty(), "no git clone expected for local path");
+    }
+
+    #[test]
+    fn add_result_has_correct_name_and_counts() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_empty_sources(&fs, &paths);
+        fs.add_dir("/local/repo");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = perform_add_with("local-source", "/local/repo", &ctx).unwrap();
+
+        assert_eq!(result.name, "local-source");
+        assert_eq!(result.agents_found, 0, "empty repo has no agents");
+        assert_eq!(result.skills_found, 0, "empty repo has no skills");
     }
 
     #[test]
@@ -636,7 +827,7 @@ mod tests {
         setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = add_with("git-source", "https://github.com/example/repo.git", &ctx);
+        let result = perform_add_with("git-source", "https://github.com/example/repo.git", &ctx);
         assert!(result.is_ok(), "expected ok: {:?}", result.err());
 
         let cloned = git.cloned.borrow();
@@ -655,10 +846,86 @@ mod tests {
         fs.add_dir("/local/repo");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        add_with("new-source", "/local/repo", &ctx).unwrap();
+        perform_add_with("new-source", "/local/repo", &ctx).unwrap();
 
         let sources = config::load_sources_with(&fs, &paths).unwrap();
         assert!(sources.sources.contains_key("new-source"), "source should be saved");
+    }
+
+    #[test]
+    fn gather_list_empty_sources_returns_empty_entries() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_empty_sources(&fs, &paths);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = gather_list_with(&ctx).unwrap();
+
+        assert!(result.entries.is_empty(), "expected empty entries for no sources");
+    }
+
+    #[test]
+    fn gather_list_local_source_has_correct_kind_and_location() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        let mut sources = crate::types::SourcesFile::default();
+        sources.sources.insert(
+            "my-source".to_string(),
+            SourceEntry {
+                source_type: SourceType::Local,
+                path: Some(PathBuf::from("/local/repo")),
+                url: None,
+                local_clone: None,
+                branch: None,
+                last_updated: None,
+            },
+        );
+        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = gather_list_with(&ctx).unwrap();
+
+        assert_eq!(result.entries.len(), 1);
+        assert_eq!(result.entries[0].name, "my-source");
+        assert_eq!(result.entries[0].kind, "local");
+        assert_eq!(result.entries[0].location, "/local/repo");
+    }
+
+    #[test]
+    fn remove_result_reports_clone_deleted() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        let clone_path = PathBuf::from("/clones/git-source");
+        let mut sources = crate::types::SourcesFile::default();
+        sources.sources.insert(
+            "git-source".to_string(),
+            SourceEntry {
+                source_type: SourceType::Git,
+                path: None,
+                url: Some("https://github.com/example/repo.git".to_string()),
+                local_clone: Some(clone_path.clone()),
+                branch: Some("main".to_string()),
+                last_updated: None,
+            },
+        );
+        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        fs.add_file(clone_path.join("README.md"), "# repo");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = perform_remove_with("git-source", &ctx).unwrap();
+
+        assert_eq!(result.name, "git-source");
+        assert!(result.clone_deleted, "expected clone_deleted to be true");
+        assert!(!fs.exists(&clone_path), "clone directory should be removed");
     }
 
     #[test]
@@ -813,5 +1080,38 @@ mod tests {
         let pulled = git.pulled.borrow();
         assert_eq!(pulled.len(), 1, "stale source should be pulled");
         assert_eq!(pulled[0], clone_path);
+    }
+
+    #[test]
+    fn perform_pull_updates_timestamp_for_git_source() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        let clone_path = PathBuf::from("/clones/git-source");
+        let mut sources = crate::types::SourcesFile::default();
+        sources.sources.insert(
+            "git-source".to_string(),
+            SourceEntry {
+                source_type: SourceType::Git,
+                path: None,
+                url: Some("https://github.com/example/repo.git".to_string()),
+                local_clone: Some(clone_path.clone()),
+                branch: Some("main".to_string()),
+                last_updated: None,
+            },
+        );
+        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        fs.add_dir(clone_path);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = perform_pull_with("git-source", &ctx).unwrap();
+
+        assert_eq!(result.name, "git-source");
+
+        let updated_sources = config::load_sources_with(&fs, &paths).unwrap();
+        let entry = updated_sources.sources.get("git-source").unwrap();
+        assert!(entry.last_updated.is_some(), "timestamp should be updated after pull");
     }
 }

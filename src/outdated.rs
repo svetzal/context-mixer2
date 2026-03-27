@@ -9,16 +9,34 @@ use crate::source;
 use crate::source_iter;
 use crate::types::{ArtifactKind, LockFile};
 
-struct OutdatedRow {
-    name: String,
-    kind: ArtifactKind,
-    installed_version: String,
-    available_version: String,
-    source: String,
-    status: String,
+// ---------------------------------------------------------------------------
+// Result types
+// ---------------------------------------------------------------------------
+
+pub(crate) struct OutdatedRow {
+    pub name: String,
+    pub kind: ArtifactKind,
+    pub installed_version: String,
+    pub available_version: String,
+    pub source: String,
+    pub status: String,
 }
 
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
 pub fn outdated_with(ctx: &AppContext<'_>) -> Result<()> {
+    let rows = gather_outdated_with(ctx)?;
+    print_outdated(&rows);
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Gather (pure logic, no println!)
+// ---------------------------------------------------------------------------
+
+pub(crate) fn gather_outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
     source::auto_update_all_with(ctx)?;
 
     let source_artifacts = scan_all_sources_with(ctx)?;
@@ -64,9 +82,17 @@ pub fn outdated_with(ctx: &AppContext<'_>) -> Result<()> {
     let mut seen = BTreeSet::new();
     rows.retain(|r| seen.insert(r.name.clone()));
 
+    Ok(rows)
+}
+
+// ---------------------------------------------------------------------------
+// Print (no business logic)
+// ---------------------------------------------------------------------------
+
+fn print_outdated(rows: &[OutdatedRow]) {
     if rows.is_empty() {
         println!("Everything is up to date.");
-        return Ok(());
+        return;
     }
 
     let w_name = rows.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
@@ -90,7 +116,7 @@ pub fn outdated_with(ctx: &AppContext<'_>) -> Result<()> {
         "-".repeat(w_st),
     );
 
-    for row in &rows {
+    for row in rows {
         println!(
             "  {:<w_name$}  {:<w_kind$}  {:<w_installed$}  {:<w_available$}  {:<w_src$}  {:<w_st$}",
             row.name,
@@ -101,9 +127,11 @@ pub fn outdated_with(ctx: &AppContext<'_>) -> Result<()> {
             row.status,
         );
     }
-
-    Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
 
 /// Returns `true` if an installed artifact is considered outdated relative to
 /// the source.  Pure function — no I/O.
@@ -226,7 +254,15 @@ fn scan_all_sources_with(ctx: &AppContext<'_>) -> Result<BTreeMap<String, Source
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ArtifactKind, LockEntry, LockSource};
+    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::lockfile;
+    use crate::test_support::{agent_content, install_agent_on_disk, make_ctx, test_paths};
+    use crate::types::{
+        ArtifactKind, LockEntry, LockFile, LockSource, SourceEntry, SourceType, SourcesFile,
+    };
+    use chrono::Utc;
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
 
     fn make_lock_entry(source_checksum: &str, version: Option<&str>) -> LockEntry {
         LockEntry {
@@ -294,5 +330,215 @@ mod tests {
     #[test]
     fn status_label_changed_no_versions() {
         assert_eq!(outdated_status_label("-", "-"), "changed");
+    }
+
+    // --- gather_outdated_with ---
+
+    fn setup_source_with_versioned_agent(
+        fs: &FakeFilesystem,
+        paths: &crate::paths::ConfigPaths,
+        source_name: &str,
+        source_path: &str,
+        agent_name: &str,
+        version: &str,
+    ) {
+        let sources = SourcesFile {
+            version: 1,
+            sources: {
+                let mut m = BTreeMap::new();
+                m.insert(
+                    source_name.to_string(),
+                    SourceEntry {
+                        source_type: SourceType::Local,
+                        path: Some(PathBuf::from(source_path)),
+                        url: None,
+                        local_clone: None,
+                        branch: None,
+                        last_updated: Some(Utc::now().to_rfc3339()),
+                    },
+                );
+                m
+            },
+        };
+        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        // Source has version embedded in frontmatter
+        fs.add_file(
+            format!("{source_path}/{agent_name}.md"),
+            format!(
+                "---\nname: {agent_name}\ndescription: A test agent\nversion: {version}\n---\n"
+            ),
+        );
+    }
+
+    #[test]
+    fn gather_outdated_outdated_artifact_appears_in_rows() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Source has version 2.0.0
+        setup_source_with_versioned_agent(
+            &fs,
+            &paths,
+            "guidelines",
+            "/sources/guidelines",
+            "my-agent",
+            "2.0.0",
+        );
+
+        // Install on disk with version 1.0.0 lock entry
+        install_agent_on_disk(
+            &fs,
+            &paths,
+            "my-agent",
+            &agent_content("my-agent", "A test agent"),
+            false,
+        );
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-agent".to_string(),
+            LockEntry {
+                artifact_type: ArtifactKind::Agent,
+                version: Some("1.0.0".to_string()),
+                installed_at: "2024-01-01T00:00:00Z".to_string(),
+                source: LockSource {
+                    repo: "guidelines".to_string(),
+                    path: "my-agent.md".to_string(),
+                },
+                source_checksum: "sha256:old".to_string(),
+                installed_checksum: "sha256:old".to_string(),
+            },
+        );
+        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let rows = gather_outdated_with(&ctx).unwrap();
+
+        assert_eq!(rows.len(), 1, "expected one outdated artifact");
+        assert_eq!(rows[0].name, "my-agent");
+        assert_eq!(rows[0].installed_version, "1.0.0");
+        assert_eq!(rows[0].available_version, "2.0.0");
+        assert_eq!(rows[0].source, "guidelines");
+    }
+
+    #[test]
+    fn gather_outdated_up_to_date_returns_empty() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // No installed artifacts, no sources
+        let sources = SourcesFile::default();
+        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let rows = gather_outdated_with(&ctx).unwrap();
+
+        assert!(rows.is_empty(), "expected no rows when everything is up to date");
+    }
+
+    #[test]
+    fn gather_outdated_untracked_artifact_appears_as_untracked() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Source has version 1.0.0
+        setup_source_with_versioned_agent(
+            &fs,
+            &paths,
+            "guidelines",
+            "/sources/guidelines",
+            "my-agent",
+            "1.0.0",
+        );
+
+        // Installed on disk but NOT in lock file
+        install_agent_on_disk(
+            &fs,
+            &paths,
+            "my-agent",
+            &agent_content("my-agent", "A test agent"),
+            false,
+        );
+        // Empty lock file — no lock entry
+        let lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let rows = gather_outdated_with(&ctx).unwrap();
+
+        assert_eq!(rows.len(), 1, "untracked artifact should appear");
+        assert_eq!(rows[0].name, "my-agent");
+        assert_eq!(rows[0].installed_version, "-");
+        assert_eq!(rows[0].status, "untracked");
+    }
+
+    #[test]
+    fn gather_outdated_locally_modified_appends_modified_status() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Source has version 2.0.0
+        setup_source_with_versioned_agent(
+            &fs,
+            &paths,
+            "guidelines",
+            "/sources/guidelines",
+            "my-agent",
+            "2.0.0",
+        );
+
+        // Install on disk
+        install_agent_on_disk(
+            &fs,
+            &paths,
+            "my-agent",
+            &agent_content("my-agent", "A test agent"),
+            false,
+        );
+
+        // Lock entry says installed_checksum matches "sha256:lock_cs" but disk has different content
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-agent".to_string(),
+            LockEntry {
+                artifact_type: ArtifactKind::Agent,
+                version: Some("1.0.0".to_string()),
+                installed_at: "2024-01-01T00:00:00Z".to_string(),
+                source: LockSource {
+                    repo: "guidelines".to_string(),
+                    path: "my-agent.md".to_string(),
+                },
+                source_checksum: "sha256:old".to_string(),
+                // Installed checksum doesn't match disk content
+                installed_checksum: "sha256:different".to_string(),
+            },
+        );
+        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let rows = gather_outdated_with(&ctx).unwrap();
+
+        assert_eq!(rows.len(), 1);
+        assert!(
+            rows[0].status.contains("modified"),
+            "status should contain 'modified': {}",
+            rows[0].status
+        );
     }
 }

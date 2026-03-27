@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::checksum;
 use crate::config;
@@ -11,7 +11,19 @@ use crate::source_iter;
 use crate::types::{ArtifactKind, LockEntry, LockSource};
 
 // ---------------------------------------------------------------------------
-// Testable variants (accept &AppContext)
+// Result types
+// ---------------------------------------------------------------------------
+
+pub(crate) struct InstallResult {
+    pub artifact_name: String,
+    pub version: Option<String>,
+    pub kind: ArtifactKind,
+    pub source_name: String,
+    pub dest_dir: PathBuf,
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
 // ---------------------------------------------------------------------------
 
 /// Tuple returned by artifact lookup: source name, path, source root, and version.
@@ -104,6 +116,25 @@ pub fn install_with(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
+    let result = perform_install_with(name, kind, local, force, ctx)?;
+    let version_info = result.version.as_deref().map(|v| format!(" v{v}")).unwrap_or_default();
+    println!(
+        "Installed {}{version_info} ({}) from '{}' -> {}",
+        result.artifact_name,
+        result.kind,
+        result.source_name,
+        result.dest_dir.display()
+    );
+    Ok(())
+}
+
+pub(crate) fn perform_install_with(
+    name: &str,
+    kind: ArtifactKind,
+    local: bool,
+    force: bool,
+    ctx: &AppContext<'_>,
+) -> Result<InstallResult> {
     let (source_name, artifact_name) = parse_name(name);
 
     source::auto_update_all_with(ctx)?;
@@ -144,13 +175,12 @@ pub fn install_with(
     let dest_path = copy_artifact(&artifact_path, &dest_dir, kind, artifact_name, ctx)?;
     let installed_checksum = checksum::checksum_artifact_with(&dest_path, kind, ctx.fs)?;
 
-    let version_info = artifact_version.as_deref().map(|v| format!(" v{v}")).unwrap_or_default();
     let mut lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
     lock.packages.insert(
         artifact_name.to_string(),
         LockEntry {
             artifact_type: kind,
-            version: artifact_version,
+            version: artifact_version.clone(),
             installed_at: ctx.clock.now().to_rfc3339(),
             source: LockSource {
                 repo: found_source.clone(),
@@ -161,12 +191,14 @@ pub fn install_with(
         },
     );
     lockfile::save_with(&lock, local, ctx.fs, ctx.paths)?;
-    println!(
-        "Installed {artifact_name}{version_info} ({kind}) from '{found_source}' -> {}",
-        dest_dir.display()
-    );
 
-    Ok(())
+    Ok(InstallResult {
+        artifact_name: artifact_name.to_string(),
+        version: artifact_version,
+        kind,
+        source_name: found_source,
+        dest_dir,
+    })
 }
 
 pub fn update_with(
@@ -449,6 +481,14 @@ mod tests {
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result = install_with("my-source:my-agent", ArtifactKind::Agent, false, false, &ctx);
         assert!(result.is_ok(), "expected ok, got: {:?}", result.err());
+
+        // Verify the artifact was installed
+        let expected_dest = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        assert!(
+            fs.file_exists(&expected_dest),
+            "agent file should be installed at {}",
+            expected_dest.display()
+        );
     }
 
     #[test]
@@ -698,5 +738,59 @@ mod tests {
         let paths = test_paths();
         let lock: LockFile = lockfile::load_with(false, &fs, &paths).unwrap();
         assert!(lock.packages.is_empty());
+    }
+
+    // --- perform_install_with: assert on InstallResult fields ---
+
+    #[test]
+    fn perform_install_returns_correct_artifact_name() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result =
+            perform_install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
+
+        assert_eq!(result.artifact_name, "my-agent");
+        assert_eq!(result.kind, ArtifactKind::Agent);
+        assert_eq!(result.source_name, "my-source");
+    }
+
+    #[test]
+    fn perform_install_dest_dir_matches_install_dir() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result =
+            perform_install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
+
+        let expected_dir = paths.install_dir(ArtifactKind::Agent, false);
+        assert_eq!(result.dest_dir, expected_dir);
+    }
+
+    #[test]
+    fn perform_install_bails_when_no_sources_registered() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        let sources = SourcesFile::default();
+        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = perform_install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
+        assert!(result.is_err());
+        let msg = result.err().unwrap().to_string();
+        assert!(msg.contains("No sources registered"), "unexpected: {msg}");
     }
 }
