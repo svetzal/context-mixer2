@@ -14,83 +14,78 @@ const AUTO_UPDATE_MINUTES: i64 = 60;
 // Result types
 // ---------------------------------------------------------------------------
 
-pub(crate) struct SourceAddResult {
+pub use crate::scan::ScanWarning;
+
+pub struct SourceAddResult {
     pub name: String,
     pub agents_found: usize,
     pub skills_found: usize,
+    pub warnings: Vec<ScanWarning>,
 }
 
-pub(crate) struct SourceListEntry {
+pub struct SourceListEntry {
     pub name: String,
     pub kind: &'static str,
     pub location: String,
 }
 
-pub(crate) struct SourceListResult {
+pub struct SourceListResult {
     pub entries: Vec<SourceListEntry>,
 }
 
-pub(crate) struct BrowseArtifact {
+pub struct BrowseArtifact {
     pub name: String,
     pub version: Option<String>,
     pub deprecation_display: String,
 }
 
-pub(crate) struct BrowseSkill {
+pub struct BrowseSkill {
     pub name: String,
     pub version: Option<String>,
     pub deprecation_display: String,
     pub files: Vec<String>,
 }
 
-pub(crate) struct SourceBrowseResult {
+pub struct SourceBrowseResult {
     pub source_name: String,
     pub agents: Vec<BrowseArtifact>,
     pub skills: Vec<BrowseSkill>,
 }
 
-pub(crate) struct SourceRemoveResult {
+pub struct SourceRemoveResult {
     pub name: String,
     pub clone_deleted: bool,
 }
 
-pub(crate) struct SourceUpdateResult {
+pub struct SourceUpdateResult {
     pub name: String,
     pub agents_found: usize,
     pub skills_found: usize,
+}
+
+pub enum SourceUpdateOutput {
+    SingleUpdate(SourceUpdateResult),
+    BatchUpdate(Vec<SourceUpdateResult>),
+    NoGitSources,
 }
 
 // ---------------------------------------------------------------------------
 // Public entry points (thin orchestrators)
 // ---------------------------------------------------------------------------
 
-pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<()> {
-    // Show progress before the potentially long-running clone
-    if looks_like_url(path_or_url) {
-        let clone_dir = ctx.paths.git_clones_dir().join(name);
-        println!("Cloning {path_or_url} to {}...", clone_dir.display());
-    }
-    let result = perform_add_with(name, path_or_url, ctx)?;
-    println!(
-        "Source '{}' registered: {} agent(s), {} skill(s) found.",
-        result.name, result.agents_found, result.skills_found
-    );
-    Ok(())
+pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<SourceAddResult> {
+    perform_add_with(name, path_or_url, ctx)
 }
 
-pub fn list_with(ctx: &AppContext<'_>) -> Result<()> {
-    let result = gather_list_with(ctx)?;
-    print_source_list(&result);
-    Ok(())
+pub fn list_with(ctx: &AppContext<'_>) -> Result<SourceListResult> {
+    gather_list_with(ctx)
 }
 
-pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
-    let result = gather_browse_with(name, ctx)?;
-    print_browse_result(&result);
-    Ok(())
+pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
+    gather_browse_with(name, ctx)
 }
 
-pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<()> {
+pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpdateOutput> {
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
     if let Some(n) = name {
@@ -98,10 +93,7 @@ pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<()> {
             bail!("Source '{n}' not found.");
         }
         let result = perform_pull_with(n, ctx)?;
-        println!(
-            "Source '{}': {} agent(s), {} skill(s).",
-            result.name, result.agents_found, result.skills_found
-        );
+        Ok(SourceUpdateOutput::SingleUpdate(result))
     } else {
         let git_sources: Vec<_> = sources
             .sources
@@ -111,30 +103,20 @@ pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<()> {
             .collect();
 
         if git_sources.is_empty() {
-            println!("No git-backed sources to update.");
-            return Ok(());
+            return Ok(SourceUpdateOutput::NoGitSources);
         }
 
+        let mut results = Vec::new();
         for source_name in &git_sources {
             let result = perform_pull_with(source_name, ctx)?;
-            println!(
-                "Source '{}': {} agent(s), {} skill(s).",
-                result.name, result.agents_found, result.skills_found
-            );
+            results.push(result);
         }
+        Ok(SourceUpdateOutput::BatchUpdate(results))
     }
-
-    Ok(())
 }
 
-pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
-    let result = perform_remove_with(name, ctx)?;
-    if result.clone_deleted {
-        println!("Source '{}' removed (cloned repo deleted).", result.name);
-    } else {
-        println!("Source '{}' removed.", result.name);
-    }
-    Ok(())
+pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
+    perform_remove_with(name, ctx)
 }
 
 // ---------------------------------------------------------------------------
@@ -159,8 +141,8 @@ pub(crate) fn perform_add_with(
     };
 
     let local_path = config::resolve_local_path(&entry);
-    let artifacts = scan::scan_source_with(&local_path, ctx.fs)?;
-    let (agents_found, skills_found) = count_artifacts(&artifacts);
+    let scan_result = scan::scan_source_with(&local_path, ctx.fs)?;
+    let (agents_found, skills_found) = count_artifacts(&scan_result.artifacts);
 
     sources.sources.insert(name.to_string(), entry);
     config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
@@ -169,6 +151,7 @@ pub(crate) fn perform_add_with(
         name: name.to_string(),
         agents_found,
         skills_found,
+        warnings: scan_result.warnings,
     })
 }
 
@@ -323,8 +306,8 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
             config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
             let local_path =
                 config::resolve_local_path(sources.sources.get(name).expect("entry present"));
-            let artifacts = scan::scan_source_with(&local_path, ctx.fs)?;
-            let (agents_found, skills_found) = count_artifacts(&artifacts);
+            let scan_result = scan::scan_source_with(&local_path, ctx.fs)?;
+            let (agents_found, skills_found) = count_artifacts(&scan_result.artifacts);
             return Ok(SourceUpdateResult {
                 name: name.to_string(),
                 agents_found,
@@ -359,8 +342,8 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
     config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
 
     let local_path = config::resolve_local_path(sources.sources.get(name).expect("entry present"));
-    let artifacts = scan::scan_source_with(&local_path, ctx.fs)?;
-    let (agents_found, skills_found) = count_artifacts(&artifacts);
+    let scan_result = scan::scan_source_with(&local_path, ctx.fs)?;
+    let (agents_found, skills_found) = count_artifacts(&scan_result.artifacts);
 
     Ok(SourceUpdateResult {
         name: name.to_string(),
@@ -373,7 +356,7 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
 // Print functions (no business logic)
 // ---------------------------------------------------------------------------
 
-fn print_source_list(result: &SourceListResult) {
+pub fn print_source_list(result: &SourceListResult) {
     if result.entries.is_empty() {
         println!("No sources registered.");
         println!();
@@ -386,7 +369,7 @@ fn print_source_list(result: &SourceListResult) {
     }
 }
 
-fn print_browse_result(result: &SourceBrowseResult) {
+pub fn print_browse_result(result: &SourceBrowseResult) {
     let name = &result.source_name;
 
     if result.agents.is_empty() && result.skills.is_empty() {
@@ -539,7 +522,7 @@ fn format_deprecation(artifact: &Artifact) -> String {
     parts.join("")
 }
 
-fn looks_like_url(s: &str) -> bool {
+pub fn looks_like_url(s: &str) -> bool {
     s.starts_with("https://")
         || s.starts_with("http://")
         || s.starts_with("git@")

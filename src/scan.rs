@@ -5,14 +5,30 @@ use crate::gateway::filesystem::Filesystem;
 use crate::types::{Artifact, ArtifactKind, Deprecation};
 
 // ---------------------------------------------------------------------------
+// Warning types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScanWarning {
+    pub message: String,
+}
+
+#[derive(Debug)]
+pub struct ScanResult {
+    pub artifacts: Vec<Artifact>,
+    pub warnings: Vec<ScanWarning>,
+}
+
+// ---------------------------------------------------------------------------
 // Testable variant (accepts injected Filesystem)
 // ---------------------------------------------------------------------------
 
-pub fn scan_source_with(root: &Path, fs: &dyn Filesystem) -> Result<Vec<Artifact>> {
+pub fn scan_source_with(root: &Path, fs: &dyn Filesystem) -> Result<ScanResult> {
     let marketplace = root.join(".claude-plugin").join("marketplace.json");
+    let mut warnings = Vec::new();
 
     let mut artifacts = if fs.exists(&marketplace) {
-        scan_marketplace_with(root, &marketplace, fs)?
+        scan_marketplace_with(root, &marketplace, fs, &mut warnings)?
     } else {
         let mut arts = Vec::new();
         walk_dir_with(root, &mut arts, fs)?;
@@ -20,13 +36,17 @@ pub fn scan_source_with(root: &Path, fs: &dyn Filesystem) -> Result<Vec<Artifact
     };
 
     artifacts.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(artifacts)
+    Ok(ScanResult {
+        artifacts,
+        warnings,
+    })
 }
 
 fn scan_marketplace_with(
     root: &Path,
     marketplace_path: &Path,
     fs: &dyn Filesystem,
+    warnings: &mut Vec<ScanWarning>,
 ) -> Result<Vec<Artifact>> {
     let content = fs.read_to_string(marketplace_path)?;
     let manifest: serde_json::Value = serde_json::from_str(&content)?;
@@ -42,7 +62,7 @@ fn scan_marketplace_with(
 
             // If explicit agents/skills arrays are present, use them directly
             if has_agents || has_skills {
-                scan_marketplace_explicit_arrays(root, plugin, &mut artifacts, fs);
+                scan_marketplace_explicit_arrays(root, plugin, &mut artifacts, fs, warnings);
                 continue;
             }
 
@@ -56,9 +76,11 @@ fn scan_marketplace_with(
                     } else {
                         let plugin_name =
                             plugin.get("name").and_then(|n| n.as_str()).unwrap_or("<unnamed>");
-                        eprintln!(
-                            "Warning: plugin '{plugin_name}' source path '{source_path}' does not exist"
-                        );
+                        warnings.push(ScanWarning {
+                            message: format!(
+                                "plugin '{plugin_name}' source path '{source_path}' does not exist"
+                            ),
+                        });
                     }
                 } else if source.is_object() {
                     // Remote source (github, url, git-subdir, npm) — not yet supported
@@ -66,9 +88,11 @@ fn scan_marketplace_with(
                         plugin.get("name").and_then(|n| n.as_str()).unwrap_or("<unnamed>");
                     let source_type =
                         source.get("source").and_then(|s| s.as_str()).unwrap_or("unknown");
-                    eprintln!(
-                        "Warning: plugin '{plugin_name}' uses remote source type '{source_type}' which is not yet supported"
-                    );
+                    warnings.push(ScanWarning {
+                        message: format!(
+                            "plugin '{plugin_name}' uses remote source type '{source_type}' which is not yet supported"
+                        ),
+                    });
                 }
             }
         }
@@ -82,6 +106,7 @@ fn scan_marketplace_explicit_arrays(
     plugin: &serde_json::Value,
     artifacts: &mut Vec<Artifact>,
     fs: &dyn Filesystem,
+    warnings: &mut Vec<ScanWarning>,
 ) {
     // Scan declared agents
     if let Some(agents) = plugin.get("agents").and_then(|a| a.as_array()) {
@@ -89,9 +114,11 @@ fn scan_marketplace_explicit_arrays(
             if let Some(path_str) = agent_path.as_str() {
                 let full_path = root.join(path_str);
                 if !fs.exists(&full_path) {
-                    eprintln!(
-                        "Warning: marketplace declares agent '{path_str}' but path does not exist"
-                    );
+                    warnings.push(ScanWarning {
+                        message: format!(
+                            "marketplace declares agent '{path_str}' but path does not exist"
+                        ),
+                    });
                     continue;
                 }
                 if let Ok(content) = fs.read_to_string(&full_path)
@@ -120,16 +147,20 @@ fn scan_marketplace_explicit_arrays(
             if let Some(path_str) = skill_path.as_str() {
                 let full_path = root.join(path_str);
                 if !fs.exists(&full_path) {
-                    eprintln!(
-                        "Warning: marketplace declares skill '{path_str}' but path does not exist"
-                    );
+                    warnings.push(ScanWarning {
+                        message: format!(
+                            "marketplace declares skill '{path_str}' but path does not exist"
+                        ),
+                    });
                     continue;
                 }
                 let skill_md = full_path.join("SKILL.md");
                 if !fs.exists(&skill_md) {
-                    eprintln!(
-                        "Warning: marketplace declares skill '{path_str}' but SKILL.md is missing"
-                    );
+                    warnings.push(ScanWarning {
+                        message: format!(
+                            "marketplace declares skill '{path_str}' but SKILL.md is missing"
+                        ),
+                    });
                     continue;
                 }
                 if let Ok(content) = fs.read_to_string(&skill_md)
@@ -431,7 +462,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         fs.add_dir("/repo");
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert!(result.is_empty());
+        assert!(result.artifacts.is_empty());
     }
 
     #[test]
@@ -439,7 +470,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/plain.md", "# No frontmatter here");
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert!(result.is_empty());
+        assert!(result.artifacts.is_empty());
     }
 
     #[test]
@@ -448,7 +479,7 @@ mod tests {
         // Has frontmatter but no 'name:' field — not an agent
         fs.add_file("/repo/not-agent.md", "---\ndescription: only desc\n---\n");
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert!(result.is_empty());
+        assert!(result.artifacts.is_empty());
     }
 
     #[test]
@@ -456,11 +487,11 @@ mod tests {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/my-agent.md", agent_content("my-agent", "Does things"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].name, "my-agent");
-        assert_eq!(result[0].kind, ArtifactKind::Agent);
-        assert_eq!(result[0].description, "Does things");
-        assert_eq!(result[0].path, PathBuf::from("/repo/my-agent.md"));
+        assert_eq!(result.artifacts.len(), 1);
+        assert_eq!(result.artifacts[0].name, "my-agent");
+        assert_eq!(result.artifacts[0].kind, ArtifactKind::Agent);
+        assert_eq!(result.artifacts[0].description, "Does things");
+        assert_eq!(result.artifacts[0].path, PathBuf::from("/repo/my-agent.md"));
     }
 
     #[test]
@@ -469,7 +500,7 @@ mod tests {
         // File inside a hidden dir — should be ignored
         fs.add_file("/repo/.hidden/secret.md", agent_content("secret", "Hidden"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert!(result.is_empty());
+        assert!(result.artifacts.is_empty());
     }
 
     #[test]
@@ -478,9 +509,9 @@ mod tests {
         fs.add_file("/repo/zebra.md", agent_content("zebra", "Z agent"));
         fs.add_file("/repo/alpha.md", agent_content("alpha", "A agent"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0].name, "alpha");
-        assert_eq!(result[1].name, "zebra");
+        assert_eq!(result.artifacts.len(), 2);
+        assert_eq!(result.artifacts[0].name, "alpha");
+        assert_eq!(result.artifacts[1].name, "zebra");
     }
 
     #[test]
@@ -488,9 +519,9 @@ mod tests {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/my-skill/SKILL.md", skill_content("A skill"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].name, "my-skill");
-        assert_eq!(result[0].kind, ArtifactKind::Skill);
+        assert_eq!(result.artifacts.len(), 1);
+        assert_eq!(result.artifacts[0].name, "my-skill");
+        assert_eq!(result.artifacts[0].kind, ArtifactKind::Skill);
     }
 
     #[test]
@@ -499,8 +530,8 @@ mod tests {
         fs.add_file("/repo/alpha.md", agent_content("alpha", "An agent"));
         fs.add_file("/repo/my-skill/SKILL.md", skill_content("A skill"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert_eq!(result.len(), 2);
-        let kinds: Vec<_> = result.iter().map(|a| a.kind).collect();
+        assert_eq!(result.artifacts.len(), 2);
+        let kinds: Vec<_> = result.artifacts.iter().map(|a| a.kind).collect();
         assert!(kinds.contains(&ArtifactKind::Agent));
         assert!(kinds.contains(&ArtifactKind::Skill));
     }
@@ -531,9 +562,9 @@ mod tests {
             agent_content("reviewer", "Reviews code"),
         );
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].name, "reviewer");
-        assert_eq!(result[0].kind, ArtifactKind::Agent);
+        assert_eq!(result.artifacts.len(), 1);
+        assert_eq!(result.artifacts[0].name, "reviewer");
+        assert_eq!(result.artifacts[0].kind, ArtifactKind::Agent);
     }
 
     #[test]
@@ -548,9 +579,9 @@ mod tests {
             skill_content("A discovered skill"),
         );
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].name, "my-skill");
-        assert_eq!(result[0].kind, ArtifactKind::Skill);
+        assert_eq!(result.artifacts.len(), 1);
+        assert_eq!(result.artifacts[0].name, "my-skill");
+        assert_eq!(result.artifacts[0].kind, ArtifactKind::Skill);
     }
 
     #[test]
@@ -566,8 +597,8 @@ mod tests {
         );
         fs.add_file("/repo/plugins/my-plugin/pdf/SKILL.md", skill_content("PDF processing"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert_eq!(result.len(), 2);
-        let names: Vec<_> = result.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(result.artifacts.len(), 2);
+        let names: Vec<_> = result.artifacts.iter().map(|a| a.name.as_str()).collect();
         assert!(names.contains(&"checker"));
         assert!(names.contains(&"pdf"));
     }
@@ -591,9 +622,9 @@ mod tests {
         // This agent exists in the repo but isn't in the explicit arrays
         fs.add_file("/repo/extra-agent.md", agent_content("extra", "Should not appear"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].name, "pdf");
-        assert_eq!(result[0].kind, ArtifactKind::Skill);
+        assert_eq!(result.artifacts.len(), 1);
+        assert_eq!(result.artifacts[0].name, "pdf");
+        assert_eq!(result.artifacts[0].kind, ArtifactKind::Skill);
     }
 
     #[test]
@@ -609,8 +640,8 @@ mod tests {
         fs.add_file("/repo/plugins/a/agent-a.md", agent_content("agent-a", "From plugin A"));
         fs.add_file("/repo/plugins/b/agent-b.md", agent_content("agent-b", "From plugin B"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert_eq!(result.len(), 2);
-        let names: Vec<_> = result.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(result.artifacts.len(), 2);
+        let names: Vec<_> = result.artifacts.iter().map(|a| a.name.as_str()).collect();
         assert!(names.contains(&"agent-a"));
         assert!(names.contains(&"agent-b"));
     }
@@ -622,9 +653,15 @@ mod tests {
             "/repo/.claude-plugin/marketplace.json",
             marketplace_json(r#"{ "name": "ghost", "source": "./nonexistent" }"#),
         );
-        // Should not error, just warn and return empty
+        // Should not error, just warn and return a warning
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert!(result.is_empty());
+        assert!(result.artifacts.is_empty());
+        assert_eq!(result.warnings.len(), 1);
+        assert!(
+            result.warnings[0].message.contains("does not exist"),
+            "unexpected warning: {}",
+            result.warnings[0].message
+        );
     }
 
     #[test]
@@ -638,6 +675,12 @@ mod tests {
         );
         // Remote sources are not supported — should warn and return empty
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
-        assert!(result.is_empty());
+        assert!(result.artifacts.is_empty());
+        assert_eq!(result.warnings.len(), 1);
+        assert!(
+            result.warnings[0].message.contains("remote source type"),
+            "unexpected warning: {}",
+            result.warnings[0].message
+        );
     }
 }

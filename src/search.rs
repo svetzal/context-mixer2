@@ -9,7 +9,7 @@ use crate::source_iter;
 // Result types
 // ---------------------------------------------------------------------------
 
-pub(crate) struct SearchResult {
+pub struct SearchResult {
     pub name: String,
     pub kind: String,
     pub version: String,
@@ -17,7 +17,7 @@ pub(crate) struct SearchResult {
     pub description: String,
 }
 
-pub(crate) struct SearchOutput {
+pub struct SearchOutput {
     pub results: Vec<SearchResult>,
     pub query: String,
 }
@@ -26,10 +26,8 @@ pub(crate) struct SearchOutput {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<()> {
-    let output = gather_search_results_with(query, ctx)?;
-    print_search_results(&output);
-    Ok(())
+pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
+    gather_search_results_with(query, ctx)
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +71,7 @@ pub(crate) fn gather_search_results_with(
 // Print (no business logic)
 // ---------------------------------------------------------------------------
 
-fn print_search_results(output: &SearchOutput) {
+pub fn print_search_results(output: &SearchOutput) {
     let query = &output.query;
     let results = &output.results;
 

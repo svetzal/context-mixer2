@@ -13,7 +13,8 @@ use crate::types::{ArtifactKind, Deprecation};
 // Result types
 // ---------------------------------------------------------------------------
 
-pub(crate) struct ArtifactInfo {
+#[derive(Debug)]
+pub struct ArtifactInfo {
     pub name: String,
     pub kind: ArtifactKind,
     pub scope: &'static str,
@@ -31,7 +32,8 @@ pub(crate) struct ArtifactInfo {
     pub skill_files: Vec<SkillFileEntry>,
 }
 
-pub(crate) struct SkillFileEntry {
+#[derive(Debug)]
+pub struct SkillFileEntry {
     pub name: String,
     pub is_dir: bool,
     pub indent_level: usize,
@@ -41,16 +43,14 @@ pub(crate) struct SkillFileEntry {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-pub fn info_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
+pub fn info_with(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
     // Search both scopes and both kinds
     for local in [false, true] {
         for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
             let dir = ctx.paths.install_dir(kind, local);
             let path = kind.installed_path(name, &dir);
             if ctx.fs.exists(&path) {
-                let info = gather_info_with(name, kind, local, &path, ctx)?;
-                print_info(&info);
-                return Ok(());
+                return gather_info_with(name, kind, local, &path, ctx);
             }
         }
     }
@@ -183,7 +183,7 @@ pub(crate) fn collect_skill_files_with(
 // Print (no business logic)
 // ---------------------------------------------------------------------------
 
-fn print_info(info: &ArtifactInfo) {
+pub fn print_info(info: &ArtifactInfo) {
     println!("Name:        {}", info.name);
     println!("Type:        {}", info.kind);
     println!("Scope:       {}", info.scope);

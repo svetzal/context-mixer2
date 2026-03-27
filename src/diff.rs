@@ -14,7 +14,8 @@ use crate::types::ArtifactKind;
 // Result types
 // ---------------------------------------------------------------------------
 
-pub(crate) struct DiffOutput {
+#[derive(Debug)]
+pub struct DiffOutput {
     pub artifact_name: String,
     pub kind: ArtifactKind,
     pub is_up_to_date: bool,
@@ -29,10 +30,8 @@ pub(crate) struct DiffOutput {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-pub async fn diff_with(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {
-    let output = gather_diff_with(name, kind, ctx).await?;
-    print_diff_output(&output);
-    Ok(())
+pub async fn diff_with(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<DiffOutput> {
+    gather_diff_with(name, kind, ctx).await
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +116,7 @@ pub(crate) async fn gather_diff_with(
 // Print (no business logic)
 // ---------------------------------------------------------------------------
 
-fn print_diff_output(output: &DiffOutput) {
+pub fn print_diff_output(output: &DiffOutput) {
     if output.is_up_to_date {
         println!("{} is up to date with source.", output.artifact_name);
         return;

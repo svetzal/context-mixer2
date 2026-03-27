@@ -29,8 +29,8 @@ pub fn each_source_artifact_with(
         if !fs.exists(&local_path) {
             continue;
         }
-        if let Ok(artifacts) = scan::scan_source_with(&local_path, fs) {
-            for artifact in artifacts {
+        if let Ok(scan_result) = scan::scan_source_with(&local_path, fs) {
+            for artifact in scan_result.artifacts {
                 results.push(SourceArtifact {
                     source_name: source_name.clone(),
                     source_root: local_path.clone(),

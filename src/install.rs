@@ -14,12 +14,25 @@ use crate::types::{ArtifactKind, LockEntry, LockSource};
 // Result types
 // ---------------------------------------------------------------------------
 
-pub(crate) struct InstallResult {
+#[derive(Debug)]
+pub struct InstallResult {
     pub artifact_name: String,
     pub version: Option<String>,
     pub kind: ArtifactKind,
     pub source_name: String,
     pub dest_dir: PathBuf,
+}
+
+#[derive(Debug)]
+pub struct InstallAllResult {
+    pub installed: Vec<InstallResult>,
+    pub kind: ArtifactKind,
+}
+
+#[derive(Debug)]
+pub struct UpdateAllResult {
+    pub updated: Vec<InstallResult>,
+    pub kind: ArtifactKind,
 }
 
 // ---------------------------------------------------------------------------
@@ -115,20 +128,11 @@ pub fn install_with(
     local: bool,
     force: bool,
     ctx: &AppContext<'_>,
-) -> Result<()> {
-    let result = perform_install_with(name, kind, local, force, ctx)?;
-    let version_info = result.version.as_deref().map(|v| format!(" v{v}")).unwrap_or_default();
-    println!(
-        "Installed {}{version_info} ({}) from '{}' -> {}",
-        result.artifact_name,
-        result.kind,
-        result.source_name,
-        result.dest_dir.display()
-    );
-    Ok(())
+) -> Result<InstallResult> {
+    perform_install_with(name, kind, local, force, ctx)
 }
 
-pub(crate) fn perform_install_with(
+pub fn perform_install_with(
     name: &str,
     kind: ArtifactKind,
     local: bool,
@@ -206,7 +210,7 @@ pub fn update_with(
     kind: ArtifactKind,
     force: bool,
     ctx: &AppContext<'_>,
-) -> Result<()> {
+) -> Result<InstallResult> {
     for local in [false, true] {
         let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
         if let Some(entry) = lock.packages.get(name) {
@@ -225,12 +229,12 @@ pub fn install_all_with(
     local: bool,
     force: bool,
     ctx: &AppContext<'_>,
-) -> Result<()> {
+) -> Result<InstallAllResult> {
     source::auto_update_all_with(ctx)?;
 
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
     let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
-    let mut installed_count = 0;
+    let mut installed = Vec::new();
 
     for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
         if sa.artifact.kind != kind {
@@ -246,23 +250,23 @@ pub fn install_all_with(
             }
         }
         let pinned = format!("{}:{}", sa.source_name, sa.artifact.name);
-        install_with(&pinned, kind, local, force, ctx)?;
-        installed_count += 1;
+        let result = perform_install_with(&pinned, kind, local, force, ctx)?;
+        installed.push(result);
     }
 
-    if installed_count == 0 {
-        println!("All available {kind}s are already installed and up to date.");
-    }
-
-    Ok(())
+    Ok(InstallAllResult { installed, kind })
 }
 
-pub fn update_all_with(kind: ArtifactKind, force: bool, ctx: &AppContext<'_>) -> Result<()> {
+pub fn update_all_with(
+    kind: ArtifactKind,
+    force: bool,
+    ctx: &AppContext<'_>,
+) -> Result<UpdateAllResult> {
     source::auto_update_all_with(ctx)?;
 
     // Scan sources for current checksums
     let source_checksums = scan_source_checksums_with(kind, ctx)?;
-    let mut updated_count = 0;
+    let mut updated = Vec::new();
 
     for local in [false, true] {
         let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
@@ -275,17 +279,13 @@ pub fn update_all_with(kind: ArtifactKind, force: bool, ctx: &AppContext<'_>) ->
                 && entry.source_checksum != *source_cs
             {
                 let pinned = format!("{}:{name}", entry.source.repo);
-                install_with(&pinned, kind, local, force, ctx)?;
-                updated_count += 1;
+                let result = perform_install_with(&pinned, kind, local, force, ctx)?;
+                updated.push(result);
             }
         }
     }
 
-    if updated_count == 0 {
-        println!("All tracked {kind}s are up to date.");
-    }
-
-    Ok(())
+    Ok(UpdateAllResult { updated, kind })
 }
 
 fn scan_source_checksums_with(

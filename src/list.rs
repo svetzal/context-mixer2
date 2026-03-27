@@ -7,7 +7,7 @@ use crate::lockfile;
 use crate::source_iter;
 use crate::types::{ArtifactKind, LockFile};
 
-pub(crate) struct Row {
+pub struct Row {
     pub name: String,
     pub installed: String,
     pub source: String,
@@ -15,13 +15,13 @@ pub(crate) struct Row {
     pub status: &'static str,
 }
 
-pub(crate) struct ListKindOutput {
+pub struct ListKindOutput {
     pub kind: ArtifactKind,
     pub global_rows: Vec<Row>,
     pub local_rows: Vec<Row>,
 }
 
-pub(crate) struct ListOutput {
+pub struct ListOutput {
     pub global_agents: Vec<Row>,
     pub local_agents: Vec<Row>,
     pub global_skills: Vec<Row>,
@@ -41,16 +41,12 @@ fn status_indicator(installed: &str, available: &str, deprecated: bool) -> &'sta
     }
 }
 
-pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {
-    let output = gather_list_kind_with(kind, ctx)?;
-    print_list_kind_output(&output);
-    Ok(())
+pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKindOutput> {
+    gather_list_kind_with(kind, ctx)
 }
 
-pub fn list_all_with(ctx: &AppContext<'_>) -> Result<()> {
-    let output = gather_list_all_with(ctx)?;
-    print_list_all_output(&output);
-    Ok(())
+pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
+    gather_list_all_with(ctx)
 }
 
 pub(crate) fn gather_list_kind_with(
@@ -92,7 +88,7 @@ pub(crate) fn gather_list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
     })
 }
 
-fn print_list_kind_output(output: &ListKindOutput) {
+pub fn print_list_kind_output(output: &ListKindOutput) {
     let kind = output.kind;
     let global = &output.global_rows;
     let local = &output.local_rows;
@@ -116,7 +112,7 @@ fn print_list_kind_output(output: &ListKindOutput) {
     }
 }
 
-fn print_list_all_output(output: &ListOutput) {
+pub fn print_list_all_output(output: &ListOutput) {
     if output.global_agents.is_empty()
         && output.local_agents.is_empty()
         && output.global_skills.is_empty()
@@ -214,7 +210,7 @@ fn build_source_versions_with(
     Ok(versions)
 }
 
-fn print_table(rows: &[Row]) {
+pub fn print_table(rows: &[Row]) {
     if rows.is_empty() {
         return;
     }
@@ -244,7 +240,7 @@ fn print_table(rows: &[Row]) {
     }
 }
 
-fn print_section(label: &str, rows: &[Row]) {
+pub fn print_section(label: &str, rows: &[Row]) {
     println!("{label}:");
     if rows.is_empty() {
         println!("  (none)");

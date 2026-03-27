@@ -15,7 +15,7 @@ pub mod paths;
 pub mod scan;
 pub mod search;
 pub mod source;
-pub mod source_iter;
+pub(crate) mod source_iter;
 #[cfg(test)]
 mod test_support;
 pub mod types;

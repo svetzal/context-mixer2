@@ -8,7 +8,7 @@ use crate::types::ArtifactKind;
 // Result types
 // ---------------------------------------------------------------------------
 
-pub(crate) struct UninstallResult {
+pub struct UninstallResult {
     pub name: String,
     pub kind: ArtifactKind,
     pub scope: &'static str,
@@ -24,10 +24,8 @@ pub fn uninstall_with(
     kind: ArtifactKind,
     local: bool,
     ctx: &AppContext<'_>,
-) -> Result<()> {
-    let result = perform_uninstall_with(name, kind, local, ctx)?;
-    print_uninstall_result(&result);
-    Ok(())
+) -> Result<UninstallResult> {
+    perform_uninstall_with(name, kind, local, ctx)
 }
 
 // ---------------------------------------------------------------------------
@@ -77,7 +75,7 @@ pub(crate) fn perform_uninstall_with(
 // Print (no business logic)
 // ---------------------------------------------------------------------------
 
-fn print_uninstall_result(result: &UninstallResult) {
+pub fn print_uninstall_result(result: &UninstallResult) {
     println!("Uninstalled {} ({}) from {} scope.", result.name, result.kind, result.scope);
     if !result.was_tracked {
         println!("  (no lock file entry found — artifact was untracked)");

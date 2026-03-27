@@ -13,7 +13,7 @@ use crate::types::{ArtifactKind, LockFile};
 // Result types
 // ---------------------------------------------------------------------------
 
-pub(crate) struct OutdatedRow {
+pub struct OutdatedRow {
     pub name: String,
     pub kind: ArtifactKind,
     pub installed_version: String,
@@ -26,10 +26,8 @@ pub(crate) struct OutdatedRow {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-pub fn outdated_with(ctx: &AppContext<'_>) -> Result<()> {
-    let rows = gather_outdated_with(ctx)?;
-    print_outdated(&rows);
-    Ok(())
+pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
+    gather_outdated_with(ctx)
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +87,7 @@ pub(crate) fn gather_outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedR
 // Print (no business logic)
 // ---------------------------------------------------------------------------
 
-fn print_outdated(rows: &[OutdatedRow]) {
+pub fn print_outdated(rows: &[OutdatedRow]) {
     if rows.is_empty() {
         println!("Everything is up to date.");
         return;

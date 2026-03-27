@@ -14,7 +14,7 @@ pub struct DirEntry {
 /// Abstraction over filesystem I/O operations used by cmx.
 ///
 /// Every function that reads or writes files accepts `&dyn Filesystem` rather
-/// than calling `std::fs` directly.  Production code uses [`RealFilesystem`];
+/// than calling `std::fs` directly.  Production code uses `RealFilesystem`;
 /// tests use the in-memory fake defined in [`super::fakes`].
 pub trait Filesystem {
     fn exists(&self, path: &Path) -> bool;
