@@ -19,6 +19,20 @@ pub(crate) fn versioned_agent_content(name: &str, desc: &str, version: &str) -> 
 }
 
 #[cfg(test)]
+pub(crate) fn metadata_versioned_agent_content(name: &str, desc: &str, version: &str) -> String {
+    format!(
+        "---\nname: {name}\ndescription: {desc}\nmetadata:\n  version: \"{version}\"\n  author: Test\n---\n# {name}\n"
+    )
+}
+
+#[cfg(test)]
+pub(crate) fn metadata_versioned_skill_content(desc: &str, version: &str) -> String {
+    format!(
+        "---\ndescription: {desc}\nmetadata:\n  version: \"{version}\"\n  author: Test\n---\n# skill\n"
+    )
+}
+
+#[cfg(test)]
 pub(crate) fn deprecated_agent_content(
     name: &str,
     desc: &str,

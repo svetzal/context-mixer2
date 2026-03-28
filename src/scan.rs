@@ -263,7 +263,7 @@ fn parse_frontmatter_str(content: &str) -> Option<Frontmatter> {
     let fm_text = &rest[..end];
     Some(Frontmatter {
         description: extract_field(fm_text, "description").unwrap_or_default(),
-        version: extract_field(fm_text, "version"),
+        version: extract_version(fm_text),
         deprecation: parse_deprecation(fm_text),
     })
 }
@@ -284,7 +284,7 @@ fn parse_agent_frontmatter_str(content: &str) -> Option<Frontmatter> {
 
     Some(Frontmatter {
         description: extract_field(fm_text, "description").unwrap_or_default(),
-        version: extract_field(fm_text, "version"),
+        version: extract_version(fm_text),
         deprecation: parse_deprecation(fm_text),
     })
 }
@@ -298,11 +298,46 @@ fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
+/// Extract a field nested under `metadata:` in YAML frontmatter.
+/// Matches indented lines (spaces or tabs) under the `metadata:` block.
+fn extract_metadata_field(frontmatter: &str, key: &str) -> Option<String> {
+    let mut in_metadata = false;
+    for line in frontmatter.lines() {
+        if line.starts_with("metadata:") {
+            in_metadata = true;
+            continue;
+        }
+        if in_metadata {
+            let trimmed = line.trim_start();
+            // A non-indented, non-empty line means we've left the metadata block
+            if !line.starts_with(' ') && !line.starts_with('\t') && !trimmed.is_empty() {
+                return None;
+            }
+            let prefix = format!("{key}:");
+            if trimmed.starts_with(&prefix) {
+                let value = trimmed[prefix.len()..].trim().trim_matches('"').to_string();
+                if !value.is_empty() {
+                    return Some(value);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Extract version from frontmatter, checking root-level first then metadata block.
+fn extract_version(frontmatter: &str) -> Option<String> {
+    extract_field(frontmatter, "version").or_else(|| extract_metadata_field(frontmatter, "version"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
-    use crate::test_support::{agent_content, skill_content};
+    use crate::test_support::{
+        agent_content, metadata_versioned_agent_content, metadata_versioned_skill_content,
+        skill_content,
+    };
     use std::path::PathBuf;
 
     // ---------------------------------------------------------------------------
@@ -352,6 +387,71 @@ mod tests {
         // key "name" must not match line "namespace: foo"
         let text = "namespace: foo";
         assert_eq!(extract_field(text, "name"), None);
+    }
+
+    // --- extract_metadata_field ---
+
+    #[test]
+    fn extract_metadata_field_basic() {
+        let text = "metadata:\n  version: \"1.3.2\"\n  author: Test";
+        assert_eq!(extract_metadata_field(text, "version"), Some("1.3.2".to_string()));
+    }
+
+    #[test]
+    fn extract_metadata_field_unquoted() {
+        let text = "metadata:\n  version: 1.0.0";
+        assert_eq!(extract_metadata_field(text, "version"), Some("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn extract_metadata_field_not_in_metadata() {
+        let text = "name: my-agent\nversion: 1.0.0";
+        assert_eq!(extract_metadata_field(text, "version"), None);
+    }
+
+    #[test]
+    fn extract_metadata_field_no_metadata_block() {
+        let text = "name: my-agent\ndescription: stuff";
+        assert_eq!(extract_metadata_field(text, "version"), None);
+    }
+
+    #[test]
+    fn extract_metadata_field_stops_at_next_root_key() {
+        let text = "metadata:\n  author: Test\nother_key: value\n  version: 1.0.0";
+        // version appears after other_key, so it's not under metadata
+        assert_eq!(extract_metadata_field(text, "version"), None);
+    }
+
+    #[test]
+    fn extract_metadata_field_empty_value_filtered() {
+        let text = "metadata:\n  version: ";
+        assert_eq!(extract_metadata_field(text, "version"), None);
+    }
+
+    #[test]
+    fn extract_metadata_field_with_tabs() {
+        let text = "metadata:\n\tversion: 2.0.0";
+        assert_eq!(extract_metadata_field(text, "version"), Some("2.0.0".to_string()));
+    }
+
+    // --- extract_version (root-level vs metadata fallback) ---
+
+    #[test]
+    fn extract_version_prefers_root_level() {
+        let text = "version: 1.0.0\nmetadata:\n  version: \"2.0.0\"";
+        assert_eq!(extract_version(text), Some("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn extract_version_falls_back_to_metadata() {
+        let text = "name: my-agent\nmetadata:\n  version: \"1.3.2\"";
+        assert_eq!(extract_version(text), Some("1.3.2".to_string()));
+    }
+
+    #[test]
+    fn extract_version_none_when_absent_everywhere() {
+        let text = "name: my-agent\ndescription: stuff";
+        assert_eq!(extract_version(text), None);
     }
 
     // --- parse_deprecation ---
@@ -426,6 +526,22 @@ mod tests {
         assert_eq!(dep.reason.as_deref(), Some("Replaced"));
     }
 
+    #[test]
+    fn parse_frontmatter_str_metadata_version() {
+        let content =
+            "---\ndescription: Test skill\nmetadata:\n  version: \"2.1.0\"\n  author: Test\n---\n";
+        let fm = parse_frontmatter_str(content).expect("expected Some");
+        assert_eq!(fm.version.as_deref(), Some("2.1.0"));
+    }
+
+    #[test]
+    fn parse_frontmatter_str_root_version_preferred_over_metadata() {
+        let content =
+            "---\ndescription: Test\nversion: 1.0.0\nmetadata:\n  version: \"2.0.0\"\n---\n";
+        let fm = parse_frontmatter_str(content).expect("expected Some");
+        assert_eq!(fm.version.as_deref(), Some("1.0.0"));
+    }
+
     // --- parse_agent_frontmatter_str ---
 
     #[test]
@@ -451,6 +567,20 @@ mod tests {
     fn parse_agent_frontmatter_str_no_delimiters_returns_none() {
         let content = "name: my-agent\ndescription: Does things\n# body";
         assert!(parse_agent_frontmatter_str(content).is_none());
+    }
+
+    #[test]
+    fn parse_agent_frontmatter_str_metadata_version() {
+        let content = "---\nname: my-agent\ndescription: Does things\nmetadata:\n  version: \"1.3.2\"\n  author: Test\n---\n# body";
+        let fm = parse_agent_frontmatter_str(content).expect("expected Some");
+        assert_eq!(fm.version.as_deref(), Some("1.3.2"));
+    }
+
+    #[test]
+    fn parse_agent_frontmatter_str_root_version_preferred_over_metadata() {
+        let content = "---\nname: my-agent\ndescription: Does things\nversion: 1.0.0\nmetadata:\n  version: \"2.0.0\"\n---\n# body";
+        let fm = parse_agent_frontmatter_str(content).expect("expected Some");
+        assert_eq!(fm.version.as_deref(), Some("1.0.0"));
     }
 
     // ---------------------------------------------------------------------------
@@ -492,6 +622,30 @@ mod tests {
         assert_eq!(result.artifacts[0].kind, ArtifactKind::Agent);
         assert_eq!(result.artifacts[0].description, "Does things");
         assert_eq!(result.artifacts[0].path, PathBuf::from("/repo/my-agent.md"));
+    }
+
+    #[test]
+    fn scan_finds_agent_with_metadata_version() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/my-agent.md",
+            metadata_versioned_agent_content("my-agent", "Does things", "1.3.2"),
+        );
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.artifacts.len(), 1);
+        assert_eq!(result.artifacts[0].version.as_deref(), Some("1.3.2"));
+    }
+
+    #[test]
+    fn scan_finds_skill_with_metadata_version() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/my-skill/SKILL.md",
+            metadata_versioned_skill_content("A skill", "2.1.0"),
+        );
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.artifacts.len(), 1);
+        assert_eq!(result.artifacts[0].version.as_deref(), Some("2.1.0"));
     }
 
     #[test]
