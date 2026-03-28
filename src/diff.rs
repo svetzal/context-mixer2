@@ -258,14 +258,12 @@ mod tests {
     use super::*;
     use crate::context::AppContext;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient, FakeLlmClient};
-    use crate::lockfile;
     use crate::test_support::{
         agent_content, install_agent_on_disk, install_skill_on_disk, make_ctx,
-        setup_source_with_agent, test_paths,
+        make_lock_entry_versioned, save_lock_with_entry, setup_source_with_agent, test_paths,
     };
-    use crate::types::{ArtifactKind, LockEntry, LockFile, LockSource};
+    use crate::types::ArtifactKind;
     use chrono::Utc;
-    use std::collections::BTreeMap;
 
     // --- collect_relative_files_with ---
 
@@ -593,25 +591,13 @@ mod tests {
         install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
 
         // Write a lock file entry so load_with succeeds
-        let mut lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lock.packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: Utc::now().to_rfc3339(),
-                source: LockSource {
-                    repo: "my-source".to_string(),
-                    path: "my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:placeholder".to_string(),
-                installed_checksum: "sha256:placeholder".to_string(),
-            },
+        save_lock_with_entry(
+            &fs,
+            &paths,
+            "my-agent",
+            make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
+            false,
         );
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
@@ -631,25 +617,13 @@ mod tests {
         // Install a different version so checksums differ
         install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
 
-        let mut lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lock.packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: Utc::now().to_rfc3339(),
-                source: LockSource {
-                    repo: "my-source".to_string(),
-                    path: "my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:placeholder".to_string(),
-                installed_checksum: "sha256:placeholder".to_string(),
-            },
+        save_lock_with_entry(
+            &fs,
+            &paths,
+            "my-agent",
+            make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
+            false,
         );
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         // No LLM configured — should bail when it tries to analyze
         let ctx = make_ctx(&fs, &git, &clock, &paths);
@@ -671,25 +645,13 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
         install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
 
-        let mut lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lock.packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: Utc::now().to_rfc3339(),
-                source: LockSource {
-                    repo: "my-source".to_string(),
-                    path: "my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:placeholder".to_string(),
-                installed_checksum: "sha256:placeholder".to_string(),
-            },
+        save_lock_with_entry(
+            &fs,
+            &paths,
+            "my-agent",
+            make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
+            false,
         );
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = AppContext {
             fs: &fs,
@@ -717,25 +679,13 @@ mod tests {
         fs.add_file("/sources/my-source/my-agent.md", content.clone());
         install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
 
-        let mut lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lock.packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: Utc::now().to_rfc3339(),
-                source: LockSource {
-                    repo: "my-source".to_string(),
-                    path: "my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:placeholder".to_string(),
-                installed_checksum: "sha256:placeholder".to_string(),
-            },
+        save_lock_with_entry(
+            &fs,
+            &paths,
+            "my-agent",
+            make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
+            false,
         );
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let output = gather_diff_with("my-agent", ArtifactKind::Agent, &ctx).await.unwrap();
@@ -759,25 +709,13 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
         install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
 
-        let mut lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lock.packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: Utc::now().to_rfc3339(),
-                source: LockSource {
-                    repo: "my-source".to_string(),
-                    path: "my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:placeholder".to_string(),
-                installed_checksum: "sha256:placeholder".to_string(),
-            },
+        save_lock_with_entry(
+            &fs,
+            &paths,
+            "my-agent",
+            make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
+            false,
         );
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = AppContext {
             fs: &fs,

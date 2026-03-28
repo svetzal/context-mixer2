@@ -342,11 +342,11 @@ fn parse_name(name: &str) -> (Option<&str>, &str) {
 mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::test_support::{agent_content, make_ctx, setup_source_with_agent, test_paths};
-    use crate::types::{ArtifactKind, LockFile, SourceEntry, SourceType, SourcesFile};
+    use crate::test_support::{
+        agent_content, make_ctx, setup_source, setup_source_with_agent, setup_sources, test_paths,
+    };
+    use crate::types::{ArtifactKind, LockFile, SourcesFile};
     use chrono::Utc;
-    use std::collections::BTreeMap;
-    use std::path::PathBuf;
 
     // --- parse_name ---
 
@@ -429,36 +429,7 @@ mod tests {
         let paths = test_paths();
 
         // Two sources, both with the same agent name
-        let sources = SourcesFile {
-            version: 1,
-            sources: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    "source1".to_string(),
-                    SourceEntry {
-                        source_type: SourceType::Local,
-                        path: Some(PathBuf::from("/source1")),
-                        url: None,
-                        local_clone: None,
-                        branch: None,
-                        last_updated: Some(Utc::now().to_rfc3339()),
-                    },
-                );
-                m.insert(
-                    "source2".to_string(),
-                    SourceEntry {
-                        source_type: SourceType::Local,
-                        path: Some(PathBuf::from("/source2")),
-                        url: None,
-                        local_clone: None,
-                        branch: None,
-                        last_updated: Some(Utc::now().to_rfc3339()),
-                    },
-                );
-                m
-            },
-        };
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        setup_sources(&fs, &paths, &[("source1", "/source1"), ("source2", "/source2")]);
         fs.add_file("/source1/my-agent.md", agent_content("my-agent", "Agent from source1"));
         fs.add_file("/source2/my-agent.md", agent_content("my-agent", "Agent from source2"));
 
@@ -626,25 +597,7 @@ mod tests {
         // Since scan won't find it, install will bail with "not found" —
         // which tests the right path without needing to intercept copy.
 
-        let sources = SourcesFile {
-            version: 1,
-            sources: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    "my-source".to_string(),
-                    SourceEntry {
-                        source_type: SourceType::Local,
-                        path: Some(PathBuf::from("/sources/my-source")),
-                        url: None,
-                        local_clone: None,
-                        branch: None,
-                        last_updated: Some(Utc::now().to_rfc3339()),
-                    },
-                );
-                m
-            },
-        };
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        setup_source(&fs, &paths, "my-source", "/sources/my-source");
 
         // Skill directory without SKILL.md — scanner won't find it
         fs.add_file("/sources/my-source/my-skill/tool.py", "code");
@@ -681,25 +634,7 @@ mod tests {
         let clock = FakeClock::at(Utc::now());
         let paths = test_paths();
 
-        let sources = SourcesFile {
-            version: 1,
-            sources: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    "my-source".to_string(),
-                    SourceEntry {
-                        source_type: SourceType::Local,
-                        path: Some(PathBuf::from("/sources/my-source")),
-                        url: None,
-                        local_clone: None,
-                        branch: None,
-                        last_updated: Some(Utc::now().to_rfc3339()),
-                    },
-                );
-                m
-            },
-        };
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        setup_source(&fs, &paths, "my-source", "/sources/my-source");
         // Skill WITH SKILL.md
         fs.add_file("/sources/my-source/my-skill/SKILL.md", "---\ndescription: My skill\n---\n");
         fs.add_file("/sources/my-source/my-skill/tool.py", "code");

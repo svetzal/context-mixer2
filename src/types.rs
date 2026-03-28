@@ -163,7 +163,7 @@ impl Artifact {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::sample_lock_file;
+    use crate::test_support::{make_git_entry, make_local_entry, sample_lock_file};
     use std::collections::BTreeMap;
 
     #[test]
@@ -205,14 +205,10 @@ mod tests {
         let mut sources = BTreeMap::new();
         sources.insert(
             "local-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Local,
-                path: Some(PathBuf::from("/home/user/repos/guidelines")),
-                url: None,
-                local_clone: None,
-                branch: None,
-                last_updated: Some("2024-01-01T00:00:00Z".to_string()),
-            },
+            make_local_entry(
+                "/home/user/repos/guidelines",
+                Some("2024-01-01T00:00:00Z".to_string()),
+            ),
         );
         let sf = SourcesFile {
             version: 1,
@@ -230,14 +226,7 @@ mod tests {
         let mut sources = BTreeMap::new();
         sources.insert(
             "git-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Git,
-                path: None,
-                url: Some("https://github.com/example/repo".to_string()),
-                local_clone: Some(PathBuf::from("/tmp/repo")),
-                branch: Some("main".to_string()),
-                last_updated: None,
-            },
+            make_git_entry("https://github.com/example/repo", "/tmp/repo", "main", None),
         );
         let sf = SourcesFile {
             version: 1,

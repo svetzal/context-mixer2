@@ -248,45 +248,31 @@ mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::lockfile;
-    use crate::paths::ConfigPaths;
     use crate::test_support::{
-        agent_content, install_agent_on_disk, make_ctx, setup_source_with_agent, test_paths,
+        agent_content, deprecated_agent_content, install_agent_on_disk, make_ctx,
+        make_lock_entry_with_checksum, save_lock_with_entry, setup_source, setup_source_with_agent,
+        setup_source_with_versioned_agent, test_paths,
     };
-    use crate::types::{
-        ArtifactKind, Deprecation, LockEntry, LockFile, LockSource, SourceEntry, SourceType,
-        SourcesFile,
-    };
+    use crate::types::{ArtifactKind, Deprecation, LockFile, SourcesFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
-    use std::path::PathBuf;
 
     fn write_lock_entry(
         fs: &FakeFilesystem,
-        paths: &ConfigPaths,
+        paths: &crate::paths::ConfigPaths,
         name: &str,
         kind: ArtifactKind,
         local: bool,
         source_checksum: &str,
     ) {
-        let mut lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lock.packages.insert(
-            name.to_string(),
-            LockEntry {
-                artifact_type: kind,
-                version: Some("1.0.0".to_string()),
-                installed_at: Utc::now().to_rfc3339(),
-                source: LockSource {
-                    repo: "my-source".to_string(),
-                    path: format!("{name}.md"),
-                },
-                source_checksum: source_checksum.to_string(),
-                installed_checksum: source_checksum.to_string(),
-            },
+        let entry = make_lock_entry_with_checksum(
+            kind,
+            Some("1.0.0"),
+            "my-source",
+            &format!("{name}.md"),
+            source_checksum,
         );
-        lockfile::save_with(&lock, local, fs, paths).unwrap();
+        save_lock_with_entry(fs, paths, name, entry, local);
     }
 
     // --- info_with ---
@@ -422,26 +408,16 @@ mod tests {
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Write a lock entry with a different checksum (simulating modification)
-        let mut lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lock.packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: Utc::now().to_rfc3339(),
-                source: LockSource {
-                    repo: "my-source".to_string(),
-                    path: "my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:original".to_string(),
-                // Installed checksum does NOT match disk content
-                installed_checksum: "sha256:different_from_disk".to_string(),
-            },
+        let mut entry = make_lock_entry_with_checksum(
+            ArtifactKind::Agent,
+            Some("1.0.0"),
+            "my-source",
+            "my-agent.md",
+            "sha256:original",
         );
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        // Installed checksum does NOT match disk content
+        entry.installed_checksum = "sha256:different_from_disk".to_string();
+        save_lock_with_entry(&fs, &paths, "my-agent", entry, false);
 
         let sources = SourcesFile::default();
         fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
@@ -467,36 +443,24 @@ mod tests {
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Setup sources with a deprecated agent
-        let sources = SourcesFile {
-            version: 1,
-            sources: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    "my-source".to_string(),
-                    SourceEntry {
-                        source_type: SourceType::Local,
-                        path: Some(PathBuf::from("/sources/my-source")),
-                        url: None,
-                        local_clone: None,
-                        branch: None,
-                        last_updated: Some(Utc::now().to_rfc3339()),
-                    },
-                );
-                m
-            },
-        };
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
-
+        setup_source(&fs, &paths, "my-source", "/sources/my-source");
         // Deprecated agent in source (uses flat deprecation fields, not YAML block)
-        let deprecated_content = "---\nname: my-agent\ndescription: A test agent\ndeprecated: true\ndeprecated_reason: Too old\ndeprecated_replacement: new-agent\n---\n";
-        fs.add_file("/sources/my-source/my-agent.md", deprecated_content);
+        fs.add_file(
+            "/sources/my-source/my-agent.md",
+            deprecated_agent_content("my-agent", "A test agent", "Too old", "new-agent"),
+        );
 
         // Empty lock file
-        let lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        lockfile::save_with(
+            &LockFile {
+                version: 1,
+                packages: BTreeMap::new(),
+            },
+            false,
+            &fs,
+            &paths,
+        )
+        .unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
@@ -521,49 +485,28 @@ mod tests {
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Lock entry with version 1.0.0
-        let mut lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lock.packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: Utc::now().to_rfc3339(),
-                source: LockSource {
-                    repo: "my-source".to_string(),
-                    path: "my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:old".to_string(),
-                installed_checksum: "sha256:old".to_string(),
-            },
+        save_lock_with_entry(
+            &fs,
+            &paths,
+            "my-agent",
+            make_lock_entry_with_checksum(
+                ArtifactKind::Agent,
+                Some("1.0.0"),
+                "my-source",
+                "my-agent.md",
+                "sha256:old",
+            ),
+            false,
         );
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         // Source has version 2.0.0
-        let sources = SourcesFile {
-            version: 1,
-            sources: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    "my-source".to_string(),
-                    SourceEntry {
-                        source_type: SourceType::Local,
-                        path: Some(PathBuf::from("/sources/my-source")),
-                        url: None,
-                        local_clone: None,
-                        branch: None,
-                        last_updated: Some(Utc::now().to_rfc3339()),
-                    },
-                );
-                m
-            },
-        };
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
-        fs.add_file(
-            "/sources/my-source/my-agent.md",
-            "---\nname: my-agent\ndescription: A test agent\nversion: 2.0.0\n---\n",
+        setup_source_with_versioned_agent(
+            &fs,
+            &paths,
+            "my-source",
+            "/sources/my-source",
+            "my-agent",
+            "2.0.0",
         );
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);

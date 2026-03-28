@@ -258,11 +258,13 @@ pub fn print_section(label: &str, rows: &[Row]) {
 mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::test_support::{make_ctx, test_paths, versioned_skill_content};
-    use crate::types::{ArtifactKind, LockEntry, LockSource, SourceEntry, SourceType, SourcesFile};
+    use crate::test_support::{
+        install_agent_on_disk, make_ctx, make_lock_entry_versioned, setup_source_with_agent,
+        setup_source_with_skill, test_paths, versioned_skill_content,
+    };
+    use crate::types::{ArtifactKind, LockFile, SourcesFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
-    use std::path::PathBuf;
 
     // --- status_indicator ---
 
@@ -321,40 +323,6 @@ mod tests {
 
     // --- build_rows_with: skill with distinct installed vs source version ---
 
-    fn setup_source_with_skill(
-        fs: &FakeFilesystem,
-        paths: &crate::paths::ConfigPaths,
-        source_name: &str,
-        source_path: &str,
-        skill_name: &str,
-        skill_version: &str,
-    ) {
-        let sources = SourcesFile {
-            version: 1,
-            sources: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    source_name.to_string(),
-                    SourceEntry {
-                        source_type: SourceType::Local,
-                        path: Some(PathBuf::from(source_path)),
-                        url: None,
-                        local_clone: None,
-                        branch: None,
-                        last_updated: Some(Utc::now().to_rfc3339()),
-                    },
-                );
-                m
-            },
-        };
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
-
-        fs.add_file(
-            format!("{source_path}/{skill_name}/SKILL.md"),
-            versioned_skill_content("A test skill", skill_version),
-        );
-    }
-
     fn install_skill_dir(
         fs: &FakeFilesystem,
         paths: &crate::paths::ConfigPaths,
@@ -367,20 +335,6 @@ mod tests {
             skill_dir.join(skill_name).join("SKILL.md"),
             versioned_skill_content("A test skill", skill_version),
         );
-    }
-
-    fn make_skill_lock_entry(version: &str, repo: &str, path: &str) -> LockEntry {
-        LockEntry {
-            artifact_type: ArtifactKind::Skill,
-            version: Some(version.to_string()),
-            installed_at: "2024-01-01T00:00:00Z".to_string(),
-            source: LockSource {
-                repo: repo.to_string(),
-                path: path.to_string(),
-            },
-            source_checksum: "sha256:old".to_string(),
-            installed_checksum: "sha256:old".to_string(),
-        }
     }
 
     #[test]
@@ -410,7 +364,7 @@ mod tests {
         };
         lock.packages.insert(
             "my-skill".to_string(),
-            make_skill_lock_entry("1.0.0", "guidelines", "my-skill"),
+            make_lock_entry_versioned(ArtifactKind::Skill, "1.0.0", "guidelines", "my-skill"),
         );
         crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
@@ -463,7 +417,12 @@ mod tests {
         };
         lock.packages.insert(
             "pdf-tool".to_string(),
-            make_skill_lock_entry("1.0.0", "marketplace", "plugins/doc-tools/skills/pdf-tool"),
+            make_lock_entry_versioned(
+                ArtifactKind::Skill,
+                "1.0.0",
+                "marketplace",
+                "plugins/doc-tools/skills/pdf-tool",
+            ),
         );
         crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
@@ -538,7 +497,12 @@ mod tests {
         };
         lock.packages.insert(
             "my-skill".to_string(),
-            make_skill_lock_entry("1.0.0", "guidelines", "skills/my-skill"),
+            make_lock_entry_versioned(
+                ArtifactKind::Skill,
+                "1.0.0",
+                "guidelines",
+                "skills/my-skill",
+            ),
         );
         crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
@@ -565,16 +529,10 @@ mod tests {
         let paths = test_paths();
 
         // Source with agent at version 2.0.0
-        crate::test_support::setup_source_with_agent(
-            &fs,
-            &paths,
-            "guidelines",
-            "/sources/guidelines",
-            "my-agent",
-        );
+        setup_source_with_agent(&fs, &paths, "guidelines", "/sources/guidelines", "my-agent");
 
         // Install agent on disk
-        crate::test_support::install_agent_on_disk(
+        install_agent_on_disk(
             &fs,
             &paths,
             "my-agent",
@@ -589,17 +547,7 @@ mod tests {
         };
         lock.packages.insert(
             "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: "2024-01-01T00:00:00Z".to_string(),
-                source: LockSource {
-                    repo: "guidelines".to_string(),
-                    path: "my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:old".to_string(),
-                installed_checksum: "sha256:old".to_string(),
-            },
+            make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "guidelines", "my-agent.md"),
         );
         crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 

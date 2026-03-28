@@ -539,8 +539,8 @@ mod tests {
     use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::paths::ConfigPaths;
-    use crate::test_support::{make_ctx, make_local_entry, test_paths};
-    use crate::types::{ArtifactKind, Deprecation, SourceType};
+    use crate::test_support::{make_ctx, make_git_entry, make_local_entry, test_paths};
+    use crate::types::{ArtifactKind, Deprecation};
     use chrono::Utc;
     use std::path::PathBuf;
 
@@ -742,17 +742,9 @@ mod tests {
 
         // Pre-populate with existing source
         let mut sources = crate::types::SourcesFile::default();
-        sources.sources.insert(
-            "my-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Local,
-                path: Some(PathBuf::from("/existing")),
-                url: None,
-                local_clone: None,
-                branch: None,
-                last_updated: None,
-            },
-        );
+        sources
+            .sources
+            .insert("my-source".to_string(), make_local_entry("/existing", None));
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
@@ -858,17 +850,9 @@ mod tests {
         let paths = test_paths();
 
         let mut sources = crate::types::SourcesFile::default();
-        sources.sources.insert(
-            "my-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Local,
-                path: Some(PathBuf::from("/local/repo")),
-                url: None,
-                local_clone: None,
-                branch: None,
-                last_updated: None,
-            },
-        );
+        sources
+            .sources
+            .insert("my-source".to_string(), make_local_entry("/local/repo", None));
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
@@ -891,14 +875,7 @@ mod tests {
         let mut sources = crate::types::SourcesFile::default();
         sources.sources.insert(
             "git-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Git,
-                path: None,
-                url: Some("https://github.com/example/repo.git".to_string()),
-                local_clone: Some(clone_path.clone()),
-                branch: Some("main".to_string()),
-                last_updated: None,
-            },
+            make_git_entry("https://github.com/example/repo.git", clone_path.clone(), "main", None),
         );
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_file(clone_path.join("README.md"), "# repo");
@@ -922,14 +899,7 @@ mod tests {
         let mut sources = crate::types::SourcesFile::default();
         sources.sources.insert(
             "git-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Git,
-                path: None,
-                url: Some("https://github.com/example/repo.git".to_string()),
-                local_clone: Some(clone_path.clone()),
-                branch: Some("main".to_string()),
-                last_updated: None,
-            },
+            make_git_entry("https://github.com/example/repo.git", clone_path.clone(), "main", None),
         );
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         // Create the clone directory
@@ -952,17 +922,9 @@ mod tests {
 
         let local_dir = PathBuf::from("/local/repo");
         let mut sources = crate::types::SourcesFile::default();
-        sources.sources.insert(
-            "local-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Local,
-                path: Some(local_dir.clone()),
-                url: None,
-                local_clone: None,
-                branch: None,
-                last_updated: None,
-            },
-        );
+        sources
+            .sources
+            .insert("local-source".to_string(), make_local_entry(local_dir.clone(), None));
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_dir(local_dir.clone());
 
@@ -983,17 +945,10 @@ mod tests {
         let paths = test_paths();
 
         let mut sources = crate::types::SourcesFile::default();
-        sources.sources.insert(
-            "local-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Local,
-                path: Some(PathBuf::from("/local/repo")),
-                url: None,
-                local_clone: None,
-                branch: None,
-                last_updated: None, // stale, but local
-            },
-        );
+        // stale, but local
+        sources
+            .sources
+            .insert("local-source".to_string(), make_local_entry("/local/repo", None));
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
@@ -1012,17 +967,15 @@ mod tests {
 
         let clone_path = PathBuf::from("/clones/git-source");
         let mut sources = crate::types::SourcesFile::default();
+        // Fresh — updated right now
         sources.sources.insert(
             "git-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Git,
-                path: None,
-                url: Some("https://github.com/example/repo.git".to_string()),
-                local_clone: Some(clone_path.clone()),
-                branch: Some("main".to_string()),
-                // Fresh — updated right now
-                last_updated: Some(Utc::now().to_rfc3339()),
-            },
+            make_git_entry(
+                "https://github.com/example/repo.git",
+                clone_path.clone(),
+                "main",
+                Some(Utc::now().to_rfc3339()),
+            ),
         );
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_dir(clone_path);
@@ -1045,14 +998,12 @@ mod tests {
         let old_time = (Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
         sources.sources.insert(
             "git-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Git,
-                path: None,
-                url: Some("https://github.com/example/repo.git".to_string()),
-                local_clone: Some(clone_path.clone()),
-                branch: Some("main".to_string()),
-                last_updated: Some(old_time),
-            },
+            make_git_entry(
+                "https://github.com/example/repo.git",
+                clone_path.clone(),
+                "main",
+                Some(old_time),
+            ),
         );
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_dir(clone_path.clone());
@@ -1076,14 +1027,7 @@ mod tests {
         let mut sources = crate::types::SourcesFile::default();
         sources.sources.insert(
             "git-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Git,
-                path: None,
-                url: Some("https://github.com/example/repo.git".to_string()),
-                local_clone: Some(clone_path.clone()),
-                branch: Some("main".to_string()),
-                last_updated: None,
-            },
+            make_git_entry("https://github.com/example/repo.git", clone_path.clone(), "main", None),
         );
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_dir(clone_path);

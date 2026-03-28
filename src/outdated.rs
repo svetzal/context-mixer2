@@ -254,26 +254,22 @@ mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::lockfile;
-    use crate::test_support::{agent_content, install_agent_on_disk, make_ctx, test_paths};
-    use crate::types::{
-        ArtifactKind, LockEntry, LockFile, LockSource, SourceEntry, SourceType, SourcesFile,
+    use crate::test_support::{
+        agent_content, install_agent_on_disk, make_ctx, make_lock_entry_with_checksum,
+        save_lock_with_entry, setup_source_with_versioned_agent, test_paths,
     };
+    use crate::types::{ArtifactKind, LockFile, SourcesFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
-    use std::path::PathBuf;
 
-    fn make_lock_entry(source_checksum: &str, version: Option<&str>) -> LockEntry {
-        LockEntry {
-            artifact_type: ArtifactKind::Agent,
-            version: version.map(std::string::ToString::to_string),
-            installed_at: "2024-01-01T00:00:00Z".to_string(),
-            source: LockSource {
-                repo: "guidelines".to_string(),
-                path: "agents/my-agent.md".to_string(),
-            },
-            source_checksum: source_checksum.to_string(),
-            installed_checksum: source_checksum.to_string(),
-        }
+    fn make_lock_entry(source_checksum: &str, version: Option<&str>) -> crate::types::LockEntry {
+        make_lock_entry_with_checksum(
+            ArtifactKind::Agent,
+            version,
+            "guidelines",
+            "agents/my-agent.md",
+            source_checksum,
+        )
     }
 
     // --- is_outdated ---
@@ -332,42 +328,6 @@ mod tests {
 
     // --- gather_outdated_with ---
 
-    fn setup_source_with_versioned_agent(
-        fs: &FakeFilesystem,
-        paths: &crate::paths::ConfigPaths,
-        source_name: &str,
-        source_path: &str,
-        agent_name: &str,
-        version: &str,
-    ) {
-        let sources = SourcesFile {
-            version: 1,
-            sources: {
-                let mut m = BTreeMap::new();
-                m.insert(
-                    source_name.to_string(),
-                    SourceEntry {
-                        source_type: SourceType::Local,
-                        path: Some(PathBuf::from(source_path)),
-                        url: None,
-                        local_clone: None,
-                        branch: None,
-                        last_updated: Some(Utc::now().to_rfc3339()),
-                    },
-                );
-                m
-            },
-        };
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
-        // Source has version embedded in frontmatter
-        fs.add_file(
-            format!("{source_path}/{agent_name}.md"),
-            format!(
-                "---\nname: {agent_name}\ndescription: A test agent\nversion: {version}\n---\n"
-            ),
-        );
-    }
-
     #[test]
     fn gather_outdated_outdated_artifact_appears_in_rows() {
         let fs = FakeFilesystem::new();
@@ -393,25 +353,19 @@ mod tests {
             &agent_content("my-agent", "A test agent"),
             false,
         );
-        let mut lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lock.packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: "2024-01-01T00:00:00Z".to_string(),
-                source: LockSource {
-                    repo: "guidelines".to_string(),
-                    path: "my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:old".to_string(),
-                installed_checksum: "sha256:old".to_string(),
-            },
+        save_lock_with_entry(
+            &fs,
+            &paths,
+            "my-agent",
+            make_lock_entry_with_checksum(
+                ArtifactKind::Agent,
+                Some("1.0.0"),
+                "guidelines",
+                "my-agent.md",
+                "sha256:old",
+            ),
+            false,
         );
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let rows = gather_outdated_with(&ctx).unwrap();
@@ -466,11 +420,16 @@ mod tests {
             false,
         );
         // Empty lock file — no lock entry
-        let lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        lockfile::save_with(
+            &LockFile {
+                version: 1,
+                packages: BTreeMap::new(),
+            },
+            false,
+            &fs,
+            &paths,
+        )
+        .unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let rows = gather_outdated_with(&ctx).unwrap();
@@ -507,27 +466,17 @@ mod tests {
             false,
         );
 
-        // Lock entry says installed_checksum matches "sha256:lock_cs" but disk has different content
-        let mut lock = LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        };
-        lock.packages.insert(
-            "my-agent".to_string(),
-            LockEntry {
-                artifact_type: ArtifactKind::Agent,
-                version: Some("1.0.0".to_string()),
-                installed_at: "2024-01-01T00:00:00Z".to_string(),
-                source: LockSource {
-                    repo: "guidelines".to_string(),
-                    path: "my-agent.md".to_string(),
-                },
-                source_checksum: "sha256:old".to_string(),
-                // Installed checksum doesn't match disk content
-                installed_checksum: "sha256:different".to_string(),
-            },
+        // Lock entry says installed_checksum doesn't match disk content
+        let mut entry = make_lock_entry_with_checksum(
+            ArtifactKind::Agent,
+            Some("1.0.0"),
+            "guidelines",
+            "my-agent.md",
+            "sha256:old",
         );
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        // Installed checksum doesn't match disk content
+        entry.installed_checksum = "sha256:different".to_string();
+        save_lock_with_entry(&fs, &paths, "my-agent", entry, false);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let rows = gather_outdated_with(&ctx).unwrap();
