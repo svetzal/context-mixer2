@@ -1,10 +1,45 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use anyhow::Result;
+
+use crate::checksum;
 use crate::config;
 use crate::gateway::filesystem::Filesystem;
 use crate::scan;
 use crate::types::{Artifact, SourceEntry};
+
+/// Checksum and metadata for a source artifact, used for update/outdated comparisons.
+pub struct SourceArtifactInfo {
+    pub source_name: String,
+    pub version: Option<String>,
+    pub checksum: String,
+}
+
+/// Scan all registered sources for all artifact kinds, computing a checksum for
+/// each.  Returns a map keyed by artifact name.  When the same name appears in
+/// multiple sources the last one wins (consistent with the existing behaviour in
+/// `outdated.rs`).
+pub fn scan_all_with_checksums(
+    sources: &BTreeMap<String, SourceEntry>,
+    fs: &dyn Filesystem,
+) -> Result<BTreeMap<String, SourceArtifactInfo>> {
+    let mut result = BTreeMap::new();
+
+    for sa in each_source_artifact_with(sources, fs) {
+        let cs = checksum::checksum_artifact_with(&sa.artifact.path, sa.artifact.kind, fs)?;
+        result.insert(
+            sa.artifact.name,
+            SourceArtifactInfo {
+                source_name: sa.source_name,
+                version: sa.artifact.version,
+                checksum: cs,
+            },
+        );
+    }
+
+    Ok(result)
+}
 
 /// An artifact discovered during source scanning, with its source context.
 pub struct SourceArtifact {

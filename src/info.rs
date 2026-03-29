@@ -44,14 +44,10 @@ pub struct SkillFileEntry {
 // ---------------------------------------------------------------------------
 
 pub fn info_with(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
-    // Search both scopes and both kinds
-    for local in [false, true] {
-        for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-            let dir = ctx.paths.install_dir(kind, local);
-            let path = kind.installed_path(name, &dir);
-            if ctx.fs.exists(&path) {
-                return gather_info_with(name, kind, local, &path, ctx);
-            }
+    // Search both kinds, global then local for each
+    for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
+        if let Some((path, local)) = config::find_installed_path(name, kind, ctx.fs, ctx.paths) {
+            return gather_info_with(name, kind, local, &path, ctx);
         }
     }
 
@@ -83,13 +79,8 @@ pub(crate) fn gather_info_with(
         locally_modified,
         untracked,
     ) = if let Some(entry) = lock_entry {
-        let current_checksum = checksum::checksum_artifact_with(path, kind, ctx.fs)?;
-        let locally_modified = current_checksum != entry.installed_checksum;
-        let disk_checksum = if locally_modified {
-            Some(current_checksum)
-        } else {
-            None
-        };
+        let (locally_modified, disk_checksum) =
+            checksum::current_checksum_if_modified(path, kind, entry, ctx.fs)?;
         (
             entry.version.clone(),
             Some(entry.installed_at.clone()),

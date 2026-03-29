@@ -46,7 +46,8 @@ pub(crate) async fn gather_diff_with(
     source::auto_update_all_with(ctx)?;
 
     // Find the installed file on disk (global then local)
-    let (installed_path, local) = find_installed_on_disk_with(name, kind, ctx)?;
+    let (installed_path, local) = config::find_installed_path(name, kind, ctx.fs, ctx.paths)
+        .with_context(|| format!("No installed {kind} named '{name}' found on disk."))?;
 
     // Find the source artifact by scanning all sources
     let (source_path, source_name, source_version) = find_in_sources_with(name, kind, ctx)?;
@@ -139,22 +140,6 @@ pub fn print_diff_output(output: &DiffOutput) {
         println!("Differences:");
         println!("{diff}");
     }
-}
-
-fn find_installed_on_disk_with(
-    name: &str,
-    kind: ArtifactKind,
-    ctx: &AppContext<'_>,
-) -> Result<(PathBuf, bool)> {
-    for local in [false, true] {
-        let dir = ctx.paths.install_dir(kind, local);
-        let path = kind.installed_path(name, &dir);
-        if ctx.fs.exists(&path) {
-            return Ok((path, local));
-        }
-    }
-
-    bail!("No installed {kind} named '{name}' found on disk.");
 }
 
 fn find_in_sources_with(
@@ -259,8 +244,8 @@ mod tests {
     use crate::context::AppContext;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient, FakeLlmClient};
     use crate::test_support::{
-        agent_content, install_agent_on_disk, install_skill_on_disk, make_ctx,
-        make_lock_entry_versioned, save_lock_with_entry, setup_source_with_agent, test_paths,
+        agent_content, install_agent_on_disk, make_ctx, make_lock_entry_versioned,
+        save_lock_with_entry, setup_source_with_agent, test_paths,
     };
     use crate::types::ArtifactKind;
     use chrono::Utc;
@@ -442,89 +427,6 @@ mod tests {
             "missing installed content: {result}"
         );
         assert!(result.contains("updated skill content"), "missing source content: {result}");
-    }
-
-    // --- find_installed_on_disk_with ---
-
-    #[test]
-    fn find_installed_finds_global_agent() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-
-        install_agent_on_disk(&fs, &paths, "my-agent", "content", false);
-
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = find_installed_on_disk_with("my-agent", ArtifactKind::Agent, &ctx);
-
-        assert!(result.is_ok(), "expected Ok: {:?}", result.err());
-        let (_, local) = result.unwrap();
-        assert!(!local, "expected global (local=false)");
-    }
-
-    #[test]
-    fn find_installed_finds_local_agent() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-
-        install_agent_on_disk(&fs, &paths, "my-agent", "content", true);
-
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = find_installed_on_disk_with("my-agent", ArtifactKind::Agent, &ctx);
-
-        assert!(result.is_ok(), "expected Ok: {:?}", result.err());
-        let (_, local) = result.unwrap();
-        assert!(local, "expected local (local=true)");
-    }
-
-    #[test]
-    fn find_installed_prefers_global_over_local() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-
-        install_agent_on_disk(&fs, &paths, "my-agent", "global content", false);
-        install_agent_on_disk(&fs, &paths, "my-agent", "local content", true);
-
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let (_, local) =
-            find_installed_on_disk_with("my-agent", ArtifactKind::Agent, &ctx).unwrap();
-
-        assert!(!local, "expected global to be preferred over local");
-    }
-
-    #[test]
-    fn find_installed_errors_when_not_found() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = find_installed_on_disk_with("nonexistent", ArtifactKind::Agent, &ctx);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn find_installed_finds_skill_directory() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-
-        install_skill_on_disk(&fs, &paths, "my-skill", &[("SKILL.md", "skill content")], false);
-
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = find_installed_on_disk_with("my-skill", ArtifactKind::Skill, &ctx);
-
-        assert!(result.is_ok(), "expected Ok: {:?}", result.err());
-        let (_, local) = result.unwrap();
-        assert!(!local, "expected global (local=false)");
     }
 
     // --- find_in_sources_with ---

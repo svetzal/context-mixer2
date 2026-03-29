@@ -165,8 +165,7 @@ pub fn perform_install_with(
         if ctx.fs.exists(&dest_check) {
             let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
             if let Some(entry) = lock.packages.get(artifact_name) {
-                let current_cs = checksum::checksum_artifact_with(&dest_check, kind, ctx.fs)?;
-                if current_cs != entry.installed_checksum {
+                if checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs)? {
                     bail!(
                         "'{artifact_name}' has local modifications. Use --force to overwrite, \
                          or 'cmx {kind} diff {artifact_name}' to review changes first."
@@ -265,7 +264,8 @@ pub fn update_all_with(
     source::auto_update_all_with(ctx)?;
 
     // Scan sources for current checksums
-    let source_checksums = scan_source_checksums_with(kind, ctx)?;
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+    let all_source_info = source_iter::scan_all_with_checksums(&sources.sources, ctx.fs)?;
     let mut updated = Vec::new();
 
     for local in [false, true] {
@@ -275,8 +275,8 @@ pub fn update_all_with(
                 continue;
             }
 
-            if let Some(source_cs) = source_checksums.get(name)
-                && entry.source_checksum != *source_cs
+            if let Some(source_info) = all_source_info.get(name)
+                && entry.source_checksum != source_info.checksum
             {
                 let pinned = format!("{}:{name}", entry.source.repo);
                 let result = perform_install_with(&pinned, kind, local, force, ctx)?;
@@ -286,23 +286,6 @@ pub fn update_all_with(
     }
 
     Ok(UpdateAllResult { updated, kind })
-}
-
-fn scan_source_checksums_with(
-    kind: ArtifactKind,
-    ctx: &AppContext<'_>,
-) -> Result<std::collections::BTreeMap<String, String>> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-    let mut checksums = std::collections::BTreeMap::new();
-
-    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
-        if sa.artifact.kind == kind {
-            let cs = checksum::checksum_artifact_with(&sa.artifact.path, kind, ctx.fs)?;
-            checksums.insert(sa.artifact.name, cs);
-        }
-    }
-
-    Ok(checksums)
 }
 
 fn copy_dir_recursive_with(src: &Path, dest: &Path, fs: &dyn Filesystem) -> Result<()> {

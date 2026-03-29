@@ -47,14 +47,7 @@ pub(crate) fn perform_uninstall_with(
     }
 
     // Remove from disk
-    match kind {
-        ArtifactKind::Agent => {
-            ctx.fs.remove_file(&target)?;
-        }
-        ArtifactKind::Skill => {
-            ctx.fs.remove_dir_all(&target)?;
-        }
-    }
+    kind.remove_installed(&target, ctx.fs)?;
 
     // Remove from lock file
     let mut lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;

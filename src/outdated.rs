@@ -7,6 +7,7 @@ use crate::context::AppContext;
 use crate::lockfile;
 use crate::source;
 use crate::source_iter;
+use crate::source_iter::SourceArtifactInfo;
 use crate::types::{ArtifactKind, LockFile};
 
 // ---------------------------------------------------------------------------
@@ -37,44 +38,17 @@ pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
 pub(crate) fn gather_outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
     source::auto_update_all_with(ctx)?;
 
-    let source_artifacts = scan_all_sources_with(ctx)?;
-    let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;
-    let local_lock = lockfile::load_with(true, ctx.fs, ctx.paths)?;
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+    let source_artifacts = source_iter::scan_all_with_checksums(&sources.sources, ctx.fs)?;
 
     let mut rows = Vec::new();
 
-    collect_outdated_for_scope_with(
-        ArtifactKind::Agent,
-        false,
-        &global_lock,
-        &source_artifacts,
-        &mut rows,
-        ctx,
-    )?;
-    collect_outdated_for_scope_with(
-        ArtifactKind::Skill,
-        false,
-        &global_lock,
-        &source_artifacts,
-        &mut rows,
-        ctx,
-    )?;
-    collect_outdated_for_scope_with(
-        ArtifactKind::Agent,
-        true,
-        &local_lock,
-        &source_artifacts,
-        &mut rows,
-        ctx,
-    )?;
-    collect_outdated_for_scope_with(
-        ArtifactKind::Skill,
-        true,
-        &local_lock,
-        &source_artifacts,
-        &mut rows,
-        ctx,
-    )?;
+    for local in [false, true] {
+        let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
+        for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
+            collect_outdated_for_scope_with(kind, local, &lock, &source_artifacts, &mut rows, ctx)?;
+        }
+    }
 
     // Deduplicate by name (in case both lock and disk scan find the same artifact)
     let mut seen = BTreeSet::new();
@@ -199,11 +173,10 @@ fn collect_outdated_for_scope_with(
         // Check for local modifications
         if let Some(entry) = lock_entry {
             let install_path = kind.installed_path(name, &ctx.paths.install_dir(kind, local));
-            if ctx.fs.exists(&install_path) {
-                let current_cs = checksum::checksum_artifact_with(&install_path, kind, ctx.fs)?;
-                if current_cs != entry.installed_checksum {
-                    status = format!("{status} (modified)");
-                }
+            if ctx.fs.exists(&install_path)
+                && checksum::is_locally_modified(&install_path, kind, entry, ctx.fs)?
+            {
+                status = format!("{status} (modified)");
             }
         }
 
@@ -218,31 +191,6 @@ fn collect_outdated_for_scope_with(
     }
 
     Ok(())
-}
-
-struct SourceArtifactInfo {
-    source_name: String,
-    version: Option<String>,
-    checksum: String,
-}
-
-fn scan_all_sources_with(ctx: &AppContext<'_>) -> Result<BTreeMap<String, SourceArtifactInfo>> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-    let mut result = BTreeMap::new();
-
-    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
-        let cs = checksum::checksum_artifact_with(&sa.artifact.path, sa.artifact.kind, ctx.fs)?;
-        result.insert(
-            sa.artifact.name,
-            SourceArtifactInfo {
-                source_name: sa.source_name,
-                version: sa.artifact.version,
-                checksum: cs,
-            },
-        );
-    }
-
-    Ok(result)
 }
 
 // ---------------------------------------------------------------------------

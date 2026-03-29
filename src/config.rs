@@ -84,25 +84,32 @@ pub fn installed_names_with(
             continue;
         }
 
-        match kind {
-            ArtifactKind::Agent => {
-                if std::path::Path::new(&entry.file_name)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("md"))
-                {
-                    names.push(entry.file_name.trim_end_matches(".md").to_string());
-                }
-            }
-            ArtifactKind::Skill => {
-                if entry.is_dir {
-                    names.push(entry.file_name.clone());
-                }
-            }
+        if let Some(name) = kind.artifact_name_from_entry(&entry) {
+            names.push(name);
         }
     }
 
     names.sort();
     Ok(names)
+}
+
+/// Search for an installed artifact on disk, checking global scope first then
+/// local.  Returns the path and whether the artifact is in local scope, or
+/// `None` if not found in either scope.
+pub fn find_installed_path(
+    name: &str,
+    kind: ArtifactKind,
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+) -> Option<(PathBuf, bool)> {
+    for local in [false, true] {
+        let dir = paths.install_dir(kind, local);
+        let path = kind.installed_path(name, &dir);
+        if fs.exists(&path) {
+            return Some((path, local));
+        }
+    }
+    None
 }
 
 pub fn resolve_local_path(entry: &SourceEntry) -> PathBuf {
@@ -260,4 +267,66 @@ mod tests {
     // free functions that now delegate through RealFilesystem).  These are
     // retained from the previously-empty test module; there are no real-FS
     // tests here to preserve since config.rs had no #[cfg(test)] block before.
+
+    // --- find_installed_path ---
+
+    #[test]
+    fn find_installed_path_returns_none_when_not_installed() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let result = find_installed_path("nonexistent", ArtifactKind::Agent, &fs, &paths);
+        assert!(result.is_none(), "expected None when artifact is not installed");
+    }
+
+    #[test]
+    fn find_installed_path_finds_global_agent() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        fs.add_file(agent_dir.join("my-agent.md"), "# agent");
+
+        let result = find_installed_path("my-agent", ArtifactKind::Agent, &fs, &paths);
+        assert!(result.is_some(), "expected Some for installed global agent");
+        let (_, local) = result.unwrap();
+        assert!(!local, "expected global scope (local=false)");
+    }
+
+    #[test]
+    fn find_installed_path_finds_local_agent() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, true);
+        fs.add_file(agent_dir.join("my-agent.md"), "# agent");
+
+        let result = find_installed_path("my-agent", ArtifactKind::Agent, &fs, &paths);
+        assert!(result.is_some(), "expected Some for installed local agent");
+        let (_, local) = result.unwrap();
+        assert!(local, "expected local scope (local=true)");
+    }
+
+    #[test]
+    fn find_installed_path_prefers_global_over_local() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        // Install in both scopes
+        fs.add_file(paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md"), "global");
+        fs.add_file(paths.install_dir(ArtifactKind::Agent, true).join("my-agent.md"), "local");
+
+        let result = find_installed_path("my-agent", ArtifactKind::Agent, &fs, &paths);
+        let (_, local) = result.unwrap();
+        assert!(!local, "expected global to be preferred over local");
+    }
+
+    #[test]
+    fn find_installed_path_finds_skill_directory() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let skill_dir = paths.install_dir(ArtifactKind::Skill, false).join("my-skill");
+        fs.add_file(skill_dir.join("SKILL.md"), "---\n---\n");
+
+        let result = find_installed_path("my-skill", ArtifactKind::Skill, &fs, &paths);
+        assert!(result.is_some(), "expected Some for installed global skill");
+        let (_, local) = result.unwrap();
+        assert!(!local, "expected global scope (local=false)");
+    }
 }

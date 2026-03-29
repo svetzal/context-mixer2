@@ -152,6 +152,36 @@ impl ArtifactKind {
             ArtifactKind::Skill => dir.join(name),
         }
     }
+
+    /// Remove an installed artifact from disk, dispatching to the correct
+    /// removal strategy based on kind: file removal for agents, recursive
+    /// directory removal for skills.
+    pub fn remove_installed(
+        &self,
+        path: &Path,
+        fs: &dyn crate::gateway::filesystem::Filesystem,
+    ) -> anyhow::Result<()> {
+        match self {
+            ArtifactKind::Agent => fs.remove_file(path)?,
+            ArtifactKind::Skill => fs.remove_dir_all(path)?,
+        }
+        Ok(())
+    }
+
+    /// Determine whether a directory entry represents a valid installed artifact
+    /// for this kind, returning the artifact name if it matches.
+    pub fn artifact_name_from_entry(
+        &self,
+        entry: &crate::gateway::filesystem::DirEntry,
+    ) -> Option<String> {
+        match self {
+            ArtifactKind::Agent => Path::new(&entry.file_name)
+                .extension()
+                .filter(|ext| ext.eq_ignore_ascii_case("md"))
+                .map(|_| entry.file_name.trim_end_matches(".md").to_string()),
+            ArtifactKind::Skill => entry.is_dir.then(|| entry.file_name.clone()),
+        }
+    }
 }
 
 impl Artifact {

@@ -254,21 +254,6 @@ pub(crate) fn sample_lock_file() -> crate::types::LockFile {
     }
 }
 
-#[cfg(all(test, feature = "llm"))]
-pub(crate) fn install_skill_on_disk(
-    fs: &crate::gateway::fakes::FakeFilesystem,
-    paths: &crate::paths::ConfigPaths,
-    name: &str,
-    files: &[(&str, &str)],
-    local: bool,
-) {
-    let dir = paths.install_dir(crate::types::ArtifactKind::Skill, local);
-    let skill_dir = dir.join(name);
-    for (file_name, content) in files {
-        fs.add_file(skill_dir.join(file_name), *content);
-    }
-}
-
 #[cfg(test)]
 pub(crate) fn install_agent_on_disk(
     fs: &crate::gateway::fakes::FakeFilesystem,
