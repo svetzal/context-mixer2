@@ -330,6 +330,18 @@ fn extract_version(frontmatter: &str) -> Option<String> {
     extract_field(frontmatter, "version").or_else(|| extract_metadata_field(frontmatter, "version"))
 }
 
+/// Extract the version from an installed artifact's file content.
+/// For agents, pass the .md file content. For skills, pass the SKILL.md content.
+pub fn extract_version_from_content(content: &str) -> Option<String> {
+    if !content.starts_with("---") {
+        return None;
+    }
+    let rest = &content[3..];
+    let end = rest.find("---")?;
+    let fm_text = &rest[..end];
+    extract_version(fm_text)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

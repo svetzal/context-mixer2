@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use crate::config;
 use crate::context::AppContext;
 use crate::lockfile;
+use crate::scan;
 use crate::source_iter;
 use crate::types::{ArtifactKind, LockFile};
 
@@ -142,7 +143,11 @@ fn build_rows_with(
         let lock_entry = lock.packages.get(&name);
         let source_info = source_versions.get(&name);
 
-        let installed = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-").to_string();
+        let installed = lock_entry
+            .and_then(|e| e.version.as_deref())
+            .map(str::to_string)
+            .or_else(|| read_installed_version(kind, &name, local, ctx))
+            .unwrap_or_else(|| "-".to_string());
 
         let (source_name, available, deprecated) = if let Some(info) = source_info {
             (info.source_name.clone(), info.version.clone(), info.deprecated)
@@ -248,6 +253,22 @@ pub fn print_section(label: &str, rows: &[Row]) {
         print_table(rows);
     }
     println!();
+}
+
+/// Read the version from an installed artifact's file on disk.
+fn read_installed_version(
+    kind: ArtifactKind,
+    name: &str,
+    local: bool,
+    ctx: &AppContext<'_>,
+) -> Option<String> {
+    let dir = ctx.paths.install_dir(kind, local);
+    let file_path = match kind {
+        ArtifactKind::Agent => dir.join(format!("{name}.md")),
+        ArtifactKind::Skill => dir.join(name).join("SKILL.md"),
+    };
+    let content = ctx.fs.read_to_string(&file_path).ok()?;
+    scan::extract_version_from_content(&content)
 }
 
 // ---------------------------------------------------------------------------
@@ -472,7 +493,7 @@ mod tests {
         assert_eq!(rows.len(), 1);
         let row = &rows[0];
         assert_eq!(row.source, "guidelines", "no lockfile entry means repo name only");
-        assert_eq!(row.installed, "-", "no lockfile means no installed version");
+        assert_eq!(row.installed, "1.0.0", "version read from installed SKILL.md");
         assert_eq!(row.available, "1.0.0", "source version still shown");
     }
 
