@@ -129,16 +129,6 @@ pub fn install_with(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<InstallResult> {
-    perform_install_with(name, kind, local, force, ctx)
-}
-
-pub fn perform_install_with(
-    name: &str,
-    kind: ArtifactKind,
-    local: bool,
-    force: bool,
-    ctx: &AppContext<'_>,
-) -> Result<InstallResult> {
     let (source_name, artifact_name) = parse_name(name);
 
     source::auto_update_all_with(ctx)?;
@@ -249,7 +239,7 @@ pub fn install_all_with(
             }
         }
         let pinned = format!("{}:{}", sa.source_name, sa.artifact.name);
-        let result = perform_install_with(&pinned, kind, local, force, ctx)?;
+        let result = install_with(&pinned, kind, local, force, ctx)?;
         installed.push(result);
     }
 
@@ -279,7 +269,7 @@ pub fn update_all_with(
                 && entry.source_checksum != source_info.checksum
             {
                 let pinned = format!("{}:{name}", entry.source.repo);
-                let result = perform_install_with(&pinned, kind, local, force, ctx)?;
+                let result = install_with(&pinned, kind, local, force, ctx)?;
                 updated.push(result);
             }
         }
@@ -658,7 +648,7 @@ mod tests {
         assert!(lock.packages.is_empty());
     }
 
-    // --- perform_install_with: assert on InstallResult fields ---
+    // --- install_with: assert on InstallResult fields ---
 
     #[test]
     fn perform_install_returns_correct_artifact_name() {
@@ -670,8 +660,7 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result =
-            perform_install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
+        let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
 
         assert_eq!(result.artifact_name, "my-agent");
         assert_eq!(result.kind, ArtifactKind::Agent);
@@ -688,8 +677,7 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result =
-            perform_install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
+        let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
 
         let expected_dir = paths.install_dir(ArtifactKind::Agent, false);
         assert_eq!(result.dest_dir, expected_dir);
@@ -706,7 +694,7 @@ mod tests {
         fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = perform_install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
+        let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("No sources registered"), "unexpected: {msg}");

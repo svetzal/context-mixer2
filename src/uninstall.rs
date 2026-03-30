@@ -16,23 +16,10 @@ pub struct UninstallResult {
 }
 
 // ---------------------------------------------------------------------------
-// Public entry point
+// Public API
 // ---------------------------------------------------------------------------
 
 pub fn uninstall_with(
-    name: &str,
-    kind: ArtifactKind,
-    local: bool,
-    ctx: &AppContext<'_>,
-) -> Result<UninstallResult> {
-    perform_uninstall_with(name, kind, local, ctx)
-}
-
-// ---------------------------------------------------------------------------
-// Perform (no println!)
-// ---------------------------------------------------------------------------
-
-pub(crate) fn perform_uninstall_with(
     name: &str,
     kind: ArtifactKind,
     local: bool,
@@ -96,7 +83,7 @@ mod tests {
         let paths = test_paths();
         let ctx = make_ctx(&fs, &git, &clock, &paths);
 
-        let result = perform_uninstall_with("nonexistent", ArtifactKind::Agent, false, &ctx);
+        let result = uninstall_with("nonexistent", ArtifactKind::Agent, false, &ctx);
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("nonexistent"), "unexpected: {msg}");
@@ -113,7 +100,7 @@ mod tests {
         fs.add_file(agent_path.clone(), "# agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        perform_uninstall_with("my-agent", ArtifactKind::Agent, false, &ctx).unwrap();
+        uninstall_with("my-agent", ArtifactKind::Agent, false, &ctx).unwrap();
 
         assert!(!fs.file_exists(&agent_path), "agent file should be removed");
     }
@@ -130,7 +117,7 @@ mod tests {
         fs.add_file(skill_dir.join("tool.py"), "code");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        perform_uninstall_with("my-skill", ArtifactKind::Skill, false, &ctx).unwrap();
+        uninstall_with("my-skill", ArtifactKind::Skill, false, &ctx).unwrap();
 
         assert!(!fs.file_exists(&skill_dir.join("SKILL.md")), "skill dir should be removed");
     }
@@ -155,7 +142,7 @@ mod tests {
         lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = perform_uninstall_with("my-agent", ArtifactKind::Agent, false, &ctx).unwrap();
+        let result = uninstall_with("my-agent", ArtifactKind::Agent, false, &ctx).unwrap();
 
         // Verify result fields
         assert_eq!(result.name, "my-agent");
@@ -178,7 +165,7 @@ mod tests {
         fs.add_file(agent_path, "# untracked agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = perform_uninstall_with("untracked", ArtifactKind::Agent, false, &ctx);
+        let result = uninstall_with("untracked", ArtifactKind::Agent, false, &ctx);
         assert!(result.is_ok(), "uninstall should succeed even without lock entry");
 
         let result = result.unwrap();

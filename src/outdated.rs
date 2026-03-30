@@ -24,18 +24,10 @@ pub struct OutdatedRow {
 }
 
 // ---------------------------------------------------------------------------
-// Public entry point
+// Public API
 // ---------------------------------------------------------------------------
 
 pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
-    gather_outdated_with(ctx)
-}
-
-// ---------------------------------------------------------------------------
-// Gather (pure logic, no println!)
-// ---------------------------------------------------------------------------
-
-pub(crate) fn gather_outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
     source::auto_update_all_with(ctx)?;
 
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
@@ -274,7 +266,7 @@ mod tests {
         assert_eq!(outdated_status_label("-", "-"), "changed");
     }
 
-    // --- gather_outdated_with ---
+    // --- outdated_with ---
 
     #[test]
     fn gather_outdated_outdated_artifact_appears_in_rows() {
@@ -316,7 +308,7 @@ mod tests {
         );
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let rows = gather_outdated_with(&ctx).unwrap();
+        let rows = outdated_with(&ctx).unwrap();
 
         assert_eq!(rows.len(), 1, "expected one outdated artifact");
         assert_eq!(rows[0].name, "my-agent");
@@ -337,7 +329,7 @@ mod tests {
         fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let rows = gather_outdated_with(&ctx).unwrap();
+        let rows = outdated_with(&ctx).unwrap();
 
         assert!(rows.is_empty(), "expected no rows when everything is up to date");
     }
@@ -380,7 +372,7 @@ mod tests {
         .unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let rows = gather_outdated_with(&ctx).unwrap();
+        let rows = outdated_with(&ctx).unwrap();
 
         assert_eq!(rows.len(), 1, "untracked artifact should appear");
         assert_eq!(rows[0].name, "my-agent");
@@ -427,7 +419,7 @@ mod tests {
         save_lock_with_entry(&fs, &paths, "my-agent", entry, false);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let rows = gather_outdated_with(&ctx).unwrap();
+        let rows = outdated_with(&ctx).unwrap();
 
         assert_eq!(rows.len(), 1);
         assert!(

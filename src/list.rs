@@ -43,17 +43,6 @@ fn status_indicator(installed: &str, available: &str, deprecated: bool) -> &'sta
 }
 
 pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKindOutput> {
-    gather_list_kind_with(kind, ctx)
-}
-
-pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
-    gather_list_all_with(ctx)
-}
-
-pub(crate) fn gather_list_kind_with(
-    kind: ArtifactKind,
-    ctx: &AppContext<'_>,
-) -> Result<ListKindOutput> {
     let source_versions = build_source_versions_with(kind, ctx)?;
     let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;
     let local_lock = lockfile::load_with(true, ctx.fs, ctx.paths)?;
@@ -66,7 +55,7 @@ pub(crate) fn gather_list_kind_with(
     })
 }
 
-pub(crate) fn gather_list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
+pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
     let agent_versions = build_source_versions_with(ArtifactKind::Agent, ctx)?;
     let skill_versions = build_source_versions_with(ArtifactKind::Skill, ctx)?;
     let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;

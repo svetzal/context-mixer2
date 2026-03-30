@@ -23,21 +23,10 @@ pub struct SearchOutput {
 }
 
 // ---------------------------------------------------------------------------
-// Public entry point
+// Public API
 // ---------------------------------------------------------------------------
 
 pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
-    gather_search_results_with(query, ctx)
-}
-
-// ---------------------------------------------------------------------------
-// Gather (pure logic, no println!)
-// ---------------------------------------------------------------------------
-
-pub(crate) fn gather_search_results_with(
-    query: &str,
-    ctx: &AppContext<'_>,
-) -> Result<SearchOutput> {
     source::auto_update_all_with(ctx)?;
 
     let query_lower = query.to_lowercase();
@@ -186,7 +175,7 @@ mod tests {
         assert_eq!(truncate_description(s, 80), "leading and trailing");
     }
 
-    // --- gather_search_results_with ---
+    // --- search_with ---
 
     #[test]
     fn gather_search_results_matches_by_name() {
@@ -204,7 +193,7 @@ mod tests {
         );
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let output = gather_search_results_with("rust", &ctx).unwrap();
+        let output = search_with("rust", &ctx).unwrap();
 
         assert_eq!(output.query, "rust");
         assert_eq!(output.results.len(), 1);
@@ -223,7 +212,7 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let output = gather_search_results_with("test agent", &ctx).unwrap();
+        let output = search_with("test agent", &ctx).unwrap();
 
         assert_eq!(output.results.len(), 1);
         assert_eq!(output.results[0].name, "my-agent");
@@ -239,7 +228,7 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let output = gather_search_results_with("nonexistent-xyz", &ctx).unwrap();
+        let output = search_with("nonexistent-xyz", &ctx).unwrap();
 
         assert!(output.results.is_empty(), "expected no results for non-matching query");
     }
@@ -254,7 +243,7 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let output = gather_search_results_with("MY-AGENT", &ctx).unwrap();
+        let output = search_with("MY-AGENT", &ctx).unwrap();
 
         assert_eq!(output.results.len(), 1, "search should be case-insensitive");
     }

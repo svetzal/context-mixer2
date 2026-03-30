@@ -70,20 +70,8 @@ pub enum SourceUpdateOutput {
 }
 
 // ---------------------------------------------------------------------------
-// Public entry points (thin orchestrators)
+// Public API
 // ---------------------------------------------------------------------------
-
-pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<SourceAddResult> {
-    perform_add_with(name, path_or_url, ctx)
-}
-
-pub fn list_with(ctx: &AppContext<'_>) -> Result<SourceListResult> {
-    gather_list_with(ctx)
-}
-
-pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
-    gather_browse_with(name, ctx)
-}
 
 pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpdateOutput> {
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
@@ -115,19 +103,7 @@ pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpd
     }
 }
 
-pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
-    perform_remove_with(name, ctx)
-}
-
-// ---------------------------------------------------------------------------
-// Gather / Perform functions (no println!)
-// ---------------------------------------------------------------------------
-
-pub(crate) fn perform_add_with(
-    name: &str,
-    path_or_url: &str,
-    ctx: &AppContext<'_>,
-) -> Result<SourceAddResult> {
+pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<SourceAddResult> {
     let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
     if sources.sources.contains_key(name) {
@@ -155,7 +131,7 @@ pub(crate) fn perform_add_with(
     })
 }
 
-pub(crate) fn gather_list_with(ctx: &AppContext<'_>) -> Result<SourceListResult> {
+pub fn list_with(ctx: &AppContext<'_>) -> Result<SourceListResult> {
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
     let entries = sources
@@ -181,7 +157,7 @@ pub(crate) fn gather_list_with(ctx: &AppContext<'_>) -> Result<SourceListResult>
     Ok(SourceListResult { entries })
 }
 
-pub(crate) fn gather_browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
+pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
     auto_update_source_with(name, ctx)?;
 
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
@@ -257,7 +233,7 @@ pub(crate) fn gather_browse_with(name: &str, ctx: &AppContext<'_>) -> Result<Sou
     })
 }
 
-pub(crate) fn perform_remove_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
+pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
     let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
     let entry = sources
@@ -748,7 +724,7 @@ mod tests {
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = perform_add_with("my-source", "/new/path", &ctx);
+        let result = add_with("my-source", "/new/path", &ctx);
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("already exists"), "unexpected: {msg}");
@@ -767,7 +743,7 @@ mod tests {
         fs.add_dir("/local/repo");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = perform_add_with("local-source", "/local/repo", &ctx);
+        let result = add_with("local-source", "/local/repo", &ctx);
         assert!(result.is_ok(), "expected ok: {:?}", result.err());
 
         // No git clone should have been called
@@ -785,7 +761,7 @@ mod tests {
         fs.add_dir("/local/repo");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = perform_add_with("local-source", "/local/repo", &ctx).unwrap();
+        let result = add_with("local-source", "/local/repo", &ctx).unwrap();
 
         assert_eq!(result.name, "local-source");
         assert_eq!(result.agents_found, 0, "empty repo has no agents");
@@ -802,7 +778,7 @@ mod tests {
         setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = perform_add_with("git-source", "https://github.com/example/repo.git", &ctx);
+        let result = add_with("git-source", "https://github.com/example/repo.git", &ctx);
         assert!(result.is_ok(), "expected ok: {:?}", result.err());
 
         let cloned = git.cloned.borrow();
@@ -821,7 +797,7 @@ mod tests {
         fs.add_dir("/local/repo");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        perform_add_with("new-source", "/local/repo", &ctx).unwrap();
+        add_with("new-source", "/local/repo", &ctx).unwrap();
 
         let sources = config::load_sources_with(&fs, &paths).unwrap();
         assert!(sources.sources.contains_key("new-source"), "source should be saved");
@@ -837,7 +813,7 @@ mod tests {
         setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = gather_list_with(&ctx).unwrap();
+        let result = list_with(&ctx).unwrap();
 
         assert!(result.entries.is_empty(), "expected empty entries for no sources");
     }
@@ -856,7 +832,7 @@ mod tests {
         fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = gather_list_with(&ctx).unwrap();
+        let result = list_with(&ctx).unwrap();
 
         assert_eq!(result.entries.len(), 1);
         assert_eq!(result.entries[0].name, "my-source");
@@ -881,7 +857,7 @@ mod tests {
         fs.add_file(clone_path.join("README.md"), "# repo");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = perform_remove_with("git-source", &ctx).unwrap();
+        let result = remove_with("git-source", &ctx).unwrap();
 
         assert_eq!(result.name, "git-source");
         assert!(result.clone_deleted, "expected clone_deleted to be true");
