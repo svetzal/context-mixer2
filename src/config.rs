@@ -10,16 +10,7 @@ use crate::types::{ArtifactKind, CmxConfig, SourceEntry, SourceType, SourcesFile
 // ---------------------------------------------------------------------------
 
 pub fn load_sources_with(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<SourcesFile> {
-    let path = paths.sources_path();
-    if !fs.exists(&path) {
-        return Ok(SourcesFile::default());
-    }
-    let content = fs
-        .read_to_string(&path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
-    let sources: SourcesFile = serde_json::from_str(&content)
-        .with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(sources)
+    crate::json_file::load_json(&paths.sources_path(), fs)
 }
 
 pub fn save_sources_with(
@@ -27,28 +18,11 @@ pub fn save_sources_with(
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<()> {
-    let path = paths.sources_path();
-    if let Some(parent) = path.parent() {
-        fs.create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
-    }
-    let content = serde_json::to_string_pretty(sources)?;
-    fs.write(&path, &content)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
-    Ok(())
+    crate::json_file::save_json(sources, &paths.sources_path(), fs)
 }
 
 pub fn load_config_with(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<CmxConfig> {
-    let path = paths.config_path();
-    if !fs.exists(&path) {
-        return Ok(CmxConfig::default());
-    }
-    let content = fs
-        .read_to_string(&path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
-    let config: CmxConfig = serde_json::from_str(&content)
-        .with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(config)
+    crate::json_file::load_json(&paths.config_path(), fs)
 }
 
 pub fn save_config_with(
@@ -56,15 +30,7 @@ pub fn save_config_with(
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<()> {
-    let path = paths.config_path();
-    if let Some(parent) = path.parent() {
-        fs.create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
-    }
-    let content = serde_json::to_string_pretty(config)?;
-    fs.write(&path, &content)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
-    Ok(())
+    crate::json_file::save_json(config, &paths.config_path(), fs)
 }
 
 pub fn installed_names_with(

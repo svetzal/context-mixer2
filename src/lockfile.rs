@@ -1,5 +1,4 @@
-use anyhow::{Context, Result};
-use std::collections::BTreeMap;
+use anyhow::Result;
 use std::path::Path;
 
 use crate::gateway::filesystem::Filesystem;
@@ -13,31 +12,13 @@ use crate::types::LockFile;
 /// Load a `LockFile` from an explicit path via the given filesystem.
 /// Returns a default (empty) lock file if the path does not exist.
 pub fn load_from_with(path: &Path, fs: &dyn Filesystem) -> Result<LockFile> {
-    if !fs.exists(path) {
-        return Ok(LockFile {
-            version: 1,
-            packages: BTreeMap::new(),
-        });
-    }
-    let content = fs
-        .read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
-    let lock: LockFile = serde_json::from_str(&content)
-        .with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(lock)
+    crate::json_file::load_json(path, fs)
 }
 
 /// Save a `LockFile` to an explicit path via the given filesystem,
 /// creating parent directories as needed.
 pub fn save_to_with(lock: &LockFile, path: &Path, fs: &dyn Filesystem) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        fs.create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
-    }
-    let content = serde_json::to_string_pretty(lock)?;
-    fs.write(path, &content)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
-    Ok(())
+    crate::json_file::save_json(lock, path, fs)
 }
 
 pub fn load_with(local: bool, fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<LockFile> {

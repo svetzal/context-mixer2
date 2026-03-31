@@ -109,6 +109,15 @@ pub struct LockFile {
     pub packages: BTreeMap<String, LockEntry>,
 }
 
+impl Default for LockFile {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            packages: BTreeMap::new(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LockEntry {
     #[serde(rename = "type")]
