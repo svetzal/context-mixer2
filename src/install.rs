@@ -265,8 +265,10 @@ pub fn update_all_with(
                 continue;
             }
 
-            if let Some(source_info) = all_source_info.get(name)
-                && entry.source_checksum != source_info.checksum
+            if let Some(source_infos) = all_source_info.get(name)
+                && source_infos.iter().any(|si| {
+                    si.source_name == entry.source.repo && si.checksum != entry.source_checksum
+                })
             {
                 let pinned = format!("{}:{name}", entry.source.repo);
                 let result = install_with(&pinned, kind, local, force, ctx)?;

@@ -42,9 +42,9 @@ pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
         }
     }
 
-    // Deduplicate by name (in case both lock and disk scan find the same artifact)
+    // Deduplicate by (name, source) in case both lock and disk scan find the same artifact
     let mut seen = BTreeSet::new();
-    rows.retain(|r| seen.insert(r.name.clone()));
+    rows.retain(|r| seen.insert((r.name.clone(), r.source.clone())));
 
     Ok(rows)
 }
@@ -137,7 +137,7 @@ fn collect_outdated_for_scope_with(
     kind: ArtifactKind,
     local: bool,
     lock: &LockFile,
-    source_artifacts: &BTreeMap<String, SourceArtifactInfo>,
+    source_artifacts: &BTreeMap<String, Vec<SourceArtifactInfo>>,
     rows: &mut Vec<OutdatedRow>,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
@@ -145,41 +145,45 @@ fn collect_outdated_for_scope_with(
 
     for name in &installed {
         let lock_entry = lock.packages.get(name);
-        let source_info = source_artifacts.get(name);
+        let source_infos = source_artifacts.get(name);
 
         // No source artifact — nothing to compare against
-        let Some(source_info) = source_info else {
+        let Some(source_infos) = source_infos else {
             continue;
         };
 
         let installed_v = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-").to_string();
 
-        let available_v = source_info.version.as_deref().unwrap_or("-").to_string();
-
-        if !is_outdated(lock_entry, &source_info.checksum, source_info.version.as_deref()) {
-            continue;
-        }
-
-        let mut status = outdated_status_label(&installed_v, &available_v).to_string();
-
-        // Check for local modifications
-        if let Some(entry) = lock_entry {
+        // Check for local modifications once (shared across all source rows)
+        let locally_modified = if let Some(entry) = lock_entry {
             let install_path = kind.installed_path(name, &ctx.paths.install_dir(kind, local));
-            if ctx.fs.exists(&install_path)
+            ctx.fs.exists(&install_path)
                 && checksum::is_locally_modified(&install_path, kind, entry, ctx.fs)?
-            {
+        } else {
+            false
+        };
+
+        for source_info in source_infos {
+            let available_v = source_info.version.as_deref().unwrap_or("-").to_string();
+
+            if !is_outdated(lock_entry, &source_info.checksum, source_info.version.as_deref()) {
+                continue;
+            }
+
+            let mut status = outdated_status_label(&installed_v, &available_v).to_string();
+            if locally_modified {
                 status = format!("{status} (modified)");
             }
-        }
 
-        rows.push(OutdatedRow {
-            name: name.clone(),
-            kind,
-            installed_version: installed_v,
-            available_version: available_v,
-            source: source_info.source_name.clone(),
-            status,
-        });
+            rows.push(OutdatedRow {
+                name: name.clone(),
+                kind,
+                installed_version: installed_v.clone(),
+                available_version: available_v,
+                source: source_info.source_name.clone(),
+                status,
+            });
+        }
     }
 
     Ok(())
@@ -196,7 +200,8 @@ mod tests {
     use crate::lockfile;
     use crate::test_support::{
         agent_content, install_agent_on_disk, make_ctx, make_lock_entry_with_checksum,
-        save_lock_with_entry, setup_source_with_versioned_agent, test_paths,
+        save_lock_with_entry, setup_source_with_versioned_agent, setup_sources, test_paths,
+        versioned_agent_content,
     };
     use crate::types::{ArtifactKind, LockFile, SourcesFile};
     use chrono::Utc;
@@ -427,5 +432,67 @@ mod tests {
             "status should contain 'modified': {}",
             rows[0].status
         );
+    }
+
+    #[test]
+    fn outdated_shows_rows_from_both_sources_when_artifact_in_two() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Two sources with the same agent at different versions
+        setup_sources(
+            &fs,
+            &paths,
+            &[
+                ("guidelines", "/sources/guidelines"),
+                ("marketplace", "/sources/marketplace"),
+            ],
+        );
+        fs.add_file(
+            "/sources/guidelines/my-agent.md",
+            versioned_agent_content("my-agent", "A test agent", "2.0.0"),
+        );
+        fs.add_file(
+            "/sources/marketplace/my-agent.md",
+            versioned_agent_content("my-agent", "A test agent", "3.0.0"),
+        );
+
+        // Install on disk with version 1.0.0
+        install_agent_on_disk(
+            &fs,
+            &paths,
+            "my-agent",
+            &agent_content("my-agent", "A test agent"),
+            false,
+        );
+        save_lock_with_entry(
+            &fs,
+            &paths,
+            "my-agent",
+            make_lock_entry_with_checksum(
+                ArtifactKind::Agent,
+                Some("1.0.0"),
+                "guidelines",
+                "my-agent.md",
+                "sha256:old",
+            ),
+            false,
+        );
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let rows = outdated_with(&ctx).unwrap();
+
+        assert_eq!(rows.len(), 2, "should show outdated row for each source");
+
+        let source_names: Vec<&str> = rows.iter().map(|r| r.source.as_str()).collect();
+        assert!(source_names.contains(&"guidelines"));
+        assert!(source_names.contains(&"marketplace"));
+
+        let guidelines_row = rows.iter().find(|r| r.source == "guidelines").unwrap();
+        let marketplace_row = rows.iter().find(|r| r.source == "marketplace").unwrap();
+        assert_eq!(guidelines_row.available_version, "2.0.0");
+        assert_eq!(marketplace_row.available_version, "3.0.0");
     }
 }

@@ -17,25 +17,21 @@ pub struct SourceArtifactInfo {
 }
 
 /// Scan all registered sources for all artifact kinds, computing a checksum for
-/// each.  Returns a map keyed by artifact name.  When the same name appears in
-/// multiple sources the last one wins (consistent with the existing behaviour in
-/// `outdated.rs`).
+/// each.  Returns a map keyed by artifact name containing all sources that
+/// provide each artifact.
 pub fn scan_all_with_checksums(
     sources: &BTreeMap<String, SourceEntry>,
     fs: &dyn Filesystem,
-) -> Result<BTreeMap<String, SourceArtifactInfo>> {
-    let mut result = BTreeMap::new();
+) -> Result<BTreeMap<String, Vec<SourceArtifactInfo>>> {
+    let mut result: BTreeMap<String, Vec<SourceArtifactInfo>> = BTreeMap::new();
 
     for sa in each_source_artifact_with(sources, fs) {
         let cs = checksum::checksum_artifact_with(&sa.artifact.path, sa.artifact.kind, fs)?;
-        result.insert(
-            sa.artifact.name,
-            SourceArtifactInfo {
-                source_name: sa.source_name,
-                version: sa.artifact.version,
-                checksum: cs,
-            },
-        );
+        result.entry(sa.artifact.name).or_default().push(SourceArtifactInfo {
+            source_name: sa.source_name,
+            version: sa.artifact.version,
+            checksum: cs,
+        });
     }
 
     Ok(result)
@@ -82,7 +78,7 @@ pub fn each_source_artifact_with(
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
-    use crate::test_support::{agent_content, make_local_entry};
+    use crate::test_support::{agent_content, make_local_entry, versioned_agent_content};
     use crate::types::ArtifactKind;
     use std::collections::BTreeMap;
 
@@ -112,5 +108,49 @@ mod tests {
         assert_eq!(results[0].source_name, "test-source");
         assert_eq!(results[0].artifact.name, "my-agent");
         assert_eq!(results[0].artifact.kind, ArtifactKind::Agent);
+    }
+
+    #[test]
+    fn scan_all_with_checksums_preserves_all_sources_for_same_artifact() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo-a/my-agent.md",
+            versioned_agent_content("my-agent", "Agent from A", "1.0.0"),
+        );
+        fs.add_file(
+            "/repo-b/my-agent.md",
+            versioned_agent_content("my-agent", "Agent from B", "2.0.0"),
+        );
+
+        let mut sources = BTreeMap::new();
+        sources.insert("source-a".to_string(), make_local_entry("/repo-a", None));
+        sources.insert("source-b".to_string(), make_local_entry("/repo-b", None));
+
+        let result = scan_all_with_checksums(&sources, &fs).unwrap();
+
+        let infos = result.get("my-agent").expect("should have my-agent");
+        assert_eq!(infos.len(), 2, "should have entries from both sources");
+
+        let source_names: Vec<&str> = infos.iter().map(|i| i.source_name.as_str()).collect();
+        assert!(source_names.contains(&"source-a"));
+        assert!(source_names.contains(&"source-b"));
+    }
+
+    #[test]
+    fn each_source_artifact_returns_both_when_same_name_in_two_sources() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/repo-a/my-agent.md", agent_content("my-agent", "Agent from A"));
+        fs.add_file("/repo-b/my-agent.md", agent_content("my-agent", "Agent from B"));
+
+        let mut sources = BTreeMap::new();
+        sources.insert("source-a".to_string(), make_local_entry("/repo-a", None));
+        sources.insert("source-b".to_string(), make_local_entry("/repo-b", None));
+
+        let results = each_source_artifact_with(&sources, &fs);
+        assert_eq!(results.len(), 2, "should return artifact from both sources");
+
+        let source_names: Vec<&str> = results.iter().map(|r| r.source_name.as_str()).collect();
+        assert!(source_names.contains(&"source-a"));
+        assert!(source_names.contains(&"source-b"));
     }
 }

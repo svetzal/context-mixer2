@@ -122,7 +122,7 @@ fn build_rows_with(
     kind: ArtifactKind,
     local: bool,
     lock: &LockFile,
-    source_versions: &BTreeMap<String, SourceInfo>,
+    source_versions: &BTreeMap<String, Vec<SourceInfo>>,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Row>> {
     let names = config::installed_names_with(kind, local, ctx.fs, ctx.paths)?;
@@ -130,7 +130,7 @@ fn build_rows_with(
 
     for name in names {
         let lock_entry = lock.packages.get(&name);
-        let source_info = source_versions.get(&name);
+        let source_infos = source_versions.get(&name);
 
         let installed = lock_entry
             .and_then(|e| e.version.as_deref())
@@ -138,27 +138,38 @@ fn build_rows_with(
             .or_else(|| read_installed_version(kind, &name, local, ctx))
             .unwrap_or_else(|| "-".to_string());
 
-        let (source_name, available, deprecated) = if let Some(info) = source_info {
-            (info.source_name.clone(), info.version.clone(), info.deprecated)
+        if let Some(infos) = source_infos {
+            // Emit one row per source that provides this artifact
+            for info in infos {
+                let source = {
+                    let path = lock_entry.map_or("", |e| e.source.path.as_str());
+                    format_source(&info.source_name, path)
+                };
+                let status = status_indicator(&installed, &info.version, info.deprecated);
+                rows.push(Row {
+                    name: name.clone(),
+                    installed: installed.clone(),
+                    source,
+                    available: info.version.clone(),
+                    status,
+                });
+            }
         } else {
-            let src = lock_entry.map_or_else(|| "-".to_string(), |e| e.source.repo.clone());
-            (src, "-".to_string(), false)
-        };
-
-        let source = {
-            let path = lock_entry.map_or("", |e| e.source.path.as_str());
-            format_source(&source_name, path)
-        };
-
-        let status = status_indicator(&installed, &available, deprecated);
-
-        rows.push(Row {
-            name,
-            installed,
-            source,
-            available,
-            status,
-        });
+            // No source provides this artifact — fall back to lockfile info
+            let source_name = lock_entry.map_or_else(|| "-".to_string(), |e| e.source.repo.clone());
+            let source = {
+                let path = lock_entry.map_or("", |e| e.source.path.as_str());
+                format_source(&source_name, path)
+            };
+            let status = status_indicator(&installed, "-", false);
+            rows.push(Row {
+                name,
+                installed,
+                source,
+                available: "-".to_string(),
+                status,
+            });
+        }
     }
 
     Ok(rows)
@@ -182,22 +193,19 @@ fn format_source(repo: &str, path: &str) -> String {
 fn build_source_versions_with(
     kind: ArtifactKind,
     ctx: &AppContext<'_>,
-) -> Result<BTreeMap<String, SourceInfo>> {
-    let mut versions = BTreeMap::new();
+) -> Result<BTreeMap<String, Vec<SourceInfo>>> {
+    let mut versions: BTreeMap<String, Vec<SourceInfo>> = BTreeMap::new();
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
     for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
         if sa.artifact.kind == kind {
             let version = sa.artifact.version.as_deref().unwrap_or("-").to_string();
             let deprecated = sa.artifact.is_deprecated();
-            versions.insert(
-                sa.artifact.name,
-                SourceInfo {
-                    source_name: sa.source_name,
-                    version,
-                    deprecated,
-                },
-            );
+            versions.entry(sa.artifact.name).or_default().push(SourceInfo {
+                source_name: sa.source_name,
+                version,
+                deprecated,
+            });
         }
     }
 
@@ -270,7 +278,8 @@ mod tests {
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::test_support::{
         install_agent_on_disk, make_ctx, make_lock_entry_versioned, setup_source_with_agent,
-        setup_source_with_skill, test_paths, versioned_skill_content,
+        setup_source_with_skill, setup_sources, test_paths, versioned_agent_content,
+        versioned_skill_content,
     };
     use crate::types::{ArtifactKind, LockFile, SourcesFile};
     use chrono::Utc;
@@ -570,5 +579,128 @@ mod tests {
         let row = &rows[0];
         assert!(row.source.contains("guidelines"), "agent row should show source repo");
         assert!(row.source.contains("my-agent.md"), "agent row should show provenance path");
+    }
+
+    // --- multi-source: same artifact in multiple sources ---
+
+    #[test]
+    fn agent_in_two_sources_produces_two_rows() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Register two sources that both contain the same agent
+        setup_sources(
+            &fs,
+            &paths,
+            &[
+                ("guidelines", "/sources/guidelines"),
+                ("marketplace", "/sources/marketplace"),
+            ],
+        );
+        fs.add_file(
+            "/sources/guidelines/my-agent.md",
+            versioned_agent_content("my-agent", "A test agent", "2.0.0"),
+        );
+        fs.add_file(
+            "/sources/marketplace/my-agent.md",
+            versioned_agent_content("my-agent", "A test agent", "3.0.0"),
+        );
+
+        // Install agent on disk
+        install_agent_on_disk(
+            &fs,
+            &paths,
+            "my-agent",
+            &versioned_agent_content("my-agent", "A test agent", "1.0.0"),
+            false,
+        );
+
+        // Lockfile records installed from guidelines
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-agent".to_string(),
+            make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "guidelines", "my-agent.md"),
+        );
+        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let source_versions = build_source_versions_with(ArtifactKind::Agent, &ctx).unwrap();
+        let rows =
+            build_rows_with(ArtifactKind::Agent, false, &lock, &source_versions, &ctx).unwrap();
+
+        assert_eq!(rows.len(), 2, "should have one row per source");
+
+        let sources: Vec<&str> = rows.iter().map(|r| r.source.as_str()).collect();
+        assert!(sources.iter().any(|s| s.contains("guidelines")), "should have a guidelines row");
+        assert!(
+            sources.iter().any(|s| s.contains("marketplace")),
+            "should have a marketplace row"
+        );
+
+        // Both rows should share the same installed version
+        assert!(rows.iter().all(|r| r.installed == "1.0.0"));
+
+        // Each row shows the available version from its own source
+        let guidelines_row = rows.iter().find(|r| r.source.contains("guidelines")).unwrap();
+        let marketplace_row = rows.iter().find(|r| r.source.contains("marketplace")).unwrap();
+        assert_eq!(guidelines_row.available, "2.0.0");
+        assert_eq!(marketplace_row.available, "3.0.0");
+    }
+
+    #[test]
+    fn skill_in_two_sources_produces_two_rows() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Register two sources with the same skill
+        setup_sources(
+            &fs,
+            &paths,
+            &[
+                ("guidelines", "/sources/guidelines"),
+                ("marketplace", "/sources/marketplace"),
+            ],
+        );
+        fs.add_file(
+            "/sources/guidelines/my-skill/SKILL.md",
+            versioned_skill_content("A test skill", "1.0.0"),
+        );
+        fs.add_file(
+            "/sources/marketplace/my-skill/SKILL.md",
+            versioned_skill_content("A test skill", "2.0.0"),
+        );
+
+        // Install skill on disk
+        install_skill_dir(&fs, &paths, "my-skill", "1.0.0", false);
+
+        // Lockfile records installed from guidelines
+        let mut lock = LockFile {
+            version: 1,
+            packages: BTreeMap::new(),
+        };
+        lock.packages.insert(
+            "my-skill".to_string(),
+            make_lock_entry_versioned(ArtifactKind::Skill, "1.0.0", "guidelines", "my-skill"),
+        );
+        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let source_versions = build_source_versions_with(ArtifactKind::Skill, &ctx).unwrap();
+        let rows =
+            build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
+
+        assert_eq!(rows.len(), 2, "should have one row per source");
+
+        let guidelines_row = rows.iter().find(|r| r.source.contains("guidelines")).unwrap();
+        let marketplace_row = rows.iter().find(|r| r.source.contains("marketplace")).unwrap();
+        assert_eq!(guidelines_row.available, "1.0.0");
+        assert_eq!(marketplace_row.available, "2.0.0");
     }
 }
