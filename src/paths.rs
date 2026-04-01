@@ -70,3 +70,87 @@ impl ConfigPaths {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_paths() -> ConfigPaths {
+        ConfigPaths::for_test(
+            PathBuf::from("/home/testuser"),
+            PathBuf::from("/home/testuser/.config/context-mixer"),
+        )
+    }
+
+    #[test]
+    fn sources_path_returns_config_dir_sources_json() {
+        let paths = test_paths();
+        assert_eq!(
+            paths.sources_path(),
+            PathBuf::from("/home/testuser/.config/context-mixer/sources.json")
+        );
+    }
+
+    #[test]
+    fn git_clones_dir_returns_config_dir_sources() {
+        let paths = test_paths();
+        assert_eq!(
+            paths.git_clones_dir(),
+            PathBuf::from("/home/testuser/.config/context-mixer/sources")
+        );
+    }
+
+    #[test]
+    fn config_path_returns_config_dir_config_json() {
+        let paths = test_paths();
+        assert_eq!(
+            paths.config_path(),
+            PathBuf::from("/home/testuser/.config/context-mixer/config.json")
+        );
+    }
+
+    #[test]
+    fn lock_path_global_returns_config_dir_lock_file() {
+        let paths = test_paths();
+        assert_eq!(
+            paths.lock_path(false),
+            PathBuf::from("/home/testuser/.config/context-mixer/cmx-lock.json")
+        );
+    }
+
+    #[test]
+    fn lock_path_local_returns_relative_path() {
+        let paths = test_paths();
+        assert_eq!(paths.lock_path(true), PathBuf::from(".context-mixer/cmx-lock.json"));
+    }
+
+    #[test]
+    fn install_dir_agent_global_returns_home_claude_agents() {
+        let paths = test_paths();
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Agent, false),
+            PathBuf::from("/home/testuser/.claude/agents")
+        );
+    }
+
+    #[test]
+    fn install_dir_skill_global_returns_home_claude_skills() {
+        let paths = test_paths();
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Skill, false),
+            PathBuf::from("/home/testuser/.claude/skills")
+        );
+    }
+
+    #[test]
+    fn install_dir_agent_local_returns_relative_claude_agents() {
+        let paths = test_paths();
+        assert_eq!(paths.install_dir(ArtifactKind::Agent, true), PathBuf::from(".claude/agents"));
+    }
+
+    #[test]
+    fn install_dir_skill_local_returns_relative_claude_skills() {
+        let paths = test_paths();
+        assert_eq!(paths.install_dir(ArtifactKind::Skill, true), PathBuf::from(".claude/skills"));
+    }
+}
