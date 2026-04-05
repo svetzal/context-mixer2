@@ -22,12 +22,16 @@
 - [Writing Agents](./creating/agents.md)
 - [Writing Skills](./creating/skills.md)
 - [Marketplace Structure](./creating/marketplace.md)
+- [Creating Plugins](./creating/plugins.md)
+- [Working with Facets](./creating/facets.md)
+- [Recipe Assembly](./creating/recipes.md)
 - [Versioning](./creating/versioning.md)
 - [Deprecation](./creating/deprecation.md)
 
 # Reference
 
-- [Command Reference](./reference/commands.md)
+- [cmx Command Reference](./reference/commands.md)
+- [cmf Command Reference](./reference/cmf-commands.md)
 - [Frontmatter Reference](./reference/frontmatter.md)
 - [Lock File](./reference/lockfile.md)
 - [Platform Paths](./reference/platforms.md)

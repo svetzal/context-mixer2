@@ -1,0 +1,27 @@
+[package]
+name = "cmf"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Publisher and authoring tool for context mixer facets, recipes, and plugins"
+authors = ["Stacey Vetzal <stacey@vetzal.com>"]
+license = "MIT"
+
+[dependencies]
+cmx = { path = "../cmx" }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Match cmx lint policy
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+[lints.rust]
+unsafe_code = "deny"

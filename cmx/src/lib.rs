@@ -8,7 +8,7 @@ pub mod diff;
 pub mod gateway;
 pub mod info;
 pub mod install;
-pub(crate) mod json_file;
+pub mod json_file;
 pub mod list;
 pub mod lockfile;
 pub mod outdated;

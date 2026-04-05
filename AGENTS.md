@@ -55,6 +55,25 @@ cargo tarpaulin      # code coverage (target >80%)
 - `src/lockfile.rs` — lock file read/write
 - `src/types.rs` — shared types (SourceEntry, Artifact, ArtifactKind, LockFile, etc.)
 
+## cmf — Context Mixer Forge
+
+Publisher and authoring tool for managing agentic context artifacts.
+
+### Architecture
+
+- `cmf/src/cli.rs` — clap CLI definition (7 commands: facet, recipe, plugin, manifest, marketplace, validate, status)
+- `cmf/src/repo.rs` — Repo root detection (marketplace, plugin, facets-only, unknown)
+- `cmf/src/plugin.rs` — Plugin scanning, initialization, validation
+- `cmf/src/plugin_types.rs` — Serde types for plugin.json and marketplace.json
+- `cmf/src/marketplace.rs` — Marketplace validation and generation
+- `cmf/src/facet.rs` — Facet scanning and validation
+- `cmf/src/facet_types.rs` — Facet and Recipe structs, frontmatter parser
+- `cmf/src/recipe.rs` — Recipe assembly and diffing
+- `cmf/src/manifest.rs` — Multi-platform manifest generation
+- `cmf/src/validate.rs` — Aggregate validation
+- `cmf/src/status.rs` — Repo overview dashboard
+- `cmf/src/validation.rs` — Shared validation types
+
 ## Spec
 
 See `SPEC.md` for the full design spec.
