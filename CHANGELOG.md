@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Converted project to Cargo workspace with `cmx` and `cmf` as separate binaries sharing the cmx library crate
 - Unified versioning via `[workspace.package]` — both binaries share the same version
 - Promoted `json_file` module from `pub(crate)` to `pub` for cross-crate use
+- Release archives now include both `cmx` and `cmf` binaries
+- Homebrew formula (`brew install svetzal/tap/cmx`) now installs both `cmx` and `cmf`
 - mdbook documentation expanded with pages for plugins, facets, recipes, and cmf command reference
 
 ## [2.4.2] - 2026-03-28
