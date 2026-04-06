@@ -329,54 +329,6 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
 }
 
 // ---------------------------------------------------------------------------
-// Print functions (no business logic)
-// ---------------------------------------------------------------------------
-
-pub fn print_source_list(result: &SourceListResult) {
-    if result.entries.is_empty() {
-        println!("No sources registered.");
-        println!();
-        println!("Add one with: cmx source add <name> <path-or-url>");
-        return;
-    }
-
-    for entry in &result.entries {
-        println!("  {:<28} ({}) {}", entry.name, entry.kind, entry.location);
-    }
-}
-
-pub fn print_browse_result(result: &SourceBrowseResult) {
-    let name = &result.source_name;
-
-    if result.agents.is_empty() && result.skills.is_empty() {
-        println!("No agents or skills found in '{name}'.");
-        return;
-    }
-
-    if !result.agents.is_empty() {
-        println!("Agents:");
-        for a in &result.agents {
-            let v = a.version.as_deref().map(|v| format!("  v{v}")).unwrap_or_default();
-            println!("  {}{v}{}", a.name, a.deprecation_display);
-        }
-    }
-
-    if !result.skills.is_empty() {
-        if !result.agents.is_empty() {
-            println!();
-        }
-        println!("Skills:");
-        for s in &result.skills {
-            let v = s.version.as_deref().map(|v| format!("  v{v}")).unwrap_or_default();
-            println!("  {}{v}{}", s.name, s.deprecation_display);
-            for f in &s.files {
-                println!("    {f}");
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Auto-update helpers (no change in logic)
 // ---------------------------------------------------------------------------
 

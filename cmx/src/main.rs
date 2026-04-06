@@ -25,7 +25,7 @@ fn main() -> Result<()> {
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, &ctx),
         Commands::List => {
             let output = cmx::list::list_all_with(&ctx)?;
-            cmx::list::print_list_all_output(&output);
+            cmx::display::print_list_all_output(&output);
             Ok(())
         }
         Commands::Info { name } => {
@@ -66,12 +66,12 @@ fn handle_source(action: SourceAction, paths: &ConfigPaths, ctx: &AppContext<'_>
         }
         SourceAction::List => {
             let result = cmx::source::list_with(ctx)?;
-            cmx::source::print_source_list(&result);
+            cmx::display::print_source_list(&result);
             Ok(())
         }
         SourceAction::Browse { name } => {
             let result = cmx::source::browse_with(&name, ctx)?;
-            cmx::source::print_browse_result(&result);
+            cmx::display::print_browse_result(&result);
             Ok(())
         }
         SourceAction::Update { name } => {
@@ -171,7 +171,7 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
         }
         ArtifactAction::List => {
             let output = cmx::list::list_kind_with(kind, ctx)?;
-            cmx::list::print_list_kind_output(&output);
+            cmx::display::print_list_kind_output(&output);
             Ok(())
         }
         #[cfg(feature = "llm")]

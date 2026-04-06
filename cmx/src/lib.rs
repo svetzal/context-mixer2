@@ -5,6 +5,7 @@ pub mod config;
 pub mod context;
 #[cfg(feature = "llm")]
 pub mod diff;
+pub mod display;
 pub mod gateway;
 pub mod info;
 pub mod install;

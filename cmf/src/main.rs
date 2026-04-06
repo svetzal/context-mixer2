@@ -4,10 +4,11 @@ use anyhow::Result;
 use clap::Parser;
 use cmx::gateway::{Filesystem, RealFilesystem};
 
+use cmf::display::print_plugin_list;
 use cmf::facet::{print_facet_list, print_recipe_list, scan_facets, scan_recipes, validate_facets};
 use cmf::manifest::{generate_manifests, print_manifest_summary};
 use cmf::marketplace::{generate_marketplace, validate_marketplace};
-use cmf::plugin::{init_plugin, print_plugin_list, scan_plugins, validate_all_plugins};
+use cmf::plugin::{init_plugin, scan_plugins, validate_all_plugins};
 use cmf::recipe::{assemble_recipe, diff_recipe, write_assembled};
 use cmf::repo::{RepoRoot, detect_repo};
 use cmf::status::print_status;
