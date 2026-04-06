@@ -1,9 +1,69 @@
 # Changelog
 
-All notable changes to cmx will be documented in this file.
+All notable changes to cmx and cmf will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.5.0] - 2026-04-05
+
+### Added
+
+- **cmf (context mixer forge)** — new publisher/authoring tool for managing agentic context artifacts, shipped alongside cmx in the same distribution
+  - `cmf status` — repo overview dashboard showing plugins, agents, skills, facets, validation summary
+  - `cmf validate` — aggregate validation across plugins, marketplace, and facets
+  - `cmf plugin list` — list all plugins with agent/skill counts per plugin
+  - `cmf plugin init <name>` — scaffold new plugin directory with plugin.json, agents/, skills/
+  - `cmf plugin validate` — check plugin structure and frontmatter integrity
+  - `cmf marketplace validate` — check marketplace.json consistency against plugin directories
+  - `cmf marketplace generate` — regenerate marketplace.json from plugin directory structure, preserving owner metadata and categories
+  - `cmf facet list` — list facets grouped by category and recipes
+  - `cmf facet validate` — validate facet frontmatter, scope fields, and recipe references
+  - `cmf recipe list` — list available recipes with target paths
+  - `cmf recipe assemble <name>` / `--all` — assemble agents from facets via naive concatenation
+  - `cmf recipe diff <name>` — compare assembled output against current agent file
+  - `cmf manifest generate` — generate multi-platform manifests for Codex, Cursor, and Gemini from Claude plugin sources
+
+### Changed
+
+- Converted project to Cargo workspace with `cmx` and `cmf` as separate binaries sharing the cmx library crate
+- Unified versioning via `[workspace.package]` — both binaries share the same version
+- Promoted `json_file` module from `pub(crate)` to `pub` for cross-crate use
+- mdbook documentation expanded with pages for plugins, facets, recipes, and cmf command reference
+
+## [2.4.2] - 2026-03-28
+
+### Fixed
+
+- Show all sources when the same artifact exists in multiple registered repos
+
+## [2.4.1] - 2026-03-27
+
+### Fixed
+
+- Show installed version from disk for untracked artifacts in `cmx list`
+
+## [2.4.0] - 2026-03-27
+
+### Added
+
+- Support metadata-nested version extraction (`metadata.version` in frontmatter)
+
+## [2.3.0] - 2026-03-25
+
+### Added
+
+- Display source repository version for skills in `cmx source browse`
+- Gate `tokio` and `mojentic` behind optional `llm` feature for lean default builds
+
+### Changed
+
+- Refactored tests to eliminate knowledge duplication
+
+### Security
+
+- Updated `sha2` and transitive cryptographic dependencies
+- Updated `uuid` to 1.23.0
 
 ## [2.2.0] - 2026-03-24
 
