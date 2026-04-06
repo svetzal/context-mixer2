@@ -79,7 +79,7 @@ jobs:
       - name: Package archive
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf ../../../${{ matrix.archive }} cmx
+          tar czf ../../../${{ matrix.archive }} cmx cmf
           cd ../../..
 
       - name: Upload artifact
@@ -145,7 +145,7 @@ jobs:
           # frozen_string_literal: true
 
           class Cmx < Formula
-            desc "Package manager for curated agentic context — agents and skills"
+            desc "Package manager and publisher for curated agentic context — agents, skills, and plugins"
             homepage "https://github.com/svetzal/context-mixer2"
             version "VERSION_PLACEHOLDER"
             license "MIT"
@@ -157,6 +157,7 @@ jobs:
 
                 def install
                   bin.install "cmx"
+                  bin.install "cmf"
                 end
               end
 
@@ -166,6 +167,7 @@ jobs:
 
                 def install
                   bin.install "cmx"
+                  bin.install "cmf"
                 end
               end
             end
@@ -177,12 +179,14 @@ jobs:
 
                 def install
                   bin.install "cmx"
+                  bin.install "cmf"
                 end
               end
             end
 
             test do
               assert_match version.to_s, shell_output("#{bin}/cmx --version")
+              assert_match version.to_s, shell_output("#{bin}/cmf --version")
             end
           end
           FORMULA
