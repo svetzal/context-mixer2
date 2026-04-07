@@ -18,6 +18,7 @@ pub mod scan;
 pub mod search;
 pub mod source;
 pub(crate) mod source_iter;
+pub mod table;
 #[cfg(test)]
 mod test_support;
 pub mod types;

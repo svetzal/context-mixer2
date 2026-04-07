@@ -4,6 +4,7 @@ use crate::config;
 use crate::context::AppContext;
 use crate::source;
 use crate::source_iter;
+use crate::table::Table;
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -69,29 +70,23 @@ pub fn print_search_results(output: &SearchOutput) {
         return;
     }
 
-    let w_name = results.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
-    let w_kind = 5;
-    let w_ver = results.iter().map(|r| r.version.len()).max().unwrap_or(7).max(7);
-    let w_src = results.iter().map(|r| r.source.len()).max().unwrap_or(6).max(6);
-
-    println!(
-        "  {:<w_name$}  {:<w_kind$}  {:<w_ver$}  {:<w_src$}  Description",
-        "Name", "Type", "Version", "Source",
-    );
-    println!(
-        "  {:<w_name$}  {:<w_kind$}  {:<w_ver$}  {:<w_src$}  -----------",
-        "-".repeat(w_name),
-        "-".repeat(w_kind),
-        "-".repeat(w_ver),
-        "-".repeat(w_src),
-    );
-
-    for r in results {
-        println!(
-            "  {:<w_name$}  {:<w_kind$}  {:<w_ver$}  {:<w_src$}  {}",
-            r.name, r.kind, r.version, r.source, r.description,
-        );
+    Table {
+        headers: vec!["Name", "Type", "Version", "Source", "Description"],
+        padded_cols: 4,
+        rows: results
+            .iter()
+            .map(|r| {
+                vec![
+                    r.name.clone(),
+                    r.kind.clone(),
+                    r.version.clone(),
+                    r.source.clone(),
+                    r.description.clone(),
+                ]
+            })
+            .collect(),
     }
+    .print();
 
     println!();
     println!("{} result(s) found.", results.len());

@@ -1,5 +1,6 @@
 use crate::list::{ListKindOutput, ListOutput, Row};
 use crate::source::{SourceBrowseResult, SourceListResult};
+use crate::table::Table;
 
 pub fn print_list_kind_output(output: &ListKindOutput) {
     let kind = output.kind;
@@ -46,29 +47,23 @@ pub fn print_table(rows: &[Row]) {
         return;
     }
 
-    let w_name = rows.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
-    let w_inst = rows.iter().map(|r| r.installed.len()).max().unwrap_or(9).max(9);
-    let w_src = rows.iter().map(|r| r.source.len()).max().unwrap_or(6).max(6);
-    let w_avail = rows.iter().map(|r| r.available.len()).max().unwrap_or(9).max(9);
-
-    println!(
-        "  {:<w_name$}  {:<w_inst$}  {:<w_src$}  {:<w_avail$}",
-        "Name", "Installed", "Source", "Available",
-    );
-    println!(
-        "  {:<w_name$}  {:<w_inst$}  {:<w_src$}  {:<w_avail$}",
-        "-".repeat(w_name),
-        "-".repeat(w_inst),
-        "-".repeat(w_src),
-        "-".repeat(w_avail),
-    );
-
-    for row in rows {
-        println!(
-            "  {:<w_name$}  {:<w_inst$}  {:<w_src$}  {:<w_avail$}  {}",
-            row.name, row.installed, row.source, row.available, row.status,
-        );
+    Table {
+        headers: vec!["Name", "Installed", "Source", "Available"],
+        padded_cols: 4,
+        rows: rows
+            .iter()
+            .map(|r| {
+                vec![
+                    r.name.clone(),
+                    r.installed.clone(),
+                    r.source.clone(),
+                    r.available.clone(),
+                    r.status.to_string(),
+                ]
+            })
+            .collect(),
     }
+    .print();
 }
 
 pub fn print_section(label: &str, rows: &[Row]) {

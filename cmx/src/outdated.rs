@@ -8,6 +8,7 @@ use crate::lockfile;
 use crate::source;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
+use crate::table::Table;
 use crate::types::{ArtifactKind, LockFile};
 
 // ---------------------------------------------------------------------------
@@ -59,38 +60,24 @@ pub fn print_outdated(rows: &[OutdatedRow]) {
         return;
     }
 
-    let w_name = rows.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
-    let w_kind = 5;
-    let w_installed = rows.iter().map(|r| r.installed_version.len()).max().unwrap_or(9).max(9);
-    let w_available = rows.iter().map(|r| r.available_version.len()).max().unwrap_or(9).max(9);
-    let w_src = rows.iter().map(|r| r.source.len()).max().unwrap_or(6).max(6);
-    let w_st = rows.iter().map(|r| r.status.len()).max().unwrap_or(6).max(6);
-
-    println!(
-        "  {:<w_name$}  {:<w_kind$}  {:<w_installed$}  {:<w_available$}  {:<w_src$}  {:<w_st$}",
-        "Name", "Type", "Installed", "Available", "Source", "Status",
-    );
-    println!(
-        "  {:<w_name$}  {:<w_kind$}  {:<w_installed$}  {:<w_available$}  {:<w_src$}  {:<w_st$}",
-        "-".repeat(w_name),
-        "-".repeat(w_kind),
-        "-".repeat(w_installed),
-        "-".repeat(w_available),
-        "-".repeat(w_src),
-        "-".repeat(w_st),
-    );
-
-    for row in rows {
-        println!(
-            "  {:<w_name$}  {:<w_kind$}  {:<w_installed$}  {:<w_available$}  {:<w_src$}  {:<w_st$}",
-            row.name,
-            row.kind,
-            row.installed_version,
-            row.available_version,
-            row.source,
-            row.status,
-        );
+    Table {
+        headers: vec!["Name", "Type", "Installed", "Available", "Source", "Status"],
+        padded_cols: 6,
+        rows: rows
+            .iter()
+            .map(|r| {
+                vec![
+                    r.name.clone(),
+                    r.kind.to_string(),
+                    r.installed_version.clone(),
+                    r.available_version.clone(),
+                    r.source.clone(),
+                    r.status.clone(),
+                ]
+            })
+            .collect(),
     }
+    .print();
 }
 
 // ---------------------------------------------------------------------------
