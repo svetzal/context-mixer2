@@ -438,11 +438,11 @@ mod tests {
             ],
         );
         fs.add_file(
-            "/sources/guidelines/my-agent.md",
+            "/sources/guidelines/agents/my-agent.md",
             versioned_agent_content("my-agent", "A test agent", "2.0.0"),
         );
         fs.add_file(
-            "/sources/marketplace/my-agent.md",
+            "/sources/marketplace/agents/my-agent.md",
             versioned_agent_content("my-agent", "A test agent", "3.0.0"),
         );
 

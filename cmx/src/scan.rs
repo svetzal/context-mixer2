@@ -211,10 +211,14 @@ fn walk_dir_with(dir: &Path, artifacts: &mut Vec<Artifact>, fs: &dyn Filesystem)
                     version: fm.version,
                     deprecation: fm.deprecation,
                 });
+                // Don't recurse into skill directories — .md files inside
+                // are reference material, not agents
+            } else {
+                walk_dir_with(&entry.path, artifacts, fs)?;
             }
-            walk_dir_with(&entry.path, artifacts, fs)?;
         } else if entry.path.extension().is_some_and(|ext| ext == "md")
             && name_str != "SKILL.md"
+            && dir.file_name().is_some_and(|d| d == "agents")
             && let Ok(content) = fs.read_to_string(&entry.path)
             && let Some(fm) = parse_agent_frontmatter_str(&content)
         {
@@ -619,7 +623,16 @@ mod tests {
     fn scan_ignores_md_file_without_agent_frontmatter() {
         let fs = FakeFilesystem::new();
         // Has frontmatter but no 'name:' field — not an agent
-        fs.add_file("/repo/not-agent.md", "---\ndescription: only desc\n---\n");
+        fs.add_file("/repo/agents/not-agent.md", "---\ndescription: only desc\n---\n");
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert!(result.artifacts.is_empty());
+    }
+
+    #[test]
+    fn scan_ignores_agent_frontmatter_outside_agents_dir() {
+        let fs = FakeFilesystem::new();
+        // Valid agent frontmatter but not in an agents/ directory
+        fs.add_file("/repo/docs/my-agent.md", agent_content("my-agent", "Does things"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
         assert!(result.artifacts.is_empty());
     }
@@ -627,20 +640,20 @@ mod tests {
     #[test]
     fn scan_finds_agent_with_valid_frontmatter() {
         let fs = FakeFilesystem::new();
-        fs.add_file("/repo/my-agent.md", agent_content("my-agent", "Does things"));
+        fs.add_file("/repo/agents/my-agent.md", agent_content("my-agent", "Does things"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 1);
         assert_eq!(result.artifacts[0].name, "my-agent");
         assert_eq!(result.artifacts[0].kind, ArtifactKind::Agent);
         assert_eq!(result.artifacts[0].description, "Does things");
-        assert_eq!(result.artifacts[0].path, PathBuf::from("/repo/my-agent.md"));
+        assert_eq!(result.artifacts[0].path, PathBuf::from("/repo/agents/my-agent.md"));
     }
 
     #[test]
     fn scan_finds_agent_with_metadata_version() {
         let fs = FakeFilesystem::new();
         fs.add_file(
-            "/repo/my-agent.md",
+            "/repo/agents/my-agent.md",
             metadata_versioned_agent_content("my-agent", "Does things", "1.3.2"),
         );
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
@@ -663,8 +676,8 @@ mod tests {
     #[test]
     fn scan_skips_hidden_directories() {
         let fs = FakeFilesystem::new();
-        // File inside a hidden dir — should be ignored
-        fs.add_file("/repo/.hidden/secret.md", agent_content("secret", "Hidden"));
+        // File inside a hidden dir — should be ignored even if parent is named agents
+        fs.add_file("/repo/.hidden/agents/secret.md", agent_content("secret", "Hidden"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
         assert!(result.artifacts.is_empty());
     }
@@ -672,8 +685,8 @@ mod tests {
     #[test]
     fn scan_finds_multiple_agents_sorted_by_name() {
         let fs = FakeFilesystem::new();
-        fs.add_file("/repo/zebra.md", agent_content("zebra", "Z agent"));
-        fs.add_file("/repo/alpha.md", agent_content("alpha", "A agent"));
+        fs.add_file("/repo/agents/zebra.md", agent_content("zebra", "Z agent"));
+        fs.add_file("/repo/agents/alpha.md", agent_content("alpha", "A agent"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 2);
         assert_eq!(result.artifacts[0].name, "alpha");
@@ -691,9 +704,28 @@ mod tests {
     }
 
     #[test]
+    fn scan_does_not_recurse_into_skill_directories() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/repo/my-skill/SKILL.md", skill_content("A skill"));
+        // Reference .md files inside the skill dir should NOT be detected as agents
+        fs.add_file(
+            "/repo/my-skill/references/some-feature.md",
+            agent_content("some-feature", "A reference doc"),
+        );
+        fs.add_file(
+            "/repo/my-skill/references/another-feature.md",
+            agent_content("another-feature", "Another reference doc"),
+        );
+        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        assert_eq!(result.artifacts.len(), 1);
+        assert_eq!(result.artifacts[0].name, "my-skill");
+        assert_eq!(result.artifacts[0].kind, ArtifactKind::Skill);
+    }
+
+    #[test]
     fn scan_finds_both_agents_and_skills() {
         let fs = FakeFilesystem::new();
-        fs.add_file("/repo/alpha.md", agent_content("alpha", "An agent"));
+        fs.add_file("/repo/agents/alpha.md", agent_content("alpha", "An agent"));
         fs.add_file("/repo/my-skill/SKILL.md", skill_content("A skill"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 2);
@@ -724,7 +756,7 @@ mod tests {
             marketplace_json(r#"{ "name": "my-plugin", "source": "./plugins/my-plugin" }"#),
         );
         fs.add_file(
-            "/repo/plugins/my-plugin/reviewer.md",
+            "/repo/plugins/my-plugin/agents/reviewer.md",
             agent_content("reviewer", "Reviews code"),
         );
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
@@ -758,7 +790,7 @@ mod tests {
             marketplace_json(r#"{ "name": "my-plugin", "source": "./plugins/my-plugin" }"#),
         );
         fs.add_file(
-            "/repo/plugins/my-plugin/checker.md",
+            "/repo/plugins/my-plugin/agents/checker.md",
             agent_content("checker", "Checks things"),
         );
         fs.add_file("/repo/plugins/my-plugin/pdf/SKILL.md", skill_content("PDF processing"));
@@ -786,7 +818,7 @@ mod tests {
         );
         fs.add_file("/repo/skills/pdf/SKILL.md", skill_content("PDF skill"));
         // This agent exists in the repo but isn't in the explicit arrays
-        fs.add_file("/repo/extra-agent.md", agent_content("extra", "Should not appear"));
+        fs.add_file("/repo/agents/extra-agent.md", agent_content("extra", "Should not appear"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 1);
         assert_eq!(result.artifacts[0].name, "pdf");
@@ -803,8 +835,8 @@ mod tests {
                    { "name": "plugin-b", "source": "./plugins/b" }"#,
             ),
         );
-        fs.add_file("/repo/plugins/a/agent-a.md", agent_content("agent-a", "From plugin A"));
-        fs.add_file("/repo/plugins/b/agent-b.md", agent_content("agent-b", "From plugin B"));
+        fs.add_file("/repo/plugins/a/agents/agent-a.md", agent_content("agent-a", "From plugin A"));
+        fs.add_file("/repo/plugins/b/agents/agent-b.md", agent_content("agent-b", "From plugin B"));
         let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 2);
         let names: Vec<_> = result.artifacts.iter().map(|a| a.name.as_str()).collect();

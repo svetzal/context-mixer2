@@ -205,7 +205,7 @@ pub(crate) fn setup_source_with_versioned_agent(
 ) {
     setup_source(fs, paths, source_name, source_path);
     fs.add_file(
-        format!("{source_path}/{agent_name}.md"),
+        format!("{source_path}/agents/{agent_name}.md"),
         versioned_agent_content(agent_name, "A test agent", version),
     );
 }
@@ -277,7 +277,7 @@ pub(crate) fn setup_source_with_agent(
 ) {
     setup_source(fs, paths, source_name, source_path);
     fs.add_file(
-        format!("{source_path}/{agent_name}.md"),
+        format!("{source_path}/agents/{agent_name}.md"),
         agent_content(agent_name, "A test agent"),
     );
 }

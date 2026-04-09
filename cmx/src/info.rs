@@ -437,7 +437,7 @@ mod tests {
         setup_source(&fs, &paths, "my-source", "/sources/my-source");
         // Deprecated agent in source (uses flat deprecation fields, not YAML block)
         fs.add_file(
-            "/sources/my-source/my-agent.md",
+            "/sources/my-source/agents/my-agent.md",
             deprecated_agent_content("my-agent", "A test agent", "Too old", "new-agent"),
         );
 

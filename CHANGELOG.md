@@ -5,6 +5,13 @@ All notable changes to cmx and cmf will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-04-09
+
+### Fixed
+
+- Agent scanner no longer recurses into skill directories — `.md` reference files inside skills were being falsely detected as agents
+- Agent scanner now requires `.md` files to live in an `agents/` directory to be recognized as agents, preventing false positives from documentation or other markdown files with similar frontmatter
+
 ## [2.5.0] - 2026-04-05
 
 ### Added

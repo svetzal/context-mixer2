@@ -405,8 +405,8 @@ mod tests {
 
         // Two sources, both with the same agent name
         setup_sources(&fs, &paths, &[("source1", "/source1"), ("source2", "/source2")]);
-        fs.add_file("/source1/my-agent.md", agent_content("my-agent", "Agent from source1"));
-        fs.add_file("/source2/my-agent.md", agent_content("my-agent", "Agent from source2"));
+        fs.add_file("/source1/agents/my-agent.md", agent_content("my-agent", "Agent from source1"));
+        fs.add_file("/source2/agents/my-agent.md", agent_content("my-agent", "Agent from source2"));
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);

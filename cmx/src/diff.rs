@@ -489,7 +489,7 @@ mod tests {
         let content = agent_content("my-agent", "A test agent");
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
         // Override the source file with specific content
-        fs.add_file("/sources/my-source/my-agent.md", content.clone());
+        fs.add_file("/sources/my-source/agents/my-agent.md", content.clone());
         install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
 
         // Write a lock file entry so load_with succeeds
@@ -578,7 +578,7 @@ mod tests {
 
         let content = agent_content("my-agent", "A test agent");
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
-        fs.add_file("/sources/my-source/my-agent.md", content.clone());
+        fs.add_file("/sources/my-source/agents/my-agent.md", content.clone());
         install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
 
         save_lock_with_entry(

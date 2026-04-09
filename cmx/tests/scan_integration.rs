@@ -28,7 +28,9 @@ fn scan_empty_directory_returns_empty() {
 #[test]
 fn scan_finds_agent_with_valid_frontmatter() {
     let dir = TempDir::new().unwrap();
-    write_file(dir.path(), "my-agent.md", &agent_frontmatter("my-agent", "Does something"));
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    write_file(&agents_dir, "my-agent.md", &agent_frontmatter("my-agent", "Does something"));
     let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
     assert_eq!(result.artifacts.len(), 1);
     assert_eq!(result.artifacts[0].name, "my-agent");
@@ -82,9 +84,11 @@ fn scan_skips_hidden_directories() {
 #[test]
 fn scan_finds_multiple_agents_sorted_by_name() {
     let dir = TempDir::new().unwrap();
-    write_file(dir.path(), "zebra.md", &agent_frontmatter("zebra", "Last"));
-    write_file(dir.path(), "alpha.md", &agent_frontmatter("alpha", "First"));
-    write_file(dir.path(), "middle.md", &agent_frontmatter("middle", "Middle"));
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    write_file(&agents_dir, "zebra.md", &agent_frontmatter("zebra", "Last"));
+    write_file(&agents_dir, "alpha.md", &agent_frontmatter("alpha", "First"));
+    write_file(&agents_dir, "middle.md", &agent_frontmatter("middle", "Middle"));
 
     let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
     assert_eq!(result.artifacts.len(), 3);
@@ -95,7 +99,9 @@ fn scan_finds_multiple_agents_sorted_by_name() {
 #[test]
 fn scan_finds_both_agents_and_skills() {
     let dir = TempDir::new().unwrap();
-    write_file(dir.path(), "agent.md", &agent_frontmatter("agent", "An agent"));
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    write_file(&agents_dir, "agent.md", &agent_frontmatter("agent", "An agent"));
     let skill_dir = dir.path().join("skill");
     fs::create_dir_all(&skill_dir).unwrap();
     write_file(&skill_dir, "SKILL.md", &skill_frontmatter("A skill"));

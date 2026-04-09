@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn each_source_artifact_finds_artifacts() {
         let fs = FakeFilesystem::new();
-        fs.add_file("/test-repo/my-agent.md", agent_content("my-agent", "Test agent"));
+        fs.add_file("/test-repo/agents/my-agent.md", agent_content("my-agent", "Test agent"));
 
         let mut sources = BTreeMap::new();
         sources.insert("test-source".to_string(), make_local_entry("/test-repo", None));
@@ -114,11 +114,11 @@ mod tests {
     fn scan_all_with_checksums_preserves_all_sources_for_same_artifact() {
         let fs = FakeFilesystem::new();
         fs.add_file(
-            "/repo-a/my-agent.md",
+            "/repo-a/agents/my-agent.md",
             versioned_agent_content("my-agent", "Agent from A", "1.0.0"),
         );
         fs.add_file(
-            "/repo-b/my-agent.md",
+            "/repo-b/agents/my-agent.md",
             versioned_agent_content("my-agent", "Agent from B", "2.0.0"),
         );
 
@@ -139,8 +139,8 @@ mod tests {
     #[test]
     fn each_source_artifact_returns_both_when_same_name_in_two_sources() {
         let fs = FakeFilesystem::new();
-        fs.add_file("/repo-a/my-agent.md", agent_content("my-agent", "Agent from A"));
-        fs.add_file("/repo-b/my-agent.md", agent_content("my-agent", "Agent from B"));
+        fs.add_file("/repo-a/agents/my-agent.md", agent_content("my-agent", "Agent from A"));
+        fs.add_file("/repo-b/agents/my-agent.md", agent_content("my-agent", "Agent from B"));
 
         let mut sources = BTreeMap::new();
         sources.insert("source-a".to_string(), make_local_entry("/repo-a", None));
