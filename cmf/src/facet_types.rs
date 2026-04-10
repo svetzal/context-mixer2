@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use cmx::scan::{extract_field, extract_version};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -49,44 +50,6 @@ pub fn parse_facet(path: &Path, content: &str) -> Option<Facet> {
         version,
         path: path.to_path_buf(),
     })
-}
-
-fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
-    let prefix = format!("{key}:");
-    frontmatter
-        .lines()
-        .find(|l| l.starts_with(&prefix))
-        .map(|l| l[prefix.len()..].trim().trim_matches('"').to_string())
-        .filter(|v| !v.is_empty())
-}
-
-fn extract_metadata_field(frontmatter: &str, key: &str) -> Option<String> {
-    let mut in_metadata = false;
-    for line in frontmatter.lines() {
-        if line.starts_with("metadata:") {
-            in_metadata = true;
-            continue;
-        }
-        if in_metadata {
-            let trimmed = line.trim_start();
-            // A non-indented, non-empty line means we've left the metadata block
-            if !line.starts_with(' ') && !line.starts_with('\t') && !trimmed.is_empty() {
-                return None;
-            }
-            let prefix = format!("{key}:");
-            if trimmed.starts_with(&prefix) {
-                let value = trimmed[prefix.len()..].trim().trim_matches('"').to_string();
-                if !value.is_empty() {
-                    return Some(value);
-                }
-            }
-        }
-    }
-    None
-}
-
-fn extract_version(frontmatter: &str) -> Option<String> {
-    extract_field(frontmatter, "version").or_else(|| extract_metadata_field(frontmatter, "version"))
 }
 
 #[cfg(test)]

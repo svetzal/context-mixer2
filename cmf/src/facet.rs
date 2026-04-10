@@ -7,7 +7,7 @@ use cmx::json_file::load_json;
 
 use crate::facet_types::{Facet, Recipe, parse_facet};
 use crate::repo::RepoRoot;
-use crate::validation::{IssueLevel, ValidationIssue};
+use crate::validation::ValidationIssue;
 
 /// Scan all facets in the `facets/` directory (excluding `recipes/` and `README.md`).
 ///
@@ -98,40 +98,24 @@ fn validate_individual_facets(facets: &[Facet], issues: &mut Vec<ValidationIssue
         let context = format!("{}/{}", facet.category, facet.name);
 
         if facet.name.is_empty() {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Error,
-                context: context.clone(),
-                message: "name field is empty".to_string(),
-            });
+            issues.push(ValidationIssue::error(context.clone(), "name field is empty"));
         }
 
         if facet.category.is_empty() {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Error,
-                context: context.clone(),
-                message: "category (facet) field is empty".to_string(),
-            });
+            issues.push(ValidationIssue::error(context.clone(), "category (facet) field is empty"));
         }
 
         if facet.scope.is_none() {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Warning,
-                context: context.clone(),
-                message: "scope field is empty".to_string(),
-            });
+            issues.push(ValidationIssue::warning(context.clone(), "scope field is empty"));
         }
 
         // Check that the facet name matches the filename (without .md)
         if let Some(stem) = facet.path.file_stem().and_then(|s| s.to_str()) {
             if stem != facet.name {
-                issues.push(ValidationIssue {
-                    level: IssueLevel::Warning,
-                    context: context.clone(),
-                    message: format!(
-                        "name \"{}\" does not match filename \"{}.md\"",
-                        facet.name, stem
-                    ),
-                });
+                issues.push(ValidationIssue::warning(
+                    context.clone(),
+                    format!("name \"{}\" does not match filename \"{}.md\"", facet.name, stem),
+                ));
             }
         }
 
@@ -140,14 +124,13 @@ fn validate_individual_facets(facets: &[Facet], issues: &mut Vec<ValidationIssue
             facet.path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str())
         {
             if parent != facet.category {
-                issues.push(ValidationIssue {
-                    level: IssueLevel::Warning,
+                issues.push(ValidationIssue::warning(
                     context,
-                    message: format!(
+                    format!(
                         "category \"{}\" does not match directory \"{}\"",
                         facet.category, parent
                     ),
-                });
+                ));
             }
         }
     }
@@ -158,14 +141,13 @@ fn check_duplicate_facet_names(facets: &[Facet], issues: &mut Vec<ValidationIssu
     for facet in facets {
         let names = seen.entry(&facet.category).or_default();
         if !names.insert(&facet.name) {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Warning,
-                context: format!("{}/{}", facet.category, facet.name),
-                message: format!(
+            issues.push(ValidationIssue::warning(
+                format!("{}/{}", facet.category, facet.name),
+                format!(
                     "duplicate facet name \"{}\" in category \"{}\"",
                     facet.name, facet.category
                 ),
-            });
+            ));
         }
     }
 }
@@ -179,30 +161,21 @@ fn validate_individual_recipes(
         let context = format!("recipe:{}", recipe.name);
 
         if recipe.name.is_empty() {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Error,
-                context: context.clone(),
-                message: "name field is empty".to_string(),
-            });
+            issues.push(ValidationIssue::error(context.clone(), "name field is empty"));
         }
 
         if recipe.produces.is_empty() {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Error,
-                context: context.clone(),
-                message: "produces field is empty".to_string(),
-            });
+            issues.push(ValidationIssue::error(context.clone(), "produces field is empty"));
         }
 
         let mut seen_refs = BTreeSet::new();
         for facet_ref in &recipe.facets {
             // Check for duplicates
             if !seen_refs.insert(facet_ref.as_str()) {
-                issues.push(ValidationIssue {
-                    level: IssueLevel::Warning,
-                    context: context.clone(),
-                    message: format!("duplicate facet reference \"{facet_ref}\""),
-                });
+                issues.push(ValidationIssue::warning(
+                    context.clone(),
+                    format!("duplicate facet reference \"{facet_ref}\""),
+                ));
                 continue;
             }
 
@@ -215,13 +188,10 @@ fn validate_individual_recipes(
             };
 
             if !resolved {
-                issues.push(ValidationIssue {
-                    level: IssueLevel::Error,
-                    context: context.clone(),
-                    message: format!(
-                        "facet reference \"{facet_ref}\" does not resolve to any known facet"
-                    ),
-                });
+                issues.push(ValidationIssue::error(
+                    context.clone(),
+                    format!("facet reference \"{facet_ref}\" does not resolve to any known facet"),
+                ));
             }
         }
     }
@@ -276,6 +246,7 @@ mod tests {
     use super::*;
     use crate::repo::RepoKind;
     use crate::test_support::{fake_facet_content, fake_recipe_json};
+    use crate::validation::IssueLevel;
     use cmx::gateway::fakes::FakeFilesystem;
     use std::path::PathBuf;
 

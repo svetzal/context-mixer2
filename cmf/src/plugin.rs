@@ -8,7 +8,7 @@ use cmx::types::ArtifactKind;
 
 use crate::plugin_types::{Author, Marketplace, PluginManifest};
 use crate::repo::{RepoKind, RepoRoot};
-use crate::validation::{IssueLevel, ValidationIssue};
+use crate::validation::ValidationIssue;
 
 #[derive(Debug)]
 pub struct PluginInfo {
@@ -126,31 +126,19 @@ pub fn validate_plugin(
 
     // Check 1: plugin.json exists
     if !fs.exists(&manifest_path) {
-        issues.push(ValidationIssue {
-            level: IssueLevel::Error,
-            context: dir_name.to_string(),
-            message: "plugin.json is missing".to_string(),
-        });
+        issues.push(ValidationIssue::error(dir_name, "plugin.json is missing"));
         return Ok(issues);
     }
 
     // Check 2: plugin.json reads and parses as valid JSON
     let Ok(content) = fs.read_to_string(&manifest_path) else {
-        issues.push(ValidationIssue {
-            level: IssueLevel::Error,
-            context: dir_name.to_string(),
-            message: "plugin.json could not be read".to_string(),
-        });
+        issues.push(ValidationIssue::error(dir_name, "plugin.json could not be read"));
         return Ok(issues);
     };
     let manifest: PluginManifest = match serde_json::from_str(&content) {
         Ok(m) => m,
         Err(e) => {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Error,
-                context: dir_name.to_string(),
-                message: format!("plugin.json is malformed: {e}"),
-            });
+            issues.push(ValidationIssue::error(dir_name, format!("plugin.json is malformed: {e}")));
             return Ok(issues);
         }
     };
@@ -184,22 +172,17 @@ fn validate_manifest_fields(
     issues: &mut Vec<ValidationIssue>,
 ) {
     if manifest.name.is_empty() {
-        issues.push(ValidationIssue {
-            level: IssueLevel::Error,
-            context: dir_name.to_string(),
-            message: "plugin.json has empty name field".to_string(),
-        });
+        issues.push(ValidationIssue::error(dir_name, "plugin.json has empty name field"));
     }
 
     if !manifest.name.is_empty() && manifest.name != dir_name {
-        issues.push(ValidationIssue {
-            level: IssueLevel::Warning,
-            context: dir_name.to_string(),
-            message: format!(
+        issues.push(ValidationIssue::warning(
+            dir_name,
+            format!(
                 "plugin.json name \"{}\" does not match directory \"{}\"",
                 manifest.name, dir_name
             ),
-        });
+        ));
     }
 }
 
@@ -226,11 +209,10 @@ fn validate_agents_dir(
         }
         let agent_name = entry.file_name.trim_end_matches(".md").to_string();
         if !discovered_agents.contains(&agent_name) {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Warning,
-                context: dir_name.to_string(),
-                message: format!("agents/{} has no frontmatter name field", entry.file_name),
-            });
+            issues.push(ValidationIssue::warning(
+                dir_name,
+                format!("agents/{} has no frontmatter name field", entry.file_name),
+            ));
         }
     }
 }
@@ -255,20 +237,15 @@ fn validate_skills_dir(
         }
         let skill_md = entry.path.join("SKILL.md");
         if !fs.exists(&skill_md) {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Warning,
-                context: dir_name.to_string(),
-                message: format!("skills/{} is missing SKILL.md", entry.file_name),
-            });
+            issues.push(ValidationIssue::warning(
+                dir_name,
+                format!("skills/{} is missing SKILL.md", entry.file_name),
+            ));
         } else if !discovered_skills.contains(&entry.file_name) {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Warning,
-                context: dir_name.to_string(),
-                message: format!(
-                    "skills/{}/SKILL.md has no frontmatter description field",
-                    entry.file_name
-                ),
-            });
+            issues.push(ValidationIssue::warning(
+                dir_name,
+                format!("skills/{}/SKILL.md has no frontmatter description field", entry.file_name),
+            ));
         }
     }
 }
@@ -286,11 +263,10 @@ pub fn validate_all_plugins(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
             .map_or_else(|| entry.name.clone(), |n| n.to_string_lossy().to_string());
 
         if !fs.exists(&plugin_path) {
-            all_issues.push(ValidationIssue {
-                level: IssueLevel::Error,
-                context: dir_name,
-                message: format!("source path \"{}\" does not exist", entry.source),
-            });
+            all_issues.push(ValidationIssue::error(
+                dir_name,
+                format!("source path \"{}\" does not exist", entry.source),
+            ));
             continue;
         }
 
@@ -311,6 +287,7 @@ fn resolve_source_path(root: &Path, source: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::validation::IssueLevel;
     use cmx::gateway::fakes::FakeFilesystem;
 
     use crate::test_support::{fake_marketplace_json_with_categories, fake_plugin_json};

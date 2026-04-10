@@ -13,6 +13,24 @@ pub struct ValidationIssue {
     pub message: String,
 }
 
+impl ValidationIssue {
+    pub fn error(context: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            level: IssueLevel::Error,
+            context: context.into(),
+            message: message.into(),
+        }
+    }
+
+    pub fn warning(context: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            level: IssueLevel::Warning,
+            context: context.into(),
+            message: message.into(),
+        }
+    }
+}
+
 /// Print formatted validation output grouped by level.
 ///
 /// Errors are printed first, then warnings. If no issues exist, prints

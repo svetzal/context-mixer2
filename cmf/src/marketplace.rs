@@ -4,7 +4,7 @@ use cmx::json_file::{load_json, save_json};
 
 use crate::plugin_types::{Marketplace, MarketplaceEntry, PluginManifest};
 use crate::repo::RepoRoot;
-use crate::validation::{IssueLevel, ValidationIssue};
+use crate::validation::ValidationIssue;
 
 /// Validate marketplace.json against the actual plugin directories.
 ///
@@ -17,31 +17,22 @@ pub fn validate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
 
     // Check 1: marketplace.json exists
     if !fs.exists(&marketplace_path) {
-        issues.push(ValidationIssue {
-            level: IssueLevel::Error,
-            context: "marketplace".to_string(),
-            message: "marketplace.json is missing".to_string(),
-        });
+        issues.push(ValidationIssue::error("marketplace", "marketplace.json is missing"));
         return Ok(issues);
     }
 
     // Check 2: parses as valid JSON
     let Ok(content) = fs.read_to_string(&marketplace_path) else {
-        issues.push(ValidationIssue {
-            level: IssueLevel::Error,
-            context: "marketplace".to_string(),
-            message: "marketplace.json could not be read".to_string(),
-        });
+        issues.push(ValidationIssue::error("marketplace", "marketplace.json could not be read"));
         return Ok(issues);
     };
     let marketplace: Marketplace = match serde_json::from_str(&content) {
         Ok(m) => m,
         Err(e) => {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Error,
-                context: "marketplace".to_string(),
-                message: format!("marketplace.json is malformed: {e}"),
-            });
+            issues.push(ValidationIssue::error(
+                "marketplace",
+                format!("marketplace.json is malformed: {e}"),
+            ));
             return Ok(issues);
         }
     };
@@ -51,27 +42,22 @@ pub fn validate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
         let plugin_path = resolve_source_path(&root.path, &entry.source);
 
         if !fs.exists(&plugin_path) || !fs.is_dir(&plugin_path) {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Error,
-                context: "marketplace".to_string(),
-                message: format!(
+            issues.push(ValidationIssue::error(
+                "marketplace",
+                format!(
                     "plugin \"{}\" source \"{}\" does not resolve to an existing directory",
                     entry.name, entry.source
                 ),
-            });
+            ));
             continue;
         }
 
         let plugin_json = plugin_path.join(".claude-plugin").join("plugin.json");
         if !fs.exists(&plugin_json) {
-            issues.push(ValidationIssue {
-                level: IssueLevel::Warning,
-                context: "marketplace".to_string(),
-                message: format!(
-                    "plugin \"{}\" directory has no .claude-plugin/plugin.json",
-                    entry.name
-                ),
-            });
+            issues.push(ValidationIssue::warning(
+                "marketplace",
+                format!("plugin \"{}\" directory has no .claude-plugin/plugin.json", entry.name),
+            ));
             continue;
         }
 
@@ -79,14 +65,13 @@ pub fn validate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
         if let Ok(pj_content) = fs.read_to_string(&plugin_json) {
             if let Ok(manifest) = serde_json::from_str::<PluginManifest>(&pj_content) {
                 if manifest.name != entry.name {
-                    issues.push(ValidationIssue {
-                        level: IssueLevel::Warning,
-                        context: "marketplace".to_string(),
-                        message: format!(
+                    issues.push(ValidationIssue::warning(
+                        "marketplace",
+                        format!(
                             "marketplace entry name \"{}\" does not match plugin.json name \"{}\"",
                             entry.name, manifest.name
                         ),
-                    });
+                    ));
                 }
             }
         }
@@ -108,14 +93,13 @@ pub fn validate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
                 }
                 let plugin_json = entry.path.join(".claude-plugin").join("plugin.json");
                 if fs.exists(&plugin_json) && !listed_sources.contains(&entry.path) {
-                    issues.push(ValidationIssue {
-                        level: IssueLevel::Warning,
-                        context: "marketplace".to_string(),
-                        message: format!(
+                    issues.push(ValidationIssue::warning(
+                        "marketplace",
+                        format!(
                             "unlisted plugin \"{}\" has plugin.json but is not in marketplace.json",
                             entry.file_name
                         ),
-                    });
+                    ));
                 }
             }
         }
@@ -205,6 +189,7 @@ mod tests {
     use crate::plugin_types::{MarketplaceMetadata, Owner};
     use crate::repo::RepoKind;
     use crate::test_support::{fake_marketplace_json, fake_plugin_json};
+    use crate::validation::IssueLevel;
     use cmx::gateway::fakes::FakeFilesystem;
     use std::path::PathBuf;
 

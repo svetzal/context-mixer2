@@ -293,7 +293,7 @@ fn parse_agent_frontmatter_str(content: &str) -> Option<Frontmatter> {
     })
 }
 
-fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
+pub fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
     let prefix = format!("{key}:");
     frontmatter
         .lines()
@@ -304,7 +304,7 @@ fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
 
 /// Extract a field nested under `metadata:` in YAML frontmatter.
 /// Matches indented lines (spaces or tabs) under the `metadata:` block.
-fn extract_metadata_field(frontmatter: &str, key: &str) -> Option<String> {
+pub fn extract_metadata_field(frontmatter: &str, key: &str) -> Option<String> {
     let mut in_metadata = false;
     for line in frontmatter.lines() {
         if line.starts_with("metadata:") {
@@ -330,7 +330,7 @@ fn extract_metadata_field(frontmatter: &str, key: &str) -> Option<String> {
 }
 
 /// Extract version from frontmatter, checking root-level first then metadata block.
-fn extract_version(frontmatter: &str) -> Option<String> {
+pub fn extract_version(frontmatter: &str) -> Option<String> {
     extract_field(frontmatter, "version").or_else(|| extract_metadata_field(frontmatter, "version"))
 }
 
