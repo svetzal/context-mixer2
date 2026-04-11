@@ -5,6 +5,14 @@ All notable changes to cmx and cmf will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.3] - 2026-04-11
+
+### Changed
+
+- Extracted `find_entry_with` helper in lockfile module for reusable lock entry lookup across scopes
+- Extracted `split_frontmatter_str` helper in scan module to DRY up frontmatter parsing
+- Refactored `update_with` in install module to use the new `find_entry_with` helper
+
 ## [2.5.2] - 2026-04-10
 
 ### Fixed
