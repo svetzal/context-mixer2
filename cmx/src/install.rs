@@ -200,17 +200,13 @@ pub fn update_with(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<InstallResult> {
-    for local in [false, true] {
-        let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
-        if let Some(entry) = lock.packages.get(name) {
-            let pinned = format!("{}:{}", entry.source.repo, name);
-            return install_with(&pinned, kind, local, force, ctx);
-        }
-    }
-
-    bail!(
-        "No installed {kind} named '{name}' found. Install it first with 'cmx {kind} install {name}'."
-    );
+    let Some((entry, local)) = lockfile::find_entry_with(name, ctx.fs, ctx.paths)? else {
+        bail!(
+            "No installed {kind} named '{name}' found. Install it first with 'cmx {kind} install {name}'."
+        );
+    };
+    let pinned = format!("{}:{}", entry.source.repo, name);
+    install_with(&pinned, kind, local, force, ctx)
 }
 
 pub fn install_all_with(

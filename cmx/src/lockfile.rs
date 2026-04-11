@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::gateway::filesystem::Filesystem;
 use crate::paths::ConfigPaths;
-use crate::types::LockFile;
+use crate::types::{LockEntry, LockFile};
 
 // ---------------------------------------------------------------------------
 // Testable variants (accept injected Filesystem + ConfigPaths)
@@ -34,6 +34,22 @@ pub fn save_with(
 ) -> Result<()> {
     let path = paths.lock_path(local);
     save_to_with(lock, &path, fs)
+}
+
+/// Search both scopes (global first, then local) for a lock entry by name.
+/// Returns the entry and the lock's `local` flag, or `None` if not found.
+pub fn find_entry_with(
+    name: &str,
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+) -> Result<Option<(LockEntry, bool)>> {
+    for local in [false, true] {
+        let lock = load_with(local, fs, paths)?;
+        if let Some(entry) = lock.packages.get(name) {
+            return Ok(Some((entry.clone(), local)));
+        }
+    }
+    Ok(None)
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +99,55 @@ mod tests {
         let path = PathBuf::from("/config/context-mixer/cmx-lock.json");
         save_to_with(&sample_lock_file(), &path, &fs).unwrap();
         assert!(fs.file_exists(&path));
+    }
+
+    // --- find_entry_with ---
+
+    #[test]
+    fn find_entry_returns_none_when_absent_in_both_scopes() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let result = find_entry_with("missing", &fs, &paths).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn find_entry_finds_entry_in_global_scope() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let lock = sample_lock_file();
+        save_with(&lock, false, &fs, &paths).unwrap();
+
+        let result = find_entry_with("my-agent", &fs, &paths).unwrap();
+        assert!(result.is_some());
+        let (_, local) = result.unwrap();
+        assert!(!local, "expected global scope (local=false)");
+    }
+
+    #[test]
+    fn find_entry_finds_entry_in_local_scope() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let lock = sample_lock_file();
+        save_with(&lock, true, &fs, &paths).unwrap();
+
+        let result = find_entry_with("my-agent", &fs, &paths).unwrap();
+        assert!(result.is_some());
+        let (_, local) = result.unwrap();
+        assert!(local, "expected local scope (local=true)");
+    }
+
+    #[test]
+    fn find_entry_prefers_global_when_present_in_both_scopes() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let lock = sample_lock_file();
+        save_with(&lock, false, &fs, &paths).unwrap();
+        save_with(&lock, true, &fs, &paths).unwrap();
+
+        let result = find_entry_with("my-agent", &fs, &paths).unwrap();
+        let (_, local) = result.unwrap();
+        assert!(!local, "expected global to be preferred over local");
     }
 
     // --- round-trip via load_with / save_with ---

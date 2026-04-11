@@ -258,13 +258,16 @@ fn parse_deprecation(fm_text: &str) -> Option<Deprecation> {
     })
 }
 
-fn parse_frontmatter_str(content: &str) -> Option<Frontmatter> {
-    if !content.starts_with("---") {
-        return None;
-    }
-    let rest = &content[3..];
+/// Split YAML frontmatter from content. Returns the text between `---` delimiters,
+/// or `None` if delimiters are missing.
+fn split_frontmatter_str(content: &str) -> Option<&str> {
+    let rest = content.strip_prefix("---")?;
     let end = rest.find("---")?;
-    let fm_text = &rest[..end];
+    Some(&rest[..end])
+}
+
+fn parse_frontmatter_str(content: &str) -> Option<Frontmatter> {
+    let fm_text = split_frontmatter_str(content)?;
     Some(Frontmatter {
         description: extract_field(fm_text, "description").unwrap_or_default(),
         version: extract_version(fm_text),
@@ -273,19 +276,12 @@ fn parse_frontmatter_str(content: &str) -> Option<Frontmatter> {
 }
 
 fn parse_agent_frontmatter_str(content: &str) -> Option<Frontmatter> {
-    if !content.starts_with("---") {
-        return None;
-    }
-    let rest = &content[3..];
-    let end = rest.find("---")?;
-    let fm_text = &rest[..end];
-
+    let fm_text = split_frontmatter_str(content)?;
     let has_name = fm_text.lines().any(|l| l.starts_with("name:"));
     let has_desc = fm_text.lines().any(|l| l.starts_with("description:"));
     if !has_name || !has_desc {
         return None;
     }
-
     Some(Frontmatter {
         description: extract_field(fm_text, "description").unwrap_or_default(),
         version: extract_version(fm_text),
@@ -337,12 +333,7 @@ pub fn extract_version(frontmatter: &str) -> Option<String> {
 /// Extract the version from an installed artifact's file content.
 /// For agents, pass the .md file content. For skills, pass the SKILL.md content.
 pub fn extract_version_from_content(content: &str) -> Option<String> {
-    if !content.starts_with("---") {
-        return None;
-    }
-    let rest = &content[3..];
-    let end = rest.find("---")?;
-    let fm_text = &rest[..end];
+    let fm_text = split_frontmatter_str(content)?;
     extract_version(fm_text)
 }
 
@@ -499,6 +490,34 @@ mod tests {
     fn parse_deprecation_absent_returns_none() {
         let text = "name: my-agent\ndescription: A thing";
         assert!(parse_deprecation(text).is_none());
+    }
+
+    // --- split_frontmatter_str ---
+
+    #[test]
+    fn split_frontmatter_str_valid_content() {
+        let content = "---\nkey: value\n---\n# body";
+        let fm = split_frontmatter_str(content);
+        assert_eq!(fm, Some("\nkey: value\n"));
+    }
+
+    #[test]
+    fn split_frontmatter_str_no_opening_delimiter_returns_none() {
+        let content = "key: value\n---\n# body";
+        assert!(split_frontmatter_str(content).is_none());
+    }
+
+    #[test]
+    fn split_frontmatter_str_no_closing_delimiter_returns_none() {
+        let content = "---\nkey: value\n# body";
+        assert!(split_frontmatter_str(content).is_none());
+    }
+
+    #[test]
+    fn split_frontmatter_str_empty_frontmatter_block() {
+        let content = "------\n# body";
+        let fm = split_frontmatter_str(content);
+        assert_eq!(fm, Some(""));
     }
 
     // --- parse_frontmatter_str ---
