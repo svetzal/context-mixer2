@@ -32,6 +32,26 @@ cargo tarpaulin      # code coverage (target >80%)
 - Never use `#[allow(clippy::lint_name)]` without documenting why
 - The `llm` feature gates tokio and mojentic; default builds are lean with no RUSTSEC advisories
 
+## Release Process
+
+To create a new release:
+
+1. **Pre-flight** — all quality gates pass (see above)
+2. **Update CHANGELOG.md** — move `[Unreleased]` entries to `[X.Y.Z]` with today's date
+3. **Bump version** in `Cargo.toml` workspace (`[workspace.package] version`)
+4. **Commit**: `Release vX.Y.Z`
+5. **Tag**: `git tag vX.Y.Z`
+6. **Push**: `git push origin main --tags`
+7. **CI** (`.github/workflows/release.yml`) triggers on the `v*` tag:
+   - Runs full quality gate (fmt, clippy, test, deny — default and all-features)
+   - Builds cross-platform binaries (macOS ARM64, macOS x64, Linux x64) with `--features llm`
+   - Creates GitHub Release with archives containing both `cmx` and `cmf`
+   - Updates Homebrew tap (`svetzal/tap`) with new formula and checksums
+8. **Local install** (immediately, don't wait for Homebrew):
+   ```bash
+   cargo install --path cmx && cargo install --path cmf
+   ```
+
 ## Reference repositories
 
 - **guidelines**: `~/Work/Projects/Personal/guidelines` — the reference source repository used for local testing of cmx features (artifact scanning, install, versioning, upgrades).
