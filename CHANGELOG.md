@@ -5,6 +5,13 @@ All notable changes to cmx and cmf will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.2] - 2026-04-10
+
+### Fixed
+
+- `cmx list` now only shows the installed version on the row matching the source from which the artifact was actually installed, leaving the column blank for other sources offering the same artifact
+- Disambiguated "not installed from this source" (blank) from "installed but unversioned" (`-`) in the Installed column
+
 ## [2.5.1] - 2026-04-09
 
 ### Fixed

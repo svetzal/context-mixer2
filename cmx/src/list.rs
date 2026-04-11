@@ -34,9 +34,9 @@ fn status_indicator(installed: &str, available: &str, deprecated: bool) -> &'sta
         return "⛔";
     }
     match (installed, available) {
-        ("-", "-") => " ",        // no source, unmanaged
+        // not installed from this source / unmanaged / no source version
+        ("", _) | ("-" | _, "-") => " ",
         ("-", _) => "⚠️",         // installed but no version tracked
-        (_, "-") => " ",          // no source version to compare
         (i, a) if i == a => "✅", // up to date
         _ => "⚠️",                // behind
     }
@@ -99,16 +99,26 @@ fn build_rows_with(
             .unwrap_or_else(|| "-".to_string());
 
         if let Some(infos) = source_infos {
-            // Emit one row per source that provides this artifact
+            // Emit one row per source that provides this artifact.
+            // Only show the installed version on the row matching the
+            // source from which the artifact was actually installed.
             for info in infos {
+                // No lock entry → show installed on all rows
+                let is_install_source =
+                    lock_entry.is_none_or(|e| e.source.repo == info.source_name);
+                let row_installed = if is_install_source {
+                    installed.clone()
+                } else {
+                    String::new()
+                };
                 let source = {
                     let path = lock_entry.map_or("", |e| e.source.path.as_str());
                     format_source(&info.source_name, path)
                 };
-                let status = status_indicator(&installed, &info.version, info.deprecated);
+                let status = status_indicator(&row_installed, &info.version, info.deprecated);
                 rows.push(Row {
                     name: name.clone(),
-                    installed: installed.clone(),
+                    installed: row_installed,
                     source,
                     available: info.version.clone(),
                     status,
@@ -562,12 +572,13 @@ mod tests {
             "should have a marketplace row"
         );
 
-        // Both rows should share the same installed version
-        assert!(rows.iter().all(|r| r.installed == "1.0.0"));
-
-        // Each row shows the available version from its own source
+        // Only the row from the install source shows the installed version
         let guidelines_row = rows.iter().find(|r| r.source.contains("guidelines")).unwrap();
         let marketplace_row = rows.iter().find(|r| r.source.contains("marketplace")).unwrap();
+        assert_eq!(guidelines_row.installed, "1.0.0");
+        assert_eq!(marketplace_row.installed, "", "non-install source should be blank");
+
+        // Each row shows the available version from its own source
         assert_eq!(guidelines_row.available, "2.0.0");
         assert_eq!(marketplace_row.available, "3.0.0");
     }
@@ -620,6 +631,11 @@ mod tests {
 
         let guidelines_row = rows.iter().find(|r| r.source.contains("guidelines")).unwrap();
         let marketplace_row = rows.iter().find(|r| r.source.contains("marketplace")).unwrap();
+
+        // Only the install source row shows the installed version
+        assert_eq!(guidelines_row.installed, "1.0.0");
+        assert_eq!(marketplace_row.installed, "", "non-install source should be blank");
+
         assert_eq!(guidelines_row.available, "1.0.0");
         assert_eq!(marketplace_row.available, "2.0.0");
     }
