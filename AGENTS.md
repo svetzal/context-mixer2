@@ -32,6 +32,10 @@ cargo tarpaulin      # code coverage (target >80%)
 - Never use `#[allow(clippy::lint_name)]` without documenting why
 - The `llm` feature gates tokio and mojentic; default builds are lean with no RUSTSEC advisories
 
+## Branching Workflow
+
+Trunk-based development: `main` is the only long-lived branch. All work lands on `main` via direct commit. Feature branches are not pushed to `origin`. Pull requests are not used. Short-lived local working branches (e.g. hopper worktrees) are merged to `main` and deleted locally before work is considered complete.
+
 ## Reference repositories
 
 - **guidelines**: `~/Work/Projects/Personal/guidelines` — the reference source repository used for local testing of cmx features (artifact scanning, install, versioning, upgrades).
