@@ -97,20 +97,17 @@ pub(crate) fn gather_info_with(
 
     // Check source for deprecation and available version
     source::auto_update_all_with(ctx).ok();
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
     let mut deprecation: Option<Deprecation> = None;
     let mut available_version: Option<String> = None;
 
-    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
-        if sa.artifact.name == name && sa.artifact.kind == kind {
-            if sa.artifact.deprecation.is_some() {
-                deprecation = sa.artifact.deprecation;
-            }
-            if let Some(v) = sa.artifact.version.as_deref() {
-                let installed_v = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-");
-                if v != installed_v {
-                    available_version = Some(v.to_string());
-                }
+    for sa in source_iter::find_by_name_and_kind(name, kind, ctx)? {
+        if sa.artifact.deprecation.is_some() {
+            deprecation = sa.artifact.deprecation;
+        }
+        if let Some(v) = sa.artifact.version.as_deref() {
+            let installed_v = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-");
+            if v != installed_v {
+                available_version = Some(v.to_string());
             }
         }
     }

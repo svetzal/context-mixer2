@@ -36,10 +36,10 @@ pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
 
     let mut rows = Vec::new();
 
-    for local in [false, true] {
-        let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
+    let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
+    for (local, lock) in [(false, &global_lock), (true, &local_lock)] {
         for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-            collect_outdated_for_scope_with(kind, local, &lock, &source_artifacts, &mut rows, ctx)?;
+            collect_outdated_for_scope_with(kind, local, lock, &source_artifacts, &mut rows, ctx)?;
         }
     }
 

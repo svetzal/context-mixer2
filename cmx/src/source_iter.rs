@@ -5,9 +5,10 @@ use anyhow::Result;
 
 use crate::checksum;
 use crate::config;
+use crate::context::AppContext;
 use crate::gateway::filesystem::Filesystem;
 use crate::scan;
-use crate::types::{Artifact, SourceEntry};
+use crate::types::{Artifact, ArtifactKind, SourceEntry};
 
 /// Checksum and metadata for a source artifact, used for update/outdated comparisons.
 pub struct SourceArtifactInfo {
@@ -72,6 +73,26 @@ pub fn each_source_artifact_with(
     }
 
     results
+}
+
+/// Load all source artifacts across every registered source via the given `AppContext`.
+///
+/// Convenience wrapper around `config::load_sources_with` + `each_source_artifact_with`.
+pub fn all_artifacts(ctx: &AppContext<'_>) -> Result<Vec<SourceArtifact>> {
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+    Ok(each_source_artifact_with(&sources.sources, ctx.fs))
+}
+
+/// Return all source artifacts matching the given name and kind across all registered sources.
+pub fn find_by_name_and_kind(
+    name: &str,
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<SourceArtifact>> {
+    Ok(all_artifacts(ctx)?
+        .into_iter()
+        .filter(|sa| sa.artifact.name == name && sa.artifact.kind == kind)
+        .collect())
 }
 
 #[cfg(test)]

@@ -1,6 +1,5 @@
 use anyhow::Result;
 
-use crate::config;
 use crate::context::AppContext;
 use crate::source;
 use crate::source_iter;
@@ -31,10 +30,9 @@ pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
     source::auto_update_all_with(ctx)?;
 
     let query_lower = query.to_lowercase();
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
     let mut results = Vec::new();
 
-    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
+    for sa in source_iter::all_artifacts(ctx)? {
         let name_lower = sa.artifact.name.to_lowercase();
         let desc_lower = sa.artifact.description.to_lowercase();
 

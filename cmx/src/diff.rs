@@ -147,14 +147,9 @@ fn find_in_sources_with(
     kind: ArtifactKind,
     ctx: &AppContext<'_>,
 ) -> Result<(PathBuf, String, Option<String>)> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-
-    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
-        if sa.artifact.name == name && sa.artifact.kind == kind {
-            return Ok((sa.artifact.path, sa.source_name, sa.artifact.version));
-        }
+    if let Some(sa) = source_iter::find_by_name_and_kind(name, kind, ctx)?.into_iter().next() {
+        return Ok((sa.artifact.path, sa.source_name, sa.artifact.version));
     }
-
     bail!("No {kind} named '{name}' found in any registered source.");
 }
 

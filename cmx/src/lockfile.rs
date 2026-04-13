@@ -36,6 +36,15 @@ pub fn save_with(
     save_to_with(lock, &path, fs)
 }
 
+/// Load both the global and local lock files in one call.
+///
+/// Returns `(global_lock, local_lock)`.
+pub fn load_both_with(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<(LockFile, LockFile)> {
+    let global = load_with(false, fs, paths)?;
+    let local = load_with(true, fs, paths)?;
+    Ok((global, local))
+}
+
 /// Search both scopes (global first, then local) for a lock entry by name.
 /// Returns the entry and the lock's `local` flag, or `None` if not found.
 pub fn find_entry_with(

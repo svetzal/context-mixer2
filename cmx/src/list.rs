@@ -44,8 +44,7 @@ fn status_indicator(installed: &str, available: &str, deprecated: bool) -> &'sta
 
 pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKindOutput> {
     let source_versions = build_source_versions_with(kind, ctx)?;
-    let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;
-    let local_lock = lockfile::load_with(true, ctx.fs, ctx.paths)?;
+    let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
     let global_rows = build_rows_with(kind, false, &global_lock, &source_versions, ctx)?;
     let local_rows = build_rows_with(kind, true, &local_lock, &source_versions, ctx)?;
     Ok(ListKindOutput {
@@ -58,8 +57,7 @@ pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKi
 pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
     let agent_versions = build_source_versions_with(ArtifactKind::Agent, ctx)?;
     let skill_versions = build_source_versions_with(ArtifactKind::Skill, ctx)?;
-    let global_lock = lockfile::load_with(false, ctx.fs, ctx.paths)?;
-    let local_lock = lockfile::load_with(true, ctx.fs, ctx.paths)?;
+    let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
 
     let global_agents =
         build_rows_with(ArtifactKind::Agent, false, &global_lock, &agent_versions, ctx)?;
@@ -165,9 +163,8 @@ fn build_source_versions_with(
     ctx: &AppContext<'_>,
 ) -> Result<BTreeMap<String, Vec<SourceInfo>>> {
     let mut versions: BTreeMap<String, Vec<SourceInfo>> = BTreeMap::new();
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
-    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
+    for sa in source_iter::all_artifacts(ctx)? {
         if sa.artifact.kind == kind {
             let version = sa.artifact.version.as_deref().unwrap_or("-").to_string();
             let deprecated = sa.artifact.is_deprecated();

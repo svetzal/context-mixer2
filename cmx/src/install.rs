@@ -217,11 +217,10 @@ pub fn install_all_with(
 ) -> Result<InstallAllResult> {
     source::auto_update_all_with(ctx)?;
 
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
     let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
     let mut installed = Vec::new();
 
-    for sa in source_iter::each_source_artifact_with(&sources.sources, ctx.fs) {
+    for sa in source_iter::all_artifacts(ctx)? {
         if sa.artifact.kind != kind {
             continue;
         }
@@ -254,8 +253,8 @@ pub fn update_all_with(
     let all_source_info = source_iter::scan_all_with_checksums(&sources.sources, ctx.fs)?;
     let mut updated = Vec::new();
 
-    for local in [false, true] {
-        let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
+    let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
+    for (local, lock) in [(false, &global_lock), (true, &local_lock)] {
         for (name, entry) in &lock.packages {
             if entry.artifact_type != kind {
                 continue;
