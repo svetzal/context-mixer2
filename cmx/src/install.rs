@@ -696,4 +696,53 @@ mod tests {
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("No sources registered"), "unexpected: {msg}");
     }
+
+    // --- failure-path tests ---
+
+    #[test]
+    fn install_agent_does_not_update_lock_when_copy_fails() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        fs.set_fail_on_copy(true);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
+        assert!(result.is_err(), "expected Err when copy fails");
+
+        // Lock file should have no entry for the agent
+        let lock = lockfile::load_with(false, &fs, &paths).unwrap();
+        assert!(
+            !lock.packages.contains_key("my-agent"),
+            "lock should not be updated after failed copy"
+        );
+    }
+
+    #[test]
+    fn install_agent_lock_save_failure_leaves_artifact_on_disk() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        // Cause the lock file write to fail
+        fs.set_fail_on_write(paths.lock_path(false));
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
+        assert!(result.is_err(), "expected Err when lock save fails");
+
+        // Despite the lock save failure, the agent file was already copied to disk
+        // (documents the current no-rollback behavior)
+        let expected_dest = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        assert!(
+            fs.file_exists(&expected_dest),
+            "agent file should still exist on disk even after lock save failure"
+        );
+    }
 }

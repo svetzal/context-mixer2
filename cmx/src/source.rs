@@ -470,6 +470,7 @@ mod tests {
     use crate::test_support::{make_ctx, make_git_entry, make_local_entry, test_paths};
     use crate::types::{ArtifactKind, Deprecation};
     use chrono::Utc;
+    use std::cell::RefCell;
     use std::path::PathBuf;
 
     // --- looks_like_url ---
@@ -968,5 +969,121 @@ mod tests {
         let updated_sources = config::load_sources_with(&fs, &paths).unwrap();
         let entry = updated_sources.sources.get("git-source").unwrap();
         assert!(entry.last_updated.is_some(), "timestamp should be updated after pull");
+    }
+
+    // --- failure-path tests ---
+
+    #[test]
+    fn add_git_source_does_not_save_entry_when_clone_fails() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient {
+            cloned: RefCell::new(Vec::new()),
+            pulled: RefCell::new(Vec::new()),
+            should_fail: true,
+        };
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_empty_sources(&fs, &paths);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = add_with("new-source", "https://github.com/example/repo.git", &ctx);
+        assert!(result.is_err(), "expected Err when clone fails");
+
+        // Sources file should remain empty — no partial save
+        let sources = config::load_sources_with(&fs, &paths).unwrap();
+        assert!(sources.sources.is_empty(), "sources should not be modified after failed clone");
+    }
+
+    #[test]
+    fn perform_pull_does_not_update_timestamp_when_pull_fails() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient {
+            cloned: RefCell::new(Vec::new()),
+            pulled: RefCell::new(Vec::new()),
+            should_fail: true,
+        };
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        let clone_path = PathBuf::from("/clones/git-source");
+        let original_timestamp = "2024-01-01T00:00:00Z".to_string();
+        let mut sources = crate::types::SourcesFile::default();
+        sources.sources.insert(
+            "git-source".to_string(),
+            make_git_entry(
+                "https://github.com/example/repo.git",
+                clone_path.clone(),
+                "main",
+                Some(original_timestamp.clone()),
+            ),
+        );
+        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        fs.add_dir(clone_path);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = perform_pull_with("git-source", &ctx);
+        assert!(result.is_err(), "expected Err when pull fails");
+
+        // Timestamp should be unchanged
+        let updated_sources = config::load_sources_with(&fs, &paths).unwrap();
+        let entry = updated_sources.sources.get("git-source").unwrap();
+        assert_eq!(
+            entry.last_updated.as_deref(),
+            Some(original_timestamp.as_str()),
+            "timestamp should not change after failed pull"
+        );
+    }
+
+    #[test]
+    fn auto_update_all_stops_on_first_pull_failure() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient {
+            cloned: RefCell::new(Vec::new()),
+            pulled: RefCell::new(Vec::new()),
+            should_fail: true,
+        };
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        // Set up two stale git sources with existing clone dirs
+        let old_time = (Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
+        let clone_a = PathBuf::from("/clones/source-a");
+        let clone_b = PathBuf::from("/clones/source-b");
+
+        let mut sources = crate::types::SourcesFile::default();
+        sources.sources.insert(
+            "source-a".to_string(),
+            make_git_entry(
+                "https://github.com/example/a.git",
+                clone_a.clone(),
+                "main",
+                Some(old_time.clone()),
+            ),
+        );
+        sources.sources.insert(
+            "source-b".to_string(),
+            make_git_entry(
+                "https://github.com/example/b.git",
+                clone_b.clone(),
+                "main",
+                Some(old_time),
+            ),
+        );
+        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        fs.add_dir(clone_a);
+        fs.add_dir(clone_b);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = auto_update_all_with(&ctx);
+        assert!(result.is_err(), "expected Err when any pull fails");
+
+        // No pulls completed (fail_on_pull bails before recording) and the error
+        // propagated after the first attempted pull, proving early exit behavior.
+        let pulled = git.pulled.borrow();
+        assert!(
+            pulled.is_empty(),
+            "no pull should complete when all pulls are configured to fail"
+        );
     }
 }

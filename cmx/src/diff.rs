@@ -629,4 +629,43 @@ mod tests {
         assert!(output.diff_text.is_some(), "expected diff_text to be present");
         assert_eq!(output.installed_version.as_deref(), Some("1.0.0"));
     }
+
+    // --- failure-path tests ---
+
+    #[tokio::test]
+    async fn diff_returns_error_when_llm_call_fails() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+        let llm = FakeLlmClient {
+            response: String::new(),
+            should_fail: true,
+        };
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        // Install a different version so checksums differ and LLM is invoked
+        install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
+
+        save_lock_with_entry(
+            &fs,
+            &paths,
+            "my-agent",
+            make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
+            false,
+        );
+
+        let ctx = AppContext {
+            fs: &fs,
+            git: &git,
+            clock: &clock,
+            paths: &paths,
+            llm: Some(&llm),
+        };
+        let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
+
+        assert!(result.is_err(), "expected Err when LLM call fails");
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("configured to fail"), "unexpected error message: {msg}");
+    }
 }

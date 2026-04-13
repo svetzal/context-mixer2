@@ -25,6 +25,8 @@ use super::llm::LlmClient;
 pub struct FakeFilesystem {
     files: RefCell<BTreeMap<PathBuf, Vec<u8>>>,
     dirs: RefCell<BTreeSet<PathBuf>>,
+    fail_on_write: RefCell<Option<PathBuf>>,
+    fail_on_copy: RefCell<bool>,
 }
 
 impl FakeFilesystem {
@@ -32,7 +34,19 @@ impl FakeFilesystem {
         Self {
             files: RefCell::new(BTreeMap::new()),
             dirs: RefCell::new(BTreeSet::new()),
+            fail_on_write: RefCell::new(None),
+            fail_on_copy: RefCell::new(false),
         }
+    }
+
+    /// Cause the next `write()` to the given path to return an error.
+    pub fn set_fail_on_write(&self, path: impl Into<PathBuf>) {
+        *self.fail_on_write.borrow_mut() = Some(path.into());
+    }
+
+    /// Cause all `copy_file()` calls to return an error.
+    pub fn set_fail_on_copy(&self, fail: bool) {
+        *self.fail_on_copy.borrow_mut() = fail;
     }
 
     /// Insert a file with the given content, automatically registering all
@@ -100,6 +114,9 @@ impl Filesystem for FakeFilesystem {
     }
 
     fn write(&self, path: &Path, contents: &str) -> Result<()> {
+        if self.fail_on_write.borrow().as_deref() == Some(path) {
+            bail!("FakeFilesystem: write configured to fail for {}", path.display());
+        }
         self.add_file(path.to_path_buf(), contents.as_bytes().to_vec());
         Ok(())
     }
@@ -121,6 +138,13 @@ impl Filesystem for FakeFilesystem {
     }
 
     fn copy_file(&self, src: &Path, dest: &Path) -> Result<()> {
+        if *self.fail_on_copy.borrow() {
+            bail!(
+                "FakeFilesystem: copy_file configured to fail ({} -> {})",
+                src.display(),
+                dest.display()
+            );
+        }
         let bytes = self
             .files
             .borrow()
@@ -265,15 +289,17 @@ impl Clock for FakeClock {
 // FakeLlmClient
 // ---------------------------------------------------------------------------
 
-/// Returns a canned response string.
+/// Returns a canned response string, or fails if `should_fail` is set.
 pub struct FakeLlmClient {
     pub response: String,
+    pub should_fail: bool,
 }
 
 impl FakeLlmClient {
     pub fn new(response: impl Into<String>) -> Self {
         Self {
             response: response.into(),
+            should_fail: false,
         }
     }
 }
@@ -284,8 +310,14 @@ impl LlmClient for FakeLlmClient {
         _system_prompt: &str,
         _user_prompt: &str,
     ) -> Pin<Box<dyn Future<Output = Result<String>> + Send + '_>> {
+        let should_fail = self.should_fail;
         let response = self.response.clone();
-        Box::pin(async move { Ok(response) })
+        Box::pin(async move {
+            if should_fail {
+                bail!("FakeLlmClient: analyze configured to fail");
+            }
+            Ok(response)
+        })
     }
 }
 
@@ -395,5 +427,47 @@ mod tests {
         let client = FakeLlmClient::new("This is the analysis.");
         let result = client.analyze("system", "user").await.unwrap();
         assert_eq!(result, "This is the analysis.");
+    }
+
+    #[test]
+    fn fake_filesystem_write_fails_on_configured_path() {
+        let fs = FakeFilesystem::new();
+        let fail_path = PathBuf::from("/config/restricted.json");
+        let other_path = PathBuf::from("/config/allowed.json");
+
+        fs.set_fail_on_write(fail_path.clone());
+
+        // Write to the configured fail path returns Err
+        assert!(fs.write(&fail_path, "data").is_err());
+
+        // Write to a different path still succeeds
+        assert!(fs.write(&other_path, "data").is_ok());
+        assert_eq!(fs.read_to_string(&other_path).unwrap(), "data");
+    }
+
+    #[test]
+    fn fake_filesystem_copy_fails_when_configured() {
+        let fs = FakeFilesystem::new();
+        let src = PathBuf::from("/src/file.txt");
+        let dest = PathBuf::from("/dest/file.txt");
+        fs.add_file(src.clone(), "content");
+
+        fs.set_fail_on_copy(true);
+
+        assert!(fs.copy_file(&src, &dest).is_err());
+        // Verify nothing was copied
+        assert!(!fs.file_exists(&dest));
+    }
+
+    #[tokio::test]
+    async fn fake_llm_client_fails_when_configured() {
+        let client = FakeLlmClient {
+            response: "unreachable".to_string(),
+            should_fail: true,
+        };
+        let result = client.analyze("system", "user").await;
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("configured to fail"), "unexpected: {msg}");
     }
 }

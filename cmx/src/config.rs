@@ -295,4 +295,23 @@ mod tests {
         let (_, local) = result.unwrap();
         assert!(!local, "expected global scope (local=false)");
     }
+
+    // --- failure-path tests ---
+
+    #[test]
+    fn save_sources_returns_error_when_filesystem_write_fails() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let sources_path = paths.sources_path();
+
+        // Cause the write to the sources file to fail
+        fs.set_fail_on_write(sources_path);
+
+        let sources = SourcesFile::default();
+        let result = save_sources_with(&sources, &fs, &paths);
+        assert!(result.is_err(), "expected Err when sources file write fails");
+
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("Failed to write"), "expected 'Failed to write' in error: {msg}");
+    }
 }

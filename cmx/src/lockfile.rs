@@ -173,4 +173,23 @@ mod tests {
         assert_eq!(entry.version.as_deref(), Some("1.0.0"));
         assert_eq!(entry.source_checksum, "sha256:abc123");
     }
+
+    // --- failure-path tests ---
+
+    #[test]
+    fn save_lock_returns_error_with_context_when_write_fails() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let lock_path = paths.lock_path(false);
+
+        // Cause the write to the lock file path to fail
+        fs.set_fail_on_write(lock_path);
+
+        let lock = sample_lock_file();
+        let result = save_with(&lock, false, &fs, &paths);
+        assert!(result.is_err(), "expected Err when lock file write fails");
+
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("Failed to write"), "expected 'Failed to write' in error: {msg}");
+    }
 }
