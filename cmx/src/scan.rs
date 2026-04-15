@@ -267,20 +267,19 @@ fn split_frontmatter_str(content: &str) -> Option<&str> {
 }
 
 fn parse_frontmatter_str(content: &str) -> Option<Frontmatter> {
-    let fm_text = split_frontmatter_str(content)?;
-    Some(Frontmatter {
-        description: extract_field(fm_text, "description").unwrap_or_default(),
-        version: extract_version(fm_text),
-        deprecation: parse_deprecation(fm_text),
-    })
+    parse_frontmatter_impl(content, &[])
 }
 
 fn parse_agent_frontmatter_str(content: &str) -> Option<Frontmatter> {
+    parse_frontmatter_impl(content, &["name", "description"])
+}
+
+fn parse_frontmatter_impl(content: &str, required_fields: &[&str]) -> Option<Frontmatter> {
     let fm_text = split_frontmatter_str(content)?;
-    let has_name = fm_text.lines().any(|l| l.starts_with("name:"));
-    let has_desc = fm_text.lines().any(|l| l.starts_with("description:"));
-    if !has_name || !has_desc {
-        return None;
+    for field in required_fields {
+        if !fm_text.lines().any(|l| l.starts_with(&format!("{field}:"))) {
+            return None;
+        }
     }
     Some(Frontmatter {
         description: extract_field(fm_text, "description").unwrap_or_default(),

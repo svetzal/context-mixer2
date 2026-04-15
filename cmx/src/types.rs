@@ -199,6 +199,12 @@ impl Artifact {
     }
 }
 
+/// Return `path` relative to `base` as a `String`, falling back to the full path if
+/// `path` does not start with `base`.
+pub fn relative_path_string(path: &Path, base: &Path) -> String {
+    path.strip_prefix(base).unwrap_or(path).to_string_lossy().to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

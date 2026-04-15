@@ -2,13 +2,12 @@ use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 
 use crate::checksum;
-use crate::config;
 use crate::context::AppContext;
 use crate::gateway::filesystem::Filesystem;
 use crate::lockfile;
 use crate::source;
 use crate::source_iter;
-use crate::types::{ArtifactKind, LockEntry, LockSource};
+use crate::types::{self, ArtifactKind, LockEntry, LockSource};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -38,52 +37,6 @@ pub struct UpdateAllResult {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-/// Tuple returned by artifact lookup: source name, path, source root, and version.
-type FoundArtifact = (String, std::path::PathBuf, std::path::PathBuf, Option<String>);
-
-/// Locate a uniquely named artifact across sources.
-fn find_artifact(
-    artifact_name: &str,
-    source_name: Option<&str>,
-    kind: ArtifactKind,
-    ctx: &AppContext<'_>,
-) -> Result<FoundArtifact> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-
-    if sources.sources.is_empty() {
-        bail!("No sources registered. Add one with: cmx source add <name> <path-or-url>");
-    }
-
-    let search_sources: std::collections::BTreeMap<_, _> = if let Some(src) = source_name {
-        let entry =
-            sources.sources.get(src).with_context(|| format!("Source '{src}' not found."))?;
-        std::iter::once((src.to_string(), entry.clone())).collect()
-    } else {
-        sources.sources.clone()
-    };
-
-    let mut found: Vec<FoundArtifact> = Vec::new();
-    for sa in source_iter::each_source_artifact_with(&search_sources, ctx.fs) {
-        if sa.artifact.name == artifact_name && sa.artifact.kind == kind {
-            found.push((sa.source_name, sa.artifact.path, sa.source_root, sa.artifact.version));
-        }
-    }
-
-    if found.is_empty() {
-        bail!("No {kind} named '{artifact_name}' found in registered sources.");
-    }
-
-    if found.len() > 1 {
-        let source_names: Vec<_> = found.iter().map(|(s, _, _, _)| s.as_str()).collect();
-        bail!(
-            "'{artifact_name}' found in multiple sources: {}. Use <source>:{artifact_name} to disambiguate.",
-            source_names.join(", ")
-        );
-    }
-
-    Ok(found.remove(0))
-}
 
 /// Copy an artifact from source to destination, returning the destination path.
 fn copy_artifact(
@@ -133,21 +86,16 @@ pub fn install_with(
 
     source::auto_update_all_with(ctx)?;
 
-    let (found_source, artifact_path, source_root, artifact_version) =
-        find_artifact(artifact_name, source_name, kind, ctx)?;
+    let found = source_iter::find_unique(artifact_name, kind, source_name, ctx)?;
 
     let dest_dir = ctx.paths.install_dir(kind, local);
     ctx.fs
         .create_dir_all(&dest_dir)
         .with_context(|| format!("Failed to create {}", dest_dir.display()))?;
 
-    let source_checksum = checksum::checksum_artifact_with(&artifact_path, kind, ctx.fs)?;
+    let source_checksum = checksum::checksum_artifact_with(&found.artifact.path, kind, ctx.fs)?;
 
-    let relative_path = artifact_path
-        .strip_prefix(&source_root)
-        .unwrap_or(&artifact_path)
-        .to_string_lossy()
-        .to_string();
+    let relative_path = types::relative_path_string(&found.artifact.path, &found.source_root);
 
     // Check for local modifications before overwriting
     if !force {
@@ -165,7 +113,7 @@ pub fn install_with(
         }
     }
 
-    let dest_path = copy_artifact(&artifact_path, &dest_dir, kind, artifact_name, ctx)?;
+    let dest_path = copy_artifact(&found.artifact.path, &dest_dir, kind, artifact_name, ctx)?;
     let installed_checksum = checksum::checksum_artifact_with(&dest_path, kind, ctx.fs)?;
 
     let mut lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
@@ -173,10 +121,10 @@ pub fn install_with(
         artifact_name.to_string(),
         LockEntry {
             artifact_type: kind,
-            version: artifact_version.clone(),
+            version: found.artifact.version.clone(),
             installed_at: ctx.clock.now().to_rfc3339(),
             source: LockSource {
-                repo: found_source.clone(),
+                repo: found.source_name.clone(),
                 path: relative_path,
             },
             source_checksum,
@@ -187,9 +135,9 @@ pub fn install_with(
 
     Ok(InstallResult {
         artifact_name: artifact_name.to_string(),
-        version: artifact_version,
+        version: found.artifact.version,
         kind,
-        source_name: found_source,
+        source_name: found.source_name,
         dest_dir,
     })
 }
@@ -248,9 +196,7 @@ pub fn update_all_with(
 ) -> Result<UpdateAllResult> {
     source::auto_update_all_with(ctx)?;
 
-    // Scan sources for current checksums
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-    let all_source_info = source_iter::scan_all_with_checksums(&sources.sources, ctx.fs)?;
+    let all_source_info = source_iter::all_with_checksums(ctx)?;
     let mut updated = Vec::new();
 
     let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result, bail};
 
 use crate::checksum;
 use crate::config;
@@ -83,6 +83,16 @@ pub fn all_artifacts(ctx: &AppContext<'_>) -> Result<Vec<SourceArtifact>> {
     Ok(each_source_artifact_with(&sources.sources, ctx.fs))
 }
 
+/// Scan all registered sources and compute checksums for every artifact.
+///
+/// Convenience wrapper around `config::load_sources_with` + `scan_all_with_checksums`.
+pub fn all_with_checksums(
+    ctx: &AppContext<'_>,
+) -> Result<BTreeMap<String, Vec<SourceArtifactInfo>>> {
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+    scan_all_with_checksums(&sources.sources, ctx.fs)
+}
+
 /// Return all source artifacts matching the given name and kind across all registered sources.
 pub fn find_by_name_and_kind(
     name: &str,
@@ -93,6 +103,50 @@ pub fn find_by_name_and_kind(
         .into_iter()
         .filter(|sa| sa.artifact.name == name && sa.artifact.kind == kind)
         .collect())
+}
+
+/// Locate exactly one artifact by name and kind across registered sources.
+///
+/// If `source` is `Some`, only that source is searched.  Bails with a
+/// descriptive error when zero or more than one match is found.
+pub fn find_unique(
+    name: &str,
+    kind: ArtifactKind,
+    source: Option<&str>,
+    ctx: &AppContext<'_>,
+) -> Result<SourceArtifact> {
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+
+    if sources.sources.is_empty() {
+        bail!("No sources registered. Add one with: cmx source add <name> <path-or-url>");
+    }
+
+    let search_sources: BTreeMap<_, _> = if let Some(src) = source {
+        let entry =
+            sources.sources.get(src).with_context(|| format!("Source '{src}' not found."))?;
+        std::iter::once((src.to_string(), entry.clone())).collect()
+    } else {
+        sources.sources.clone()
+    };
+
+    let mut found: Vec<SourceArtifact> = each_source_artifact_with(&search_sources, ctx.fs)
+        .into_iter()
+        .filter(|sa| sa.artifact.name == name && sa.artifact.kind == kind)
+        .collect();
+
+    if found.is_empty() {
+        bail!("No {kind} named '{name}' found in registered sources.");
+    }
+
+    if found.len() > 1 {
+        let source_names: Vec<_> = found.iter().map(|sa| sa.source_name.as_str()).collect();
+        bail!(
+            "'{name}' found in multiple sources: {}. Use <source>:{name} to disambiguate.",
+            source_names.join(", ")
+        );
+    }
+
+    Ok(found.remove(0))
 }
 
 #[cfg(test)]

@@ -31,8 +31,7 @@ pub struct OutdatedRow {
 pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
     source::auto_update_all_with(ctx)?;
 
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-    let source_artifacts = source_iter::scan_all_with_checksums(&sources.sources, ctx.fs)?;
+    let source_artifacts = source_iter::all_with_checksums(ctx)?;
 
     let mut rows = Vec::new();
 

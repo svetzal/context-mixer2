@@ -8,7 +8,7 @@ use crate::context::AppContext;
 use crate::lockfile;
 use crate::source;
 use crate::source_iter;
-use crate::types::ArtifactKind;
+use crate::types::{self, ArtifactKind};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -207,7 +207,7 @@ fn diff_dirs_with(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Resu
 fn collect_relative_files_with(dir: &Path, ctx: &AppContext<'_>) -> Result<Vec<String>> {
     let mut files = collect_files_with(dir, ctx)?
         .into_iter()
-        .map(|p| p.strip_prefix(dir).unwrap_or(&p).to_string_lossy().to_string())
+        .map(|p| types::relative_path_string(&p, dir))
         .collect::<Vec<_>>();
     files.sort();
     Ok(files)
