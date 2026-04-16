@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use crate::config;
 use crate::context::AppContext;
+use crate::gateway::DirEntry;
 use crate::scan;
 use crate::source_iter;
 use crate::types::{Artifact, SourceEntry, SourceType};
@@ -195,35 +196,28 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResul
         })
         .collect();
 
-    let skills = artifacts
+    // Imperative shell: collect skill artifacts and eagerly load their directory listings
+    let skill_artifacts: Vec<&Artifact> = artifacts
         .iter()
         .filter(|a| a.kind == crate::types::ArtifactKind::Skill)
-        .map(|s| {
-            let files = if let Ok(entries) = ctx.fs.read_dir(&s.path) {
-                let mut names: Vec<_> = entries
-                    .iter()
-                    .filter(|e| !e.file_name.starts_with('.'))
-                    .map(|e| {
-                        if e.is_dir {
-                            format!("{}/", e.file_name)
-                        } else {
-                            e.file_name.clone()
-                        }
-                    })
-                    .collect();
-                names.sort();
-                names
-            } else {
-                Vec::new()
-            };
+        .collect();
 
-            BrowseSkill {
-                name: s.name.clone(),
-                version: s.version.clone(),
-                deprecation_display: format_deprecation(s),
-                files,
-            }
+    let skill_inputs: Vec<(&Artifact, Vec<String>)> = skill_artifacts
+        .into_iter()
+        .map(|s| {
+            let files = ctx
+                .fs
+                .read_dir(&s.path)
+                .map(|entries| dir_entry_names(&entries))
+                .unwrap_or_default();
+            (s, files)
         })
+        .collect();
+
+    // Pure core: transform skill data into BrowseSkill structs
+    let skills = skill_inputs
+        .into_iter()
+        .map(|(s, files)| build_browse_skill(s, files))
         .collect();
 
     Ok(SourceBrowseResult {
@@ -425,6 +419,31 @@ fn add_git_source_with(name: &str, url: &str, ctx: &AppContext<'_>) -> Result<So
 // ---------------------------------------------------------------------------
 // Pure helpers (no I/O)
 // ---------------------------------------------------------------------------
+
+fn dir_entry_names(entries: &[DirEntry]) -> Vec<String> {
+    let mut names: Vec<String> = entries
+        .iter()
+        .filter(|e| !e.file_name.starts_with('.'))
+        .map(|e| {
+            if e.is_dir {
+                format!("{}/", e.file_name)
+            } else {
+                e.file_name.clone()
+            }
+        })
+        .collect();
+    names.sort();
+    names
+}
+
+fn build_browse_skill(artifact: &Artifact, files: Vec<String>) -> BrowseSkill {
+    BrowseSkill {
+        name: artifact.name.clone(),
+        version: artifact.version.clone(),
+        deprecation_display: format_deprecation(artifact),
+        files,
+    }
+}
 
 fn count_artifacts(artifacts: &[Artifact]) -> (usize, usize) {
     let agents = artifacts.iter().filter(|a| a.kind == crate::types::ArtifactKind::Agent).count();
@@ -1033,6 +1052,79 @@ mod tests {
             Some(original_timestamp.as_str()),
             "timestamp should not change after failed pull"
         );
+    }
+
+    // --- dir_entry_names ---
+
+    fn make_dir_entry(file_name: &str, is_dir: bool) -> crate::gateway::DirEntry {
+        crate::gateway::DirEntry {
+            path: PathBuf::from(file_name),
+            file_name: file_name.to_string(),
+            is_dir,
+        }
+    }
+
+    #[test]
+    fn dir_entry_names_filters_dotfiles() {
+        let entries = vec![
+            make_dir_entry(".hidden", false),
+            make_dir_entry("visible.md", false),
+        ];
+        let names = dir_entry_names(&entries);
+        assert_eq!(names, vec!["visible.md"]);
+    }
+
+    #[test]
+    fn dir_entry_names_appends_slash_to_dirs() {
+        let entries = vec![
+            make_dir_entry("subdir", true),
+            make_dir_entry("file.md", false),
+        ];
+        let names = dir_entry_names(&entries);
+        assert!(names.contains(&"subdir/".to_string()));
+        assert!(names.contains(&"file.md".to_string()));
+    }
+
+    #[test]
+    fn dir_entry_names_sorts_results() {
+        let entries = vec![
+            make_dir_entry("z.md", false),
+            make_dir_entry("a.md", false),
+            make_dir_entry("m.md", false),
+        ];
+        let names = dir_entry_names(&entries);
+        assert_eq!(names, vec!["a.md", "m.md", "z.md"]);
+    }
+
+    // --- build_browse_skill ---
+
+    #[test]
+    fn build_browse_skill_populates_fields() {
+        let artifact = make_skill("my-skill");
+        let files = vec!["a.md".to_string(), "b.md".to_string()];
+        let skill = build_browse_skill(&artifact, files.clone());
+        assert_eq!(skill.name, "my-skill");
+        assert_eq!(skill.version, None);
+        assert_eq!(skill.deprecation_display, "");
+        assert_eq!(skill.files, files);
+    }
+
+    #[test]
+    fn build_browse_skill_includes_version_and_deprecation() {
+        let artifact = Artifact {
+            kind: ArtifactKind::Skill,
+            name: "my-skill".to_string(),
+            description: String::new(),
+            path: PathBuf::from("my-skill"),
+            version: Some("1.2.3".to_string()),
+            deprecation: Some(Deprecation {
+                reason: Some("Old".to_string()),
+                replacement: Some("new-skill".to_string()),
+            }),
+        };
+        let skill = build_browse_skill(&artifact, vec![]);
+        assert_eq!(skill.version, Some("1.2.3".to_string()));
+        assert!(skill.deprecation_display.contains("DEPRECATED"));
     }
 
     #[test]
