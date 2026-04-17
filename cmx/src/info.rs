@@ -168,66 +168,6 @@ pub(crate) fn collect_skill_files_with(
 }
 
 // ---------------------------------------------------------------------------
-// Print (no business logic)
-// ---------------------------------------------------------------------------
-
-pub fn print_info(info: &ArtifactInfo) {
-    println!("Name:        {}", info.name);
-    println!("Type:        {}", info.kind);
-    println!("Scope:       {}", info.scope);
-    println!("Path:        {}", info.path.display());
-
-    if let Some(v) = &info.version {
-        println!("Version:     {v}");
-    }
-    if let Some(at) = &info.installed_at {
-        println!("Installed:   {at}");
-    }
-    if let Some(src) = &info.source_display {
-        println!("Source:      {src}");
-    }
-    if let Some(cs) = &info.source_checksum {
-        println!("Source SHA:  {cs}");
-    }
-    if let Some(cs) = &info.installed_checksum {
-        println!("Install SHA: {cs}");
-    }
-    if info.locally_modified {
-        let disk_cs = info.disk_checksum.as_deref().unwrap_or("unknown");
-        println!("Disk SHA:    {disk_cs}  (locally modified)");
-    }
-    if info.untracked {
-        println!("Lock entry:  (none — untracked)");
-    }
-
-    if let Some(dep) = &info.deprecation {
-        println!("Status:      DEPRECATED");
-        if let Some(reason) = &dep.reason {
-            println!("  Reason:    {reason}");
-        }
-        if let Some(repl) = &dep.replacement {
-            println!("  Replace:   {repl}");
-        }
-    }
-    if let Some(v) = &info.available_version {
-        println!("Available:   v{v} (update available)");
-    }
-
-    if !info.skill_files.is_empty() {
-        println!();
-        println!("Files:");
-        for entry in &info.skill_files {
-            let indent = "  ".repeat(entry.indent_level + 1);
-            if entry.is_dir {
-                println!("{indent}{}/", entry.name);
-            } else {
-                println!("{indent}{}", entry.name);
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 

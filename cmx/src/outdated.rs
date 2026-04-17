@@ -8,7 +8,6 @@ use crate::lockfile;
 use crate::source;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
-use crate::table::Table;
 use crate::types::{ArtifactKind, LockFile};
 
 // ---------------------------------------------------------------------------
@@ -47,36 +46,6 @@ pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
     rows.retain(|r| seen.insert((r.name.clone(), r.source.clone())));
 
     Ok(rows)
-}
-
-// ---------------------------------------------------------------------------
-// Print (no business logic)
-// ---------------------------------------------------------------------------
-
-pub fn print_outdated(rows: &[OutdatedRow]) {
-    if rows.is_empty() {
-        println!("Everything is up to date.");
-        return;
-    }
-
-    Table {
-        headers: vec!["Name", "Type", "Installed", "Available", "Source", "Status"],
-        padded_cols: 6,
-        rows: rows
-            .iter()
-            .map(|r| {
-                vec![
-                    r.name.clone(),
-                    r.kind.to_string(),
-                    r.installed_version.clone(),
-                    r.available_version.clone(),
-                    r.source.clone(),
-                    r.status.clone(),
-                ]
-            })
-            .collect(),
-    }
-    .print();
 }
 
 // ---------------------------------------------------------------------------

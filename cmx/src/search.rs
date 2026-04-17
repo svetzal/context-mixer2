@@ -3,7 +3,6 @@ use anyhow::Result;
 use crate::context::AppContext;
 use crate::source;
 use crate::source_iter;
-use crate::table::Table;
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -53,41 +52,6 @@ pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
         results,
         query: query.to_string(),
     })
-}
-
-// ---------------------------------------------------------------------------
-// Print (no business logic)
-// ---------------------------------------------------------------------------
-
-pub fn print_search_results(output: &SearchOutput) {
-    let query = &output.query;
-    let results = &output.results;
-
-    if results.is_empty() {
-        println!("No results for '{query}'.");
-        return;
-    }
-
-    Table {
-        headers: vec!["Name", "Type", "Version", "Source", "Description"],
-        padded_cols: 4,
-        rows: results
-            .iter()
-            .map(|r| {
-                vec![
-                    r.name.clone(),
-                    r.kind.clone(),
-                    r.version.clone(),
-                    r.source.clone(),
-                    r.description.clone(),
-                ]
-            })
-            .collect(),
-    }
-    .print();
-
-    println!();
-    println!("{} result(s) found.", results.len());
 }
 
 // ---------------------------------------------------------------------------

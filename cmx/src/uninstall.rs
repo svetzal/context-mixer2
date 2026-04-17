@@ -52,17 +52,6 @@ pub fn uninstall_with(
 }
 
 // ---------------------------------------------------------------------------
-// Print (no business logic)
-// ---------------------------------------------------------------------------
-
-pub fn print_uninstall_result(result: &UninstallResult) {
-    println!("Uninstalled {} ({}) from {} scope.", result.name, result.kind, result.scope);
-    if !result.was_tracked {
-        println!("  (no lock file entry found — artifact was untracked)");
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 

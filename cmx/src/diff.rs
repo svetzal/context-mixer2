@@ -113,35 +113,6 @@ pub(crate) async fn gather_diff_with(
     })
 }
 
-// ---------------------------------------------------------------------------
-// Print (no business logic)
-// ---------------------------------------------------------------------------
-
-pub fn print_diff_output(output: &DiffOutput) {
-    if output.is_up_to_date {
-        println!("{} is up to date with source.", output.artifact_name);
-        return;
-    }
-
-    let installed_ver = output.installed_version.as_deref().unwrap_or("unversioned");
-    let source_ver = output.source_version.as_deref().unwrap_or("unversioned");
-
-    println!("Comparing {} ({})", output.artifact_name, output.kind);
-    println!("  Installed: {installed_ver}");
-    println!("  Source ({}): {source_ver}", output.source_name);
-    println!();
-
-    if let Some(analysis) = &output.analysis {
-        println!("Analyzing differences...");
-        println!();
-        println!("{analysis}");
-    } else if let Some(diff) = &output.diff_text {
-        // No LLM analysis available — show raw diff
-        println!("Differences:");
-        println!("{diff}");
-    }
-}
-
 fn find_in_sources_with(
     name: &str,
     kind: ArtifactKind,
