@@ -76,14 +76,17 @@ impl Table {
             .collect()
     }
 
-    /// Prints the table to stdout with a 2-space leading indent.
+    /// Renders the table to a `String` with a 2-space leading indent.
     ///
     /// Output format:
     /// - Header row: padded columns followed by any extra header (unpadded)
     /// - Separator row: dashes per padded column width + any extra header dashes (unpadded)
     /// - Data rows: padded columns followed by extra data cells (unpadded)
-    pub fn print(&self) {
+    pub fn render(&self) -> String {
+        use std::fmt::Write as FmtWrite;
+
         let widths = self.column_widths();
+        let mut out = String::new();
 
         // Header row
         let mut header_parts: Vec<String> = self.headers[..self.padded_cols]
@@ -98,7 +101,7 @@ impl Table {
         if let Some(trailing_header) = self.headers.get(self.padded_cols) {
             header_parts.push(trailing_header.to_string());
         }
-        println!("  {}", header_parts.join("  "));
+        let _ = writeln!(out, "  {}", header_parts.join("  "));
 
         // Separator row
         let mut sep_parts: Vec<String> = widths
@@ -111,7 +114,7 @@ impl Table {
         if let Some(trailing_header) = self.headers.get(self.padded_cols) {
             sep_parts.push("-".repeat(trailing_header.len()));
         }
-        println!("  {}", sep_parts.join("  "));
+        let _ = writeln!(out, "  {}", sep_parts.join("  "));
 
         // Data rows
         for row in &self.rows {
@@ -127,8 +130,15 @@ impl Table {
             for cell in row.iter().skip(self.padded_cols) {
                 parts.push(cell.clone());
             }
-            println!("  {}", parts.join("  "));
+            let _ = writeln!(out, "  {}", parts.join("  "));
         }
+
+        out
+    }
+
+    /// Prints the table to stdout. Delegates to [`render`](Self::render).
+    pub fn print(&self) {
+        print!("{}", self.render());
     }
 }
 
@@ -252,5 +262,53 @@ mod tests {
         let widths = t.column_widths();
         // widths[0] = max(4, 5, 13) = 13; widths[1] = max(7, 3, 6) = 7
         assert_eq!(widths, vec![13, 7]);
+    }
+
+    // --- render ---
+
+    #[test]
+    fn render_header_row_with_separator() {
+        let t = make_table(vec!["Name", "Version"], 2, vec![]);
+        let out = t.render();
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 2);
+        // "Name" padded to 4, "Version" padded to 7, joined by 2 spaces
+        assert_eq!(lines[0], "  Name  Version");
+        assert_eq!(lines[1], "  ----  -------");
+    }
+
+    #[test]
+    fn render_data_rows_are_padded() {
+        let t = make_table(
+            vec!["Name", "Version"],
+            2,
+            vec![vec!["short", "1.0"], vec!["a-longer-name", "10.0.0"]],
+        );
+        let out = t.render();
+        let lines: Vec<&str> = out.lines().collect();
+        // header + separator + 2 data rows = 4
+        assert_eq!(lines.len(), 4);
+        // widths: max(4,5,13)=13, max(7,3,6)=7; each cell is right-padded to its width
+        assert_eq!(lines[2], "  short          1.0    ");
+        assert_eq!(lines[3], "  a-longer-name  10.0.0 ");
+    }
+
+    #[test]
+    fn render_trailing_unpadded_column() {
+        let t = make_table(vec!["Name", "Installed"], 2, vec![vec!["my-agent", "1.0.0", "ok"]]);
+        let out = t.render();
+        let lines: Vec<&str> = out.lines().collect();
+        // header + separator + 1 data row = 3
+        assert_eq!(lines.len(), 3);
+        // "my-agent" padded to 8, "1.0.0" padded to 9 (= "Installed" len), then "ok" unpadded
+        assert_eq!(lines[2], "  my-agent  1.0.0      ok");
+    }
+
+    #[test]
+    fn render_empty_rows_produces_only_header_and_separator() {
+        let t = make_table(vec!["Name", "Status"], 2, vec![]);
+        let out = t.render();
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 2);
     }
 }

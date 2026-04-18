@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::Write as FmtWrite;
 
 use anyhow::Result;
 use cmx::gateway::Filesystem;
@@ -11,16 +12,17 @@ use crate::repo::{RepoKind, RepoRoot};
 use crate::validate::validate_all;
 use crate::validation::IssueLevel;
 
-/// Print a comprehensive status overview of the repo.
-pub fn print_status(root: &RepoRoot, fs: &dyn Filesystem) -> Result<()> {
-    print_repo_identity(root, fs);
-    print_plugin_summary(root, fs);
-    print_facet_summary(root, fs);
-    print_validation_summary(root, fs);
-    Ok(())
+/// Format a comprehensive status overview of the repo.
+pub fn format_status(root: &RepoRoot, fs: &dyn Filesystem) -> Result<String> {
+    let mut out = String::new();
+    out.push_str(&format_repo_identity(root, fs));
+    out.push_str(&format_plugin_summary(root, fs));
+    out.push_str(&format_facet_summary(root, fs));
+    out.push_str(&format_validation_summary(root, fs));
+    Ok(out)
 }
 
-fn print_repo_identity(root: &RepoRoot, fs: &dyn Filesystem) {
+fn format_repo_identity(root: &RepoRoot, fs: &dyn Filesystem) -> String {
     let marketplace_path = root.path.join(".claude-plugin").join("marketplace.json");
     let name = load_json::<Marketplace>(&marketplace_path, fs)
         .ok()
@@ -34,20 +36,21 @@ fn print_repo_identity(root: &RepoRoot, fs: &dyn Filesystem) {
         RepoKind::Unknown => "unknown",
     };
 
-    match name {
-        Some(n) => println!("Repository: {n} ({kind_label})"),
-        None => println!("Repository: ({kind_label})"),
-    }
-    println!("Root: {}", root.path.display());
+    let mut out = match name {
+        Some(n) => format!("Repository: {n} ({kind_label})\n"),
+        None => format!("Repository: ({kind_label})\n"),
+    };
+    let _ = writeln!(out, "Root: {}", root.path.display());
+    out
 }
 
-fn print_plugin_summary(root: &RepoRoot, fs: &dyn Filesystem) {
+fn format_plugin_summary(root: &RepoRoot, fs: &dyn Filesystem) -> String {
     let Ok(plugins) = scan_plugins(root, fs) else {
-        return;
+        return String::new();
     };
 
     if plugins.is_empty() {
-        return;
+        return String::new();
     }
 
     let mut by_category: BTreeMap<String, usize> = BTreeMap::new();
@@ -66,18 +69,21 @@ fn print_plugin_summary(root: &RepoRoot, fs: &dyn Filesystem) {
 
     let plugin_count = plugins.len();
     let breakdown = breakdown.join(", ");
-    println!("Plugins: {plugin_count} ({breakdown})");
-    println!("Agents: {total_agents} | Skills: {total_skills}");
+    format!(
+        "Plugins: {plugin_count} ({breakdown})\nAgents: {total_agents} | Skills: {total_skills}\n"
+    )
 }
 
-fn print_facet_summary(root: &RepoRoot, fs: &dyn Filesystem) {
+fn format_facet_summary(root: &RepoRoot, fs: &dyn Filesystem) -> String {
     if !root.has_facets {
-        return;
+        return String::new();
     }
 
     let Ok(facets) = scan_facets(root, fs) else {
-        return;
+        return String::new();
     };
+
+    let mut out = String::new();
 
     if !facets.is_empty() {
         let mut by_category: BTreeMap<String, usize> = BTreeMap::new();
@@ -90,27 +96,28 @@ fn print_facet_summary(root: &RepoRoot, fs: &dyn Filesystem) {
 
         let facet_count = facets.len();
         let breakdown = breakdown.join(", ");
-        println!("Facets: {facet_count} ({breakdown})");
+        let _ = writeln!(out, "Facets: {facet_count} ({breakdown})");
     }
 
     let Ok(recipes) = scan_recipes(root, fs) else {
-        return;
+        return out;
     };
 
     if !recipes.is_empty() {
         let recipe_count = recipes.len();
-        println!("Recipes: {recipe_count}");
+        let _ = writeln!(out, "Recipes: {recipe_count}");
     }
+
+    out
 }
 
-fn print_validation_summary(root: &RepoRoot, fs: &dyn Filesystem) {
+fn format_validation_summary(root: &RepoRoot, fs: &dyn Filesystem) -> String {
     let Ok(issues) = validate_all(root, fs) else {
-        return;
+        return String::new();
     };
 
     if issues.is_empty() {
-        println!("Validation: all clean");
-        return;
+        return "Validation: all clean\n".to_string();
     }
 
     let errors = issues.iter().filter(|i| i.level == IssueLevel::Error).count();
@@ -127,7 +134,7 @@ fn print_validation_summary(root: &RepoRoot, fs: &dyn Filesystem) {
     }
 
     let summary = parts.join(", ");
-    println!("Validation: {summary}");
+    format!("Validation: {summary}\n")
 }
 
 #[cfg(test)]
@@ -207,9 +214,11 @@ mod tests {
             has_plugins_dir: true,
         };
 
-        // Should complete without error
-        let result = print_status(&root, &fs);
-        assert!(result.is_ok(), "print_status failed: {:?}", result.err());
+        let result = format_status(&root, &fs);
+        assert!(result.is_ok(), "format_status failed: {:?}", result.err());
+        let out = result.unwrap();
+        assert!(out.contains("Repository:"));
+        assert!(out.contains("Plugins:"));
     }
 
     #[test]
@@ -224,7 +233,7 @@ mod tests {
             has_plugins_dir: false,
         };
 
-        let result = print_status(&root, &fs);
-        assert!(result.is_ok(), "print_status failed: {:?}", result.err());
+        let result = format_status(&root, &fs);
+        assert!(result.is_ok(), "format_status failed: {:?}", result.err());
     }
 }

@@ -90,14 +90,15 @@ pub fn generate_manifests(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<Pa
     Ok(written)
 }
 
-/// Print a summary of what was generated.
-pub fn print_manifest_summary(files: &[PathBuf]) {
+/// Format a summary of what was generated.
+pub fn format_manifest_summary(files: &[PathBuf]) -> String {
+    use std::fmt::Write as FmtWrite;
+
     if files.is_empty() {
-        println!("No .claude-plugin/ sources found — nothing to generate.");
-        return;
+        return "No .claude-plugin/ sources found — nothing to generate.\n".to_string();
     }
 
-    println!("Generated manifests for {} platforms:", Platform::targets().len());
+    let mut out = format!("Generated manifests for {} platforms:\n", Platform::targets().len());
 
     for platform in Platform::targets() {
         let dir_name = platform.manifest_dir();
@@ -122,8 +123,10 @@ pub fn print_manifest_summary(files: &[PathBuf]) {
             ));
         }
 
-        println!("  {dir_name}/ — {}", parts.join(" + "));
+        let _ = writeln!(out, "  {dir_name}/ — {}", parts.join(" + "));
     }
+
+    out
 }
 
 #[cfg(test)]

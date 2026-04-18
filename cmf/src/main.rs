@@ -4,16 +4,18 @@ use anyhow::Result;
 use clap::Parser;
 use cmx::gateway::{Filesystem, RealFilesystem};
 
-use cmf::display::print_plugin_list;
-use cmf::facet::{print_facet_list, print_recipe_list, scan_facets, scan_recipes, validate_facets};
-use cmf::manifest::{generate_manifests, print_manifest_summary};
+use cmf::display::format_plugin_list;
+use cmf::facet::{
+    format_facet_list, format_recipe_list, scan_facets, scan_recipes, validate_facets,
+};
+use cmf::manifest::{format_manifest_summary, generate_manifests};
 use cmf::marketplace::{generate_marketplace, validate_marketplace};
 use cmf::plugin::{init_plugin, scan_plugins, validate_all_plugins};
 use cmf::recipe::{assemble_recipe, diff_recipe, write_assembled};
 use cmf::repo::{RepoRoot, detect_repo};
-use cmf::status::print_status;
+use cmf::status::format_status;
 use cmf::validate::validate_all;
-use cmf::validation::print_validation_issues;
+use cmf::validation::format_validation_issues;
 
 mod cli;
 
@@ -35,10 +37,10 @@ fn main() -> Result<()> {
         Commands::Marketplace { action } => handle_marketplace(&action, &root, &fs)?,
         Commands::Validate => {
             let issues = validate_all(&root, &fs)?;
-            print_validation_issues(&issues);
+            print!("{}", format_validation_issues(&issues));
         }
         Commands::Status => {
-            print_status(&root, &fs)?;
+            print!("{}", format_status(&root, &fs)?);
         }
     }
 
@@ -49,13 +51,13 @@ fn handle_facet(action: &FacetAction, root: &RepoRoot, fs: &dyn Filesystem) -> R
     match action {
         FacetAction::List => {
             let facets = scan_facets(root, fs)?;
-            print_facet_list(&facets);
+            print!("{}", format_facet_list(&facets));
             let recipes = scan_recipes(root, fs)?;
-            print_recipe_list(&recipes);
+            print!("{}", format_recipe_list(&recipes));
         }
         FacetAction::Validate => {
             let issues = validate_facets(root, fs)?;
-            print_validation_issues(&issues);
+            print!("{}", format_validation_issues(&issues));
         }
     }
     Ok(())
@@ -65,7 +67,7 @@ fn handle_recipe(action: RecipeAction, root: &RepoRoot, fs: &dyn Filesystem) -> 
     match action {
         RecipeAction::List => {
             let recipes = scan_recipes(root, fs)?;
-            print_recipe_list(&recipes);
+            print!("{}", format_recipe_list(&recipes));
         }
         RecipeAction::Assemble { name, all } => {
             let recipes = scan_recipes(root, fs)?;
@@ -117,11 +119,11 @@ fn handle_plugin(action: &PluginAction, root: &RepoRoot, fs: &dyn Filesystem) ->
         }
         PluginAction::Validate => {
             let issues = validate_all_plugins(root, fs)?;
-            print_validation_issues(&issues);
+            print!("{}", format_validation_issues(&issues));
         }
         PluginAction::List => {
             let plugins = scan_plugins(root, fs)?;
-            print_plugin_list(&plugins);
+            print!("{}", format_plugin_list(&plugins));
         }
     }
     Ok(())
@@ -131,7 +133,7 @@ fn handle_manifest(action: &ManifestAction, root: &RepoRoot, fs: &dyn Filesystem
     match action {
         ManifestAction::Generate => {
             let written = generate_manifests(root, fs)?;
-            print_manifest_summary(&written);
+            print!("{}", format_manifest_summary(&written));
         }
     }
     Ok(())
@@ -145,7 +147,7 @@ fn handle_marketplace(
     match action {
         MarketplaceAction::Validate => {
             let issues = validate_marketplace(root, fs)?;
-            print_validation_issues(&issues);
+            print!("{}", format_validation_issues(&issues));
         }
         MarketplaceAction::Generate => {
             generate_marketplace(root, fs)?;

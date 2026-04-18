@@ -197,12 +197,14 @@ fn validate_individual_recipes(
     }
 }
 
-/// Print a formatted facet listing grouped by category.
-pub fn print_facet_list(facets: &[Facet]) {
-    println!("Facets ({}):", facets.len());
+/// Format a facet listing grouped by category.
+pub fn format_facet_list(facets: &[Facet]) -> String {
+    use std::fmt::Write as FmtWrite;
+
+    let mut out = format!("Facets ({}):\n", facets.len());
 
     if facets.is_empty() {
-        return;
+        return out;
     }
 
     // Group facets by category, preserving sort order
@@ -221,17 +223,22 @@ pub fn print_facet_list(facets: &[Facet]) {
 
     for (category, names) in &groups {
         let label = format!("{category}/");
-        println!("  {:<width$} {}", label, names.join(", "), width = max_cat_width);
+        let _ = writeln!(out, "  {:<width$} {}", label, names.join(", "), width = max_cat_width);
     }
+
+    out
 }
 
-/// Print a formatted recipe listing.
-pub fn print_recipe_list(recipes: &[Recipe]) {
-    println!("Recipes ({}):", recipes.len());
+/// Format a recipe listing.
+pub fn format_recipe_list(recipes: &[Recipe]) -> String {
+    use std::fmt::Write as FmtWrite;
+
+    let mut out = format!("Recipes ({}):\n", recipes.len());
 
     for recipe in recipes {
         let count = recipe.facets.len();
-        println!(
+        let _ = writeln!(
+            out,
             "  {} -> {} ({} {})",
             recipe.name,
             recipe.produces,
@@ -239,6 +246,8 @@ pub fn print_recipe_list(recipes: &[Recipe]) {
             if count == 1 { "facet" } else { "facets" }
         );
     }
+
+    out
 }
 
 #[cfg(test)]

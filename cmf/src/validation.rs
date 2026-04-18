@@ -31,32 +31,37 @@ impl ValidationIssue {
     }
 }
 
-/// Print formatted validation output grouped by level.
+/// Format validation output grouped by level.
 ///
-/// Errors are printed first, then warnings. If no issues exist, prints
+/// Errors are formatted first, then warnings. If no issues exist, returns
 /// a success message.
-pub fn print_validation_issues(issues: &[ValidationIssue]) {
+pub fn format_validation_issues(issues: &[ValidationIssue]) -> String {
+    use std::fmt::Write as FmtWrite;
+
     if issues.is_empty() {
-        println!("All plugins valid.");
-        return;
+        return "All plugins valid.\n".to_string();
     }
 
     let errors: Vec<_> = issues.iter().filter(|i| i.level == IssueLevel::Error).collect();
     let warnings: Vec<_> = issues.iter().filter(|i| i.level == IssueLevel::Warning).collect();
 
+    let mut out = String::new();
+
     if !errors.is_empty() {
-        println!("Errors:");
+        out.push_str("Errors:\n");
         for issue in &errors {
-            println!("  {}: {}", issue.context, issue.message);
+            let _ = writeln!(out, "  {}: {}", issue.context, issue.message);
         }
     }
 
     if !warnings.is_empty() {
-        println!("Warnings:");
+        out.push_str("Warnings:\n");
         for issue in &warnings {
-            println!("  {}: {}", issue.context, issue.message);
+            let _ = writeln!(out, "  {}: {}", issue.context, issue.message);
         }
     }
+
+    out
 }
 
 #[cfg(test)]
