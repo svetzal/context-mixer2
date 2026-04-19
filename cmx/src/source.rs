@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use crate::config;
 use crate::context::AppContext;
-use crate::gateway::DirEntry;
+use crate::gateway::{DirEntry, Filesystem};
 use crate::scan;
 use crate::source_iter;
 use crate::types::{Artifact, SourceEntry, SourceType};
@@ -117,9 +117,7 @@ pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<S
         add_local_source_with(path_or_url, ctx)?
     };
 
-    let local_path = config::resolve_local_path(&entry);
-    let scan_result = scan::scan_source_with(&local_path, ctx.fs)?;
-    let (agents_found, skills_found) = count_artifacts(&scan_result.artifacts);
+    let (agents_found, skills_found, warnings) = scan_and_count(&entry, ctx.fs)?;
 
     sources.sources.insert(name.to_string(), entry);
     config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
@@ -128,7 +126,7 @@ pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<S
         name: name.to_string(),
         agents_found,
         skills_found,
-        warnings: scan_result.warnings,
+        warnings,
     })
 }
 
@@ -259,7 +257,6 @@ pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResul
 pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceUpdateResult> {
     let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
-    // Clone or borrow what we need before mutating the map
     let source_type = sources
         .sources
         .get(name)
@@ -267,53 +264,33 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
         .source_type
         .clone();
 
-    match source_type {
-        SourceType::Local => {
-            // Update timestamp for local sources
-            if let Some(entry) = sources.sources.get_mut(name) {
-                entry.last_updated = Some(ctx.clock.now().to_rfc3339());
-            }
-            config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
-            let local_path =
-                config::resolve_local_path(sources.sources.get(name).expect("entry present"));
-            let scan_result = scan::scan_source_with(&local_path, ctx.fs)?;
-            let (agents_found, skills_found) = count_artifacts(&scan_result.artifacts);
-            return Ok(SourceUpdateResult {
-                name: name.to_string(),
-                agents_found,
-                skills_found,
-            });
+    if matches!(source_type, SourceType::Git) {
+        let clone_path = sources
+            .sources
+            .get(name)
+            .expect("entry present")
+            .local_clone
+            .as_ref()
+            .context("Git source has no local clone path")?
+            .clone();
+
+        if !ctx.fs.exists(&clone_path) {
+            bail!(
+                "Clone directory {} does not exist. Try removing and re-adding the source.",
+                clone_path.display()
+            );
         }
-        SourceType::Git => {}
+
+        ctx.git.pull(&clone_path)?;
     }
 
-    let clone_path = sources
-        .sources
-        .get(name)
-        .expect("entry present")
-        .local_clone
-        .as_ref()
-        .context("Git source has no local clone path")?
-        .clone();
-
-    if !ctx.fs.exists(&clone_path) {
-        bail!(
-            "Clone directory {} does not exist. Try removing and re-adding the source.",
-            clone_path.display()
-        );
-    }
-
-    ctx.git.pull(&clone_path)?;
-
-    // Update timestamp
     if let Some(entry) = sources.sources.get_mut(name) {
         entry.last_updated = Some(ctx.clock.now().to_rfc3339());
     }
     config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
 
-    let local_path = config::resolve_local_path(sources.sources.get(name).expect("entry present"));
-    let scan_result = scan::scan_source_with(&local_path, ctx.fs)?;
-    let (agents_found, skills_found) = count_artifacts(&scan_result.artifacts);
+    let entry = sources.sources.get(name).expect("entry present");
+    let (agents_found, skills_found, _warnings) = scan_and_count(entry, ctx.fs)?;
 
     Ok(SourceUpdateResult {
         name: name.to_string(),
@@ -449,6 +426,16 @@ fn count_artifacts(artifacts: &[Artifact]) -> (usize, usize) {
     let agents = artifacts.iter().filter(|a| a.kind == crate::types::ArtifactKind::Agent).count();
     let skills = artifacts.iter().filter(|a| a.kind == crate::types::ArtifactKind::Skill).count();
     (agents, skills)
+}
+
+fn scan_and_count(
+    entry: &crate::types::SourceEntry,
+    fs: &dyn Filesystem,
+) -> Result<(usize, usize, Vec<ScanWarning>)> {
+    let local_path = config::resolve_local_path(entry);
+    let scan_result = scan::scan_source_with(&local_path, fs)?;
+    let (agents_found, skills_found) = count_artifacts(&scan_result.artifacts);
+    Ok((agents_found, skills_found, scan_result.warnings))
 }
 
 fn format_deprecation(artifact: &Artifact) -> String {
