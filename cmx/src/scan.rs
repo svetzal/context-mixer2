@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::gateway::filesystem::Filesystem;
 use crate::types::{Artifact, ArtifactKind, Deprecation};
@@ -128,14 +128,12 @@ fn scan_marketplace_explicit_arrays(
                         .file_stem()
                         .map(|s| s.to_string_lossy().to_string())
                         .unwrap_or_default();
-                    artifacts.push(Artifact {
-                        kind: ArtifactKind::Agent,
+                    artifacts.push(artifact_from_frontmatter(
+                        ArtifactKind::Agent,
                         name,
-                        description: fm.description,
-                        path: full_path,
-                        version: fm.version,
-                        deprecation: fm.deprecation,
-                    });
+                        full_path,
+                        fm,
+                    ));
                 }
             }
         }
@@ -170,14 +168,12 @@ fn scan_marketplace_explicit_arrays(
                         .file_name()
                         .map(|s| s.to_string_lossy().to_string())
                         .unwrap_or_default();
-                    artifacts.push(Artifact {
-                        kind: ArtifactKind::Skill,
+                    artifacts.push(artifact_from_frontmatter(
+                        ArtifactKind::Skill,
                         name,
-                        description: fm.description,
-                        path: full_path,
-                        version: fm.version,
-                        deprecation: fm.deprecation,
-                    });
+                        full_path,
+                        fm,
+                    ));
                 }
             }
         }
@@ -203,14 +199,12 @@ fn walk_dir_with(dir: &Path, artifacts: &mut Vec<Artifact>, fs: &dyn Filesystem)
                 && let Ok(content) = fs.read_to_string(&skill_md)
                 && let Some(fm) = parse_frontmatter_str(&content)
             {
-                artifacts.push(Artifact {
-                    kind: ArtifactKind::Skill,
-                    name: name_str.clone(),
-                    description: fm.description,
-                    path: entry.path.clone(),
-                    version: fm.version,
-                    deprecation: fm.deprecation,
-                });
+                artifacts.push(artifact_from_frontmatter(
+                    ArtifactKind::Skill,
+                    name_str.clone(),
+                    entry.path.clone(),
+                    fm,
+                ));
                 // Don't recurse into skill directories — .md files inside
                 // are reference material, not agents
             } else {
@@ -223,14 +217,12 @@ fn walk_dir_with(dir: &Path, artifacts: &mut Vec<Artifact>, fs: &dyn Filesystem)
             && let Some(fm) = parse_agent_frontmatter_str(&content)
         {
             let agent_name = name_str.trim_end_matches(".md").to_string();
-            artifacts.push(Artifact {
-                kind: ArtifactKind::Agent,
-                name: agent_name,
-                description: fm.description,
-                path: entry.path.clone(),
-                version: fm.version,
-                deprecation: fm.deprecation,
-            });
+            artifacts.push(artifact_from_frontmatter(
+                ArtifactKind::Agent,
+                agent_name,
+                entry.path.clone(),
+                fm,
+            ));
         }
     }
 
@@ -245,6 +237,22 @@ struct Frontmatter {
     description: String,
     version: Option<String>,
     deprecation: Option<Deprecation>,
+}
+
+fn artifact_from_frontmatter(
+    kind: ArtifactKind,
+    name: String,
+    path: PathBuf,
+    fm: Frontmatter,
+) -> Artifact {
+    Artifact {
+        kind,
+        name,
+        description: fm.description,
+        path,
+        version: fm.version,
+        deprecation: fm.deprecation,
+    }
 }
 
 fn parse_deprecation(fm_text: &str) -> Option<Deprecation> {
