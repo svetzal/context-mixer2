@@ -5,9 +5,9 @@ use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
 use crate::lockfile;
-use crate::source;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
+use crate::source_update;
 use crate::types::{ArtifactKind, LockFile};
 
 // ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ pub struct OutdatedRow {
 // ---------------------------------------------------------------------------
 
 pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
-    source::auto_update_all_with(ctx)?;
+    source_update::auto_update_all_with(ctx)?;
 
     let source_artifacts = source_iter::all_with_checksums(ctx)?;
 

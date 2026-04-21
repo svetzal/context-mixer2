@@ -5,8 +5,8 @@ use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
 use crate::lockfile;
-use crate::source;
 use crate::source_iter;
+use crate::source_update;
 use crate::types::{ArtifactKind, Deprecation};
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ pub(crate) fn gather_info_with(
     };
 
     // Check source for deprecation and available version
-    source::auto_update_all_with(ctx).ok();
+    source_update::auto_update_all_with(ctx).ok();
     let mut deprecation: Option<Deprecation> = None;
     let mut available_version: Option<String> = None;
 

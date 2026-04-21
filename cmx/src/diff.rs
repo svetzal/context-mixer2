@@ -6,8 +6,8 @@ use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
 use crate::lockfile;
-use crate::source;
 use crate::source_iter;
+use crate::source_update;
 use crate::types::{self, ArtifactKind};
 
 // ---------------------------------------------------------------------------
@@ -43,7 +43,7 @@ pub(crate) async fn gather_diff_with(
     kind: ArtifactKind,
     ctx: &AppContext<'_>,
 ) -> Result<DiffOutput> {
-    source::auto_update_all_with(ctx)?;
+    source_update::auto_update_all_with(ctx)?;
 
     // Find the installed file on disk (global then local)
     let (installed_path, local) = config::find_installed_path(name, kind, ctx.fs, ctx.paths)

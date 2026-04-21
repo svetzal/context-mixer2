@@ -1,12 +1,12 @@
 use anyhow::{Context, Result, bail};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::checksum;
 use crate::context::AppContext;
-use crate::gateway::filesystem::Filesystem;
+use crate::copy;
 use crate::lockfile;
-use crate::source;
 use crate::source_iter;
+use crate::source_update;
 use crate::types::{self, ArtifactKind, LockEntry, LockSource};
 
 // ---------------------------------------------------------------------------
@@ -34,47 +34,6 @@ pub struct UpdateAllResult {
     pub kind: ArtifactKind,
 }
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/// Copy an artifact from source to destination, returning the destination path.
-fn copy_artifact(
-    artifact_path: &std::path::Path,
-    dest_dir: &std::path::Path,
-    kind: ArtifactKind,
-    artifact_name: &str,
-    ctx: &AppContext<'_>,
-) -> Result<std::path::PathBuf> {
-    let dest_path = match kind {
-        ArtifactKind::Agent => {
-            let filename = artifact_path.file_name().context("Invalid agent path")?;
-            let dest = dest_dir.join(filename);
-            ctx.fs.copy_file(artifact_path, &dest).with_context(|| {
-                format!("Failed to copy {} to {}", artifact_path.display(), dest.display())
-            })?;
-            dest
-        }
-        ArtifactKind::Skill => {
-            let dir_name = artifact_path.file_name().context("Invalid skill path")?;
-            let dest = dest_dir.join(dir_name);
-            copy_dir_recursive_with(artifact_path, &dest, ctx.fs)?;
-            dest
-        }
-    };
-
-    // Validate skill installation
-    if matches!(kind, ArtifactKind::Skill) {
-        let skill_md = dest_path.join("SKILL.md");
-        if !ctx.fs.exists(&skill_md) {
-            let _ = ctx.fs.remove_dir_all(&dest_path);
-            bail!("Skill '{artifact_name}' is missing SKILL.md. Partial install removed.");
-        }
-    }
-
-    Ok(dest_path)
-}
-
 pub fn install_with(
     name: &str,
     kind: ArtifactKind,
@@ -84,7 +43,7 @@ pub fn install_with(
 ) -> Result<InstallResult> {
     let (source_name, artifact_name) = parse_name(name);
 
-    source::auto_update_all_with(ctx)?;
+    source_update::auto_update_all_with(ctx)?;
 
     let found = source_iter::find_unique(artifact_name, kind, source_name, ctx)?;
 
@@ -113,7 +72,7 @@ pub fn install_with(
         }
     }
 
-    let dest_path = copy_artifact(&found.artifact.path, &dest_dir, kind, artifact_name, ctx)?;
+    let dest_path = copy::copy_artifact(&found.artifact.path, &dest_dir, kind, artifact_name, ctx)?;
     let installed_checksum = checksum::checksum_artifact_with(&dest_path, kind, ctx.fs)?;
 
     let mut lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
@@ -163,7 +122,7 @@ pub fn install_all_with(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<InstallAllResult> {
-    source::auto_update_all_with(ctx)?;
+    source_update::auto_update_all_with(ctx)?;
 
     let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
     let mut installed = Vec::new();
@@ -194,7 +153,7 @@ pub fn update_all_with(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<UpdateAllResult> {
-    source::auto_update_all_with(ctx)?;
+    source_update::auto_update_all_with(ctx)?;
 
     let all_source_info = source_iter::all_with_checksums(ctx)?;
     let mut updated = Vec::new();
@@ -221,23 +180,6 @@ pub fn update_all_with(
     Ok(UpdateAllResult { updated, kind })
 }
 
-fn copy_dir_recursive_with(src: &Path, dest: &Path, fs: &dyn Filesystem) -> Result<()> {
-    fs.create_dir_all(dest)
-        .with_context(|| format!("Failed to create {}", dest.display()))?;
-
-    for entry in fs.read_dir(src)? {
-        let dest_path = dest.join(&entry.file_name);
-
-        if entry.is_dir {
-            copy_dir_recursive_with(&entry.path, &dest_path, fs)?;
-        } else {
-            fs.copy_file(&entry.path, &dest_path)?;
-        }
-    }
-
-    Ok(())
-}
-
 // ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
@@ -257,6 +199,7 @@ fn parse_name(name: &str) -> (Option<&str>, &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::test_support::{
         agent_content, make_ctx, setup_source, setup_source_with_agent, setup_sources, test_paths,

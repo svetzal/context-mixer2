@@ -69,7 +69,7 @@ fn handle_source(action: SourceAction, paths: &ConfigPaths, ctx: &AppContext<'_>
             Ok(())
         }
         SourceAction::Update { name } => {
-            let output = cmx::source::update_with(name.as_deref(), ctx)?;
+            let output = cmx::source_update::update_with(name.as_deref(), ctx)?;
             print!("{}", cmx::display::format_source_update_output(&output));
             Ok(())
         }

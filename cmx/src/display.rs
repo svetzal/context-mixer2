@@ -9,9 +9,8 @@ use crate::install::{InstallAllResult, InstallResult, UpdateAllResult};
 use crate::list::{ListKindOutput, ListOutput, Row};
 use crate::outdated::OutdatedRow;
 use crate::search::SearchOutput;
-use crate::source::{
-    SourceAddResult, SourceBrowseResult, SourceListResult, SourceRemoveResult, SourceUpdateOutput,
-};
+use crate::source::{SourceAddResult, SourceBrowseResult, SourceListResult, SourceRemoveResult};
+use crate::source_update::SourceUpdateOutput;
 use crate::table::Table;
 use crate::uninstall::UninstallResult;
 
