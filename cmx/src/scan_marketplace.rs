@@ -2,11 +2,8 @@ use anyhow::Result;
 use std::path::Path;
 
 use crate::gateway::Filesystem;
-use crate::scan::{
-    ScanWarning, artifact_from_frontmatter, parse_agent_frontmatter_str, parse_frontmatter_str,
-    walk_dir_with,
-};
-use crate::types::{Artifact, ArtifactKind};
+use crate::scan::{ScanWarning, try_parse_agent, try_parse_skill, walk_dir_with};
+use crate::types::Artifact;
 
 pub(crate) fn scan_marketplace_with(
     root: &Path,
@@ -87,19 +84,8 @@ fn scan_marketplace_explicit_arrays(
                     });
                     continue;
                 }
-                if let Ok(content) = fs.read_to_string(&full_path)
-                    && let Some(fm) = parse_agent_frontmatter_str(&content)
-                {
-                    let name = full_path
-                        .file_stem()
-                        .map(|s| s.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    artifacts.push(artifact_from_frontmatter(
-                        ArtifactKind::Agent,
-                        name,
-                        full_path,
-                        fm,
-                    ));
+                if let Some(artifact) = try_parse_agent(&full_path, fs) {
+                    artifacts.push(artifact);
                 }
             }
         }
@@ -127,19 +113,8 @@ fn scan_marketplace_explicit_arrays(
                     });
                     continue;
                 }
-                if let Ok(content) = fs.read_to_string(&skill_md)
-                    && let Some(fm) = parse_frontmatter_str(&content)
-                {
-                    let name = full_path
-                        .file_name()
-                        .map(|s| s.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    artifacts.push(artifact_from_frontmatter(
-                        ArtifactKind::Skill,
-                        name,
-                        full_path,
-                        fm,
-                    ));
+                if let Some(artifact) = try_parse_skill(&full_path, fs) {
+                    artifacts.push(artifact);
                 }
             }
         }

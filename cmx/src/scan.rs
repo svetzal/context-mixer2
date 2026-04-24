@@ -43,6 +43,31 @@ pub fn scan_source_with(root: &Path, fs: &dyn Filesystem) -> Result<ScanResult> 
     })
 }
 
+pub(crate) fn try_parse_agent(agent_path: &Path, fs: &dyn Filesystem) -> Option<Artifact> {
+    let content = fs.read_to_string(agent_path).ok()?;
+    let fm = parse_agent_frontmatter_str(&content)?;
+    let name = agent_path.file_stem()?.to_string_lossy().to_string();
+    Some(artifact_from_frontmatter(
+        ArtifactKind::Agent,
+        name,
+        agent_path.to_path_buf(),
+        fm,
+    ))
+}
+
+pub(crate) fn try_parse_skill(skill_dir: &Path, fs: &dyn Filesystem) -> Option<Artifact> {
+    let skill_md = skill_dir.join("SKILL.md");
+    let content = fs.read_to_string(&skill_md).ok()?;
+    let fm = parse_frontmatter_str(&content)?;
+    let name = skill_dir.file_name()?.to_string_lossy().to_string();
+    Some(artifact_from_frontmatter(
+        ArtifactKind::Skill,
+        name,
+        skill_dir.to_path_buf(),
+        fm,
+    ))
+}
+
 pub(crate) fn walk_dir_with(
     dir: &Path,
     artifacts: &mut Vec<Artifact>,
@@ -61,17 +86,8 @@ pub(crate) fn walk_dir_with(
         }
 
         if entry.is_dir {
-            let skill_md = entry.path.join("SKILL.md");
-            if fs.exists(&skill_md)
-                && let Ok(content) = fs.read_to_string(&skill_md)
-                && let Some(fm) = parse_frontmatter_str(&content)
-            {
-                artifacts.push(artifact_from_frontmatter(
-                    ArtifactKind::Skill,
-                    name_str.clone(),
-                    entry.path.clone(),
-                    fm,
-                ));
+            if let Some(artifact) = try_parse_skill(&entry.path, fs) {
+                artifacts.push(artifact);
                 // Don't recurse into skill directories — .md files inside
                 // are reference material, not agents
             } else {
@@ -80,16 +96,10 @@ pub(crate) fn walk_dir_with(
         } else if entry.path.extension().is_some_and(|ext| ext == "md")
             && name_str != "SKILL.md"
             && dir.file_name().is_some_and(|d| d == "agents")
-            && let Ok(content) = fs.read_to_string(&entry.path)
-            && let Some(fm) = parse_agent_frontmatter_str(&content)
         {
-            let agent_name = name_str.trim_end_matches(".md").to_string();
-            artifacts.push(artifact_from_frontmatter(
-                ArtifactKind::Agent,
-                agent_name,
-                entry.path.clone(),
-                fm,
-            ));
+            if let Some(artifact) = try_parse_agent(&entry.path, fs) {
+                artifacts.push(artifact);
+            }
         }
     }
 
