@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
+use crate::fs_util;
 use crate::lockfile;
 use crate::source_iter;
 use crate::source_update;
@@ -176,27 +177,11 @@ fn diff_dirs_with(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Resu
 }
 
 fn collect_relative_files_with(dir: &Path, ctx: &AppContext<'_>) -> Result<Vec<String>> {
-    let mut files = collect_files_with(dir, ctx)?
+    let mut files = fs_util::collect_files_recursive(dir, ctx.fs)?
         .into_iter()
         .map(|p| types::relative_path_string(&p, dir))
         .collect::<Vec<_>>();
     files.sort();
-    Ok(files)
-}
-
-fn collect_files_with(dir: &Path, ctx: &AppContext<'_>) -> Result<Vec<PathBuf>> {
-    let mut files = Vec::new();
-    let entries = ctx.fs.read_dir(dir)?;
-    for entry in entries {
-        if entry.file_name.starts_with('.') {
-            continue;
-        }
-        if entry.is_dir {
-            files.extend(collect_files_with(&entry.path, ctx)?);
-        } else {
-            files.push(entry.path);
-        }
-    }
     Ok(files)
 }
 

@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
+use crate::fs_util;
 use crate::gateway::filesystem::Filesystem;
 use crate::types::{ArtifactKind, LockEntry};
 
@@ -20,7 +21,7 @@ pub fn checksum_file_with(path: &Path, fs: &dyn Filesystem) -> Result<String> {
 /// Hashes all files in sorted order for determinism.
 pub fn checksum_dir_with(path: &Path, fs: &dyn Filesystem) -> Result<String> {
     let mut hasher = Sha256::new();
-    let mut files = collect_files_with(path, fs)?;
+    let mut files = fs_util::collect_files_recursive(path, fs)?;
     files.sort();
 
     for file in &files {
@@ -84,26 +85,6 @@ fn hex_encode(bytes: &[u8]) -> String {
         let _ = write!(acc, "{b:02x}");
         acc
     })
-}
-
-/// Recursively collect all non-hidden files under `dir` via the given filesystem.
-fn collect_files_with(dir: &Path, fs: &dyn Filesystem) -> Result<Vec<std::path::PathBuf>> {
-    let mut files = Vec::new();
-    let entries = fs
-        .read_dir(dir)
-        .with_context(|| format!("Failed to read directory {}", dir.display()))?;
-
-    for entry in entries {
-        if entry.file_name.starts_with('.') {
-            continue;
-        }
-        if entry.is_dir {
-            files.extend(collect_files_with(&entry.path, fs)?);
-        } else {
-            files.push(entry.path);
-        }
-    }
-    Ok(files)
 }
 
 // ---------------------------------------------------------------------------
