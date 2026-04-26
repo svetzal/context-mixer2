@@ -43,29 +43,16 @@ pub fn scan_source_with(root: &Path, fs: &dyn Filesystem) -> Result<ScanResult> 
     })
 }
 
-pub(crate) fn try_parse_agent(agent_path: &Path, fs: &dyn Filesystem) -> Option<Artifact> {
-    let content = fs.read_to_string(agent_path).ok()?;
-    let fm = parse_agent_frontmatter_str(&content)?;
-    let name = agent_path.file_stem()?.to_string_lossy().to_string();
-    Some(artifact_from_frontmatter(
-        ArtifactKind::Agent,
-        name,
-        agent_path.to_path_buf(),
-        fm,
-    ))
-}
-
-pub(crate) fn try_parse_skill(skill_dir: &Path, fs: &dyn Filesystem) -> Option<Artifact> {
-    let skill_md = skill_dir.join("SKILL.md");
-    let content = fs.read_to_string(&skill_md).ok()?;
-    let fm = parse_frontmatter_str(&content)?;
-    let name = skill_dir.file_name()?.to_string_lossy().to_string();
-    Some(artifact_from_frontmatter(
-        ArtifactKind::Skill,
-        name,
-        skill_dir.to_path_buf(),
-        fm,
-    ))
+pub(crate) fn try_parse_artifact(
+    kind: ArtifactKind,
+    path: &Path,
+    fs: &dyn Filesystem,
+) -> Option<Artifact> {
+    let content_path = kind.content_path(path);
+    let content = fs.read_to_string(&content_path).ok()?;
+    let fm = kind.parse_frontmatter(&content)?;
+    let name = kind.artifact_name_from_path(path)?;
+    Some(artifact_from_frontmatter(kind, name, path.to_path_buf(), fm))
 }
 
 pub(crate) fn walk_dir_with(
@@ -86,7 +73,7 @@ pub(crate) fn walk_dir_with(
         }
 
         if entry.is_dir {
-            if let Some(artifact) = try_parse_skill(&entry.path, fs) {
+            if let Some(artifact) = try_parse_artifact(ArtifactKind::Skill, &entry.path, fs) {
                 artifacts.push(artifact);
                 // Don't recurse into skill directories — .md files inside
                 // are reference material, not agents
@@ -97,13 +84,29 @@ pub(crate) fn walk_dir_with(
             && name_str != "SKILL.md"
             && dir.file_name().is_some_and(|d| d == "agents")
         {
-            if let Some(artifact) = try_parse_agent(&entry.path, fs) {
+            if let Some(artifact) = try_parse_artifact(ArtifactKind::Agent, &entry.path, fs) {
                 artifacts.push(artifact);
             }
         }
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// ArtifactKind frontmatter parsing (scan-local, depends on local parsers)
+// ---------------------------------------------------------------------------
+
+impl ArtifactKind {
+    /// Parse frontmatter from content using the appropriate strategy for this
+    /// artifact kind.  Agents require `name` and `description` fields; skills
+    /// only require the standard frontmatter block.
+    pub(crate) fn parse_frontmatter(self, content: &str) -> Option<Frontmatter> {
+        match self {
+            ArtifactKind::Agent => parse_agent_frontmatter_str(content),
+            ArtifactKind::Skill => parse_frontmatter_str(content),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

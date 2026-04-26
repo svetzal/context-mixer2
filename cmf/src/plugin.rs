@@ -160,8 +160,22 @@ pub fn validate_plugin(
         .map(|a| a.name.clone())
         .collect();
 
-    validate_agents_dir(plugin_path, dir_name, &discovered_agents, fs, &mut issues);
-    validate_skills_dir(plugin_path, dir_name, &discovered_skills, fs, &mut issues);
+    validate_artifact_dir(
+        ArtifactKind::Agent,
+        plugin_path,
+        dir_name,
+        &discovered_agents,
+        fs,
+        &mut issues,
+    );
+    validate_artifact_dir(
+        ArtifactKind::Skill,
+        plugin_path,
+        dir_name,
+        &discovered_skills,
+        fs,
+        &mut issues,
+    );
 
     Ok(issues)
 }
@@ -186,66 +200,59 @@ fn validate_manifest_fields(
     }
 }
 
-fn validate_agents_dir(
+fn validate_artifact_dir(
+    kind: ArtifactKind,
     plugin_path: &Path,
     dir_name: &str,
-    discovered_agents: &[String],
+    discovered_names: &[String],
     fs: &dyn Filesystem,
     issues: &mut Vec<ValidationIssue>,
 ) {
-    let agents_dir = plugin_path.join("agents");
-    if !fs.is_dir(&agents_dir) {
+    let artifact_dir = plugin_path.join(kind.subdir_name());
+    if !fs.is_dir(&artifact_dir) {
         return;
     }
-    let Ok(entries) = fs.read_dir(&agents_dir) else {
+    let Ok(entries) = fs.read_dir(&artifact_dir) else {
         return;
     };
     for entry in entries {
-        let is_md = Path::new(&entry.file_name)
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
-        if entry.is_dir || !is_md {
-            continue;
-        }
-        let agent_name = entry.file_name.trim_end_matches(".md").to_string();
-        if !discovered_agents.contains(&agent_name) {
-            issues.push(ValidationIssue::warning(
-                dir_name,
-                format!("agents/{} has no frontmatter name field", entry.file_name),
-            ));
-        }
-    }
-}
-
-fn validate_skills_dir(
-    plugin_path: &Path,
-    dir_name: &str,
-    discovered_skills: &[String],
-    fs: &dyn Filesystem,
-    issues: &mut Vec<ValidationIssue>,
-) {
-    let skills_dir = plugin_path.join("skills");
-    if !fs.is_dir(&skills_dir) {
-        return;
-    }
-    let Ok(entries) = fs.read_dir(&skills_dir) else {
-        return;
-    };
-    for entry in entries {
-        if !entry.is_dir {
-            continue;
-        }
-        let skill_md = entry.path.join("SKILL.md");
-        if !fs.exists(&skill_md) {
-            issues.push(ValidationIssue::warning(
-                dir_name,
-                format!("skills/{} is missing SKILL.md", entry.file_name),
-            ));
-        } else if !discovered_skills.contains(&entry.file_name) {
-            issues.push(ValidationIssue::warning(
-                dir_name,
-                format!("skills/{}/SKILL.md has no frontmatter description field", entry.file_name),
-            ));
+        match kind {
+            ArtifactKind::Agent => {
+                let is_md = Path::new(&entry.file_name)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
+                if entry.is_dir || !is_md {
+                    continue;
+                }
+                let artifact_name =
+                    kind.artifact_name_from_path(Path::new(&entry.file_name)).unwrap_or_default();
+                if !discovered_names.contains(&artifact_name) {
+                    issues.push(ValidationIssue::warning(
+                        dir_name,
+                        format!("agents/{} has no frontmatter name field", entry.file_name),
+                    ));
+                }
+            }
+            ArtifactKind::Skill => {
+                if !entry.is_dir {
+                    continue;
+                }
+                let content_path = kind.content_path(&entry.path);
+                if !fs.exists(&content_path) {
+                    issues.push(ValidationIssue::warning(
+                        dir_name,
+                        format!("skills/{} is missing SKILL.md", entry.file_name),
+                    ));
+                } else if !discovered_names.contains(&entry.file_name) {
+                    issues.push(ValidationIssue::warning(
+                        dir_name,
+                        format!(
+                            "skills/{}/SKILL.md has no frontmatter description field",
+                            entry.file_name
+                        ),
+                    ));
+                }
+            }
         }
     }
 }

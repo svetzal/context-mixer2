@@ -2,8 +2,9 @@ use anyhow::Result;
 use std::path::Path;
 
 use crate::gateway::Filesystem;
-use crate::scan::{ScanWarning, try_parse_agent, try_parse_skill, walk_dir_with};
+use crate::scan::{ScanWarning, try_parse_artifact, walk_dir_with};
 use crate::types::Artifact;
+use crate::types::ArtifactKind;
 
 pub(crate) fn scan_marketplace_with(
     root: &Path,
@@ -84,7 +85,7 @@ fn scan_marketplace_explicit_arrays(
                     });
                     continue;
                 }
-                if let Some(artifact) = try_parse_agent(&full_path, fs) {
+                if let Some(artifact) = try_parse_artifact(ArtifactKind::Agent, &full_path, fs) {
                     artifacts.push(artifact);
                 }
             }
@@ -113,7 +114,7 @@ fn scan_marketplace_explicit_arrays(
                     });
                     continue;
                 }
-                if let Some(artifact) = try_parse_skill(&full_path, fs) {
+                if let Some(artifact) = try_parse_artifact(ArtifactKind::Skill, &full_path, fs) {
                     artifacts.push(artifact);
                 }
             }

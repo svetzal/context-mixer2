@@ -55,25 +55,31 @@ pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKi
 }
 
 pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
-    let agent_versions = build_source_versions_with(ArtifactKind::Agent, ctx)?;
-    let skill_versions = build_source_versions_with(ArtifactKind::Skill, ctx)?;
     let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
+    let mut output = ListOutput {
+        global_agents: Vec::new(),
+        local_agents: Vec::new(),
+        global_skills: Vec::new(),
+        local_skills: Vec::new(),
+    };
 
-    let global_agents =
-        build_rows_with(ArtifactKind::Agent, false, &global_lock, &agent_versions, ctx)?;
-    let local_agents =
-        build_rows_with(ArtifactKind::Agent, true, &local_lock, &agent_versions, ctx)?;
-    let global_skills =
-        build_rows_with(ArtifactKind::Skill, false, &global_lock, &skill_versions, ctx)?;
-    let local_skills =
-        build_rows_with(ArtifactKind::Skill, true, &local_lock, &skill_versions, ctx)?;
+    for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
+        let source_versions = build_source_versions_with(kind, ctx)?;
+        let global = build_rows_with(kind, false, &global_lock, &source_versions, ctx)?;
+        let local = build_rows_with(kind, true, &local_lock, &source_versions, ctx)?;
+        match kind {
+            ArtifactKind::Agent => {
+                output.global_agents = global;
+                output.local_agents = local;
+            }
+            ArtifactKind::Skill => {
+                output.global_skills = global;
+                output.local_skills = local;
+            }
+        }
+    }
 
-    Ok(ListOutput {
-        global_agents,
-        local_agents,
-        global_skills,
-        local_skills,
-    })
+    Ok(output)
 }
 
 fn build_rows_with(

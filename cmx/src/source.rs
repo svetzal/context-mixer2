@@ -140,9 +140,7 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResul
         .map(|sa| sa.artifact)
         .collect();
 
-    let agents = artifacts
-        .iter()
-        .filter(|a| a.kind == crate::types::ArtifactKind::Agent)
+    let agents = artifacts_of_kind(&artifacts, crate::types::ArtifactKind::Agent)
         .map(|a| BrowseArtifact {
             name: a.name.clone(),
             version: a.version.clone(),
@@ -151,10 +149,8 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResul
         .collect();
 
     // Imperative shell: collect skill artifacts and eagerly load their directory listings
-    let skill_artifacts: Vec<&Artifact> = artifacts
-        .iter()
-        .filter(|a| a.kind == crate::types::ArtifactKind::Skill)
-        .collect();
+    let skill_artifacts: Vec<&Artifact> =
+        artifacts_of_kind(&artifacts, crate::types::ArtifactKind::Skill).collect();
 
     let skill_inputs: Vec<(&Artifact, Vec<String>)> = skill_artifacts
         .into_iter()
@@ -261,6 +257,13 @@ fn add_git_source_with(name: &str, url: &str, ctx: &AppContext<'_>) -> Result<So
 // Pure helpers (no I/O)
 // ---------------------------------------------------------------------------
 
+fn artifacts_of_kind(
+    artifacts: &[Artifact],
+    kind: crate::types::ArtifactKind,
+) -> impl Iterator<Item = &Artifact> {
+    artifacts.iter().filter(move |a| a.kind == kind)
+}
+
 fn dir_entry_names(entries: &[DirEntry]) -> Vec<String> {
     let mut names: Vec<String> = entries
         .iter()
@@ -287,8 +290,8 @@ fn build_browse_skill(artifact: &Artifact, files: Vec<String>) -> BrowseSkill {
 }
 
 fn count_artifacts(artifacts: &[Artifact]) -> (usize, usize) {
-    let agents = artifacts.iter().filter(|a| a.kind == crate::types::ArtifactKind::Agent).count();
-    let skills = artifacts.iter().filter(|a| a.kind == crate::types::ArtifactKind::Skill).count();
+    let agents = artifacts_of_kind(artifacts, crate::types::ArtifactKind::Agent).count();
+    let skills = artifacts_of_kind(artifacts, crate::types::ArtifactKind::Skill).count();
     (agents, skills)
 }
 

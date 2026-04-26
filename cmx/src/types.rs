@@ -191,6 +191,37 @@ impl ArtifactKind {
             ArtifactKind::Skill => entry.is_dir.then(|| entry.file_name.clone()),
         }
     }
+
+    /// Return the subdirectory name used by this kind in a plugin source tree.
+    pub fn subdir_name(&self) -> &'static str {
+        match self {
+            ArtifactKind::Agent => "agents",
+            ArtifactKind::Skill => "skills",
+        }
+    }
+
+    /// Return the path to the content file for an artifact of this kind given
+    /// its base path.
+    ///
+    /// For agents the base path is the `.md` file itself; for skills it is the
+    /// directory that contains `SKILL.md`.
+    pub fn content_path(&self, base: &Path) -> PathBuf {
+        match self {
+            ArtifactKind::Agent => base.to_path_buf(),
+            ArtifactKind::Skill => base.join("SKILL.md"),
+        }
+    }
+
+    /// Derive an artifact name from its source path.
+    ///
+    /// For agents the name is the file stem (strips the `.md` extension).
+    /// For skills the name is the directory name as-is.
+    pub fn artifact_name_from_path(&self, path: &Path) -> Option<String> {
+        match self {
+            ArtifactKind::Agent => path.file_stem().map(|s| s.to_string_lossy().to_string()),
+            ArtifactKind::Skill => path.file_name().map(|s| s.to_string_lossy().to_string()),
+        }
+    }
 }
 
 impl Artifact {
@@ -374,6 +405,55 @@ mod tests {
         let dep = s.deprecation.as_ref().unwrap();
         assert_eq!(dep.reason.as_deref(), Some("Old"));
         assert_eq!(dep.replacement.as_deref(), Some("new-skill"));
+    }
+
+    // --- ArtifactKind::subdir_name ---
+
+    #[test]
+    fn subdir_name_agent() {
+        assert_eq!(ArtifactKind::Agent.subdir_name(), "agents");
+    }
+
+    #[test]
+    fn subdir_name_skill() {
+        assert_eq!(ArtifactKind::Skill.subdir_name(), "skills");
+    }
+
+    // --- ArtifactKind::content_path ---
+
+    #[test]
+    fn content_path_agent_returns_base_unchanged() {
+        let base = Path::new("/repo/agents/my-agent.md");
+        assert_eq!(
+            ArtifactKind::Agent.content_path(base),
+            PathBuf::from("/repo/agents/my-agent.md")
+        );
+    }
+
+    #[test]
+    fn content_path_skill_appends_skill_md() {
+        let base = Path::new("/repo/my-skill");
+        assert_eq!(
+            ArtifactKind::Skill.content_path(base),
+            PathBuf::from("/repo/my-skill/SKILL.md")
+        );
+    }
+
+    // --- ArtifactKind::artifact_name_from_path ---
+
+    #[test]
+    fn artifact_name_from_path_agent_strips_extension() {
+        let path = Path::new("/repo/agents/rust-craftsperson.md");
+        assert_eq!(
+            ArtifactKind::Agent.artifact_name_from_path(path),
+            Some("rust-craftsperson".to_string())
+        );
+    }
+
+    #[test]
+    fn artifact_name_from_path_skill_uses_dir_name() {
+        let path = Path::new("/repo/my-skill");
+        assert_eq!(ArtifactKind::Skill.artifact_name_from_path(path), Some("my-skill".to_string()));
     }
 
     // --- Golden JSON test ---
