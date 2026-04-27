@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Context as _, Result, bail};
 use std::path::{Path, PathBuf};
 
 use crate::context::AppContext;
@@ -13,24 +13,8 @@ pub(crate) fn copy_artifact(
     artifact_name: &str,
     ctx: &AppContext<'_>,
 ) -> Result<PathBuf> {
-    let dest_path = match kind {
-        ArtifactKind::Agent => {
-            let filename = artifact_path.file_name().context("Invalid agent path")?;
-            let dest = dest_dir.join(filename);
-            ctx.fs.copy_file(artifact_path, &dest).with_context(|| {
-                format!("Failed to copy {} to {}", artifact_path.display(), dest.display())
-            })?;
-            dest
-        }
-        ArtifactKind::Skill => {
-            let dir_name = artifact_path.file_name().context("Invalid skill path")?;
-            let dest = dest_dir.join(dir_name);
-            copy_dir_recursive_with(artifact_path, &dest, ctx.fs)?;
-            dest
-        }
-    };
+    let dest_path = kind.copy_to(artifact_path, dest_dir, ctx.fs)?;
 
-    // Validate skill installation
     if matches!(kind, ArtifactKind::Skill) {
         let skill_md = dest_path.join("SKILL.md");
         if !ctx.fs.exists(&skill_md) {

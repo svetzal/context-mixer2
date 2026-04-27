@@ -1,3 +1,4 @@
+use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -221,6 +222,48 @@ impl ArtifactKind {
             ArtifactKind::Agent => path.file_stem().map(|s| s.to_string_lossy().to_string()),
             ArtifactKind::Skill => path.file_name().map(|s| s.to_string_lossy().to_string()),
         }
+    }
+
+    /// Produce a textual diff between an installed artifact and its source
+    /// counterpart, dispatching to the correct strategy (file diff for agents,
+    /// directory diff for skills).
+    #[cfg(feature = "llm")]
+    pub fn diff_with(
+        &self,
+        installed: &Path,
+        source: &Path,
+        ctx: &crate::context::AppContext<'_>,
+    ) -> anyhow::Result<String> {
+        match self {
+            ArtifactKind::Agent => crate::diff::diff_files_with(installed, source, ctx),
+            ArtifactKind::Skill => crate::diff::diff_dirs_with(installed, source, ctx),
+        }
+    }
+
+    /// Copy an artifact from `source` into `dest_dir`, dispatching to the
+    /// correct strategy (file copy for agents, recursive directory copy for
+    /// skills). Returns the destination path.
+    pub fn copy_to(
+        &self,
+        source: &Path,
+        dest_dir: &Path,
+        fs: &dyn crate::gateway::filesystem::Filesystem,
+    ) -> anyhow::Result<PathBuf> {
+        let name = source
+            .file_name()
+            .ok_or_else(|| anyhow::anyhow!("Invalid source path: {}", source.display()))?;
+        let dest = dest_dir.join(name);
+        match self {
+            ArtifactKind::Agent => {
+                fs.copy_file(source, &dest).with_context(|| {
+                    format!("Failed to copy {} to {}", source.display(), dest.display())
+                })?;
+            }
+            ArtifactKind::Skill => {
+                crate::copy::copy_dir_recursive_with(source, &dest, fs)?;
+            }
+        }
+        Ok(dest)
     }
 }
 

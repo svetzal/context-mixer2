@@ -75,10 +75,7 @@ pub(crate) async fn gather_diff_with(
     let installed_version = lock.packages.get(name).and_then(|e| e.version.clone());
 
     // Build diff text
-    let diff_text = match kind {
-        ArtifactKind::Agent => diff_files_with(&installed_path, &source_path, ctx)?,
-        ArtifactKind::Skill => diff_dirs_with(&installed_path, &source_path, ctx)?,
-    };
+    let diff_text = kind.diff_with(&installed_path, &source_path, ctx)?;
 
     let installed_ver_display = installed_version.as_deref().unwrap_or("unversioned");
     let source_ver_display = source_version.as_deref().unwrap_or("unversioned");
@@ -125,7 +122,11 @@ fn find_in_sources_with(
     bail!("No {kind} named '{name}' found in any registered source.");
 }
 
-fn diff_files_with(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Result<String> {
+pub(crate) fn diff_files_with(
+    installed: &Path,
+    source: &Path,
+    ctx: &AppContext<'_>,
+) -> Result<String> {
     let installed_content = ctx
         .fs
         .read_to_string(installed)
@@ -140,7 +141,11 @@ fn diff_files_with(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Res
     ))
 }
 
-fn diff_dirs_with(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Result<String> {
+pub(crate) fn diff_dirs_with(
+    installed: &Path,
+    source: &Path,
+    ctx: &AppContext<'_>,
+) -> Result<String> {
     let mut result = String::new();
 
     let installed_files = collect_relative_files_with(installed, ctx)?;

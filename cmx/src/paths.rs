@@ -59,10 +59,7 @@ impl ConfigPaths {
 
     /// Directory where artifacts of the given kind and scope are installed.
     pub fn install_dir(&self, kind: ArtifactKind, local: bool) -> PathBuf {
-        let subdir = match kind {
-            ArtifactKind::Agent => "agents",
-            ArtifactKind::Skill => "skills",
-        };
+        let subdir = kind.subdir_name();
         if local {
             PathBuf::from(".claude").join(subdir)
         } else {
