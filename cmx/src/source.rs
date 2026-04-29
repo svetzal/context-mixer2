@@ -339,8 +339,10 @@ mod tests {
     use super::*;
     use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::paths::ConfigPaths;
-    use crate::test_support::{make_ctx, make_git_entry, make_local_entry, test_paths};
+    use crate::test_support::{
+        make_ctx, make_git_entry, make_local_entry, setup_empty_sources,
+        setup_sources_from_entries, test_paths,
+    };
     use crate::types::{ArtifactKind, Deprecation};
     use chrono::Utc;
     use std::cell::RefCell;
@@ -501,11 +503,6 @@ mod tests {
 
     // --- source management business logic tests ---
 
-    fn setup_empty_sources(fs: &FakeFilesystem, paths: &ConfigPaths) {
-        let sources = crate::types::SourcesFile::default();
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
-    }
-
     #[test]
     fn add_bails_when_source_name_already_exists() {
         let fs = FakeFilesystem::new();
@@ -514,11 +511,11 @@ mod tests {
         let paths = test_paths();
 
         // Pre-populate with existing source
-        let mut sources = crate::types::SourcesFile::default();
-        sources
-            .sources
-            .insert("my-source".to_string(), make_local_entry("/existing", None));
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        setup_sources_from_entries(
+            &fs,
+            &paths,
+            &[("my-source", make_local_entry("/existing", None))],
+        );
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result = add_with("my-source", "/new/path", &ctx);
@@ -622,11 +619,11 @@ mod tests {
         let clock = FakeClock::at(Utc::now());
         let paths = test_paths();
 
-        let mut sources = crate::types::SourcesFile::default();
-        sources
-            .sources
-            .insert("my-source".to_string(), make_local_entry("/local/repo", None));
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        setup_sources_from_entries(
+            &fs,
+            &paths,
+            &[("my-source", make_local_entry("/local/repo", None))],
+        );
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result = list_with(&ctx).unwrap();
@@ -645,12 +642,19 @@ mod tests {
         let paths = test_paths();
 
         let clone_path = PathBuf::from("/clones/git-source");
-        let mut sources = crate::types::SourcesFile::default();
-        sources.sources.insert(
-            "git-source".to_string(),
-            make_git_entry("https://github.com/example/repo.git", clone_path.clone(), "main", None),
+        setup_sources_from_entries(
+            &fs,
+            &paths,
+            &[(
+                "git-source",
+                make_git_entry(
+                    "https://github.com/example/repo.git",
+                    clone_path.clone(),
+                    "main",
+                    None,
+                ),
+            )],
         );
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_file(clone_path.join("README.md"), "# repo");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
@@ -669,12 +673,19 @@ mod tests {
         let paths = test_paths();
 
         let clone_path = PathBuf::from("/clones/git-source");
-        let mut sources = crate::types::SourcesFile::default();
-        sources.sources.insert(
-            "git-source".to_string(),
-            make_git_entry("https://github.com/example/repo.git", clone_path.clone(), "main", None),
+        setup_sources_from_entries(
+            &fs,
+            &paths,
+            &[(
+                "git-source",
+                make_git_entry(
+                    "https://github.com/example/repo.git",
+                    clone_path.clone(),
+                    "main",
+                    None,
+                ),
+            )],
         );
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         // Create the clone directory
         fs.add_file(clone_path.join("README.md"), "# repo");
 
@@ -694,11 +705,11 @@ mod tests {
         let paths = test_paths();
 
         let local_dir = PathBuf::from("/local/repo");
-        let mut sources = crate::types::SourcesFile::default();
-        sources
-            .sources
-            .insert("local-source".to_string(), make_local_entry(local_dir.clone(), None));
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        setup_sources_from_entries(
+            &fs,
+            &paths,
+            &[("local-source", make_local_entry(local_dir.clone(), None))],
+        );
         fs.add_dir(local_dir.clone());
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);

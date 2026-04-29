@@ -178,10 +178,10 @@ mod tests {
     use crate::lockfile;
     use crate::test_support::{
         agent_content, deprecated_agent_content, install_agent_on_disk, make_ctx,
-        make_lock_entry_with_checksum, save_lock_with_entry, setup_source, setup_source_with_agent,
-        setup_source_with_versioned_agent, test_paths,
+        make_lock_entry_with_checksum, save_lock_with_entry, setup_empty_sources, setup_source,
+        setup_source_with_agent, setup_source_with_versioned_agent, test_paths,
     };
-    use crate::types::{ArtifactKind, Deprecation, LockFile, SourcesFile};
+    use crate::types::{ArtifactKind, Deprecation, LockFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
 
@@ -214,9 +214,7 @@ mod tests {
 
         install_agent_on_disk(&fs, &paths, "my-agent", &agent_content("my-agent", "test"), false);
 
-        // Provide an empty sources.json so config::load_sources_with succeeds
-        let sources = SourcesFile::default();
-        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+        setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result = info_with("my-agent", &ctx);
@@ -233,8 +231,7 @@ mod tests {
 
         install_agent_on_disk(&fs, &paths, "my-agent", &agent_content("my-agent", "test"), true);
 
-        let sources = SourcesFile::default();
-        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+        setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result = info_with("my-agent", &ctx);
@@ -249,8 +246,7 @@ mod tests {
         let clock = FakeClock::at(Utc::now());
         let paths = test_paths();
 
-        let sources = SourcesFile::default();
-        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+        setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result = info_with("nonexistent-agent", &ctx);
@@ -308,8 +304,7 @@ mod tests {
         install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
 
         // No lock entry — untracked
-        let sources = SourcesFile::default();
-        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+        setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let install_dir = paths.install_dir(ArtifactKind::Agent, false);
@@ -347,8 +342,7 @@ mod tests {
         entry.installed_checksum = "sha256:different_from_disk".to_string();
         save_lock_with_entry(&fs, &paths, "my-agent", entry, false);
 
-        let sources = SourcesFile::default();
-        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+        setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();

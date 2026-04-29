@@ -155,10 +155,10 @@ mod tests {
     use crate::lockfile;
     use crate::test_support::{
         agent_content, install_agent_on_disk, make_ctx, make_lock_entry_with_checksum,
-        save_lock_with_entry, setup_source_with_versioned_agent, setup_sources, test_paths,
-        versioned_agent_content,
+        save_lock_with_entry, setup_empty_sources, setup_source_with_versioned_agent,
+        setup_sources, test_paths, versioned_agent_content,
     };
-    use crate::types::{ArtifactKind, LockFile, SourcesFile};
+    use crate::types::{ArtifactKind, LockFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
 
@@ -285,8 +285,7 @@ mod tests {
         let paths = test_paths();
 
         // No installed artifacts, no sources
-        let sources = SourcesFile::default();
-        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+        setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let rows = outdated_with(&ctx).unwrap();

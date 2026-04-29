@@ -207,11 +207,11 @@ mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::test_support::{
-        install_agent_on_disk, make_ctx, make_lock_entry_versioned, setup_source_with_agent,
-        setup_source_with_skill, setup_sources, test_paths, versioned_agent_content,
-        versioned_skill_content,
+        install_agent_on_disk, make_ctx, make_lock_entry_versioned, setup_empty_sources,
+        setup_source_with_agent, setup_source_with_skill, setup_sources, test_paths,
+        versioned_agent_content, versioned_skill_content,
     };
-    use crate::types::{ArtifactKind, LockFile, SourcesFile};
+    use crate::types::{ArtifactKind, LockFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
 
@@ -433,8 +433,7 @@ mod tests {
         let paths = test_paths();
 
         // No source registered — empty sources.json
-        let sources = SourcesFile::default();
-        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+        setup_empty_sources(&fs, &paths);
 
         // Skill installed on disk
         install_skill_dir(&fs, &paths, "my-skill", "1.0.0", false);

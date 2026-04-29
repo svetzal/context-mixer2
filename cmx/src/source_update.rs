@@ -157,7 +157,10 @@ fn is_stale_at(entry: &SourceEntry, now: DateTime<Utc>) -> bool {
 mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::test_support::{make_ctx, make_git_entry, make_local_entry, test_paths};
+    use crate::test_support::{
+        make_ctx, make_git_entry, make_local_entry, setup_source_git, setup_sources_from_entries,
+        test_paths,
+    };
     use chrono::Utc;
     use std::cell::RefCell;
     use std::path::PathBuf;
@@ -200,11 +203,11 @@ mod tests {
         let clock = FakeClock::at(Utc::now());
         let paths = test_paths();
 
-        let mut sources = crate::types::SourcesFile::default();
-        sources
-            .sources
-            .insert("local-source".to_string(), make_local_entry("/local/repo", None));
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        setup_sources_from_entries(
+            &fs,
+            &paths,
+            &[("local-source", make_local_entry("/local/repo", None))],
+        );
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         auto_update_source_with("local-source", &ctx).unwrap();
@@ -220,17 +223,15 @@ mod tests {
         let paths = test_paths();
 
         let clone_path = PathBuf::from("/clones/git-source");
-        let mut sources = crate::types::SourcesFile::default();
-        sources.sources.insert(
-            "git-source".to_string(),
-            make_git_entry(
-                "https://github.com/example/repo.git",
-                clone_path.clone(),
-                "main",
-                Some(Utc::now().to_rfc3339()),
-            ),
+        setup_source_git(
+            &fs,
+            &paths,
+            "git-source",
+            "https://github.com/example/repo.git",
+            clone_path.clone(),
+            "main",
+            Some(Utc::now().to_rfc3339()),
         );
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_dir(clone_path);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
@@ -247,18 +248,16 @@ mod tests {
         let paths = test_paths();
 
         let clone_path = PathBuf::from("/clones/git-source");
-        let mut sources = crate::types::SourcesFile::default();
         let old_time = (Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
-        sources.sources.insert(
-            "git-source".to_string(),
-            make_git_entry(
-                "https://github.com/example/repo.git",
-                clone_path.clone(),
-                "main",
-                Some(old_time),
-            ),
+        setup_source_git(
+            &fs,
+            &paths,
+            "git-source",
+            "https://github.com/example/repo.git",
+            clone_path.clone(),
+            "main",
+            Some(old_time),
         );
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_dir(clone_path.clone());
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
@@ -277,12 +276,15 @@ mod tests {
         let paths = test_paths();
 
         let clone_path = PathBuf::from("/clones/git-source");
-        let mut sources = crate::types::SourcesFile::default();
-        sources.sources.insert(
-            "git-source".to_string(),
-            make_git_entry("https://github.com/example/repo.git", clone_path.clone(), "main", None),
+        setup_source_git(
+            &fs,
+            &paths,
+            "git-source",
+            "https://github.com/example/repo.git",
+            clone_path.clone(),
+            "main",
+            None,
         );
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_dir(clone_path);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
@@ -308,17 +310,15 @@ mod tests {
 
         let clone_path = PathBuf::from("/clones/git-source");
         let original_timestamp = "2024-01-01T00:00:00Z".to_string();
-        let mut sources = crate::types::SourcesFile::default();
-        sources.sources.insert(
-            "git-source".to_string(),
-            make_git_entry(
-                "https://github.com/example/repo.git",
-                clone_path.clone(),
-                "main",
-                Some(original_timestamp.clone()),
-            ),
+        setup_source_git(
+            &fs,
+            &paths,
+            "git-source",
+            "https://github.com/example/repo.git",
+            clone_path.clone(),
+            "main",
+            Some(original_timestamp.clone()),
         );
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_dir(clone_path);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
@@ -349,26 +349,30 @@ mod tests {
         let clone_a = PathBuf::from("/clones/source-a");
         let clone_b = PathBuf::from("/clones/source-b");
 
-        let mut sources = crate::types::SourcesFile::default();
-        sources.sources.insert(
-            "source-a".to_string(),
-            make_git_entry(
-                "https://github.com/example/a.git",
-                clone_a.clone(),
-                "main",
-                Some(old_time.clone()),
-            ),
+        setup_sources_from_entries(
+            &fs,
+            &paths,
+            &[
+                (
+                    "source-a",
+                    make_git_entry(
+                        "https://github.com/example/a.git",
+                        clone_a.clone(),
+                        "main",
+                        Some(old_time.clone()),
+                    ),
+                ),
+                (
+                    "source-b",
+                    make_git_entry(
+                        "https://github.com/example/b.git",
+                        clone_b.clone(),
+                        "main",
+                        Some(old_time),
+                    ),
+                ),
+            ],
         );
-        sources.sources.insert(
-            "source-b".to_string(),
-            make_git_entry(
-                "https://github.com/example/b.git",
-                clone_b.clone(),
-                "main",
-                Some(old_time),
-            ),
-        );
-        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
         fs.add_dir(clone_a);
         fs.add_dir(clone_b);
 

@@ -292,6 +292,45 @@ pub(crate) fn test_paths() -> crate::paths::ConfigPaths {
 }
 
 #[cfg(test)]
+pub(crate) fn setup_empty_sources(
+    fs: &crate::gateway::fakes::FakeFilesystem,
+    paths: &crate::paths::ConfigPaths,
+) {
+    let sources = crate::types::SourcesFile::default();
+    fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+}
+
+#[cfg(test)]
+pub(crate) fn setup_source_git(
+    fs: &crate::gateway::fakes::FakeFilesystem,
+    paths: &crate::paths::ConfigPaths,
+    source_name: &str,
+    url: &str,
+    clone_path: impl Into<std::path::PathBuf>,
+    branch: &str,
+    last_updated: Option<String>,
+) {
+    let mut sources = crate::types::SourcesFile::default();
+    sources
+        .sources
+        .insert(source_name.to_string(), make_git_entry(url, clone_path, branch, last_updated));
+    fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+}
+
+#[cfg(test)]
+pub(crate) fn setup_sources_from_entries(
+    fs: &crate::gateway::fakes::FakeFilesystem,
+    paths: &crate::paths::ConfigPaths,
+    entries: &[(&str, crate::types::SourceEntry)],
+) {
+    let mut sources = crate::types::SourcesFile::default();
+    for (name, entry) in entries {
+        sources.sources.insert(name.to_string(), entry.clone());
+    }
+    fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+}
+
+#[cfg(test)]
 pub(crate) fn make_ctx<'a>(
     fs: &'a crate::gateway::fakes::FakeFilesystem,
     git: &'a crate::gateway::fakes::FakeGitClient,

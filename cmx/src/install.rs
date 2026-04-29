@@ -202,9 +202,10 @@ mod tests {
     use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::test_support::{
-        agent_content, make_ctx, setup_source, setup_source_with_agent, setup_sources, test_paths,
+        agent_content, make_ctx, setup_empty_sources, setup_source, setup_source_with_agent,
+        setup_sources, test_paths,
     };
-    use crate::types::{ArtifactKind, LockFile, SourcesFile};
+    use crate::types::{ArtifactKind, LockFile};
     use chrono::Utc;
 
     // --- parse_name ---
@@ -253,9 +254,7 @@ mod tests {
         let clock = FakeClock::at(Utc::now());
         let paths = test_paths();
 
-        // Empty sources.json (default)
-        let sources = SourcesFile::default();
-        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+        setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
@@ -576,8 +575,7 @@ mod tests {
         let clock = FakeClock::at(Utc::now());
         let paths = test_paths();
 
-        let sources = SourcesFile::default();
-        fs.add_file(paths.sources_path(), serde_json::to_string(&sources).unwrap());
+        setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);

@@ -93,9 +93,7 @@ pub fn resolve_local_path(entry: &SourceEntry) -> PathBuf {
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
-    use crate::test_support::test_paths;
-    use crate::types::{SourceEntry, SourceType};
-    use std::path::PathBuf;
+    use crate::test_support::{make_local_entry, test_paths};
 
     // --- load_sources_with ---
 
@@ -142,17 +140,9 @@ mod tests {
         let paths = test_paths();
 
         let mut sources = SourcesFile::default();
-        sources.sources.insert(
-            "test-source".to_string(),
-            SourceEntry {
-                source_type: SourceType::Local,
-                path: Some(PathBuf::from("/some/path")),
-                url: None,
-                local_clone: None,
-                branch: None,
-                last_updated: None,
-            },
-        );
+        sources
+            .sources
+            .insert("test-source".to_string(), make_local_entry("/some/path", None));
 
         save_sources_with(&sources, &fs, &paths).unwrap();
         let loaded = load_sources_with(&fs, &paths).unwrap();
