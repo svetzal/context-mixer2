@@ -8,7 +8,7 @@ use crate::lockfile;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
 use crate::source_update;
-use crate::types::{ArtifactKind, LockFile};
+use crate::types::{ArtifactKind, LockFile, display_version};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -78,13 +78,11 @@ fn is_outdated(
 
 /// Derives the human-readable status label given installed and available version
 /// strings.  Pure function — no I/O.
-fn outdated_status_label(installed_v: &str, available_v: &str) -> &'static str {
-    if installed_v == "-" && available_v != "-" {
-        "untracked"
-    } else if installed_v != "-" && available_v != "-" && installed_v != available_v {
-        "update"
-    } else {
-        "changed"
+fn outdated_status_label(installed_v: Option<&str>, available_v: Option<&str>) -> &'static str {
+    match (installed_v, available_v) {
+        (None, Some(_)) => "untracked",
+        (Some(i), Some(a)) if i != a => "update",
+        _ => "changed",
     }
 }
 
@@ -107,7 +105,7 @@ fn collect_outdated_for_scope_with(
             continue;
         };
 
-        let installed_v = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-").to_string();
+        let installed_v: Option<String> = lock_entry.and_then(|e| e.version.clone());
 
         // Check for local modifications once (shared across all source rows)
         let locally_modified = if let Some(entry) = lock_entry {
@@ -119,13 +117,14 @@ fn collect_outdated_for_scope_with(
         };
 
         for source_info in source_infos {
-            let available_v = source_info.version.as_deref().unwrap_or("-").to_string();
+            let available_v: Option<String> = source_info.version.clone();
 
             if !is_outdated(lock_entry, &source_info.checksum, source_info.version.as_deref()) {
                 continue;
             }
 
-            let mut status = outdated_status_label(&installed_v, &available_v).to_string();
+            let mut status =
+                outdated_status_label(installed_v.as_deref(), available_v.as_deref()).to_string();
             if locally_modified {
                 status = format!("{status} (modified)");
             }
@@ -133,8 +132,8 @@ fn collect_outdated_for_scope_with(
             rows.push(OutdatedRow {
                 name: name.clone(),
                 kind,
-                installed_version: installed_v.clone(),
-                available_version: available_v,
+                installed_version: display_version(installed_v.as_deref()).to_string(),
+                available_version: display_version(available_v.as_deref()).to_string(),
                 source: source_info.source_name.clone(),
                 status,
             });
@@ -208,22 +207,22 @@ mod tests {
 
     #[test]
     fn status_label_untracked() {
-        assert_eq!(outdated_status_label("-", "1.0.0"), "untracked");
+        assert_eq!(outdated_status_label(None, Some("1.0.0")), "untracked");
     }
 
     #[test]
     fn status_label_update_available() {
-        assert_eq!(outdated_status_label("1.0.0", "2.0.0"), "update");
+        assert_eq!(outdated_status_label(Some("1.0.0"), Some("2.0.0")), "update");
     }
 
     #[test]
     fn status_label_changed_same_version() {
-        assert_eq!(outdated_status_label("1.0.0", "1.0.0"), "changed");
+        assert_eq!(outdated_status_label(Some("1.0.0"), Some("1.0.0")), "changed");
     }
 
     #[test]
     fn status_label_changed_no_versions() {
-        assert_eq!(outdated_status_label("-", "-"), "changed");
+        assert_eq!(outdated_status_label(None, None), "changed");
     }
 
     // --- outdated_with ---

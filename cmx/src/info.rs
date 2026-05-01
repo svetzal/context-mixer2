@@ -105,8 +105,8 @@ pub(crate) fn gather_info_with(
             deprecation = sa.artifact.deprecation;
         }
         if let Some(v) = sa.artifact.version.as_deref() {
-            let installed_v = lock_entry.and_then(|e| e.version.as_deref()).unwrap_or("-");
-            if v != installed_v {
+            let installed_v = lock_entry.and_then(|e| e.version.as_deref());
+            if installed_v != Some(v) {
                 available_version = Some(v.to_string());
             }
         }

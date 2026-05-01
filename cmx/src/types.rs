@@ -279,6 +279,11 @@ pub fn relative_path_string(path: &Path, base: &Path) -> String {
     path.strip_prefix(base).unwrap_or(path).to_string_lossy().to_string()
 }
 
+/// Render an optional version for display, substituting `"-"` when absent.
+pub fn display_version(v: Option<&str>) -> &str {
+    v.unwrap_or("-")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

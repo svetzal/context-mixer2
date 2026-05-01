@@ -3,6 +3,7 @@ use anyhow::Result;
 use crate::context::AppContext;
 use crate::source_iter;
 use crate::source_update;
+use crate::types::display_version;
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -41,7 +42,7 @@ pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
             results.push(SearchResult {
                 name: sa.artifact.name,
                 kind: sa.artifact.kind.to_string(),
-                version: sa.artifact.version.as_deref().unwrap_or("-").to_string(),
+                version: display_version(sa.artifact.version.as_deref()).to_string(),
                 source: sa.source_name,
                 description: short_desc,
             });

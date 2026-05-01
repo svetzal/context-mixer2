@@ -6,7 +6,7 @@ use crate::context::AppContext;
 use crate::lockfile;
 use crate::scan;
 use crate::source_iter;
-use crate::types::{ArtifactKind, LockFile};
+use crate::types::{ArtifactKind, LockFile, display_version};
 
 pub struct Row {
     pub name: String,
@@ -29,16 +29,18 @@ pub struct ListOutput {
     pub local_skills: Vec<Row>,
 }
 
-fn status_indicator(installed: &str, available: &str, deprecated: bool) -> &'static str {
+fn status_indicator(
+    installed: Option<&str>,
+    available: Option<&str>,
+    deprecated: bool,
+) -> &'static str {
     if deprecated {
         return "⛔";
     }
     match (installed, available) {
-        // not installed from this source / unmanaged / no source version
-        ("", _) | ("-" | _, "-") => " ",
-        ("-", _) => "⚠️",         // installed but no version tracked
-        (i, a) if i == a => "✅", // up to date
-        _ => "⚠️",                // behind
+        (None | Some(_), None) => " ",
+        (Some(i), Some(a)) if i == a => "✅",
+        _ => "⚠️",
     }
 }
 
@@ -96,11 +98,9 @@ fn build_rows_with(
         let lock_entry = lock.packages.get(&name);
         let source_infos = source_versions.get(&name);
 
-        let installed = lock_entry
-            .and_then(|e| e.version.as_deref())
-            .map(str::to_string)
-            .or_else(|| read_installed_version(kind, &name, local, ctx))
-            .unwrap_or_else(|| "-".to_string());
+        let installed: Option<String> = lock_entry
+            .and_then(|e| e.version.clone())
+            .or_else(|| read_installed_version(kind, &name, local, ctx));
 
         if let Some(infos) = source_infos {
             // Emit one row per source that provides this artifact.
@@ -111,7 +111,7 @@ fn build_rows_with(
                 let is_install_source =
                     lock_entry.is_none_or(|e| e.source.repo == info.source_name);
                 let row_installed = if is_install_source {
-                    installed.clone()
+                    display_version(installed.as_deref()).to_string()
                 } else {
                     String::new()
                 };
@@ -119,12 +119,16 @@ fn build_rows_with(
                     let path = lock_entry.map_or("", |e| e.source.path.as_str());
                     format_source(&info.source_name, path)
                 };
-                let status = status_indicator(&row_installed, &info.version, info.deprecated);
+                let status = status_indicator(
+                    installed.as_deref(),
+                    info.version.as_deref(),
+                    info.deprecated,
+                );
                 rows.push(Row {
                     name: name.clone(),
                     installed: row_installed,
                     source,
-                    available: info.version.clone(),
+                    available: display_version(info.version.as_deref()).to_string(),
                     status,
                 });
             }
@@ -135,12 +139,12 @@ fn build_rows_with(
                 let path = lock_entry.map_or("", |e| e.source.path.as_str());
                 format_source(&source_name, path)
             };
-            let status = status_indicator(&installed, "-", false);
+            let status = status_indicator(installed.as_deref(), None, false);
             rows.push(Row {
                 name,
-                installed,
+                installed: display_version(installed.as_deref()).to_string(),
                 source,
-                available: "-".to_string(),
+                available: display_version(None).to_string(),
                 status,
             });
         }
@@ -151,7 +155,7 @@ fn build_rows_with(
 
 struct SourceInfo {
     source_name: String,
-    version: String,
+    version: Option<String>,
     deprecated: bool,
 }
 
@@ -172,11 +176,10 @@ fn build_source_versions_with(
 
     for sa in source_iter::all_artifacts(ctx)? {
         if sa.artifact.kind == kind {
-            let version = sa.artifact.version.as_deref().unwrap_or("-").to_string();
             let deprecated = sa.artifact.is_deprecated();
             versions.entry(sa.artifact.name).or_default().push(SourceInfo {
                 source_name: sa.source_name,
-                version,
+                version: sa.artifact.version,
                 deprecated,
             });
         }
@@ -219,37 +222,37 @@ mod tests {
 
     #[test]
     fn status_indicator_deprecated_always_stops() {
-        assert_eq!(status_indicator("1.0", "1.0", true), "⛔");
-        assert_eq!(status_indicator("-", "-", true), "⛔");
-        assert_eq!(status_indicator("1.0", "2.0", true), "⛔");
+        assert_eq!(status_indicator(Some("1.0"), Some("1.0"), true), "⛔");
+        assert_eq!(status_indicator(None, None, true), "⛔");
+        assert_eq!(status_indicator(Some("1.0"), Some("2.0"), true), "⛔");
     }
 
     #[test]
     fn status_indicator_unmanaged_no_versions() {
-        // Both are "-" and not deprecated — unmanaged
-        assert_eq!(status_indicator("-", "-", false), " ");
+        // Both None and not deprecated — unmanaged
+        assert_eq!(status_indicator(None, None, false), " ");
     }
 
     #[test]
     fn status_indicator_installed_no_version_tracked() {
-        // installed="-" means no version tracked but artifact is installed
-        assert_eq!(status_indicator("-", "1.0", false), "⚠️");
+        // installed=None means no version tracked but artifact is installed
+        assert_eq!(status_indicator(None, Some("1.0"), false), "⚠️");
     }
 
     #[test]
     fn status_indicator_no_source_version() {
-        // available="-" means no upstream version to compare
-        assert_eq!(status_indicator("1.0", "-", false), " ");
+        // available=None means no upstream version to compare
+        assert_eq!(status_indicator(Some("1.0"), None, false), " ");
     }
 
     #[test]
     fn status_indicator_up_to_date() {
-        assert_eq!(status_indicator("1.0", "1.0", false), "✅");
+        assert_eq!(status_indicator(Some("1.0"), Some("1.0"), false), "✅");
     }
 
     #[test]
     fn status_indicator_behind() {
-        assert_eq!(status_indicator("1.0", "2.0", false), "⚠️");
+        assert_eq!(status_indicator(Some("1.0"), Some("2.0"), false), "⚠️");
     }
 
     // --- format_source ---
