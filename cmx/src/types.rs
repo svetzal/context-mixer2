@@ -131,6 +131,12 @@ pub struct LockEntry {
     pub installed_checksum: String,
 }
 
+pub struct InstalledArtifact<'a> {
+    pub name: String,
+    pub lock_entry: Option<&'a LockEntry>,
+    pub installed_version: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LockSource {
     pub repo: String,

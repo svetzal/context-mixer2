@@ -3,7 +3,9 @@ use std::path::PathBuf;
 
 use crate::gateway::filesystem::Filesystem;
 use crate::paths::ConfigPaths;
-use crate::types::{ArtifactKind, CmxConfig, SourceEntry, SourceType, SourcesFile};
+use crate::types::{
+    ArtifactKind, CmxConfig, InstalledArtifact, LockFile, SourceEntry, SourceType, SourcesFile,
+};
 
 // ---------------------------------------------------------------------------
 // Testable variants (accept injected Filesystem + ConfigPaths)
@@ -59,6 +61,28 @@ pub fn installed_names_with(
     Ok(names)
 }
 
+pub fn installed_with_lock_data<'a>(
+    kind: ArtifactKind,
+    local: bool,
+    lock: &'a LockFile,
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+) -> Result<Vec<InstalledArtifact<'a>>> {
+    let names = installed_names_with(kind, local, fs, paths)?;
+    Ok(names
+        .into_iter()
+        .map(|name| {
+            let lock_entry = lock.packages.get(&name);
+            let installed_version = lock_entry.and_then(|e| e.version.clone());
+            InstalledArtifact {
+                name,
+                lock_entry,
+                installed_version,
+            }
+        })
+        .collect())
+}
+
 /// Search for an installed artifact on disk, checking global scope first then
 /// local.  Returns the path and whether the artifact is in local scope, or
 /// `None` if not found in either scope.
@@ -93,7 +117,8 @@ pub fn resolve_local_path(entry: &SourceEntry) -> PathBuf {
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
-    use crate::test_support::{make_local_entry, test_paths};
+    use crate::test_support::{make_local_entry, make_lock_entry_versioned, test_paths};
+    use crate::types::LockFile;
 
     // --- load_sources_with ---
 
@@ -284,6 +309,51 @@ mod tests {
         assert!(result.is_some(), "expected Some for installed global skill");
         let (_, local) = result.unwrap();
         assert!(!local, "expected global scope (local=false)");
+    }
+
+    // --- installed_with_lock_data ---
+
+    #[test]
+    fn installed_with_lock_data_returns_name_and_lock_entry() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        fs.add_file(agent_dir.join("my-agent.md"), "# agent");
+
+        let mut lock = LockFile::default();
+        lock.packages.insert(
+            "my-agent".to_string(),
+            make_lock_entry_versioned(
+                ArtifactKind::Agent,
+                "1.0.0",
+                "guidelines",
+                "agents/my-agent.md",
+            ),
+        );
+
+        let artifacts =
+            installed_with_lock_data(ArtifactKind::Agent, false, &lock, &fs, &paths).unwrap();
+        assert_eq!(artifacts.len(), 1);
+        assert_eq!(artifacts[0].name, "my-agent");
+        assert!(artifacts[0].lock_entry.is_some());
+        assert_eq!(artifacts[0].installed_version.as_deref(), Some("1.0.0"));
+    }
+
+    #[test]
+    fn installed_with_lock_data_absent_lock_entry_gives_none_version() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        fs.add_file(agent_dir.join("my-agent.md"), "# agent");
+
+        let lock = LockFile::default();
+
+        let artifacts =
+            installed_with_lock_data(ArtifactKind::Agent, false, &lock, &fs, &paths).unwrap();
+        assert_eq!(artifacts.len(), 1);
+        assert_eq!(artifacts[0].name, "my-agent");
+        assert!(artifacts[0].lock_entry.is_none());
+        assert!(artifacts[0].installed_version.is_none());
     }
 
     // --- failure-path tests ---

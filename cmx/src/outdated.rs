@@ -94,22 +94,23 @@ fn collect_outdated_for_scope_with(
     rows: &mut Vec<OutdatedRow>,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
-    let installed = config::installed_names_with(kind, local, ctx.fs, ctx.paths)?;
+    let installed_artifacts =
+        config::installed_with_lock_data(kind, local, lock, ctx.fs, ctx.paths)?;
 
-    for name in &installed {
-        let lock_entry = lock.packages.get(name);
-        let source_infos = source_artifacts.get(name);
+    for ia in &installed_artifacts {
+        let lock_entry = ia.lock_entry;
+        let source_infos = source_artifacts.get(&ia.name);
 
         // No source artifact — nothing to compare against
         let Some(source_infos) = source_infos else {
             continue;
         };
 
-        let installed_v: Option<String> = lock_entry.and_then(|e| e.version.clone());
+        let installed_v: Option<String> = ia.installed_version.clone();
 
         // Check for local modifications once (shared across all source rows)
         let locally_modified = if let Some(entry) = lock_entry {
-            let install_path = kind.installed_path(name, &ctx.paths.install_dir(kind, local));
+            let install_path = kind.installed_path(&ia.name, &ctx.paths.install_dir(kind, local));
             ctx.fs.exists(&install_path)
                 && checksum::is_locally_modified(&install_path, kind, entry, ctx.fs)?
         } else {
@@ -130,7 +131,7 @@ fn collect_outdated_for_scope_with(
             }
 
             rows.push(OutdatedRow {
-                name: name.clone(),
+                name: ia.name.clone(),
                 kind,
                 installed_version: display_version(installed_v.as_deref()).to_string(),
                 available_version: display_version(available_v.as_deref()).to_string(),

@@ -91,16 +91,17 @@ fn build_rows_with(
     source_versions: &BTreeMap<String, Vec<SourceInfo>>,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Row>> {
-    let names = config::installed_names_with(kind, local, ctx.fs, ctx.paths)?;
+    let installed_artifacts =
+        config::installed_with_lock_data(kind, local, lock, ctx.fs, ctx.paths)?;
     let mut rows = Vec::new();
 
-    for name in names {
-        let lock_entry = lock.packages.get(&name);
-        let source_infos = source_versions.get(&name);
+    for ia in installed_artifacts {
+        let lock_entry = ia.lock_entry;
+        let source_infos = source_versions.get(&ia.name);
 
-        let installed: Option<String> = lock_entry
-            .and_then(|e| e.version.clone())
-            .or_else(|| read_installed_version(kind, &name, local, ctx));
+        let installed: Option<String> = ia
+            .installed_version
+            .or_else(|| read_installed_version(kind, &ia.name, local, ctx));
 
         if let Some(infos) = source_infos {
             // Emit one row per source that provides this artifact.
@@ -125,7 +126,7 @@ fn build_rows_with(
                     info.deprecated,
                 );
                 rows.push(Row {
-                    name: name.clone(),
+                    name: ia.name.clone(),
                     installed: row_installed,
                     source,
                     available: display_version(info.version.as_deref()).to_string(),
@@ -141,7 +142,7 @@ fn build_rows_with(
             };
             let status = status_indicator(installed.as_deref(), None, false);
             rows.push(Row {
-                name,
+                name: ia.name,
                 installed: display_version(installed.as_deref()).to_string(),
                 source,
                 available: display_version(None).to_string(),
