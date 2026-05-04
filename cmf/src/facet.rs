@@ -197,59 +197,6 @@ fn validate_individual_recipes(
     }
 }
 
-/// Format a facet listing grouped by category.
-pub fn format_facet_list(facets: &[Facet]) -> String {
-    use std::fmt::Write as FmtWrite;
-
-    let mut out = format!("Facets ({}):\n", facets.len());
-
-    if facets.is_empty() {
-        return out;
-    }
-
-    // Group facets by category, preserving sort order
-    let mut groups: Vec<(String, Vec<String>)> = Vec::new();
-    for facet in facets {
-        if let Some(last) = groups.last_mut() {
-            if last.0 == facet.category {
-                last.1.push(facet.name.clone());
-                continue;
-            }
-        }
-        groups.push((facet.category.clone(), vec![facet.name.clone()]));
-    }
-
-    let max_cat_width = groups.iter().map(|(cat, _)| cat.len() + 1).max().unwrap_or(0);
-
-    for (category, names) in &groups {
-        let label = format!("{category}/");
-        let _ = writeln!(out, "  {:<width$} {}", label, names.join(", "), width = max_cat_width);
-    }
-
-    out
-}
-
-/// Format a recipe listing.
-pub fn format_recipe_list(recipes: &[Recipe]) -> String {
-    use std::fmt::Write as FmtWrite;
-
-    let mut out = format!("Recipes ({}):\n", recipes.len());
-
-    for recipe in recipes {
-        let count = recipe.facets.len();
-        let _ = writeln!(
-            out,
-            "  {} -> {} ({} {})",
-            recipe.name,
-            recipe.produces,
-            count,
-            if count == 1 { "facet" } else { "facets" }
-        );
-    }
-
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

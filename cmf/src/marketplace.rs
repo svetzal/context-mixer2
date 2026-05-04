@@ -114,7 +114,7 @@ pub fn validate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
 /// already exists. Discovers all plugins under `plugins/` that have a
 /// `.claude-plugin/plugin.json`, and preserves existing category assignments for
 /// matching entries.
-pub fn generate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<()> {
+pub fn generate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<usize> {
     let marketplace_path = root.path.join(".claude-plugin").join("marketplace.json");
 
     // Load existing marketplace to preserve top-level fields and categories
@@ -169,11 +169,9 @@ pub fn generate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<()> 
         plugins: entries,
     };
 
+    let plugin_count = marketplace.plugins.len();
     save_json(&marketplace, &marketplace_path, fs)?;
-
-    println!("Generated marketplace.json with {} plugins", marketplace.plugins.len());
-
-    Ok(())
+    Ok(plugin_count)
 }
 
 /// Resolve a marketplace source path (which may start with `./`) relative to

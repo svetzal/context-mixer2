@@ -90,45 +90,6 @@ pub fn generate_manifests(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<Pa
     Ok(written)
 }
 
-/// Format a summary of what was generated.
-pub fn format_manifest_summary(files: &[PathBuf]) -> String {
-    use std::fmt::Write as FmtWrite;
-
-    if files.is_empty() {
-        return "No .claude-plugin/ sources found — nothing to generate.\n".to_string();
-    }
-
-    let mut out = format!("Generated manifests for {} platforms:\n", Platform::targets().len());
-
-    for platform in Platform::targets() {
-        let dir_name = platform.manifest_dir();
-
-        let platform_files: Vec<_> = files
-            .iter()
-            .filter(|p| p.components().any(|c| c.as_os_str() == dir_name))
-            .collect();
-
-        let marketplace_count =
-            platform_files.iter().filter(|p| p.ends_with("marketplace.json")).count();
-        let plugin_count = platform_files.iter().filter(|p| p.ends_with("plugin.json")).count();
-
-        let mut parts = Vec::new();
-        if marketplace_count > 0 {
-            parts.push("marketplace.json".to_string());
-        }
-        if plugin_count > 0 {
-            parts.push(format!(
-                "{plugin_count} plugin manifest{}",
-                if plugin_count == 1 { "" } else { "s" }
-            ));
-        }
-
-        let _ = writeln!(out, "  {dir_name}/ — {}", parts.join(" + "));
-    }
-
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

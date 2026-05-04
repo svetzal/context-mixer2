@@ -7,7 +7,6 @@ pub mod plugin;
 pub mod plugin_types;
 pub mod recipe;
 pub mod repo;
-pub mod status;
 #[cfg(test)]
 pub mod test_support;
 pub mod validate;

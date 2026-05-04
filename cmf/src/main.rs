@@ -4,18 +4,19 @@ use anyhow::Result;
 use clap::Parser;
 use cmx::gateway::{Filesystem, RealFilesystem};
 
-use cmf::display::format_plugin_list;
-use cmf::facet::{
-    format_facet_list, format_recipe_list, scan_facets, scan_recipes, validate_facets,
+use cmf::display::{
+    format_facet_list, format_manifest_summary, format_marketplace_generate_result,
+    format_plugin_create_result, format_plugin_list, format_recipe_assemble_result,
+    format_recipe_batch_result, format_recipe_diff, format_recipe_list, format_recipe_up_to_date,
+    format_status, format_validation_issues,
 };
-use cmf::manifest::{format_manifest_summary, generate_manifests};
+use cmf::facet::{scan_facets, scan_recipes, validate_facets};
+use cmf::manifest::generate_manifests;
 use cmf::marketplace::{generate_marketplace, validate_marketplace};
 use cmf::plugin::{init_plugin, scan_plugins, validate_all_plugins};
 use cmf::recipe::{assemble_recipe, diff_recipe, write_assembled};
 use cmf::repo::{RepoRoot, detect_repo};
-use cmf::status::format_status;
 use cmf::validate::validate_all;
-use cmf::validation::format_validation_issues;
 
 mod cli;
 
@@ -75,14 +76,14 @@ fn handle_recipe(action: RecipeAction, root: &RepoRoot, fs: &dyn Filesystem) -> 
                 for recipe in &recipes {
                     let content = assemble_recipe(recipe, root, fs)?;
                     write_assembled(recipe, &content, root, fs)?;
-                    println!("Wrote {}", recipe.produces);
+                    print!("{}", format_recipe_assemble_result(&recipe.produces));
                 }
-                println!("Assembled {} recipe(s)", recipes.len());
+                print!("{}", format_recipe_batch_result(recipes.len()));
             } else if let Some(name) = name {
                 let recipe = find_recipe(&recipes, &name)?;
                 let content = assemble_recipe(recipe, root, fs)?;
                 write_assembled(recipe, &content, root, fs)?;
-                println!("Wrote {}", recipe.produces);
+                print!("{}", format_recipe_assemble_result(&recipe.produces));
             } else {
                 anyhow::bail!("Provide a recipe name or use --all");
             }
@@ -92,9 +93,9 @@ fn handle_recipe(action: RecipeAction, root: &RepoRoot, fs: &dyn Filesystem) -> 
             let recipe = find_recipe(&recipes, &name)?;
             let diff = diff_recipe(recipe, root, fs)?;
             if diff.is_empty() {
-                println!("Recipe '{}' is up to date", recipe.name);
+                print!("{}", format_recipe_up_to_date(&recipe.name));
             } else {
-                println!("{diff}");
+                print!("{}", format_recipe_diff(&diff));
             }
         }
     }
@@ -115,7 +116,7 @@ fn handle_plugin(action: &PluginAction, root: &RepoRoot, fs: &dyn Filesystem) ->
     match action {
         PluginAction::Init { name } => {
             let path = init_plugin(root, name, fs)?;
-            println!("Created plugin '{}' at {}", name, path.display());
+            print!("{}", format_plugin_create_result(name, &path));
         }
         PluginAction::Validate => {
             let issues = validate_all_plugins(root, fs)?;
@@ -150,7 +151,8 @@ fn handle_marketplace(
             print!("{}", format_validation_issues(&issues));
         }
         MarketplaceAction::Generate => {
-            generate_marketplace(root, fs)?;
+            let count = generate_marketplace(root, fs)?;
+            print!("{}", format_marketplace_generate_result(count));
         }
     }
     Ok(())
