@@ -7,7 +7,7 @@ use crate::lockfile;
 use crate::scan;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
-use crate::types::{ArtifactKind, LockFile, display_version};
+use crate::types::{ArtifactKind, InstalledArtifact, LockEntry, LockFile, display_version};
 
 pub struct Row {
     pub name: String,
@@ -101,57 +101,75 @@ fn build_rows_with(
 
         let installed: Option<String> = ia
             .installed_version
+            .clone()
             .or_else(|| read_installed_version(kind, &ia.name, local, ctx));
 
         if let Some(infos) = source_infos {
-            // Emit one row per source that provides this artifact.
-            // Only show the installed version on the row matching the
-            // source from which the artifact was actually installed.
-            for info in infos {
-                // No lock entry → show installed on all rows
-                let is_install_source =
-                    lock_entry.is_none_or(|e| e.source.repo == info.source_name);
-                let row_installed = if is_install_source {
-                    display_version(installed.as_deref()).to_string()
-                } else {
-                    String::new()
-                };
-                let source = {
-                    let path = lock_entry.map_or("", |e| e.source.path.as_str());
-                    format_source(&info.source_name, path)
-                };
-                let status = status_indicator(
-                    installed.as_deref(),
-                    info.version.as_deref(),
-                    info.deprecated,
-                );
-                rows.push(Row {
-                    name: ia.name.clone(),
-                    installed: row_installed,
-                    source,
-                    available: display_version(info.version.as_deref()).to_string(),
-                    status,
-                });
-            }
+            rows.extend(build_rows_from_sources(&ia, lock_entry, installed.as_deref(), infos));
         } else {
-            // No source provides this artifact — fall back to lockfile info
-            let source_name = lock_entry.map_or_else(|| "-".to_string(), |e| e.source.repo.clone());
-            let source = {
-                let path = lock_entry.map_or("", |e| e.source.path.as_str());
-                format_source(&source_name, path)
-            };
-            let status = status_indicator(installed.as_deref(), None, false);
-            rows.push(Row {
-                name: ia.name,
-                installed: display_version(installed.as_deref()).to_string(),
-                source,
-                available: display_version(None).to_string(),
-                status,
-            });
+            rows.push(build_orphan_row(&ia, lock_entry, installed.as_deref()));
         }
     }
 
     Ok(rows)
+}
+
+/// Build rows for an artifact that has one or more source entries.
+///
+/// Emits one row per source. Only the row for the source the artifact was
+/// actually installed from shows the installed version.
+fn build_rows_from_sources(
+    ia: &InstalledArtifact<'_>,
+    lock_entry: Option<&LockEntry>,
+    installed: Option<&str>,
+    infos: &[SourceArtifactInfo],
+) -> Vec<Row> {
+    let mut rows = Vec::new();
+    for info in infos {
+        // No lock entry → show installed on all rows
+        let is_install_source = lock_entry.is_none_or(|e| e.source.repo == info.source_name);
+        let row_installed = if is_install_source {
+            display_version(installed).to_string()
+        } else {
+            String::new()
+        };
+        let source = {
+            let path = lock_entry.map_or("", |e| e.source.path.as_str());
+            format_source(&info.source_name, path)
+        };
+        let status = status_indicator(installed, info.version.as_deref(), info.deprecated);
+        rows.push(Row {
+            name: ia.name.clone(),
+            installed: row_installed,
+            source,
+            available: display_version(info.version.as_deref()).to_string(),
+            status,
+        });
+    }
+    rows
+}
+
+/// Build a single row for an artifact with no matching source (orphan).
+///
+/// Falls back to lockfile provenance for the source column.
+fn build_orphan_row(
+    ia: &InstalledArtifact<'_>,
+    lock_entry: Option<&LockEntry>,
+    installed: Option<&str>,
+) -> Row {
+    let source_name = lock_entry.map_or_else(|| "-".to_string(), |e| e.source.repo.clone());
+    let source = {
+        let path = lock_entry.map_or("", |e| e.source.path.as_str());
+        format_source(&source_name, path)
+    };
+    let status = status_indicator(installed, None, false);
+    Row {
+        name: ia.name.clone(),
+        installed: display_version(installed).to_string(),
+        source,
+        available: display_version(None).to_string(),
+        status,
+    }
 }
 
 /// Format the Source column to include provenance path when available.

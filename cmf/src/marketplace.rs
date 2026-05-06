@@ -38,7 +38,71 @@ pub fn validate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
     };
 
     // Check 3: each entry's source resolves to a directory with plugin.json
-    for entry in &marketplace.plugins {
+    issues.extend(validate_marketplace_entries(&marketplace.plugins, root, fs));
+
+    // Check 4: unlisted plugins — directories in plugins/ with plugin.json not in marketplace
+    issues.extend(find_unlisted_plugins(&marketplace, root, fs));
+
+    Ok(issues)
+}
+
+/// Discover plugin entries by walking the plugins directory.
+///
+/// Loads each plugin's `plugin.json`, builds a `MarketplaceEntry`, and
+/// preserves any existing category assignment by looking up the plugin name in
+/// `existing_by_name`.
+fn discover_plugin_entries(
+    plugins_dir: &std::path::Path,
+    existing_by_name: &std::collections::HashMap<&str, &MarketplaceEntry>,
+    fs: &dyn Filesystem,
+) -> Result<Vec<MarketplaceEntry>> {
+    let mut entries = Vec::new();
+
+    if !fs.is_dir(plugins_dir) {
+        return Ok(entries);
+    }
+
+    let Ok(dir_entries) = fs.read_dir(plugins_dir) else {
+        return Ok(entries);
+    };
+
+    for dir_entry in dir_entries {
+        if !dir_entry.is_dir {
+            continue;
+        }
+        let plugin_json = dir_entry.path.join(".claude-plugin").join("plugin.json");
+        if !fs.exists(&plugin_json) {
+            continue;
+        }
+
+        let manifest: PluginManifest = load_json(&plugin_json, fs)?;
+        let source = format!("./plugins/{}", dir_entry.file_name);
+
+        // Preserve category from existing entry if the name matches
+        let category =
+            existing_by_name.get(manifest.name.as_str()).and_then(|e| e.category.clone());
+
+        entries.push(MarketplaceEntry {
+            name: manifest.name,
+            description: manifest.description.unwrap_or_default(),
+            source,
+            category,
+        });
+    }
+
+    Ok(entries)
+}
+
+/// Validate each marketplace entry's source directory, plugin.json existence,
+/// and name consistency.
+fn validate_marketplace_entries(
+    entries: &[MarketplaceEntry],
+    root: &RepoRoot,
+    fs: &dyn Filesystem,
+) -> Vec<ValidationIssue> {
+    let mut issues = Vec::new();
+
+    for entry in entries {
         let plugin_path = resolve_source_path(&root.path, &entry.source);
 
         if !fs.exists(&plugin_path) || !fs.is_dir(&plugin_path) {
@@ -77,35 +141,50 @@ pub fn validate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
         }
     }
 
-    // Check 4: unlisted plugins — directories in plugins/ with plugin.json not in marketplace
-    let plugins_dir = root.path.join("plugins");
-    if fs.is_dir(&plugins_dir) {
-        if let Ok(entries) = fs.read_dir(&plugins_dir) {
-            let listed_sources: Vec<_> = marketplace
-                .plugins
-                .iter()
-                .map(|e| resolve_source_path(&root.path, &e.source))
-                .collect();
+    issues
+}
 
-            for entry in entries {
-                if !entry.is_dir {
-                    continue;
-                }
-                let plugin_json = entry.path.join(".claude-plugin").join("plugin.json");
-                if fs.exists(&plugin_json) && !listed_sources.contains(&entry.path) {
-                    issues.push(ValidationIssue::warning(
-                        "marketplace",
-                        format!(
-                            "unlisted plugin \"{}\" has plugin.json but is not in marketplace.json",
-                            entry.file_name
-                        ),
-                    ));
-                }
-            }
+/// Scan for plugin directories that have a plugin.json but are not listed in
+/// marketplace.json.
+fn find_unlisted_plugins(
+    marketplace: &Marketplace,
+    root: &RepoRoot,
+    fs: &dyn Filesystem,
+) -> Vec<ValidationIssue> {
+    let mut issues = Vec::new();
+
+    let plugins_dir = root.path.join("plugins");
+    if !fs.is_dir(&plugins_dir) {
+        return issues;
+    }
+
+    let Ok(entries) = fs.read_dir(&plugins_dir) else {
+        return issues;
+    };
+
+    let listed_sources: Vec<_> = marketplace
+        .plugins
+        .iter()
+        .map(|e| resolve_source_path(&root.path, &e.source))
+        .collect();
+
+    for entry in entries {
+        if !entry.is_dir {
+            continue;
+        }
+        let plugin_json = entry.path.join(".claude-plugin").join("plugin.json");
+        if fs.exists(&plugin_json) && !listed_sources.contains(&entry.path) {
+            issues.push(ValidationIssue::warning(
+                "marketplace",
+                format!(
+                    "unlisted plugin \"{}\" has plugin.json but is not in marketplace.json",
+                    entry.file_name
+                ),
+            ));
         }
     }
 
-    Ok(issues)
+    issues
 }
 
 /// Generate marketplace.json from the plugin directories.
@@ -128,37 +207,8 @@ pub fn generate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<usiz
     let existing_by_name: std::collections::HashMap<&str, &MarketplaceEntry> =
         existing.plugins.iter().map(|e| (e.name.as_str(), e)).collect();
 
-    // Walk plugins/ directory to discover plugins
     let plugins_dir = root.path.join("plugins");
-    let mut entries = Vec::new();
-
-    if fs.is_dir(&plugins_dir) {
-        if let Ok(dir_entries) = fs.read_dir(&plugins_dir) {
-            for dir_entry in dir_entries {
-                if !dir_entry.is_dir {
-                    continue;
-                }
-                let plugin_json = dir_entry.path.join(".claude-plugin").join("plugin.json");
-                if !fs.exists(&plugin_json) {
-                    continue;
-                }
-
-                let manifest: PluginManifest = load_json(&plugin_json, fs)?;
-                let source = format!("./plugins/{}", dir_entry.file_name);
-
-                // Preserve category from existing entry if the name matches
-                let category =
-                    existing_by_name.get(manifest.name.as_str()).and_then(|e| e.category.clone());
-
-                entries.push(MarketplaceEntry {
-                    name: manifest.name,
-                    description: manifest.description.unwrap_or_default(),
-                    source,
-                    category,
-                });
-            }
-        }
-    }
+    let mut entries = discover_plugin_entries(&plugins_dir, &existing_by_name, fs)?;
 
     entries.sort_by(|a, b| a.name.cmp(&b.name));
 

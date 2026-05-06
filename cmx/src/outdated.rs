@@ -86,6 +86,26 @@ fn outdated_status_label(installed_v: Option<&str>, available_v: Option<&str>) -
     }
 }
 
+/// Determine whether an installed artifact has been locally modified since
+/// installation. Returns `false` if there is no lock entry or the file is not
+/// present on disk.
+fn check_locally_modified(
+    lock_entry: Option<&crate::types::LockEntry>,
+    kind: ArtifactKind,
+    name: &str,
+    local: bool,
+    ctx: &AppContext<'_>,
+) -> Result<bool> {
+    let Some(entry) = lock_entry else {
+        return Ok(false);
+    };
+    let install_path = kind.installed_path(name, &ctx.paths.install_dir(kind, local));
+    if !ctx.fs.exists(&install_path) {
+        return Ok(false);
+    }
+    checksum::is_locally_modified(&install_path, kind, entry, ctx.fs)
+}
+
 fn collect_outdated_for_scope_with(
     kind: ArtifactKind,
     local: bool,
@@ -108,13 +128,7 @@ fn collect_outdated_for_scope_with(
         let installed_v: Option<String> = ia.installed_version.clone();
 
         // Check for local modifications once (shared across all source rows)
-        let locally_modified = if let Some(entry) = lock_entry {
-            let install_path = kind.installed_path(&ia.name, &ctx.paths.install_dir(kind, local));
-            ctx.fs.exists(&install_path)
-                && checksum::is_locally_modified(&install_path, kind, entry, ctx.fs)?
-        } else {
-            false
-        };
+        let locally_modified = check_locally_modified(lock_entry, kind, &ia.name, local, ctx)?;
 
         for source_info in source_infos {
             let available_v: Option<String> = source_info.version.clone();

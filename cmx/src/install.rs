@@ -58,18 +58,7 @@ pub fn install_with(
 
     // Check for local modifications before overwriting
     if !force {
-        let dest_check = kind.installed_path(artifact_name, &dest_dir);
-        if ctx.fs.exists(&dest_check) {
-            let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
-            if let Some(entry) = lock.packages.get(artifact_name) {
-                if checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs)? {
-                    bail!(
-                        "'{artifact_name}' has local modifications. Use --force to overwrite, \
-                         or 'cmx {kind} diff {artifact_name}' to review changes first."
-                    );
-                }
-            }
-        }
+        check_local_modifications(artifact_name, kind, &dest_dir, local, ctx)?;
     }
 
     let dest_path = copy::copy_artifact(&found.artifact.path, &dest_dir, kind, artifact_name, ctx)?;
@@ -181,8 +170,33 @@ pub fn update_all_with(
 }
 
 // ---------------------------------------------------------------------------
-// Pure helpers
+// Private helpers
 // ---------------------------------------------------------------------------
+
+/// Check whether the named artifact has been locally modified since it was
+/// installed. Returns `Ok(())` if clean, or bails with a user-facing error if
+/// modifications are detected.
+fn check_local_modifications(
+    artifact_name: &str,
+    kind: ArtifactKind,
+    dest_dir: &std::path::Path,
+    local: bool,
+    ctx: &AppContext<'_>,
+) -> Result<()> {
+    let dest_check = kind.installed_path(artifact_name, dest_dir);
+    if ctx.fs.exists(&dest_check) {
+        let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
+        if let Some(entry) = lock.packages.get(artifact_name) {
+            if checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs)? {
+                bail!(
+                    "'{artifact_name}' has local modifications. Use --force to overwrite, \
+                     or 'cmx {kind} diff {artifact_name}' to review changes first."
+                );
+            }
+        }
+    }
+    Ok(())
+}
 
 fn parse_name(name: &str) -> (Option<&str>, &str) {
     if let Some((source, artifact)) = name.split_once(':') {

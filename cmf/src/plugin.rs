@@ -47,15 +47,7 @@ pub fn scan_plugins(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<PluginIn
         let manifest: PluginManifest = load_json(&manifest_path, fs)?;
 
         let scan_result = scan_source_with(&plugin_path, fs)?;
-
-        let mut agents = Vec::new();
-        let mut skills = Vec::new();
-        for artifact in scan_result.artifacts {
-            match artifact.kind {
-                ArtifactKind::Agent => agents.push(artifact),
-                ArtifactKind::Skill => skills.push(artifact),
-            }
-        }
+        let (agents, skills) = partition_artifacts(scan_result.artifacts);
 
         plugins.push(PluginInfo {
             name: manifest.name,
@@ -147,18 +139,7 @@ pub fn validate_plugin(
 
     // Use cmx scan to discover what agents/skills have valid frontmatter
     let scan_result = scan_source_with(plugin_path, fs)?;
-    let discovered_agents: Vec<_> = scan_result
-        .artifacts
-        .iter()
-        .filter(|a| a.kind == ArtifactKind::Agent)
-        .map(|a| a.name.clone())
-        .collect();
-    let discovered_skills: Vec<_> = scan_result
-        .artifacts
-        .iter()
-        .filter(|a| a.kind == ArtifactKind::Skill)
-        .map(|a| a.name.clone())
-        .collect();
+    let (discovered_agents, discovered_skills) = artifact_names_by_kind(&scan_result.artifacts);
 
     validate_artifact_dir(
         ArtifactKind::Agent,
@@ -178,6 +159,38 @@ pub fn validate_plugin(
     );
 
     Ok(issues)
+}
+
+/// Split a flat list of artifacts into `(agents, skills)`.
+fn partition_artifacts(
+    artifacts: Vec<cmx::types::Artifact>,
+) -> (Vec<cmx::types::Artifact>, Vec<cmx::types::Artifact>) {
+    let mut agents = Vec::new();
+    let mut skills = Vec::new();
+    for artifact in artifacts {
+        match artifact.kind {
+            ArtifactKind::Agent => agents.push(artifact),
+            ArtifactKind::Skill => skills.push(artifact),
+        }
+    }
+    (agents, skills)
+}
+
+/// Extract artifact names grouped by kind from a slice of artifacts.
+///
+/// Returns `(agent_names, skill_names)`.
+fn artifact_names_by_kind(artifacts: &[cmx::types::Artifact]) -> (Vec<String>, Vec<String>) {
+    let agents = artifacts
+        .iter()
+        .filter(|a| a.kind == ArtifactKind::Agent)
+        .map(|a| a.name.clone())
+        .collect();
+    let skills = artifacts
+        .iter()
+        .filter(|a| a.kind == ArtifactKind::Skill)
+        .map(|a| a.name.clone())
+        .collect();
+    (agents, skills)
 }
 
 fn validate_manifest_fields(
@@ -217,43 +230,58 @@ fn validate_artifact_dir(
     };
     for entry in entries {
         match kind {
-            ArtifactKind::Agent => {
-                let is_md = Path::new(&entry.file_name)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
-                if entry.is_dir || !is_md {
-                    continue;
-                }
-                let artifact_name =
-                    kind.artifact_name_from_path(Path::new(&entry.file_name)).unwrap_or_default();
-                if !discovered_names.contains(&artifact_name) {
-                    issues.push(ValidationIssue::warning(
-                        dir_name,
-                        format!("agents/{} has no frontmatter name field", entry.file_name),
-                    ));
-                }
-            }
+            ArtifactKind::Agent => validate_agent_entry(&entry, discovered_names, dir_name, issues),
             ArtifactKind::Skill => {
-                if !entry.is_dir {
-                    continue;
-                }
-                let content_path = kind.content_path(&entry.path);
-                if !fs.exists(&content_path) {
-                    issues.push(ValidationIssue::warning(
-                        dir_name,
-                        format!("skills/{} is missing SKILL.md", entry.file_name),
-                    ));
-                } else if !discovered_names.contains(&entry.file_name) {
-                    issues.push(ValidationIssue::warning(
-                        dir_name,
-                        format!(
-                            "skills/{}/SKILL.md has no frontmatter description field",
-                            entry.file_name
-                        ),
-                    ));
-                }
+                validate_skill_entry(&entry, discovered_names, dir_name, fs, issues);
             }
         }
+    }
+}
+
+fn validate_agent_entry(
+    entry: &cmx::gateway::DirEntry,
+    discovered_names: &[String],
+    dir_name: &str,
+    issues: &mut Vec<ValidationIssue>,
+) {
+    let is_md = Path::new(&entry.file_name)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
+    if entry.is_dir || !is_md {
+        return;
+    }
+    let artifact_name = ArtifactKind::Agent
+        .artifact_name_from_path(Path::new(&entry.file_name))
+        .unwrap_or_default();
+    if !discovered_names.contains(&artifact_name) {
+        issues.push(ValidationIssue::warning(
+            dir_name,
+            format!("agents/{} has no frontmatter name field", entry.file_name),
+        ));
+    }
+}
+
+fn validate_skill_entry(
+    entry: &cmx::gateway::DirEntry,
+    discovered_names: &[String],
+    dir_name: &str,
+    fs: &dyn Filesystem,
+    issues: &mut Vec<ValidationIssue>,
+) {
+    if !entry.is_dir {
+        return;
+    }
+    let content_path = ArtifactKind::Skill.content_path(&entry.path);
+    if !fs.exists(&content_path) {
+        issues.push(ValidationIssue::warning(
+            dir_name,
+            format!("skills/{} is missing SKILL.md", entry.file_name),
+        ));
+    } else if !discovered_names.contains(&entry.file_name) {
+        issues.push(ValidationIssue::warning(
+            dir_name,
+            format!("skills/{}/SKILL.md has no frontmatter description field", entry.file_name),
+        ));
     }
 }
 

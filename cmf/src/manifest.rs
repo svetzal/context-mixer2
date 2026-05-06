@@ -30,15 +30,11 @@ impl Platform {
     }
 }
 
-/// Generate multi-platform manifests from the canonical `.claude-plugin/` source.
+/// Collect all source files to replicate across platforms.
 ///
-/// Works at both marketplace level (root `marketplace.json`) and per-plugin level
-/// (`plugin.json`). Returns the list of files that were written.
-pub fn generate_manifests(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<PathBuf>> {
-    let mut written = Vec::new();
-
-    // Collect all source files to replicate: (source_path, containing_dir)
-    // where containing_dir is the parent of `.claude-plugin/`
+/// Returns a list of `(source_path, containing_dir)` pairs where
+/// `containing_dir` is the parent of `.claude-plugin/`.
+fn collect_manifest_sources(root: &RepoRoot, fs: &dyn Filesystem) -> Vec<(PathBuf, PathBuf)> {
     let mut sources: Vec<(PathBuf, PathBuf)> = Vec::new();
 
     // Root-level marketplace.json
@@ -68,6 +64,18 @@ pub fn generate_manifests(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<Pa
             }
         }
     }
+
+    sources
+}
+
+/// Generate multi-platform manifests from the canonical `.claude-plugin/` source.
+///
+/// Works at both marketplace level (root `marketplace.json`) and per-plugin level
+/// (`plugin.json`). Returns the list of files that were written.
+pub fn generate_manifests(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<PathBuf>> {
+    let mut written = Vec::new();
+
+    let sources = collect_manifest_sources(root, fs);
 
     // For each source file, copy to each target platform directory
     for (source_path, containing_dir) in &sources {
