@@ -15,6 +15,7 @@ pub struct SourceArtifactInfo {
     pub source_name: String,
     pub version: Option<String>,
     pub checksum: String,
+    pub deprecated: bool,
 }
 
 /// Scan all registered sources for all artifact kinds, computing a checksum for
@@ -28,10 +29,12 @@ pub fn scan_all_with_checksums(
 
     for sa in each_source_artifact_with(sources, fs) {
         let cs = checksum::checksum_artifact_with(&sa.artifact.path, sa.artifact.kind, fs)?;
+        let deprecated = sa.artifact.is_deprecated();
         result.entry(sa.artifact.name).or_default().push(SourceArtifactInfo {
             source_name: sa.source_name,
             version: sa.artifact.version,
             checksum: cs,
+            deprecated,
         });
     }
 

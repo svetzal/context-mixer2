@@ -6,6 +6,7 @@ use crate::context::AppContext;
 use crate::lockfile;
 use crate::scan;
 use crate::source_iter;
+use crate::source_iter::SourceArtifactInfo;
 use crate::types::{ArtifactKind, LockFile, display_version};
 
 pub struct Row {
@@ -45,7 +46,7 @@ fn status_indicator(
 }
 
 pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKindOutput> {
-    let source_versions = build_source_versions_with(kind, ctx)?;
+    let source_versions = source_iter::all_with_checksums(ctx)?;
     let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
     let global_rows = build_rows_with(kind, false, &global_lock, &source_versions, ctx)?;
     let local_rows = build_rows_with(kind, true, &local_lock, &source_versions, ctx)?;
@@ -57,6 +58,7 @@ pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKi
 }
 
 pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
+    let source_versions = source_iter::all_with_checksums(ctx)?;
     let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
     let mut output = ListOutput {
         global_agents: Vec::new(),
@@ -66,7 +68,6 @@ pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
     };
 
     for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-        let source_versions = build_source_versions_with(kind, ctx)?;
         let global = build_rows_with(kind, false, &global_lock, &source_versions, ctx)?;
         let local = build_rows_with(kind, true, &local_lock, &source_versions, ctx)?;
         match kind {
@@ -88,16 +89,15 @@ fn build_rows_with(
     kind: ArtifactKind,
     local: bool,
     lock: &LockFile,
-    source_versions: &BTreeMap<String, Vec<SourceInfo>>,
+    source_versions: &BTreeMap<String, Vec<SourceArtifactInfo>>,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Row>> {
-    let installed_artifacts =
-        config::installed_with_lock_data(kind, local, lock, ctx.fs, ctx.paths)?;
+    let pairs =
+        config::match_installed_to_sources(kind, local, lock, source_versions, ctx.fs, ctx.paths)?;
     let mut rows = Vec::new();
 
-    for ia in installed_artifacts {
+    for (ia, source_infos) in pairs {
         let lock_entry = ia.lock_entry;
-        let source_infos = source_versions.get(&ia.name);
 
         let installed: Option<String> = ia
             .installed_version
@@ -154,12 +154,6 @@ fn build_rows_with(
     Ok(rows)
 }
 
-struct SourceInfo {
-    source_name: String,
-    version: Option<String>,
-    deprecated: bool,
-}
-
 /// Format the Source column to include provenance path when available.
 fn format_source(repo: &str, path: &str) -> String {
     if path.is_empty() || repo == "-" {
@@ -167,26 +161,6 @@ fn format_source(repo: &str, path: &str) -> String {
     } else {
         format!("{repo} ({path})")
     }
-}
-
-fn build_source_versions_with(
-    kind: ArtifactKind,
-    ctx: &AppContext<'_>,
-) -> Result<BTreeMap<String, Vec<SourceInfo>>> {
-    let mut versions: BTreeMap<String, Vec<SourceInfo>> = BTreeMap::new();
-
-    for sa in source_iter::all_artifacts(ctx)? {
-        if sa.artifact.kind == kind {
-            let deprecated = sa.artifact.is_deprecated();
-            versions.entry(sa.artifact.name).or_default().push(SourceInfo {
-                source_name: sa.source_name,
-                version: sa.artifact.version,
-                deprecated,
-            });
-        }
-    }
-
-    Ok(versions)
 }
 
 /// Read the version from an installed artifact's file on disk.
@@ -322,7 +296,7 @@ mod tests {
         crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let source_versions = build_source_versions_with(ArtifactKind::Skill, &ctx).unwrap();
+        let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
 
@@ -380,7 +354,7 @@ mod tests {
         crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let source_versions = build_source_versions_with(ArtifactKind::Skill, &ctx).unwrap();
+        let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
 
@@ -418,7 +392,7 @@ mod tests {
         };
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let source_versions = build_source_versions_with(ArtifactKind::Skill, &ctx).unwrap();
+        let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
 
@@ -459,7 +433,7 @@ mod tests {
         crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let source_versions = build_source_versions_with(ArtifactKind::Skill, &ctx).unwrap();
+        let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
 
@@ -504,7 +478,7 @@ mod tests {
         crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let source_versions = build_source_versions_with(ArtifactKind::Agent, &ctx).unwrap();
+        let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Agent, false, &lock, &source_versions, &ctx).unwrap();
 
@@ -562,7 +536,7 @@ mod tests {
         crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let source_versions = build_source_versions_with(ArtifactKind::Agent, &ctx).unwrap();
+        let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Agent, false, &lock, &source_versions, &ctx).unwrap();
 
@@ -626,7 +600,7 @@ mod tests {
         crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let source_versions = build_source_versions_with(ArtifactKind::Skill, &ctx).unwrap();
+        let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
 

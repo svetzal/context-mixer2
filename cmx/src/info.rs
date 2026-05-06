@@ -67,7 +67,8 @@ pub(crate) fn gather_info_with(
 ) -> Result<ArtifactInfo> {
     let scope = if local { "local" } else { "global" };
     let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
-    let lock_entry = lock.packages.get(name);
+    let installed = config::installed_single_with_lock_data(name, &lock, kind);
+    let lock_entry = installed.as_ref().and_then(|ia| ia.lock_entry);
 
     let (
         version,

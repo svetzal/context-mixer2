@@ -94,12 +94,11 @@ fn collect_outdated_for_scope_with(
     rows: &mut Vec<OutdatedRow>,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
-    let installed_artifacts =
-        config::installed_with_lock_data(kind, local, lock, ctx.fs, ctx.paths)?;
+    let pairs =
+        config::match_installed_to_sources(kind, local, lock, source_artifacts, ctx.fs, ctx.paths)?;
 
-    for ia in &installed_artifacts {
+    for (ia, source_infos) in pairs {
         let lock_entry = ia.lock_entry;
-        let source_infos = source_artifacts.get(&ia.name);
 
         // No source artifact — nothing to compare against
         let Some(source_infos) = source_infos else {

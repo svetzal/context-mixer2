@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::gateway::filesystem::Filesystem;
@@ -79,6 +80,53 @@ pub fn installed_with_lock_data<'a>(
                 lock_entry,
                 installed_version,
             }
+        })
+        .collect())
+}
+
+/// Look up a single installed artifact by name in the lock file.
+///
+/// Returns `Some(InstalledArtifact)` if the artifact is present in `lock`,
+/// or `None` if there is no lock entry for `name`.  `kind` is used to
+/// populate the `InstalledArtifact` fields consistently with
+/// [`installed_with_lock_data`].
+pub fn installed_single_with_lock_data<'a>(
+    name: &str,
+    lock: &'a LockFile,
+    _kind: ArtifactKind,
+) -> Option<InstalledArtifact<'a>> {
+    let lock_entry = lock.packages.get(name)?;
+    Some(InstalledArtifact {
+        name: name.to_string(),
+        lock_entry: Some(lock_entry),
+        installed_version: lock_entry.version.clone(),
+    })
+}
+
+/// Each element returned by [`match_installed_to_sources`]: an installed
+/// artifact paired with its optional source entries.
+pub type InstalledWithSources<'a, S> = (InstalledArtifact<'a>, Option<&'a Vec<S>>);
+
+/// Pair every installed artifact of the given `kind` and `local` scope with its
+/// source entries from `source_map`, if any.
+///
+/// Calls [`installed_with_lock_data`] internally and enriches each result with
+/// a reference to the matching `Vec<S>` in `source_map` (keyed by artifact
+/// name), returning `None` for the source slot when no entry exists.
+pub fn match_installed_to_sources<'a, S>(
+    kind: ArtifactKind,
+    local: bool,
+    lock: &'a LockFile,
+    source_map: &'a BTreeMap<String, Vec<S>>,
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+) -> Result<Vec<InstalledWithSources<'a, S>>> {
+    let installed = installed_with_lock_data(kind, local, lock, fs, paths)?;
+    Ok(installed
+        .into_iter()
+        .map(|ia| {
+            let sources = source_map.get(&ia.name);
+            (ia, sources)
         })
         .collect())
 }
@@ -354,6 +402,93 @@ mod tests {
         assert_eq!(artifacts[0].name, "my-agent");
         assert!(artifacts[0].lock_entry.is_none());
         assert!(artifacts[0].installed_version.is_none());
+    }
+
+    // --- installed_single_with_lock_data ---
+
+    #[test]
+    fn installed_single_with_lock_data_returns_entry_when_present() {
+        let paths = test_paths();
+        let _ = paths; // paths not needed for this pure function
+        let mut lock = LockFile::default();
+        lock.packages.insert(
+            "my-agent".to_string(),
+            make_lock_entry_versioned(
+                ArtifactKind::Agent,
+                "1.0.0",
+                "guidelines",
+                "agents/my-agent.md",
+            ),
+        );
+
+        let result = installed_single_with_lock_data("my-agent", &lock, ArtifactKind::Agent);
+        assert!(result.is_some(), "expected Some for present artifact");
+        let ia = result.unwrap();
+        assert_eq!(ia.name, "my-agent");
+        assert_eq!(ia.installed_version.as_deref(), Some("1.0.0"));
+        assert!(ia.lock_entry.is_some());
+    }
+
+    #[test]
+    fn installed_single_with_lock_data_returns_none_when_absent() {
+        let lock = LockFile::default();
+        let result = installed_single_with_lock_data("missing-agent", &lock, ArtifactKind::Agent);
+        assert!(result.is_none(), "expected None for absent artifact");
+    }
+
+    // --- match_installed_to_sources ---
+
+    #[test]
+    fn match_installed_to_sources_pairs_artifact_with_matching_sources() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        fs.add_file(agent_dir.join("my-agent.md"), "# agent");
+
+        let mut lock = LockFile::default();
+        lock.packages.insert(
+            "my-agent".to_string(),
+            make_lock_entry_versioned(
+                ArtifactKind::Agent,
+                "1.0.0",
+                "guidelines",
+                "agents/my-agent.md",
+            ),
+        );
+
+        let mut source_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        source_map.insert("my-agent".to_string(), vec!["source-entry".to_string()]);
+
+        let pairs =
+            match_installed_to_sources(ArtifactKind::Agent, false, &lock, &source_map, &fs, &paths)
+                .unwrap();
+
+        assert_eq!(pairs.len(), 1);
+        let (ia, sources) = &pairs[0];
+        assert_eq!(ia.name, "my-agent");
+        assert_eq!(ia.installed_version.as_deref(), Some("1.0.0"));
+        assert!(sources.is_some(), "expected source entries to be found");
+        assert_eq!(sources.unwrap(), &["source-entry"]);
+    }
+
+    #[test]
+    fn match_installed_to_sources_returns_none_when_no_matching_source() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        fs.add_file(agent_dir.join("orphan-agent.md"), "# agent");
+
+        let lock = LockFile::default();
+        let source_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+
+        let pairs =
+            match_installed_to_sources(ArtifactKind::Agent, false, &lock, &source_map, &fs, &paths)
+                .unwrap();
+
+        assert_eq!(pairs.len(), 1);
+        let (ia, sources) = &pairs[0];
+        assert_eq!(ia.name, "orphan-agent");
+        assert!(sources.is_none(), "expected no source entries for orphan artifact");
     }
 
     // --- failure-path tests ---
