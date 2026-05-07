@@ -48,16 +48,58 @@ Trunk-based development: `main` is the only long-lived branch. All work lands on
 
 ## Architecture
 
+Entry points:
+- `src/main.rs` — binary entry point; constructs AppContext with real gateways and dispatches CLI commands
+- `src/lib.rs` — crate root; re-exports all public modules
 - `src/cli.rs` — clap CLI definition
-- `src/config.rs` — config dir paths, sources.json read/write
+- `src/context.rs` — AppContext: bundles all I/O gateway dependencies for command invocations
+
+Source management:
 - `src/source.rs` — `cmx source` subcommands (add, list, browse, update, remove)
+- `src/source_update.rs` — source update logic (git pull for registered sources)
+- `src/source_iter.rs` — iterator over configured sources
+
+Artifact scanning:
+- `src/scan.rs` — artifact detection (walks source repos, matches agents/skills by frontmatter)
+- `src/scan_marketplace.rs` — scans marketplace-structured plugin repos
+
+Install/uninstall:
 - `src/install.rs` — `cmx agent install` / `cmx skill install`
+- `src/uninstall.rs` — `cmx agent uninstall` / `cmx skill uninstall`
+- `src/copy.rs` — file copy helpers used by install
+
+Query & display:
 - `src/list.rs` — `cmx agent list` / `cmx skill list` / `cmx list`
 - `src/outdated.rs` — `cmx outdated` (compare installed vs source)
-- `src/scan.rs` — artifact detection (walks source repos, matches agents/skills by frontmatter)
-- `src/checksum.rs` — SHA-256 checksums for files and directories
+- `src/search.rs` — `cmx search` (full-text search across sources)
+- `src/info.rs` — `cmx info` (artifact detail view)
+- `src/diff.rs` — LLM-powered diff analysis between installed and source versions (feature-gated)
+- `src/display.rs` — output formatting for all commands
+- `src/table.rs` — table rendering helpers
+
+Config & persistence:
+- `src/config.rs` — config dir paths, sources.json read/write
+- `src/cmx_config.rs` — `cmx config` subcommands (show, set)
+- `src/paths.rs` — ConfigPaths: global/local install dir resolution
 - `src/lockfile.rs` — lock file read/write
+- `src/json_file.rs` — generic JSON file load/save helpers
+- `src/checksum.rs` — SHA-256 checksums for files and directories
+- `src/fs_util.rs` — filesystem utility functions
+
+Types:
 - `src/types.rs` — shared types (SourceEntry, Artifact, ArtifactKind, LockFile, etc.)
+
+Gateway (DI for testability):
+- `src/gateway/mod.rs` — gateway module; re-exports traits and real implementations
+- `src/gateway/filesystem.rs` — Filesystem trait for file I/O abstraction
+- `src/gateway/git.rs` — GitClient trait for git operations
+- `src/gateway/clock.rs` — Clock trait for time abstraction
+- `src/gateway/llm.rs` — LlmClient trait for LLM access (feature-gated)
+- `src/gateway/real.rs` — production implementations (RealFilesystem, RealGitClient, SystemClock, MojenticLlmClient)
+- `src/gateway/fakes.rs` — in-memory fakes for tests (FakeFilesystem, FakeGitClient, etc.)
+
+Test support:
+- `src/test_support.rs` — test helpers shared across integration tests
 
 ## cmf — Context Mixer Forge
 
@@ -65,6 +107,8 @@ Publisher and authoring tool for managing agentic context artifacts.
 
 ### Architecture
 
+- `cmf/src/main.rs` — binary entry point; dispatches CLI commands (including status)
+- `cmf/src/lib.rs` — crate root; re-exports all public modules
 - `cmf/src/cli.rs` — clap CLI definition (7 commands: facet, recipe, plugin, manifest, marketplace, validate, status)
 - `cmf/src/repo.rs` — Repo root detection (marketplace, plugin, facets-only, unknown)
 - `cmf/src/plugin.rs` — Plugin scanning, initialization, validation
@@ -75,8 +119,9 @@ Publisher and authoring tool for managing agentic context artifacts.
 - `cmf/src/recipe.rs` — Recipe assembly and diffing
 - `cmf/src/manifest.rs` — Multi-platform manifest generation
 - `cmf/src/validate.rs` — Aggregate validation
-- `cmf/src/status.rs` — Repo overview dashboard
+- `cmf/src/display.rs` — formatting for plugin lists, recipes, facets, manifests, and validation results
 - `cmf/src/validation.rs` — Shared validation types
+- `cmf/src/test_support.rs` — test helpers for generating fake marketplace/plugin JSON
 
 ## Spec
 
