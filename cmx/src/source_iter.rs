@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 
 use crate::checksum;
 use crate::config;
@@ -125,8 +125,7 @@ pub fn find_unique(
     }
 
     let search_sources: BTreeMap<_, _> = if let Some(src) = source {
-        let entry =
-            sources.sources.get(src).with_context(|| format!("Source '{src}' not found."))?;
+        let entry = sources.get_source(src)?;
         std::iter::once((src.to_string(), entry.clone())).collect()
     } else {
         sources.sources.clone()

@@ -7,7 +7,7 @@ use crate::context::AppContext;
 use crate::lockfile;
 use crate::source_iter;
 use crate::source_update;
-use crate::types::{ArtifactKind, Deprecation};
+use crate::types::{ArtifactKind, Deprecation, scope_label};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -65,7 +65,7 @@ pub(crate) fn gather_info_with(
     path: &Path,
     ctx: &AppContext<'_>,
 ) -> Result<ArtifactInfo> {
-    let scope = if local { "local" } else { "global" };
+    let scope = scope_label(local);
     let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
     let installed = config::installed_single_with_lock_data(name, &lock, kind);
     let lock_entry = installed.as_ref().and_then(|ia| ia.lock_entry);

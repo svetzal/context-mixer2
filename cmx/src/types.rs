@@ -290,6 +290,20 @@ pub fn display_version(v: Option<&str>) -> &str {
     v.unwrap_or("-")
 }
 
+pub fn scope_label(local: bool) -> &'static str {
+    if local { "local" } else { "global" }
+}
+
+pub fn format_version_prefix(version: Option<&str>) -> String {
+    version.map(|v| format!(" v{v}")).unwrap_or_default()
+}
+
+impl SourcesFile {
+    pub fn get_source(&self, name: &str) -> anyhow::Result<&SourceEntry> {
+        self.sources.get(name).with_context(|| format!("Source '{name}' not found."))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

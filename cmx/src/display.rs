@@ -12,6 +12,7 @@ use crate::search::SearchOutput;
 use crate::source::{SourceAddResult, SourceBrowseResult, SourceListResult, SourceRemoveResult};
 use crate::source_update::SourceUpdateOutput;
 use crate::table::Table;
+use crate::types::format_version_prefix;
 use crate::uninstall::UninstallResult;
 
 pub fn format_list_kind_output(output: &ListKindOutput) -> String {
@@ -118,7 +119,7 @@ pub fn format_browse_result(result: &SourceBrowseResult) -> String {
     if !result.agents.is_empty() {
         out.push_str("Agents:\n");
         for a in &result.agents {
-            let v = a.version.as_deref().map(|v| format!("  v{v}")).unwrap_or_default();
+            let v = format_version_prefix(a.version.as_deref());
             let _ = writeln!(out, "  {}{v}{}", a.name, a.deprecation_display);
         }
     }
@@ -129,7 +130,7 @@ pub fn format_browse_result(result: &SourceBrowseResult) -> String {
         }
         out.push_str("Skills:\n");
         for s in &result.skills {
-            let v = s.version.as_deref().map(|v| format!("  v{v}")).unwrap_or_default();
+            let v = format_version_prefix(s.version.as_deref());
             let _ = writeln!(out, "  {}{v}{}", s.name, s.deprecation_display);
             for f in &s.files {
                 let _ = writeln!(out, "    {f}");
@@ -291,7 +292,7 @@ pub fn format_diff_output(output: &DiffOutput) -> String {
 }
 
 pub fn format_install_result(result: &InstallResult) -> String {
-    let version_info = result.version.as_deref().map(|v| format!(" v{v}")).unwrap_or_default();
+    let version_info = format_version_prefix(result.version.as_deref());
     format!(
         "Installed {}{version_info} ({}) from '{}' -> {}\n",
         result.artifact_name,

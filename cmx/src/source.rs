@@ -117,9 +117,9 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResul
 
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
-    let entry = sources.sources.get(name).with_context(|| {
-        format!("Source '{name}' not found. Run 'cmx source list' to see registered sources.")
-    })?;
+    let entry = sources
+        .get_source(name)
+        .context("Run 'cmx source list' to see registered sources.")?;
 
     let local_path = config::resolve_local_path(entry);
     if !ctx.fs.exists(&local_path) {

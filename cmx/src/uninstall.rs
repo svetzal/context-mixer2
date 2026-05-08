@@ -2,7 +2,7 @@ use anyhow::{Result, bail};
 
 use crate::context::AppContext;
 use crate::lockfile;
-use crate::types::ArtifactKind;
+use crate::types::{ArtifactKind, scope_label};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -29,7 +29,7 @@ pub fn uninstall_with(
     let target = kind.installed_path(name, &dir);
 
     if !ctx.fs.exists(&target) {
-        let scope = if local { "local" } else { "global" };
+        let scope = scope_label(local);
         bail!("No {kind} named '{name}' found in {scope} scope.");
     }
 
@@ -41,7 +41,7 @@ pub fn uninstall_with(
     let was_tracked = lock.packages.remove(name).is_some();
     lockfile::save_with(&lock, local, ctx.fs, ctx.paths)?;
 
-    let scope = if local { "local" } else { "global" };
+    let scope = scope_label(local);
 
     Ok(UninstallResult {
         name: name.to_string(),
