@@ -97,7 +97,9 @@ pub(crate) fn gather_info_with(
     };
 
     // Check source for deprecation and available version
-    source_update::auto_update_all_with(ctx).ok();
+    if let Err(e) = source_update::auto_update_all_with(ctx) {
+        eprintln!("Warning: failed to auto-update sources: {e:#}");
+    }
     let mut deprecation: Option<Deprecation> = None;
     let mut available_version: Option<String> = None;
 

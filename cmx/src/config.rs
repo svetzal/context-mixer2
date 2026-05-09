@@ -150,10 +150,16 @@ pub fn find_installed_path(
     None
 }
 
-pub fn resolve_local_path(entry: &SourceEntry) -> PathBuf {
+pub fn resolve_local_path(entry: &SourceEntry) -> Result<PathBuf> {
     match entry.source_type {
-        SourceType::Local => entry.path.clone().unwrap_or_default(),
-        SourceType::Git => entry.local_clone.clone().unwrap_or_default(),
+        SourceType::Local => entry
+            .path
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("Local source has no path configured")),
+        SourceType::Git => entry
+            .local_clone
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("Git source has no local clone path configured")),
     }
 }
 
@@ -508,5 +514,52 @@ mod tests {
 
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("Failed to write"), "expected 'Failed to write' in error: {msg}");
+    }
+
+    // --- resolve_local_path ---
+
+    #[test]
+    fn resolve_local_path_errors_for_local_entry_with_no_path() {
+        use crate::types::{SourceEntry, SourceType};
+        let entry = SourceEntry {
+            source_type: SourceType::Local,
+            path: None,
+            url: None,
+            local_clone: None,
+            branch: None,
+            last_updated: None,
+        };
+        let result = resolve_local_path(&entry);
+        assert!(result.is_err(), "expected Err when Local source has no path");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("no path configured"),
+            "expected 'no path configured' in error: {msg}"
+        );
+    }
+
+    #[test]
+    fn resolve_local_path_errors_for_git_entry_with_no_local_clone() {
+        use crate::types::{SourceEntry, SourceType};
+        let entry = SourceEntry {
+            source_type: SourceType::Git,
+            path: None,
+            url: Some("https://github.com/example/repo.git".to_string()),
+            local_clone: None,
+            branch: None,
+            last_updated: None,
+        };
+        let result = resolve_local_path(&entry);
+        assert!(result.is_err(), "expected Err when Git source has no local clone");
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("no local clone"), "expected 'no local clone' in error: {msg}");
+    }
+
+    #[test]
+    fn resolve_local_path_returns_path_for_local_entry() {
+        let entry = make_local_entry("/some/path", None);
+        let result = resolve_local_path(&entry);
+        assert!(result.is_ok(), "expected Ok for local entry with path");
+        assert_eq!(result.unwrap(), std::path::PathBuf::from("/some/path"));
     }
 }

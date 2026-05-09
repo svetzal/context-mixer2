@@ -104,7 +104,7 @@ pub fn list_with(ctx: &AppContext<'_>) -> Result<SourceListResult> {
             SourceListEntry {
                 name: name.clone(),
                 kind,
-                location: location.unwrap_or_default(),
+                location: location.unwrap_or_else(|| "<no location>".to_string()),
             }
         })
         .collect();
@@ -121,7 +121,7 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResul
         .get_source(name)
         .context("Run 'cmx source list' to see registered sources.")?;
 
-    let local_path = config::resolve_local_path(entry);
+    let local_path = config::resolve_local_path(entry)?;
     if !ctx.fs.exists(&local_path) {
         bail!(
             "Source path {} does not exist. {}",
@@ -133,7 +133,7 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResul
         );
     }
 
-    let all_artifacts = source_iter::each_source_artifact_with(&sources.sources, ctx.fs);
+    let all_artifacts = source_iter::each_source_artifact_with(&sources.sources, ctx.fs)?;
     let artifacts: Vec<_> = all_artifacts
         .into_iter()
         .filter(|sa| sa.source_name == name)
@@ -299,7 +299,7 @@ pub(crate) fn scan_and_count(
     entry: &crate::types::SourceEntry,
     fs: &dyn Filesystem,
 ) -> Result<(usize, usize, Vec<ScanWarning>)> {
-    let local_path = config::resolve_local_path(entry);
+    let local_path = config::resolve_local_path(entry)?;
     let scan_result = scan::scan_source_with(&local_path, fs)?;
     let (agents_found, skills_found) = count_artifacts(&scan_result.artifacts);
     Ok((agents_found, skills_found, scan_result.warnings))

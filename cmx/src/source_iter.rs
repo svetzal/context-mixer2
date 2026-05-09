@@ -27,7 +27,7 @@ pub fn scan_all_with_checksums(
 ) -> Result<BTreeMap<String, Vec<SourceArtifactInfo>>> {
     let mut result: BTreeMap<String, Vec<SourceArtifactInfo>> = BTreeMap::new();
 
-    for sa in each_source_artifact_with(sources, fs) {
+    for sa in each_source_artifact_with(sources, fs)? {
         let cs = checksum::checksum_artifact_with(&sa.artifact.path, sa.artifact.kind, fs)?;
         let deprecated = sa.artifact.is_deprecated();
         result.entry(sa.artifact.name).or_default().push(SourceArtifactInfo {
@@ -52,30 +52,30 @@ pub struct SourceArtifact {
 ///
 /// Resolves local paths, scans each source, and returns every artifact found
 /// with its source context. Silently skips sources whose local paths do not
-/// exist or that fail to scan (sources may be unavailable during normal use).
+/// exist (sources may not yet be cloned). Propagates errors from sources that
+/// exist but fail to scan.
 pub fn each_source_artifact_with(
     sources: &BTreeMap<String, SourceEntry>,
     fs: &dyn Filesystem,
-) -> Vec<SourceArtifact> {
+) -> Result<Vec<SourceArtifact>> {
     let mut results = Vec::new();
 
     for (source_name, entry) in sources {
-        let local_path = config::resolve_local_path(entry);
+        let local_path = config::resolve_local_path(entry)?;
         if !fs.exists(&local_path) {
             continue;
         }
-        if let Ok(scan_result) = scan::scan_source_with(&local_path, fs) {
-            for artifact in scan_result.artifacts {
-                results.push(SourceArtifact {
-                    source_name: source_name.clone(),
-                    source_root: local_path.clone(),
-                    artifact,
-                });
-            }
+        let scan_result = scan::scan_source_with(&local_path, fs)?;
+        for artifact in scan_result.artifacts {
+            results.push(SourceArtifact {
+                source_name: source_name.clone(),
+                source_root: local_path.clone(),
+                artifact,
+            });
         }
     }
 
-    results
+    Ok(results)
 }
 
 /// Load all source artifacts across every registered source via the given `AppContext`.
@@ -83,7 +83,7 @@ pub fn each_source_artifact_with(
 /// Convenience wrapper around `config::load_sources_with` + `each_source_artifact_with`.
 pub fn all_artifacts(ctx: &AppContext<'_>) -> Result<Vec<SourceArtifact>> {
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-    Ok(each_source_artifact_with(&sources.sources, ctx.fs))
+    each_source_artifact_with(&sources.sources, ctx.fs)
 }
 
 /// Scan all registered sources and compute checksums for every artifact.
@@ -131,7 +131,7 @@ pub fn find_unique(
         sources.sources.clone()
     };
 
-    let mut found: Vec<SourceArtifact> = each_source_artifact_with(&search_sources, ctx.fs)
+    let mut found: Vec<SourceArtifact> = each_source_artifact_with(&search_sources, ctx.fs)?
         .into_iter()
         .filter(|sa| sa.artifact.name == name && sa.artifact.kind == kind)
         .collect();
@@ -168,7 +168,7 @@ mod tests {
             make_local_entry("/nonexistent/path/that/does/not/exist", None),
         );
 
-        let results = each_source_artifact_with(&sources, &fs);
+        let results = each_source_artifact_with(&sources, &fs).unwrap();
         assert!(results.is_empty(), "should yield no results for a missing path");
     }
 
@@ -180,7 +180,7 @@ mod tests {
         let mut sources = BTreeMap::new();
         sources.insert("test-source".to_string(), make_local_entry("/test-repo", None));
 
-        let results = each_source_artifact_with(&sources, &fs);
+        let results = each_source_artifact_with(&sources, &fs).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].source_name, "test-source");
         assert_eq!(results[0].artifact.name, "my-agent");
@@ -214,6 +214,20 @@ mod tests {
     }
 
     #[test]
+    fn each_source_artifact_propagates_scan_error_for_existing_but_unscannable_source() {
+        let fs = FakeFilesystem::new();
+        // Create a source directory that exists but contains a malformed marketplace.json
+        // so that scan_source_with returns an error.
+        fs.add_file("/bad-repo/.claude-plugin/marketplace.json", "not valid json{{{{");
+
+        let mut sources = BTreeMap::new();
+        sources.insert("bad-source".to_string(), make_local_entry("/bad-repo", None));
+
+        let result = each_source_artifact_with(&sources, &fs);
+        assert!(result.is_err(), "expected Err when source path exists but scan fails");
+    }
+
+    #[test]
     fn each_source_artifact_returns_both_when_same_name_in_two_sources() {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo-a/agents/my-agent.md", agent_content("my-agent", "Agent from A"));
@@ -223,7 +237,7 @@ mod tests {
         sources.insert("source-a".to_string(), make_local_entry("/repo-a", None));
         sources.insert("source-b".to_string(), make_local_entry("/repo-b", None));
 
-        let results = each_source_artifact_with(&sources, &fs);
+        let results = each_source_artifact_with(&sources, &fs).unwrap();
         assert_eq!(results.len(), 2, "should return artifact from both sources");
 
         let source_names: Vec<&str> = results.iter().map(|r| r.source_name.as_str()).collect();

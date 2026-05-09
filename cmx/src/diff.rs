@@ -167,8 +167,14 @@ pub(crate) fn diff_dirs_with(
         if source_files.contains(f) {
             let i_path = installed.join(f);
             let s_path = source.join(f);
-            let i_content = ctx.fs.read_to_string(&i_path).unwrap_or_default();
-            let s_content = ctx.fs.read_to_string(&s_path).unwrap_or_default();
+            let i_content = ctx
+                .fs
+                .read_to_string(&i_path)
+                .with_context(|| format!("Failed to read installed file {}", i_path.display()))?;
+            let s_content = ctx
+                .fs
+                .read_to_string(&s_path)
+                .with_context(|| format!("Failed to read source file {}", s_path.display()))?;
             if i_content != s_content {
                 let _ = write!(
                     result,
