@@ -1,9 +1,9 @@
 use anyhow::Result;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::config;
-use crate::context::AppContext;
-use crate::lockfile;
+use crate::config::InstalledWithSources;
+use crate::context::{AppContext, LoadedState};
 use crate::scan;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
@@ -46,10 +46,10 @@ fn status_indicator(
 }
 
 pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKindOutput> {
-    let source_versions = source_iter::all_with_checksums(ctx)?;
-    let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
-    let global_rows = build_rows_with(kind, false, &global_lock, &source_versions, ctx)?;
-    let local_rows = build_rows_with(kind, true, &local_lock, &source_versions, ctx)?;
+    let loaded = LoadedState::load(ctx)?;
+    let source_versions = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
+    let global_rows = build_rows_with(kind, false, &loaded.global_lock, &source_versions, ctx)?;
+    let local_rows = build_rows_with(kind, true, &loaded.local_lock, &source_versions, ctx)?;
     Ok(ListKindOutput {
         kind,
         global_rows,
@@ -58,8 +58,8 @@ pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKi
 }
 
 pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
-    let source_versions = source_iter::all_with_checksums(ctx)?;
-    let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
+    let loaded = LoadedState::load(ctx)?;
+    let source_versions = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
     let mut output = ListOutput {
         global_agents: Vec::new(),
         local_agents: Vec::new(),
@@ -68,8 +68,8 @@ pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
     };
 
     for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-        let global = build_rows_with(kind, false, &global_lock, &source_versions, ctx)?;
-        let local = build_rows_with(kind, true, &local_lock, &source_versions, ctx)?;
+        let global = build_rows_with(kind, false, &loaded.global_lock, &source_versions, ctx)?;
+        let local = build_rows_with(kind, true, &loaded.local_lock, &source_versions, ctx)?;
         match kind {
             ArtifactKind::Agent => {
                 output.global_agents = global;
@@ -94,6 +94,30 @@ fn build_rows_with(
 ) -> Result<Vec<Row>> {
     let pairs =
         config::match_installed_to_sources(kind, local, lock, source_versions, ctx.fs, ctx.paths)?;
+    let names: Vec<&str> = pairs.iter().map(|(ia, _)| ia.name.as_str()).collect();
+    let installed_versions = load_installed_versions(kind, local, &names, ctx);
+    Ok(assemble_rows(pairs, &installed_versions))
+}
+
+/// Pre-load installed artifact versions from disk for a batch of artifact names.
+fn load_installed_versions(
+    kind: ArtifactKind,
+    local: bool,
+    names: &[&str],
+    ctx: &AppContext<'_>,
+) -> HashMap<String, Option<String>> {
+    names
+        .iter()
+        .map(|&name| (name.to_string(), read_installed_version(kind, name, local, ctx)))
+        .collect()
+}
+
+/// Pure row assembly — no filesystem access. Accepts pre-computed pairs and
+/// pre-loaded installed versions.
+fn assemble_rows(
+    pairs: Vec<InstalledWithSources<'_, SourceArtifactInfo>>,
+    installed_versions: &HashMap<String, Option<String>>,
+) -> Vec<Row> {
     let mut rows = Vec::new();
 
     for (ia, source_infos) in pairs {
@@ -102,7 +126,7 @@ fn build_rows_with(
         let installed: Option<String> = ia
             .installed_version
             .clone()
-            .or_else(|| read_installed_version(kind, &ia.name, local, ctx));
+            .or_else(|| installed_versions.get(&ia.name).and_then(Clone::clone));
 
         if let Some(infos) = source_infos {
             rows.extend(build_rows_from_sources(&ia, lock_entry, installed.as_deref(), infos));
@@ -111,7 +135,7 @@ fn build_rows_with(
         }
     }
 
-    Ok(rows)
+    rows
 }
 
 /// Build rows for an artifact that has one or more source entries.
@@ -210,6 +234,71 @@ mod tests {
     use crate::types::{ArtifactKind, LockFile};
     use chrono::Utc;
     use std::collections::BTreeMap;
+
+    // --- assemble_rows (pure, no gateway fakes needed) ---
+
+    #[test]
+    fn assemble_rows_builds_row_from_source_with_pre_loaded_versions() {
+        let mut packages = BTreeMap::new();
+        packages.insert(
+            "my-agent".to_string(),
+            make_lock_entry_versioned(
+                ArtifactKind::Agent,
+                "1.0.0",
+                "guidelines",
+                "agents/my-agent.md",
+            ),
+        );
+        let lock = LockFile {
+            version: 1,
+            packages,
+        };
+
+        let ia = InstalledArtifact {
+            name: "my-agent".to_string(),
+            lock_entry: lock.packages.get("my-agent"),
+            installed_version: Some("1.0.0".to_string()),
+        };
+        let source_infos = vec![SourceArtifactInfo {
+            source_name: "guidelines".to_string(),
+            version: Some("2.0.0".to_string()),
+            checksum: "sha256:abc".to_string(),
+            deprecated: false,
+        }];
+        let pairs = vec![(ia, Some(&source_infos))];
+        let installed_versions =
+            HashMap::from([("my-agent".to_string(), Some("1.0.0".to_string()))]);
+
+        let rows = assemble_rows(pairs, &installed_versions);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "my-agent");
+        assert_eq!(rows[0].installed, "1.0.0");
+        assert_eq!(rows[0].available, "2.0.0");
+    }
+
+    #[test]
+    fn assemble_rows_falls_back_to_installed_versions_map_when_lock_version_absent() {
+        let lock = LockFile::default();
+        let ia = InstalledArtifact {
+            name: "unversioned-agent".to_string(),
+            lock_entry: None,
+            installed_version: None,
+        };
+        let source_infos = vec![SourceArtifactInfo {
+            source_name: "guidelines".to_string(),
+            version: Some("1.0.0".to_string()),
+            checksum: "sha256:abc".to_string(),
+            deprecated: false,
+        }];
+        let pairs = vec![(ia, Some(&source_infos))];
+        let installed_versions =
+            HashMap::from([("unversioned-agent".to_string(), Some("0.9.0".to_string()))]);
+
+        let rows = assemble_rows(pairs, &installed_versions);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].installed, "0.9.0");
+        let _ = lock; // ensure lock outlives
+    }
 
     // --- status_indicator ---
 

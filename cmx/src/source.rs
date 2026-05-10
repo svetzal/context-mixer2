@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::config;
@@ -7,7 +8,7 @@ use crate::gateway::{DirEntry, Filesystem};
 use crate::scan;
 use crate::source_iter;
 use crate::source_update;
-use crate::types::{Artifact, SourceEntry, SourceType};
+use crate::types::{Artifact, ArtifactKind, SourceEntry, SourceType};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -140,41 +141,21 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResul
         .map(|sa| sa.artifact)
         .collect();
 
-    let agents = artifacts_of_kind(&artifacts, crate::types::ArtifactKind::Agent)
-        .map(|a| BrowseArtifact {
-            name: a.name.clone(),
-            version: a.version.clone(),
-            deprecation_display: format_deprecation(a),
-        })
-        .collect();
-
-    // Imperative shell: collect skill artifacts and eagerly load their directory listings
-    let skill_artifacts: Vec<&Artifact> =
-        artifacts_of_kind(&artifacts, crate::types::ArtifactKind::Skill).collect();
-
-    let skill_inputs: Vec<(&Artifact, Vec<String>)> = skill_artifacts
-        .into_iter()
+    // Imperative shell: pre-load skill directory listings keyed by artifact path
+    let skill_dirs: HashMap<PathBuf, Vec<String>> = artifacts
+        .iter()
+        .filter(|a| a.kind == ArtifactKind::Skill)
         .map(|s| {
             let files = ctx
                 .fs
                 .read_dir(&s.path)
                 .map(|entries| dir_entry_names(&entries))
                 .unwrap_or_default();
-            (s, files)
+            (s.path.clone(), files)
         })
         .collect();
 
-    // Pure core: transform skill data into BrowseSkill structs
-    let skills = skill_inputs
-        .into_iter()
-        .map(|(s, files)| build_browse_skill(s, files))
-        .collect();
-
-    Ok(SourceBrowseResult {
-        source_name: name.to_string(),
-        agents,
-        skills,
-    })
+    Ok(build_browse_result(name, &artifacts, &skill_dirs))
 }
 
 pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
@@ -256,6 +237,34 @@ fn add_git_source_with(name: &str, url: &str, ctx: &AppContext<'_>) -> Result<So
 // ---------------------------------------------------------------------------
 // Pure helpers (no I/O)
 // ---------------------------------------------------------------------------
+
+/// Build a `SourceBrowseResult` from pre-loaded data with no filesystem access.
+fn build_browse_result(
+    source_name: &str,
+    artifacts: &[Artifact],
+    skill_dirs: &HashMap<PathBuf, Vec<String>>,
+) -> SourceBrowseResult {
+    let agents = artifacts_of_kind(artifacts, ArtifactKind::Agent)
+        .map(|a| BrowseArtifact {
+            name: a.name.clone(),
+            version: a.version.clone(),
+            deprecation_display: format_deprecation(a),
+        })
+        .collect();
+
+    let skills = artifacts_of_kind(artifacts, ArtifactKind::Skill)
+        .map(|s| {
+            let files = skill_dirs.get(&s.path).cloned().unwrap_or_default();
+            build_browse_skill(s, files)
+        })
+        .collect();
+
+    SourceBrowseResult {
+        source_name: source_name.to_string(),
+        agents,
+        skills,
+    }
+}
 
 fn artifacts_of_kind(
     artifacts: &[Artifact],
@@ -785,6 +794,32 @@ mod tests {
         ];
         let names = dir_entry_names(&entries);
         assert_eq!(names, vec!["a.md", "m.md", "z.md"]);
+    }
+
+    // --- build_browse_result ---
+
+    #[test]
+    fn build_browse_result_separates_agents_and_skills() {
+        let mut skill_dirs = HashMap::new();
+        let skill_path = PathBuf::from("my-skill");
+        skill_dirs.insert(skill_path.clone(), vec!["tool.md".to_string()]);
+
+        let artifacts = vec![make_agent("alpha"), make_skill("my-skill")];
+        let result = build_browse_result("test-source", &artifacts, &skill_dirs);
+
+        assert_eq!(result.source_name, "test-source");
+        assert_eq!(result.agents.len(), 1);
+        assert_eq!(result.agents[0].name, "alpha");
+        assert_eq!(result.skills.len(), 1);
+        assert_eq!(result.skills[0].name, "my-skill");
+        assert_eq!(result.skills[0].files, vec!["tool.md"]);
+    }
+
+    #[test]
+    fn build_browse_result_empty_skill_dirs_gives_empty_files() {
+        let artifacts = vec![make_skill("lonely-skill")];
+        let result = build_browse_result("src", &artifacts, &HashMap::new());
+        assert_eq!(result.skills[0].files, Vec::<String>::new());
     }
 
     // --- build_browse_skill ---

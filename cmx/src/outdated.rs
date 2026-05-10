@@ -1,10 +1,10 @@
 use anyhow::Result;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::checksum;
 use crate::config;
-use crate::context::AppContext;
-use crate::lockfile;
+use crate::config::InstalledWithSources;
+use crate::context::{AppContext, LoadedState};
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
 use crate::source_update;
@@ -30,12 +30,12 @@ pub struct OutdatedRow {
 pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
     source_update::auto_update_all_with(ctx)?;
 
-    let source_artifacts = source_iter::all_with_checksums(ctx)?;
+    let loaded = LoadedState::load(ctx)?;
+    let source_artifacts = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
 
     let mut rows = Vec::new();
 
-    let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
-    for (local, lock) in [(false, &global_lock), (true, &local_lock)] {
+    for (local, lock) in [(false, &loaded.global_lock), (true, &loaded.local_lock)] {
         for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
             collect_outdated_for_scope_with(kind, local, lock, &source_artifacts, &mut rows, ctx)?;
         }
@@ -116,6 +116,38 @@ fn collect_outdated_for_scope_with(
 ) -> Result<()> {
     let pairs =
         config::match_installed_to_sources(kind, local, lock, source_artifacts, ctx.fs, ctx.paths)?;
+    let names: Vec<&str> = pairs.iter().map(|(ia, _)| ia.name.as_str()).collect();
+    let modifications = compute_modification_status(kind, local, &names, lock, ctx)?;
+    rows.extend(compare_versions(kind, pairs, &modifications));
+    Ok(())
+}
+
+/// Pre-compute whether each artifact has been locally modified since installation.
+fn compute_modification_status(
+    kind: ArtifactKind,
+    local: bool,
+    names: &[&str],
+    lock: &LockFile,
+    ctx: &AppContext<'_>,
+) -> Result<HashMap<String, bool>> {
+    names
+        .iter()
+        .map(|&name| {
+            let lock_entry = lock.packages.get(name);
+            let modified = check_locally_modified(lock_entry, kind, name, local, ctx)?;
+            Ok((name.to_string(), modified))
+        })
+        .collect()
+}
+
+/// Pure comparison — no filesystem access. Accepts pre-computed pairs and
+/// pre-loaded modification status.
+fn compare_versions(
+    kind: ArtifactKind,
+    pairs: Vec<InstalledWithSources<'_, SourceArtifactInfo>>,
+    modifications: &HashMap<String, bool>,
+) -> Vec<OutdatedRow> {
+    let mut rows = Vec::new();
 
     for (ia, source_infos) in pairs {
         let lock_entry = ia.lock_entry;
@@ -126,9 +158,7 @@ fn collect_outdated_for_scope_with(
         };
 
         let installed_v: Option<String> = ia.installed_version.clone();
-
-        // Check for local modifications once (shared across all source rows)
-        let locally_modified = check_locally_modified(lock_entry, kind, &ia.name, local, ctx)?;
+        let locally_modified = modifications.get(&ia.name).copied().unwrap_or(false);
 
         for source_info in source_infos {
             let available_v: Option<String> = source_info.version.clone();
@@ -154,7 +184,7 @@ fn collect_outdated_for_scope_with(
         }
     }
 
-    Ok(())
+    rows
 }
 
 // ---------------------------------------------------------------------------
@@ -171,9 +201,107 @@ mod tests {
         save_lock_with_entry, setup_empty_sources, setup_source_with_versioned_agent,
         setup_sources, test_paths, versioned_agent_content,
     };
-    use crate::types::{ArtifactKind, LockFile};
+    use crate::types::{ArtifactKind, InstalledArtifact, LockFile};
     use chrono::Utc;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashMap};
+
+    // --- compare_versions (pure, no gateway fakes needed) ---
+
+    #[test]
+    fn compare_versions_emits_outdated_row_when_checksum_differs() {
+        let mut packages = BTreeMap::new();
+        packages.insert(
+            "my-agent".to_string(),
+            make_lock_entry_with_checksum(
+                ArtifactKind::Agent,
+                Some("1.0.0"),
+                "guidelines",
+                "agents/my-agent.md",
+                "sha256:old",
+            ),
+        );
+        let lock = LockFile {
+            version: 1,
+            packages,
+        };
+
+        let ia = InstalledArtifact {
+            name: "my-agent".to_string(),
+            lock_entry: lock.packages.get("my-agent"),
+            installed_version: Some("1.0.0".to_string()),
+        };
+        let source_infos = vec![crate::source_iter::SourceArtifactInfo {
+            source_name: "guidelines".to_string(),
+            version: Some("2.0.0".to_string()),
+            checksum: "sha256:new".to_string(),
+            deprecated: false,
+        }];
+        let pairs = vec![(ia, Some(&source_infos))];
+        let modifications = HashMap::from([("my-agent".to_string(), false)]);
+
+        let rows = compare_versions(ArtifactKind::Agent, pairs, &modifications);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "my-agent");
+        assert_eq!(rows[0].available_version, "2.0.0");
+        assert_eq!(rows[0].status, "update");
+    }
+
+    #[test]
+    fn compare_versions_appends_modified_suffix_when_locally_modified() {
+        let mut packages = BTreeMap::new();
+        packages.insert(
+            "my-agent".to_string(),
+            make_lock_entry_with_checksum(
+                ArtifactKind::Agent,
+                Some("1.0.0"),
+                "guidelines",
+                "agents/my-agent.md",
+                "sha256:old",
+            ),
+        );
+        let lock = LockFile {
+            version: 1,
+            packages,
+        };
+
+        let ia = InstalledArtifact {
+            name: "my-agent".to_string(),
+            lock_entry: lock.packages.get("my-agent"),
+            installed_version: Some("1.0.0".to_string()),
+        };
+        let source_infos = vec![crate::source_iter::SourceArtifactInfo {
+            source_name: "guidelines".to_string(),
+            version: Some("2.0.0".to_string()),
+            checksum: "sha256:new".to_string(),
+            deprecated: false,
+        }];
+        let pairs = vec![(ia, Some(&source_infos))];
+        let modifications = HashMap::from([("my-agent".to_string(), true)]);
+
+        let rows = compare_versions(ArtifactKind::Agent, pairs, &modifications);
+        assert_eq!(rows.len(), 1);
+        assert!(
+            rows[0].status.contains("modified"),
+            "expected 'modified' in status: {}",
+            rows[0].status
+        );
+    }
+
+    #[test]
+    fn compare_versions_skips_pairs_without_source_infos() {
+        let lock = LockFile::default();
+        let ia = InstalledArtifact {
+            name: "orphan".to_string(),
+            lock_entry: None,
+            installed_version: None,
+        };
+        let pairs: Vec<_> = vec![(ia, None)];
+        let modifications = HashMap::new();
+
+        let rows = compare_versions(ArtifactKind::Agent, pairs, &modifications);
+        assert!(rows.is_empty(), "orphan with no source should produce no rows");
+        let _ = lock;
+    }
 
     fn make_lock_entry(source_checksum: &str, version: Option<&str>) -> crate::types::LockEntry {
         make_lock_entry_with_checksum(

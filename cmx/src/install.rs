@@ -5,6 +5,7 @@ use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
 use crate::lockfile;
+use crate::paths::ConfigPaths;
 use crate::source_iter;
 use crate::source_update;
 use crate::types::{self, ArtifactKind, LockEntry, LockSource};
@@ -34,6 +35,18 @@ pub struct UpdateAllResult {
     pub kind: ArtifactKind,
 }
 
+/// Pure description of an intended installation — computed from source metadata
+/// and path configuration, with no filesystem access.
+#[derive(Debug)]
+pub struct InstallPlan {
+    pub artifact_name: String,
+    pub version: Option<String>,
+    pub source_name: String,
+    pub source_root: PathBuf,
+    pub dest_dir: PathBuf,
+    pub relative_path: String,
+}
+
 pub fn install_with(
     name: &str,
     kind: ArtifactKind,
@@ -47,21 +60,21 @@ pub fn install_with(
 
     let found = source_iter::find_unique(artifact_name, kind, source_name, ctx)?;
 
-    let dest_dir = ctx.paths.install_dir(kind, local);
+    let plan = plan_install(artifact_name, kind, local, &found, ctx.paths);
+
     ctx.fs
-        .create_dir_all(&dest_dir)
-        .with_context(|| format!("Failed to create {}", dest_dir.display()))?;
+        .create_dir_all(&plan.dest_dir)
+        .with_context(|| format!("Failed to create {}", plan.dest_dir.display()))?;
 
     let source_checksum = checksum::checksum_artifact_with(&found.artifact.path, kind, ctx.fs)?;
 
-    let relative_path = types::relative_path_string(&found.artifact.path, &found.source_root);
-
     // Check for local modifications before overwriting
     if !force {
-        check_local_modifications(artifact_name, kind, &dest_dir, local, ctx)?;
+        check_local_modifications(artifact_name, kind, &plan.dest_dir, local, ctx)?;
     }
 
-    let dest_path = copy::copy_artifact(&found.artifact.path, &dest_dir, kind, artifact_name, ctx)?;
+    let dest_path =
+        copy::copy_artifact(&found.artifact.path, &plan.dest_dir, kind, artifact_name, ctx)?;
     let installed_checksum = checksum::checksum_artifact_with(&dest_path, kind, ctx.fs)?;
 
     let mut lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
@@ -69,11 +82,11 @@ pub fn install_with(
         artifact_name.to_string(),
         LockEntry {
             artifact_type: kind,
-            version: found.artifact.version.clone(),
+            version: plan.version.clone(),
             installed_at: ctx.clock.now().to_rfc3339(),
             source: LockSource {
-                repo: found.source_name.clone(),
-                path: relative_path,
+                repo: plan.source_name.clone(),
+                path: plan.relative_path.clone(),
             },
             source_checksum,
             installed_checksum,
@@ -83,10 +96,10 @@ pub fn install_with(
 
     Ok(InstallResult {
         artifact_name: artifact_name.to_string(),
-        version: found.artifact.version,
+        version: plan.version,
         kind,
-        source_name: found.source_name,
-        dest_dir,
+        source_name: plan.source_name,
+        dest_dir: plan.dest_dir,
     })
 }
 
@@ -173,6 +186,27 @@ pub fn update_all_with(
 // Private helpers
 // ---------------------------------------------------------------------------
 
+/// Compute the destination directory and relative source path for an install.
+/// Pure function — no filesystem access.
+fn plan_install(
+    artifact_name: &str,
+    kind: ArtifactKind,
+    local: bool,
+    found: &source_iter::SourceArtifact,
+    paths: &ConfigPaths,
+) -> InstallPlan {
+    let dest_dir = paths.install_dir(kind, local);
+    let relative_path = types::relative_path_string(&found.artifact.path, &found.source_root);
+    InstallPlan {
+        artifact_name: artifact_name.to_string(),
+        version: found.artifact.version.clone(),
+        source_name: found.source_name.clone(),
+        source_root: found.source_root.clone(),
+        dest_dir,
+        relative_path,
+    }
+}
+
 /// Check whether the named artifact has been locally modified since it was
 /// installed. Returns `Ok(())` if clean, or bails with a user-facing error if
 /// modifications are detected.
@@ -215,12 +249,79 @@ mod tests {
     use super::*;
     use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::source_iter::SourceArtifact;
     use crate::test_support::{
         agent_content, make_ctx, setup_empty_sources, setup_source, setup_source_with_agent,
         setup_sources, test_paths,
     };
-    use crate::types::{ArtifactKind, LockFile};
+    use crate::types::{Artifact, ArtifactKind, Deprecation, LockFile};
     use chrono::Utc;
+
+    // --- plan_install (pure, no gateway fakes needed) ---
+
+    fn make_source_artifact(
+        kind: ArtifactKind,
+        name: &str,
+        version: Option<&str>,
+    ) -> SourceArtifact {
+        SourceArtifact {
+            source_name: "guidelines".to_string(),
+            source_root: PathBuf::from("/sources/guidelines"),
+            artifact: Artifact {
+                kind,
+                name: name.to_string(),
+                description: String::new(),
+                path: match kind {
+                    ArtifactKind::Agent => {
+                        PathBuf::from(format!("/sources/guidelines/agents/{name}.md"))
+                    }
+                    ArtifactKind::Skill => PathBuf::from(format!("/sources/guidelines/{name}")),
+                },
+                version: version.map(str::to_string),
+                deprecation: None,
+            },
+        }
+    }
+
+    #[test]
+    fn plan_install_computes_correct_paths_for_global_agent() {
+        let paths = test_paths();
+        let found = make_source_artifact(ArtifactKind::Agent, "my-agent", Some("1.0.0"));
+
+        let plan = plan_install("my-agent", ArtifactKind::Agent, false, &found, &paths);
+
+        assert_eq!(plan.artifact_name, "my-agent");
+        assert_eq!(plan.dest_dir, paths.install_dir(ArtifactKind::Agent, false));
+        assert_eq!(plan.relative_path, "agents/my-agent.md");
+        assert_eq!(plan.version, Some("1.0.0".to_string()));
+        assert_eq!(plan.source_name, "guidelines");
+    }
+
+    #[test]
+    fn plan_install_computes_correct_paths_for_local_skill() {
+        let paths = test_paths();
+        let found = make_source_artifact(ArtifactKind::Skill, "my-skill", None);
+
+        let plan = plan_install("my-skill", ArtifactKind::Skill, true, &found, &paths);
+
+        assert_eq!(plan.dest_dir, paths.install_dir(ArtifactKind::Skill, true));
+        assert_eq!(plan.relative_path, "my-skill");
+        assert!(plan.version.is_none());
+    }
+
+    #[test]
+    fn plan_install_uses_deprecation_none_for_plain_artifact() {
+        let paths = test_paths();
+        let mut found = make_source_artifact(ArtifactKind::Agent, "legacy", Some("0.1.0"));
+        found.artifact.deprecation = Some(Deprecation {
+            reason: Some("old".to_string()),
+            replacement: Some("new-agent".to_string()),
+        });
+
+        let plan = plan_install("legacy", ArtifactKind::Agent, false, &found, &paths);
+        assert_eq!(plan.version, Some("0.1.0".to_string()));
+        assert_eq!(plan.source_name, "guidelines");
+    }
 
     // --- parse_name ---
 
