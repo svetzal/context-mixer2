@@ -321,9 +321,11 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use crate::facet_types::{Facet, Recipe};
     use crate::plugin::PluginInfo;
     use crate::repo::RepoKind;
     use crate::test_support::{fake_marketplace_json_with_categories, fake_plugin_json};
+    use crate::validation::ValidationIssue;
     use cmx::gateway::fakes::FakeFilesystem;
     use cmx::types::{Artifact, ArtifactKind};
 
@@ -477,5 +479,221 @@ mod tests {
 
         let result = format_status(&root, &fs);
         assert!(result.is_ok(), "format_status failed: {:?}", result.err());
+    }
+
+    #[test]
+    fn status_plugin_kind_label() {
+        let fs = FakeFilesystem::new();
+        fs.add_dir("/repo");
+        let root = RepoRoot {
+            path: PathBuf::from("/repo"),
+            kind: RepoKind::Plugin,
+            has_facets: false,
+            has_plugins_dir: false,
+        };
+        let out = format_status(&root, &fs).unwrap();
+        assert!(out.contains("plugin"), "expected 'plugin' in: {out}");
+    }
+
+    #[test]
+    fn status_facets_only_kind_label() {
+        let fs = FakeFilesystem::new();
+        fs.add_dir("/repo");
+        let root = RepoRoot {
+            path: PathBuf::from("/repo"),
+            kind: RepoKind::FacetsOnly,
+            has_facets: false,
+            has_plugins_dir: false,
+        };
+        let out = format_status(&root, &fs).unwrap();
+        assert!(out.contains("facets-only"), "expected 'facets-only' in: {out}");
+    }
+
+    // --- format_facet_list ---
+
+    #[test]
+    fn format_facet_list_empty() {
+        let out = format_facet_list(&[]);
+        assert_eq!(out, "Facets (0):\n");
+    }
+
+    #[test]
+    fn format_facet_list_groups_by_category() {
+        let facets = vec![
+            Facet {
+                name: "error-handling".to_string(),
+                category: "rust".to_string(),
+                scope: None,
+                does_not_cover: None,
+                version: None,
+                path: PathBuf::from("/facets/error-handling.md"),
+            },
+            Facet {
+                name: "testing".to_string(),
+                category: "rust".to_string(),
+                scope: None,
+                does_not_cover: None,
+                version: None,
+                path: PathBuf::from("/facets/testing.md"),
+            },
+            Facet {
+                name: "commits".to_string(),
+                category: "git".to_string(),
+                scope: None,
+                does_not_cover: None,
+                version: None,
+                path: PathBuf::from("/facets/commits.md"),
+            },
+        ];
+        let out = format_facet_list(&facets);
+        assert!(out.starts_with("Facets (3):"));
+        assert!(out.contains("rust/"), "expected 'rust/' in: {out}");
+        assert!(out.contains("git/"), "expected 'git/' in: {out}");
+        assert!(out.contains("error-handling"));
+        assert!(out.contains("testing"));
+        assert!(out.contains("commits"));
+    }
+
+    // --- format_recipe_list ---
+
+    #[test]
+    fn format_recipe_list_empty() {
+        let out = format_recipe_list(&[]);
+        assert_eq!(out, "Recipes (0):\n");
+    }
+
+    #[test]
+    fn format_recipe_list_single_facet_uses_singular() {
+        let recipes = vec![Recipe {
+            name: "my-recipe".to_string(),
+            description: String::new(),
+            produces: "AGENTS.md".to_string(),
+            facets: vec!["rust/error-handling".to_string()],
+            runtime_skills: Vec::new(),
+        }];
+        let out = format_recipe_list(&recipes);
+        assert!(out.contains("my-recipe"));
+        assert!(out.contains("1 facet"), "expected singular 'facet' in: {out}");
+        assert!(!out.contains("1 facets"), "unexpected plural in: {out}");
+    }
+
+    #[test]
+    fn format_recipe_list_multiple_facets_uses_plural() {
+        let recipes = vec![Recipe {
+            name: "full-recipe".to_string(),
+            description: String::new(),
+            produces: "AGENTS.md".to_string(),
+            facets: vec![
+                "rust/error-handling".to_string(),
+                "rust/testing".to_string(),
+            ],
+            runtime_skills: Vec::new(),
+        }];
+        let out = format_recipe_list(&recipes);
+        assert!(out.contains("2 facets"), "expected '2 facets' in: {out}");
+    }
+
+    // --- format_manifest_summary ---
+
+    #[test]
+    fn format_manifest_summary_empty_returns_no_sources_message() {
+        let out = format_manifest_summary(&[]);
+        assert!(out.contains("No .claude-plugin/ sources found"));
+    }
+
+    #[test]
+    fn format_manifest_summary_with_files_shows_platform_dirs() {
+        let files = vec![
+            PathBuf::from("/repo/.codex-plugin/marketplace.json"),
+            PathBuf::from("/repo/.cursor-plugin/marketplace.json"),
+            PathBuf::from("/repo/.gemini-plugin/marketplace.json"),
+            PathBuf::from("/repo/.codex-plugin/plugin.json"),
+        ];
+        let out = format_manifest_summary(&files);
+        assert!(out.starts_with("Generated manifests for"), "unexpected start: {out}");
+        assert!(out.contains(".codex-plugin/"), "missing .codex-plugin/ in: {out}");
+    }
+
+    // --- format_validation_issues ---
+
+    #[test]
+    fn format_validation_issues_empty_returns_all_valid() {
+        let out = format_validation_issues(&[]);
+        assert_eq!(out, "All plugins valid.\n");
+    }
+
+    #[test]
+    fn format_validation_issues_errors_only() {
+        let issues = vec![ValidationIssue::error(
+            "plugin/alpha",
+            "Missing description",
+        )];
+        let out = format_validation_issues(&issues);
+        assert!(out.contains("Errors:"), "expected 'Errors:' in: {out}");
+        assert!(out.contains("plugin/alpha"));
+        assert!(out.contains("Missing description"));
+        assert!(!out.contains("Warnings:"));
+    }
+
+    #[test]
+    fn format_validation_issues_warnings_only() {
+        let issues = vec![ValidationIssue::warning(
+            "plugin/beta",
+            "Version not semver",
+        )];
+        let out = format_validation_issues(&issues);
+        assert!(out.contains("Warnings:"), "expected 'Warnings:' in: {out}");
+        assert!(out.contains("plugin/beta"));
+        assert!(!out.contains("Errors:"));
+    }
+
+    #[test]
+    fn format_validation_issues_both() {
+        let issues = vec![
+            ValidationIssue::error("plugin/alpha", "Missing description"),
+            ValidationIssue::warning("plugin/beta", "Version not semver"),
+        ];
+        let out = format_validation_issues(&issues);
+        assert!(out.contains("Errors:"));
+        assert!(out.contains("Warnings:"));
+    }
+
+    // --- simple format functions ---
+
+    #[test]
+    fn format_recipe_assemble_result_contains_produces() {
+        let out = format_recipe_assemble_result("AGENTS.md");
+        assert_eq!(out, "Wrote AGENTS.md\n");
+    }
+
+    #[test]
+    fn format_recipe_batch_result_formats_count() {
+        assert_eq!(format_recipe_batch_result(1), "Assembled 1 recipe(s)\n");
+        assert_eq!(format_recipe_batch_result(3), "Assembled 3 recipe(s)\n");
+    }
+
+    #[test]
+    fn format_recipe_up_to_date_contains_name() {
+        let out = format_recipe_up_to_date("my-recipe");
+        assert_eq!(out, "Recipe 'my-recipe' is up to date\n");
+    }
+
+    #[test]
+    fn format_recipe_diff_appends_newline() {
+        let out = format_recipe_diff("some diff text");
+        assert_eq!(out, "some diff text\n");
+    }
+
+    #[test]
+    fn format_plugin_create_result_contains_name_and_path() {
+        let out = format_plugin_create_result("my-plugin", Path::new("/plugins/my-plugin"));
+        assert!(out.contains("my-plugin"));
+        assert!(out.contains("/plugins/my-plugin"));
+    }
+
+    #[test]
+    fn format_marketplace_generate_result_contains_count() {
+        let out = format_marketplace_generate_result(5);
+        assert_eq!(out, "Generated marketplace.json with 5 plugins\n");
     }
 }
