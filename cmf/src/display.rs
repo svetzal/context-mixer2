@@ -696,4 +696,74 @@ mod tests {
         let out = format_marketplace_generate_result(5);
         assert_eq!(out, "Generated marketplace.json with 5 plugins\n");
     }
+
+    // --- format_status error and edge-case paths ---
+
+    #[test]
+    fn status_plugin_summary_scan_error_returns_gracefully() {
+        let fs = FakeFilesystem::new();
+        // Malformed marketplace.json causes scan_plugins to fail (line 204)
+        fs.add_file("/repo/.claude-plugin/marketplace.json", "{ not valid json {{");
+        let root = RepoRoot {
+            path: PathBuf::from("/repo"),
+            kind: RepoKind::Marketplace,
+            has_facets: false,
+            has_plugins_dir: true,
+        };
+        let out = format_status(&root, &fs).unwrap();
+        assert!(!out.contains("Plugins:"), "expected no plugin summary on scan failure: {out}");
+    }
+
+    #[test]
+    fn status_facet_summary_scan_error_returns_gracefully() {
+        let fs = FakeFilesystem::new();
+        // has_facets=true but facets dir absent -> scan_facets and validate_all fail (lines 238, 271)
+        let root = RepoRoot {
+            path: PathBuf::from("/repo"),
+            kind: RepoKind::FacetsOnly,
+            has_facets: true,
+            has_plugins_dir: false,
+        };
+        let out = format_status(&root, &fs).unwrap();
+        assert!(!out.contains("Facets:"), "expected no facet summary on scan failure: {out}");
+        assert!(!out.contains("Validation:"), "expected no validation summary on error: {out}");
+    }
+
+    #[test]
+    fn status_recipe_scan_error_returns_gracefully() {
+        let fs = FakeFilesystem::new();
+        // facets dir exists so scan_facets succeeds, but a malformed recipe file fails scan_recipes (line 258)
+        fs.add_dir("/repo/facets");
+        fs.add_dir("/repo/facets/recipes");
+        fs.add_file("/repo/facets/recipes/bad.json", "{ not valid json {{");
+        let root = RepoRoot {
+            path: PathBuf::from("/repo"),
+            kind: RepoKind::FacetsOnly,
+            has_facets: true,
+            has_plugins_dir: false,
+        };
+        let out = format_status(&root, &fs).unwrap();
+        assert!(
+            !out.contains("Recipes:"),
+            "expected no recipe count on recipe scan failure: {out}"
+        );
+    }
+
+    #[test]
+    fn status_validation_summary_shows_warning_count() {
+        let fs = FakeFilesystem::new();
+        // Facet without scope produces a validation warning (lines 287-288)
+        fs.add_file(
+            "/repo/facets/rust/error-handling.md",
+            "---\nname: error-handling\nfacet: rust\n---\nContent\n",
+        );
+        let root = RepoRoot {
+            path: PathBuf::from("/repo"),
+            kind: RepoKind::FacetsOnly,
+            has_facets: true,
+            has_plugins_dir: false,
+        };
+        let out = format_status(&root, &fs).unwrap();
+        assert!(out.contains("warning"), "expected 'warning' in validation summary: {out}");
+    }
 }
