@@ -46,9 +46,8 @@ pub(crate) fn copy_dir_recursive_with(src: &Path, dest: &Path, fs: &dyn Filesyst
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::test_support::{make_ctx, test_paths};
-    use chrono::Utc;
+    use crate::gateway::fakes::FakeFilesystem;
+    use crate::test_support::TestContext;
 
     #[test]
     fn copy_dir_recursive_with_copies_flat_directory() {
@@ -83,15 +82,12 @@ mod tests {
 
     #[test]
     fn copy_artifact_skill_with_skill_md_succeeds() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/source/my-skill/SKILL.md", "---\ndescription: A skill\n---\n");
-        fs.add_file("/source/my-skill/tool.py", "code");
+        t.fs.add_file("/source/my-skill/SKILL.md", "---\ndescription: A skill\n---\n");
+        t.fs.add_file("/source/my-skill/tool.py", "code");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let dest_dir = Path::new("/dest");
         let result = copy_artifact(
             Path::new("/source/my-skill"),
@@ -103,19 +99,16 @@ mod tests {
 
         assert!(result.is_ok(), "expected ok, got: {:?}", result.err());
         let dest_path = result.unwrap();
-        assert!(fs.file_exists(&dest_path.join("SKILL.md")));
+        assert!(t.fs.file_exists(&dest_path.join("SKILL.md")));
     }
 
     #[test]
     fn copy_artifact_skill_missing_skill_md_returns_error_and_cleans_up() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/source/my-skill/tool.py", "code");
+        t.fs.add_file("/source/my-skill/tool.py", "code");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = copy_artifact(
             Path::new("/source/my-skill"),
             Path::new("/dest"),
@@ -128,24 +121,21 @@ mod tests {
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("missing SKILL.md"), "unexpected: {msg}");
         assert!(
-            !fs.file_exists(Path::new("/dest/my-skill/tool.py")),
+            !t.fs.file_exists(Path::new("/dest/my-skill/tool.py")),
             "partial install should be removed"
         );
     }
 
     #[test]
     fn copy_artifact_agent_does_not_require_skill_md() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file(
+        t.fs.add_file(
             "/source/agents/my-agent.md",
             "---\nname: my-agent\ndescription: An agent\n---\n",
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = copy_artifact(
             Path::new("/source/agents/my-agent.md"),
             Path::new("/dest/agents"),
@@ -155,6 +145,6 @@ mod tests {
         );
 
         assert!(result.is_ok(), "agent copy should succeed without SKILL.md: {:?}", result.err());
-        assert!(fs.file_exists(Path::new("/dest/agents/my-agent.md")));
+        assert!(t.fs.file_exists(Path::new("/dest/agents/my-agent.md")));
     }
 }

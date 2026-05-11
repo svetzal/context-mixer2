@@ -194,15 +194,13 @@ fn compare_versions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::lockfile;
     use crate::test_support::{
-        agent_content, install_agent_on_disk, make_ctx, make_lock_entry_with_checksum,
+        TestContext, agent_content, install_agent_on_disk, make_lock_entry_with_checksum,
         save_lock_with_entry, setup_empty_sources, setup_source_with_versioned_agent,
-        setup_sources, test_paths, versioned_agent_content,
+        setup_sources, versioned_agent_content,
     };
     use crate::types::{ArtifactKind, InstalledArtifact, LockFile};
-    use chrono::Utc;
     use std::collections::{BTreeMap, HashMap};
 
     // --- compare_versions (pure, no gateway fakes needed) ---
@@ -371,15 +369,12 @@ mod tests {
 
     #[test]
     fn gather_outdated_outdated_artifact_appears_in_rows() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Source has version 2.0.0
         setup_source_with_versioned_agent(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "guidelines",
             "/sources/guidelines",
             "my-agent",
@@ -388,15 +383,15 @@ mod tests {
 
         // Install on disk with version 1.0.0 lock entry
         install_agent_on_disk(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             &agent_content("my-agent", "A test agent"),
             false,
         );
         save_lock_with_entry(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             make_lock_entry_with_checksum(
                 ArtifactKind::Agent,
@@ -408,7 +403,7 @@ mod tests {
             false,
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let rows = outdated_with(&ctx).unwrap();
 
         assert_eq!(rows.len(), 1, "expected one outdated artifact");
@@ -420,15 +415,12 @@ mod tests {
 
     #[test]
     fn gather_outdated_up_to_date_returns_empty() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // No installed artifacts, no sources
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let rows = outdated_with(&ctx).unwrap();
 
         assert!(rows.is_empty(), "expected no rows when everything is up to date");
@@ -436,15 +428,12 @@ mod tests {
 
     #[test]
     fn gather_outdated_untracked_artifact_appears_as_untracked() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Source has version 1.0.0
         setup_source_with_versioned_agent(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "guidelines",
             "/sources/guidelines",
             "my-agent",
@@ -453,8 +442,8 @@ mod tests {
 
         // Installed on disk but NOT in lock file
         install_agent_on_disk(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             &agent_content("my-agent", "A test agent"),
             false,
@@ -466,12 +455,12 @@ mod tests {
                 packages: BTreeMap::new(),
             },
             false,
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
         )
         .unwrap();
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let rows = outdated_with(&ctx).unwrap();
 
         assert_eq!(rows.len(), 1, "untracked artifact should appear");
@@ -482,15 +471,12 @@ mod tests {
 
     #[test]
     fn gather_outdated_locally_modified_appends_modified_status() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Source has version 2.0.0
         setup_source_with_versioned_agent(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "guidelines",
             "/sources/guidelines",
             "my-agent",
@@ -499,8 +485,8 @@ mod tests {
 
         // Install on disk
         install_agent_on_disk(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             &agent_content("my-agent", "A test agent"),
             false,
@@ -516,9 +502,9 @@ mod tests {
         );
         // Installed checksum doesn't match disk content
         entry.installed_checksum = "sha256:different".to_string();
-        save_lock_with_entry(&fs, &paths, "my-agent", entry, false);
+        save_lock_with_entry(&t.fs, &t.paths, "my-agent", entry, false);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let rows = outdated_with(&ctx).unwrap();
 
         assert_eq!(rows.len(), 1);
@@ -531,40 +517,37 @@ mod tests {
 
     #[test]
     fn outdated_shows_rows_from_both_sources_when_artifact_in_two() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Two sources with the same agent at different versions
         setup_sources(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             &[
                 ("guidelines", "/sources/guidelines"),
                 ("marketplace", "/sources/marketplace"),
             ],
         );
-        fs.add_file(
+        t.fs.add_file(
             "/sources/guidelines/agents/my-agent.md",
             versioned_agent_content("my-agent", "A test agent", "2.0.0"),
         );
-        fs.add_file(
+        t.fs.add_file(
             "/sources/marketplace/agents/my-agent.md",
             versioned_agent_content("my-agent", "A test agent", "3.0.0"),
         );
 
         // Install on disk with version 1.0.0
         install_agent_on_disk(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             &agent_content("my-agent", "A test agent"),
             false,
         );
         save_lock_with_entry(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             make_lock_entry_with_checksum(
                 ArtifactKind::Agent,
@@ -576,7 +559,7 @@ mod tests {
             false,
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let rows = outdated_with(&ctx).unwrap();
 
         assert_eq!(rows.len(), 2, "should show outdated row for each source");

@@ -49,26 +49,12 @@ pub fn set_model_with(value: &str, ctx: &AppContext<'_>) -> Result<ConfigSetResu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::test_support::{make_ctx, test_paths};
-    use chrono::Utc;
-
-    fn make_test_ctx<'a>(
-        fs: &'a FakeFilesystem,
-        git: &'a FakeGitClient,
-        clock: &'a FakeClock,
-        paths: &'a crate::paths::ConfigPaths,
-    ) -> AppContext<'a> {
-        make_ctx(fs, git, clock, paths)
-    }
+    use crate::test_support::TestContext;
 
     #[test]
     fn show_returns_defaults_when_no_config_file() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let t = TestContext::new();
+        let ctx = t.ctx();
 
         let result = show_with(&ctx).unwrap();
         assert_eq!(result.gateway, "openai");
@@ -77,11 +63,8 @@ mod tests {
 
     #[test]
     fn set_gateway_openai_persists_and_round_trips() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let t = TestContext::new();
+        let ctx = t.ctx();
 
         let result = set_gateway_with("openai", &ctx).unwrap();
         assert_eq!(result.field, "gateway");
@@ -93,11 +76,8 @@ mod tests {
 
     #[test]
     fn set_gateway_ollama_persists_and_round_trips() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let t = TestContext::new();
+        let ctx = t.ctx();
 
         set_gateway_with("ollama", &ctx).unwrap();
 
@@ -107,11 +87,8 @@ mod tests {
 
     #[test]
     fn set_gateway_unknown_returns_error() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let t = TestContext::new();
+        let ctx = t.ctx();
 
         match set_gateway_with("unknown-gw", &ctx) {
             Err(e) => assert!(
@@ -124,11 +101,8 @@ mod tests {
 
     #[test]
     fn set_model_persists_and_round_trips() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let t = TestContext::new();
+        let ctx = t.ctx();
 
         let result = set_model_with("gpt-4", &ctx).unwrap();
         assert_eq!(result.field, "model");

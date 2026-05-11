@@ -345,3 +345,27 @@ pub(crate) fn make_ctx<'a>(
         llm: None,
     }
 }
+
+#[cfg(test)]
+pub(crate) struct TestContext {
+    pub fs: crate::gateway::fakes::FakeFilesystem,
+    pub git: crate::gateway::fakes::FakeGitClient,
+    pub clock: crate::gateway::fakes::FakeClock,
+    pub paths: crate::paths::ConfigPaths,
+}
+
+#[cfg(test)]
+impl TestContext {
+    pub fn new() -> Self {
+        Self {
+            fs: crate::gateway::fakes::FakeFilesystem::new(),
+            git: crate::gateway::fakes::FakeGitClient::new(),
+            clock: crate::gateway::fakes::FakeClock::at(chrono::Utc::now()),
+            paths: test_paths(),
+        }
+    }
+
+    pub fn ctx(&self) -> crate::context::AppContext<'_> {
+        make_ctx(&self.fs, &self.git, &self.clock, &self.paths)
+    }
+}

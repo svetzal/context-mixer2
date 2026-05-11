@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 
 use crate::config;
 use crate::context::AppContext;
+use crate::source::SourceScanResult;
 use crate::types::{SourceEntry, SourceType};
 
 const AUTO_UPDATE_MINUTES: i64 = 60;
@@ -11,15 +12,9 @@ const AUTO_UPDATE_MINUTES: i64 = 60;
 // Result types
 // ---------------------------------------------------------------------------
 
-pub struct SourceUpdateResult {
-    pub name: String,
-    pub agents_found: usize,
-    pub skills_found: usize,
-}
-
 pub enum SourceUpdateOutput {
-    SingleUpdate(SourceUpdateResult),
-    BatchUpdate(Vec<SourceUpdateResult>),
+    SingleUpdate(SourceScanResult),
+    BatchUpdate(Vec<SourceScanResult>),
     NoGitSources,
 }
 
@@ -57,7 +52,7 @@ pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpd
     }
 }
 
-pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceUpdateResult> {
+pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceScanResult> {
     let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
     let source_type = sources
@@ -95,10 +90,11 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
     let entry = sources.sources.get(name).expect("entry present");
     let (agents_found, skills_found, _) = crate::source::scan_and_count(entry, ctx.fs)?;
 
-    Ok(SourceUpdateResult {
+    Ok(SourceScanResult {
         name: name.to_string(),
         agents_found,
         skills_found,
+        warnings: vec![],
     })
 }
 
@@ -158,8 +154,8 @@ mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::test_support::{
-        make_ctx, make_git_entry, make_local_entry, setup_source_git, setup_sources_from_entries,
-        test_paths,
+        TestContext, make_ctx, make_git_entry, make_local_entry, setup_source_git,
+        setup_sources_from_entries, test_paths,
     };
     use chrono::Utc;
     use std::cell::RefCell;
@@ -198,101 +194,89 @@ mod tests {
 
     #[test]
     fn auto_update_skips_local_sources() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         setup_sources_from_entries(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             &[("local-source", make_local_entry("/local/repo", None))],
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         auto_update_source_with("local-source", &ctx).unwrap();
 
-        assert!(git.pulled.borrow().is_empty(), "no git pull expected for local source");
+        assert!(t.git.pulled.borrow().is_empty(), "no git pull expected for local source");
     }
 
     #[test]
     fn auto_update_skips_fresh_git_sources() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let clone_path = PathBuf::from("/clones/git-source");
         setup_source_git(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "git-source",
             "https://github.com/example/repo.git",
             clone_path.clone(),
             "main",
             Some(Utc::now().to_rfc3339()),
         );
-        fs.add_dir(clone_path);
+        t.fs.add_dir(clone_path);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         auto_update_source_with("git-source", &ctx).unwrap();
 
-        assert!(git.pulled.borrow().is_empty(), "fresh source should not be pulled");
+        assert!(t.git.pulled.borrow().is_empty(), "fresh source should not be pulled");
     }
 
     #[test]
     fn auto_update_pulls_stale_git_sources() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let clone_path = PathBuf::from("/clones/git-source");
         let old_time = (Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
         setup_source_git(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "git-source",
             "https://github.com/example/repo.git",
             clone_path.clone(),
             "main",
             Some(old_time),
         );
-        fs.add_dir(clone_path.clone());
+        t.fs.add_dir(clone_path.clone());
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         auto_update_source_with("git-source", &ctx).unwrap();
 
-        let pulled = git.pulled.borrow();
+        let pulled = t.git.pulled.borrow();
         assert_eq!(pulled.len(), 1, "stale source should be pulled");
         assert_eq!(pulled[0], clone_path);
     }
 
     #[test]
     fn perform_pull_updates_timestamp_for_git_source() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let clone_path = PathBuf::from("/clones/git-source");
         setup_source_git(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "git-source",
             "https://github.com/example/repo.git",
             clone_path.clone(),
             "main",
             None,
         );
-        fs.add_dir(clone_path);
+        t.fs.add_dir(clone_path);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = perform_pull_with("git-source", &ctx).unwrap();
 
         assert_eq!(result.name, "git-source");
 
-        let updated_sources = crate::config::load_sources_with(&fs, &paths).unwrap();
+        let updated_sources = crate::config::load_sources_with(&t.fs, &t.paths).unwrap();
         let entry = updated_sources.sources.get("git-source").unwrap();
         assert!(entry.last_updated.is_some(), "timestamp should be updated after pull");
     }

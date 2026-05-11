@@ -206,7 +206,7 @@ mod tests {
     use crate::context::AppContext;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient, FakeLlmClient};
     use crate::test_support::{
-        agent_content, install_agent_on_disk, make_ctx, make_lock_entry_versioned,
+        TestContext, agent_content, install_agent_on_disk, make_lock_entry_versioned,
         save_lock_with_entry, setup_source_with_agent, test_paths,
     };
     use crate::types::ArtifactKind;
@@ -216,16 +216,13 @@ mod tests {
 
     #[test]
     fn collect_relative_files_returns_sorted_relative_paths() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/dir/b.md", "b");
-        fs.add_file("/dir/a.md", "a");
-        fs.add_file("/dir/sub/c.md", "c");
+        t.fs.add_file("/dir/b.md", "b");
+        t.fs.add_file("/dir/a.md", "a");
+        t.fs.add_file("/dir/sub/c.md", "c");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = collect_relative_files_with(std::path::Path::new("/dir"), &ctx).unwrap();
 
         assert_eq!(result, vec!["a.md", "b.md", "sub/c.md"]);
@@ -233,14 +230,11 @@ mod tests {
 
     #[test]
     fn collect_relative_files_empty_dir_returns_empty() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_dir("/empty");
+        t.fs.add_dir("/empty");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = collect_relative_files_with(std::path::Path::new("/empty"), &ctx).unwrap();
 
         assert!(result.is_empty());
@@ -250,15 +244,12 @@ mod tests {
 
     #[test]
     fn diff_files_builds_comparison_text() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/installed/agent.md", "installed content");
-        fs.add_file("/source/agent.md", "source content");
+        t.fs.add_file("/installed/agent.md", "installed content");
+        t.fs.add_file("/source/agent.md", "source content");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = diff_files_with(
             std::path::Path::new("/installed/agent.md"),
             std::path::Path::new("/source/agent.md"),
@@ -277,14 +268,11 @@ mod tests {
 
     #[test]
     fn diff_files_errors_on_missing_installed() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/source/agent.md", "source content");
+        t.fs.add_file("/source/agent.md", "source content");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = diff_files_with(
             std::path::Path::new("/installed/agent.md"),
             std::path::Path::new("/source/agent.md"),
@@ -298,16 +286,13 @@ mod tests {
 
     #[test]
     fn diff_dirs_identical_directories_returns_empty() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let content = "---\ndescription: My skill\n---\n";
-        fs.add_file("/installed/my-skill/SKILL.md", content);
-        fs.add_file("/source/my-skill/SKILL.md", content);
+        t.fs.add_file("/installed/my-skill/SKILL.md", content);
+        t.fs.add_file("/source/my-skill/SKILL.md", content);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = diff_dirs_with(
             std::path::Path::new("/installed/my-skill"),
             std::path::Path::new("/source/my-skill"),
@@ -320,16 +305,13 @@ mod tests {
 
     #[test]
     fn diff_dirs_shows_files_only_in_installed() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/installed/my-skill/SKILL.md", "skill");
-        fs.add_file("/installed/my-skill/extra.md", "extra");
-        fs.add_file("/source/my-skill/SKILL.md", "skill");
+        t.fs.add_file("/installed/my-skill/SKILL.md", "skill");
+        t.fs.add_file("/installed/my-skill/extra.md", "extra");
+        t.fs.add_file("/source/my-skill/SKILL.md", "skill");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = diff_dirs_with(
             std::path::Path::new("/installed/my-skill"),
             std::path::Path::new("/source/my-skill"),
@@ -343,16 +325,13 @@ mod tests {
 
     #[test]
     fn diff_dirs_shows_files_only_in_source() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/installed/my-skill/SKILL.md", "skill");
-        fs.add_file("/source/my-skill/SKILL.md", "skill");
-        fs.add_file("/source/my-skill/new-file.md", "new");
+        t.fs.add_file("/installed/my-skill/SKILL.md", "skill");
+        t.fs.add_file("/source/my-skill/SKILL.md", "skill");
+        t.fs.add_file("/source/my-skill/new-file.md", "new");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = diff_dirs_with(
             std::path::Path::new("/installed/my-skill"),
             std::path::Path::new("/source/my-skill"),
@@ -366,15 +345,12 @@ mod tests {
 
     #[test]
     fn diff_dirs_shows_changed_file_content() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/installed/my-skill/SKILL.md", "installed skill content");
-        fs.add_file("/source/my-skill/SKILL.md", "updated skill content");
+        t.fs.add_file("/installed/my-skill/SKILL.md", "installed skill content");
+        t.fs.add_file("/source/my-skill/SKILL.md", "updated skill content");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = diff_dirs_with(
             std::path::Path::new("/installed/my-skill"),
             std::path::Path::new("/source/my-skill"),
@@ -395,14 +371,11 @@ mod tests {
 
     #[test]
     fn find_in_sources_locates_agent() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = find_in_sources_with("my-agent", ArtifactKind::Agent, &ctx);
 
         assert!(result.is_ok(), "expected Ok: {:?}", result.err());
@@ -410,14 +383,11 @@ mod tests {
 
     #[test]
     fn find_in_sources_errors_when_not_found() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "other-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "other-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = find_in_sources_with("my-agent", ArtifactKind::Agent, &ctx);
 
         assert!(result.is_err());
@@ -425,15 +395,12 @@ mod tests {
 
     #[test]
     fn find_in_sources_matches_kind() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Source has an agent named "my-agent"; searching for a skill with same name should fail
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = find_in_sources_with("my-agent", ArtifactKind::Skill, &ctx);
 
         assert!(result.is_err(), "expected Err when kind doesn't match");
@@ -443,27 +410,24 @@ mod tests {
 
     #[tokio::test]
     async fn diff_with_reports_up_to_date_when_checksums_match() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let content = agent_content("my-agent", "A test agent");
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
         // Override the source file with specific content
-        fs.add_file("/sources/my-source/agents/my-agent.md", content.clone());
-        install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
+        t.fs.add_file("/sources/my-source/agents/my-agent.md", content.clone());
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
 
         // Write a lock file entry so load_with succeeds
         save_lock_with_entry(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
             false,
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
 
         // Same content => checksums match => returns Ok immediately (no LLM needed)
@@ -472,25 +436,22 @@ mod tests {
 
     #[tokio::test]
     async fn diff_with_errors_without_llm_when_checksums_differ() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
         // Install a different version so checksums differ
-        install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", "different installed content", false);
 
         save_lock_with_entry(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
             false,
         );
 
         // No LLM configured — should bail when it tries to analyze
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
 
         assert!(result.is_err());
@@ -533,25 +494,22 @@ mod tests {
 
     #[tokio::test]
     async fn gather_diff_sets_is_up_to_date_when_checksums_match() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let content = agent_content("my-agent", "A test agent");
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
-        fs.add_file("/sources/my-source/agents/my-agent.md", content.clone());
-        install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
+        t.fs.add_file("/sources/my-source/agents/my-agent.md", content.clone());
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
 
         save_lock_with_entry(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
             false,
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let output = gather_diff_with("my-agent", ArtifactKind::Agent, &ctx).await.unwrap();
 
         assert!(output.is_up_to_date, "expected is_up_to_date = true");

@@ -16,7 +16,7 @@ use crate::types::{Artifact, ArtifactKind, SourceEntry, SourceType};
 
 pub use crate::scan::ScanWarning;
 
-pub struct SourceAddResult {
+pub struct SourceScanResult {
     pub name: String,
     pub agents_found: usize,
     pub skills_found: usize,
@@ -61,7 +61,7 @@ pub struct SourceRemoveResult {
 // Public API
 // ---------------------------------------------------------------------------
 
-pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<SourceAddResult> {
+pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<SourceScanResult> {
     let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
     if sources.sources.contains_key(name) {
@@ -79,7 +79,7 @@ pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<S
     sources.sources.insert(name.to_string(), entry);
     config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
 
-    Ok(SourceAddResult {
+    Ok(SourceScanResult {
         name: name.to_string(),
         agents_found,
         skills_found,
@@ -349,7 +349,7 @@ mod tests {
     use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::test_support::{
-        make_ctx, make_git_entry, make_local_entry, setup_empty_sources,
+        TestContext, make_ctx, make_git_entry, make_local_entry, setup_empty_sources,
         setup_sources_from_entries, test_paths,
     };
     use crate::types::{ArtifactKind, Deprecation};
@@ -514,19 +514,16 @@ mod tests {
 
     #[test]
     fn add_bails_when_source_name_already_exists() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Pre-populate with existing source
         setup_sources_from_entries(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             &[("my-source", make_local_entry("/existing", None))],
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = add_with("my-source", "/new/path", &ctx);
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
@@ -535,35 +532,29 @@ mod tests {
 
     #[test]
     fn add_detects_local_path_no_git_call() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
         // Set up a valid local directory
-        fs.add_dir("/local/repo");
+        t.fs.add_dir("/local/repo");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = add_with("local-source", "/local/repo", &ctx);
         assert!(result.is_ok(), "expected ok: {:?}", result.err());
 
         // No git clone should have been called
-        assert!(git.cloned.borrow().is_empty(), "no git clone expected for local path");
+        assert!(t.git.cloned.borrow().is_empty(), "no git clone expected for local path");
     }
 
     #[test]
     fn add_result_has_correct_name_and_counts() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_empty_sources(&fs, &paths);
-        fs.add_dir("/local/repo");
+        setup_empty_sources(&t.fs, &t.paths);
+        t.fs.add_dir("/local/repo");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = add_with("local-source", "/local/repo", &ctx).unwrap();
 
         assert_eq!(result.name, "local-source");
@@ -573,49 +564,40 @@ mod tests {
 
     #[test]
     fn add_detects_url_and_clones() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = add_with("git-source", "https://github.com/example/repo.git", &ctx);
         assert!(result.is_ok(), "expected ok: {:?}", result.err());
 
-        let cloned = git.cloned.borrow();
+        let cloned = t.git.cloned.borrow();
         assert_eq!(cloned.len(), 1, "expected one git clone");
         assert_eq!(cloned[0].0, "https://github.com/example/repo.git");
     }
 
     #[test]
     fn add_saves_sources_after_registration() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_empty_sources(&fs, &paths);
-        fs.add_dir("/local/repo");
+        setup_empty_sources(&t.fs, &t.paths);
+        t.fs.add_dir("/local/repo");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         add_with("new-source", "/local/repo", &ctx).unwrap();
 
-        let sources = config::load_sources_with(&fs, &paths).unwrap();
+        let sources = config::load_sources_with(&t.fs, &t.paths).unwrap();
         assert!(sources.sources.contains_key("new-source"), "source should be saved");
     }
 
     #[test]
     fn gather_list_empty_sources_returns_empty_entries() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = list_with(&ctx).unwrap();
 
         assert!(result.entries.is_empty(), "expected empty entries for no sources");
@@ -623,18 +605,15 @@ mod tests {
 
     #[test]
     fn gather_list_local_source_has_correct_kind_and_location() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         setup_sources_from_entries(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             &[("my-source", make_local_entry("/local/repo", None))],
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = list_with(&ctx).unwrap();
 
         assert_eq!(result.entries.len(), 1);
@@ -645,15 +624,12 @@ mod tests {
 
     #[test]
     fn remove_result_reports_clone_deleted() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let clone_path = PathBuf::from("/clones/git-source");
         setup_sources_from_entries(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             &[(
                 "git-source",
                 make_git_entry(
@@ -664,27 +640,24 @@ mod tests {
                 ),
             )],
         );
-        fs.add_file(clone_path.join("README.md"), "# repo");
+        t.fs.add_file(clone_path.join("README.md"), "# repo");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = remove_with("git-source", &ctx).unwrap();
 
         assert_eq!(result.name, "git-source");
         assert!(result.clone_deleted, "expected clone_deleted to be true");
-        assert!(!fs.exists(&clone_path), "clone directory should be removed");
+        assert!(!t.fs.exists(&clone_path), "clone directory should be removed");
     }
 
     #[test]
     fn remove_deletes_clone_directory_for_git_source() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let clone_path = PathBuf::from("/clones/git-source");
         setup_sources_from_entries(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             &[(
                 "git-source",
                 make_git_entry(
@@ -696,37 +669,34 @@ mod tests {
             )],
         );
         // Create the clone directory
-        fs.add_file(clone_path.join("README.md"), "# repo");
+        t.fs.add_file(clone_path.join("README.md"), "# repo");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         remove_with("git-source", &ctx).unwrap();
 
-        assert!(!fs.exists(&clone_path), "clone directory should be removed");
-        let updated_sources = config::load_sources_with(&fs, &paths).unwrap();
+        assert!(!t.fs.exists(&clone_path), "clone directory should be removed");
+        let updated_sources = config::load_sources_with(&t.fs, &t.paths).unwrap();
         assert!(!updated_sources.sources.contains_key("git-source"));
     }
 
     #[test]
     fn remove_only_updates_json_for_local_source() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let local_dir = PathBuf::from("/local/repo");
         setup_sources_from_entries(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             &[("local-source", make_local_entry(local_dir.clone(), None))],
         );
-        fs.add_dir(local_dir.clone());
+        t.fs.add_dir(local_dir.clone());
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         remove_with("local-source", &ctx).unwrap();
 
         // Local dir should still exist (we only remove git clones)
-        assert!(fs.exists(&local_dir), "local dir should not be removed");
-        let updated_sources = config::load_sources_with(&fs, &paths).unwrap();
+        assert!(t.fs.exists(&local_dir), "local dir should not be removed");
+        let updated_sources = config::load_sources_with(&t.fs, &t.paths).unwrap();
         assert!(!updated_sources.sources.contains_key("local-source"));
     }
 

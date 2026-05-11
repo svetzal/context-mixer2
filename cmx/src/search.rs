@@ -84,9 +84,7 @@ fn truncate_description(desc: &str, max_len: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::test_support::{make_ctx, setup_source_with_agent, test_paths};
-    use chrono::Utc;
+    use crate::test_support::{TestContext, setup_source_with_agent};
 
     // --- truncate_description ---
 
@@ -137,20 +135,17 @@ mod tests {
 
     #[test]
     fn gather_search_results_matches_by_name() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         setup_source_with_agent(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-source",
             "/sources/my-source",
             "rust-craftsperson",
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let output = search_with("rust", &ctx).unwrap();
 
         assert_eq!(output.query, "rust");
@@ -161,15 +156,12 @@ mod tests {
 
     #[test]
     fn gather_search_results_matches_by_description() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // agent_content uses "A test agent" as description
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let output = search_with("test agent", &ctx).unwrap();
 
         assert_eq!(output.results.len(), 1);
@@ -178,14 +170,11 @@ mod tests {
 
     #[test]
     fn gather_search_results_no_match_returns_empty() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let output = search_with("nonexistent-xyz", &ctx).unwrap();
 
         assert!(output.results.is_empty(), "expected no results for non-matching query");
@@ -193,14 +182,11 @@ mod tests {
 
     #[test]
     fn gather_search_results_case_insensitive() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let output = search_with("MY-AGENT", &ctx).unwrap();
 
         assert_eq!(output.results.len(), 1, "search should be case-insensitive");

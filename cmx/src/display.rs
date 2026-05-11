@@ -5,11 +5,11 @@ use crate::cmx_config::{ConfigSetResult, ConfigShowResult};
 #[cfg(feature = "llm")]
 use crate::diff::DiffOutput;
 use crate::info::ArtifactInfo;
-use crate::install::{InstallAllResult, InstallResult, UpdateAllResult};
+use crate::install::{BatchInstallResult, InstallResult};
 use crate::list::{ListKindOutput, ListOutput, Row};
 use crate::outdated::OutdatedRow;
 use crate::search::SearchOutput;
-use crate::source::{SourceAddResult, SourceBrowseResult, SourceListResult, SourceRemoveResult};
+use crate::source::{SourceBrowseResult, SourceListResult, SourceRemoveResult, SourceScanResult};
 use crate::source_update::SourceUpdateOutput;
 use crate::table::Table;
 use crate::types::format_version_prefix;
@@ -302,19 +302,19 @@ pub fn format_install_result(result: &InstallResult) -> String {
     )
 }
 
-pub fn format_install_all_result(result: &InstallAllResult) -> String {
-    if result.installed.is_empty() {
+pub fn format_install_all_result(result: &BatchInstallResult) -> String {
+    if result.items.is_empty() {
         format!("All available {}s are already installed and up to date.\n", result.kind)
     } else {
-        result.installed.iter().map(format_install_result).collect()
+        result.items.iter().map(format_install_result).collect()
     }
 }
 
-pub fn format_update_all_result(result: &UpdateAllResult) -> String {
-    if result.updated.is_empty() {
+pub fn format_update_all_result(result: &BatchInstallResult) -> String {
+    if result.items.is_empty() {
         format!("All tracked {}s are up to date.\n", result.kind)
     } else {
-        result.updated.iter().map(format_install_result).collect()
+        result.items.iter().map(format_install_result).collect()
     }
 }
 
@@ -322,7 +322,7 @@ pub fn format_source_clone_start(url: &str, clone_dir: &Path) -> String {
     format!("Cloning {url} to {}...\n", clone_dir.display())
 }
 
-pub fn format_source_add_result(result: &SourceAddResult) -> String {
+pub fn format_source_add_result(result: &SourceScanResult) -> String {
     let mut out = format!(
         "Source '{}' registered: {} agent(s), {} skill(s) found.\n",
         result.name, result.agents_found, result.skills_found
@@ -376,16 +376,16 @@ mod tests {
 
     use super::*;
     use crate::info::ArtifactInfo;
-    use crate::install::{InstallAllResult, InstallResult, UpdateAllResult};
+    use crate::install::{BatchInstallResult, InstallResult};
     use crate::list::{ListKindOutput, ListOutput, Row};
     use crate::outdated::OutdatedRow;
     use crate::scan::ScanWarning;
     use crate::search::{SearchOutput, SearchResult};
     use crate::source::{
-        BrowseArtifact, BrowseSkill, SourceAddResult, SourceBrowseResult, SourceListEntry,
-        SourceListResult, SourceRemoveResult,
+        BrowseArtifact, BrowseSkill, SourceBrowseResult, SourceListEntry, SourceListResult,
+        SourceRemoveResult, SourceScanResult,
     };
-    use crate::source_update::{SourceUpdateOutput, SourceUpdateResult};
+    use crate::source_update::SourceUpdateOutput;
     use crate::types::{ArtifactKind, Deprecation};
     use crate::uninstall::UninstallResult;
 
@@ -615,7 +615,7 @@ mod tests {
 
     #[test]
     fn format_source_add_result_no_warnings() {
-        let result = SourceAddResult {
+        let result = SourceScanResult {
             name: "my-source".to_string(),
             agents_found: 3,
             skills_found: 1,
@@ -629,7 +629,7 @@ mod tests {
 
     #[test]
     fn format_source_add_result_with_warnings() {
-        let result = SourceAddResult {
+        let result = SourceScanResult {
             name: "my-source".to_string(),
             agents_found: 0,
             skills_found: 0,
@@ -872,8 +872,8 @@ mod tests {
 
     #[test]
     fn format_install_all_result_empty() {
-        let result = InstallAllResult {
-            installed: vec![],
+        let result = BatchInstallResult {
+            items: vec![],
             kind: ArtifactKind::Agent,
         };
         let out = format_install_all_result(&result);
@@ -883,8 +883,8 @@ mod tests {
 
     #[test]
     fn format_install_all_result_with_items() {
-        let result = InstallAllResult {
-            installed: vec![InstallResult {
+        let result = BatchInstallResult {
+            items: vec![InstallResult {
                 artifact_name: "my-agent".to_string(),
                 kind: ArtifactKind::Agent,
                 source_name: "guidelines".to_string(),
@@ -902,8 +902,8 @@ mod tests {
 
     #[test]
     fn format_update_all_result_empty() {
-        let result = UpdateAllResult {
-            updated: vec![],
+        let result = BatchInstallResult {
+            items: vec![],
             kind: ArtifactKind::Skill,
         };
         let out = format_update_all_result(&result);
@@ -913,8 +913,8 @@ mod tests {
 
     #[test]
     fn format_update_all_result_with_items() {
-        let result = UpdateAllResult {
-            updated: vec![InstallResult {
+        let result = BatchInstallResult {
+            items: vec![InstallResult {
                 artifact_name: "my-skill".to_string(),
                 kind: ArtifactKind::Skill,
                 source_name: "guidelines".to_string(),
@@ -938,10 +938,11 @@ mod tests {
     #[test]
     fn format_source_update_output_single_update() {
         let out =
-            format_source_update_output(&SourceUpdateOutput::SingleUpdate(SourceUpdateResult {
+            format_source_update_output(&SourceUpdateOutput::SingleUpdate(SourceScanResult {
                 name: "guidelines".to_string(),
                 agents_found: 5,
                 skills_found: 3,
+                warnings: vec![],
             }));
         assert!(out.contains("guidelines"));
         assert!(out.contains("5 agent(s)"));
@@ -951,15 +952,17 @@ mod tests {
     #[test]
     fn format_source_update_output_batch_update() {
         let out = format_source_update_output(&SourceUpdateOutput::BatchUpdate(vec![
-            SourceUpdateResult {
+            SourceScanResult {
                 name: "source-a".to_string(),
                 agents_found: 1,
                 skills_found: 0,
+                warnings: vec![],
             },
-            SourceUpdateResult {
+            SourceScanResult {
                 name: "source-b".to_string(),
                 agents_found: 2,
                 skills_found: 4,
+                warnings: vec![],
             },
         ]));
         assert!(out.contains("source-a"));

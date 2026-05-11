@@ -225,14 +225,13 @@ fn read_installed_version(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::gateway::fakes::FakeFilesystem;
     use crate::test_support::{
-        install_agent_on_disk, make_ctx, make_lock_entry_versioned, setup_empty_sources,
-        setup_source_with_agent, setup_source_with_skill, setup_sources, test_paths,
-        versioned_agent_content, versioned_skill_content,
+        TestContext, install_agent_on_disk, make_lock_entry_versioned, setup_empty_sources,
+        setup_source_with_agent, setup_source_with_skill, setup_sources, versioned_agent_content,
+        versioned_skill_content,
     };
     use crate::types::{ArtifactKind, LockFile};
-    use chrono::Utc;
     use std::collections::BTreeMap;
 
     // --- assemble_rows (pure, no gateway fakes needed) ---
@@ -373,15 +372,12 @@ mod tests {
 
     #[test]
     fn skill_row_shows_source_provenance_and_both_versions() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Source has skill at version 2.0.0
         setup_source_with_skill(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "guidelines",
             "/sources/guidelines",
             "my-skill",
@@ -389,7 +385,7 @@ mod tests {
         );
 
         // Installed skill at version 1.0.0
-        install_skill_dir(&fs, &paths, "my-skill", "1.0.0", false);
+        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", false);
 
         // Lockfile records installed version 1.0.0 from guidelines
         let mut lock = LockFile {
@@ -400,9 +396,9 @@ mod tests {
             "my-skill".to_string(),
             make_lock_entry_versioned(ArtifactKind::Skill, "1.0.0", "guidelines", "my-skill"),
         );
-        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
@@ -426,15 +422,12 @@ mod tests {
 
     #[test]
     fn skill_row_source_includes_full_provenance_path() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Source has skill at a nested path within the repo
         setup_source_with_skill(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "marketplace",
             "/sources/marketplace",
             "pdf-tool",
@@ -442,7 +435,7 @@ mod tests {
         );
 
         // Install the skill
-        install_skill_dir(&fs, &paths, "pdf-tool", "1.0.0", false);
+        install_skill_dir(&t.fs, &t.paths, "pdf-tool", "1.0.0", false);
 
         // Lockfile records source path as a nested marketplace location
         let mut lock = LockFile {
@@ -458,9 +451,9 @@ mod tests {
                 "plugins/doc-tools/skills/pdf-tool",
             ),
         );
-        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
@@ -475,15 +468,12 @@ mod tests {
 
     #[test]
     fn skill_row_no_lockfile_shows_repo_name_only() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Source has skill
         setup_source_with_skill(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "guidelines",
             "/sources/guidelines",
             "my-skill",
@@ -491,14 +481,14 @@ mod tests {
         );
 
         // Skill installed on disk but NOT in lockfile
-        install_skill_dir(&fs, &paths, "my-skill", "1.0.0", false);
+        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", false);
 
         let lock = LockFile {
             version: 1,
             packages: BTreeMap::new(),
         };
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
@@ -512,16 +502,13 @@ mod tests {
 
     #[test]
     fn skill_row_source_removed_shows_lockfile_provenance() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // No source registered — empty sources.json
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
         // Skill installed on disk
-        install_skill_dir(&fs, &paths, "my-skill", "1.0.0", false);
+        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", false);
 
         // Lockfile still has the provenance
         let mut lock = LockFile {
@@ -537,9 +524,9 @@ mod tests {
                 "skills/my-skill",
             ),
         );
-        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
@@ -556,18 +543,15 @@ mod tests {
 
     #[test]
     fn agent_row_also_shows_source_provenance() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Source with agent at version 2.0.0
-        setup_source_with_agent(&fs, &paths, "guidelines", "/sources/guidelines", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "guidelines", "/sources/guidelines", "my-agent");
 
         // Install agent on disk
         install_agent_on_disk(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             &crate::test_support::agent_content("my-agent", "A test agent"),
             false,
@@ -582,9 +566,9 @@ mod tests {
             "my-agent".to_string(),
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "guidelines", "my-agent.md"),
         );
-        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Agent, false, &lock, &source_versions, &ctx).unwrap();
@@ -599,33 +583,30 @@ mod tests {
 
     #[test]
     fn agent_in_two_sources_produces_two_rows() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Register two sources that both contain the same agent
         setup_sources(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             &[
                 ("guidelines", "/sources/guidelines"),
                 ("marketplace", "/sources/marketplace"),
             ],
         );
-        fs.add_file(
+        t.fs.add_file(
             "/sources/guidelines/agents/my-agent.md",
             versioned_agent_content("my-agent", "A test agent", "2.0.0"),
         );
-        fs.add_file(
+        t.fs.add_file(
             "/sources/marketplace/agents/my-agent.md",
             versioned_agent_content("my-agent", "A test agent", "3.0.0"),
         );
 
         // Install agent on disk
         install_agent_on_disk(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             &versioned_agent_content("my-agent", "A test agent", "1.0.0"),
             false,
@@ -640,9 +621,9 @@ mod tests {
             "my-agent".to_string(),
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "guidelines", "my-agent.md"),
         );
-        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Agent, false, &lock, &source_versions, &ctx).unwrap();
@@ -669,31 +650,28 @@ mod tests {
 
     #[test]
     fn skill_in_two_sources_produces_two_rows() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Register two sources with the same skill
         setup_sources(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             &[
                 ("guidelines", "/sources/guidelines"),
                 ("marketplace", "/sources/marketplace"),
             ],
         );
-        fs.add_file(
+        t.fs.add_file(
             "/sources/guidelines/my-skill/SKILL.md",
             versioned_skill_content("A test skill", "1.0.0"),
         );
-        fs.add_file(
+        t.fs.add_file(
             "/sources/marketplace/my-skill/SKILL.md",
             versioned_skill_content("A test skill", "2.0.0"),
         );
 
         // Install skill on disk
-        install_skill_dir(&fs, &paths, "my-skill", "1.0.0", false);
+        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", false);
 
         // Lockfile records installed from guidelines
         let mut lock = LockFile {
@@ -704,9 +682,9 @@ mod tests {
             "my-skill".to_string(),
             make_lock_entry_versioned(ArtifactKind::Skill, "1.0.0", "guidelines", "my-skill"),
         );
-        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
         let rows =
             build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();

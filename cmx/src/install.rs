@@ -24,14 +24,8 @@ pub struct InstallResult {
 }
 
 #[derive(Debug)]
-pub struct InstallAllResult {
-    pub installed: Vec<InstallResult>,
-    pub kind: ArtifactKind,
-}
-
-#[derive(Debug)]
-pub struct UpdateAllResult {
-    pub updated: Vec<InstallResult>,
+pub struct BatchInstallResult {
+    pub items: Vec<InstallResult>,
     pub kind: ArtifactKind,
 }
 
@@ -123,7 +117,7 @@ pub fn install_all_with(
     local: bool,
     force: bool,
     ctx: &AppContext<'_>,
-) -> Result<InstallAllResult> {
+) -> Result<BatchInstallResult> {
     source_update::auto_update_all_with(ctx)?;
 
     let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
@@ -147,14 +141,17 @@ pub fn install_all_with(
         installed.push(result);
     }
 
-    Ok(InstallAllResult { installed, kind })
+    Ok(BatchInstallResult {
+        items: installed,
+        kind,
+    })
 }
 
 pub fn update_all_with(
     kind: ArtifactKind,
     force: bool,
     ctx: &AppContext<'_>,
-) -> Result<UpdateAllResult> {
+) -> Result<BatchInstallResult> {
     source_update::auto_update_all_with(ctx)?;
 
     let all_source_info = source_iter::all_with_checksums(ctx)?;
@@ -179,7 +176,10 @@ pub fn update_all_with(
         }
     }
 
-    Ok(UpdateAllResult { updated, kind })
+    Ok(BatchInstallResult {
+        items: updated,
+        kind,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -251,8 +251,8 @@ mod tests {
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::source_iter::SourceArtifact;
     use crate::test_support::{
-        agent_content, make_ctx, setup_empty_sources, setup_source, setup_source_with_agent,
-        setup_sources, test_paths,
+        TestContext, agent_content, make_ctx, setup_empty_sources, setup_source,
+        setup_source_with_agent, setup_sources, test_paths,
     };
     use crate::types::{Artifact, ArtifactKind, Deprecation, LockFile};
     use chrono::Utc;
@@ -364,14 +364,11 @@ mod tests {
 
     #[test]
     fn install_bails_when_no_sources_registered() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
@@ -380,14 +377,17 @@ mod tests {
 
     #[test]
     fn install_bails_when_artifact_not_found() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "existing-agent");
+        setup_source_with_agent(
+            &t.fs,
+            &t.paths,
+            "my-source",
+            "/sources/my-source",
+            "existing-agent",
+        );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("nonexistent-agent", ArtifactKind::Agent, false, false, &ctx);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
@@ -396,17 +396,20 @@ mod tests {
 
     #[test]
     fn install_bails_on_ambiguous_name() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Two sources, both with the same agent name
-        setup_sources(&fs, &paths, &[("source1", "/source1"), ("source2", "/source2")]);
-        fs.add_file("/source1/agents/my-agent.md", agent_content("my-agent", "Agent from source1"));
-        fs.add_file("/source2/agents/my-agent.md", agent_content("my-agent", "Agent from source2"));
+        setup_sources(&t.fs, &t.paths, &[("source1", "/source1"), ("source2", "/source2")]);
+        t.fs.add_file(
+            "/source1/agents/my-agent.md",
+            agent_content("my-agent", "Agent from source1"),
+        );
+        t.fs.add_file(
+            "/source2/agents/my-agent.md",
+            agent_content("my-agent", "Agent from source2"),
+        );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
@@ -415,21 +418,18 @@ mod tests {
 
     #[test]
     fn install_succeeds_with_source_prefix_disambiguation() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("my-source:my-agent", ArtifactKind::Agent, false, false, &ctx);
         assert!(result.is_ok(), "expected ok, got: {:?}", result.err());
 
         // Verify the artifact was installed
-        let expected_dest = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        let expected_dest = t.paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
         assert!(
-            fs.file_exists(&expected_dest),
+            t.fs.file_exists(&expected_dest),
             "agent file should be installed at {}",
             expected_dest.display()
         );
@@ -437,19 +437,16 @@ mod tests {
 
     #[test]
     fn install_copies_agent_file_to_correct_destination() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
 
-        let expected_dest = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        let expected_dest = t.paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
         assert!(
-            fs.file_exists(&expected_dest),
+            t.fs.file_exists(&expected_dest),
             "agent file should be at {}",
             expected_dest.display()
         );
@@ -457,17 +454,14 @@ mod tests {
 
     #[test]
     fn install_records_checksums_in_lock() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
 
-        let lock = lockfile::load_with(false, &fs, &paths).unwrap();
+        let lock = lockfile::load_with(false, &t.fs, &t.paths).unwrap();
         let entry = lock.packages.get("my-agent").expect("lock entry must exist");
         assert!(!entry.source_checksum.is_empty());
         assert!(!entry.installed_checksum.is_empty());
@@ -500,20 +494,18 @@ mod tests {
 
     #[test]
     fn install_bails_on_local_modifications_without_force() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         // First install
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
 
         // Modify the installed file (different content than the recorded checksum)
-        let installed_path = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
-        fs.write(&installed_path, "modified content that differs from source").unwrap();
+        let installed_path = t.paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        t.fs.write(&installed_path, "modified content that differs from source")
+            .unwrap();
 
         // Second install should fail without force
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
@@ -524,20 +516,17 @@ mod tests {
 
     #[test]
     fn install_proceeds_on_local_modifications_with_force() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         // First install
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
 
         // Modify the installed file
-        let installed_path = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
-        fs.write(&installed_path, "modified content").unwrap();
+        let installed_path = t.paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        t.fs.write(&installed_path, "modified content").unwrap();
 
         // Second install with force should succeed
         let result = install_with("my-agent", ArtifactKind::Agent, false, true, &ctx);
@@ -546,10 +535,7 @@ mod tests {
 
     #[test]
     fn install_validates_skill_has_skill_md() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Set up a source with a "skill" directory that has no SKILL.md
         // Note: scan_source_with only picks up skills with SKILL.md, so we need
@@ -570,12 +556,12 @@ mod tests {
         // Since scan won't find it, install will bail with "not found" —
         // which tests the right path without needing to intercept copy.
 
-        setup_source(&fs, &paths, "my-source", "/sources/my-source");
+        setup_source(&t.fs, &t.paths, "my-source", "/sources/my-source");
 
         // Skill directory without SKILL.md — scanner won't find it
-        fs.add_file("/sources/my-source/my-skill/tool.py", "code");
+        t.fs.add_file("/sources/my-source/my-skill/tool.py", "code");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("my-skill", ArtifactKind::Skill, false, false, &ctx);
         assert!(result.is_err());
         // Either "not found in registered sources" or "missing SKILL.md"
@@ -602,39 +588,33 @@ mod tests {
         // this path is best exercised via integration test. We document it here.
         //
         // Verify the inverse: skill WITH SKILL.md installs successfully.
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source(&fs, &paths, "my-source", "/sources/my-source");
+        setup_source(&t.fs, &t.paths, "my-source", "/sources/my-source");
         // Skill WITH SKILL.md
-        fs.add_file("/sources/my-source/my-skill/SKILL.md", "---\ndescription: My skill\n---\n");
-        fs.add_file("/sources/my-source/my-skill/tool.py", "code");
+        t.fs.add_file("/sources/my-source/my-skill/SKILL.md", "---\ndescription: My skill\n---\n");
+        t.fs.add_file("/sources/my-source/my-skill/tool.py", "code");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("my-skill", ArtifactKind::Skill, false, false, &ctx);
         assert!(result.is_ok(), "skill with SKILL.md should install: {:?}", result.err());
 
         // Verify SKILL.md was copied to dest
-        let dest = paths.install_dir(ArtifactKind::Skill, false).join("my-skill");
-        assert!(fs.file_exists(&dest.join("SKILL.md")));
+        let dest = t.paths.install_dir(ArtifactKind::Skill, false).join("my-skill");
+        assert!(t.fs.file_exists(&dest.join("SKILL.md")));
     }
 
     // --- Verify empty lock produces empty lock file ---
     #[test]
     fn install_writes_lock_with_source_repo_name() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "guidelines", "/sources/guidelines", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "guidelines", "/sources/guidelines", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
 
-        let lock = lockfile::load_with(false, &fs, &paths).unwrap();
+        let lock = lockfile::load_with(false, &t.fs, &t.paths).unwrap();
         let entry = lock.packages.get("my-agent").unwrap();
         assert_eq!(entry.source.repo, "guidelines");
     }
@@ -642,9 +622,8 @@ mod tests {
     // Ensure the LockFile starts empty
     #[test]
     fn fresh_lock_file_has_no_entries() {
-        let fs = FakeFilesystem::new();
-        let paths = test_paths();
-        let lock: LockFile = lockfile::load_with(false, &fs, &paths).unwrap();
+        let t = TestContext::new();
+        let lock: LockFile = lockfile::load_with(false, &t.fs, &t.paths).unwrap();
         assert!(lock.packages.is_empty());
     }
 
@@ -652,14 +631,11 @@ mod tests {
 
     #[test]
     fn perform_install_returns_correct_artifact_name() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
 
         assert_eq!(result.artifact_name, "my-agent");
@@ -669,30 +645,24 @@ mod tests {
 
     #[test]
     fn perform_install_dest_dir_matches_install_dir() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
 
-        let expected_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let expected_dir = t.paths.install_dir(ArtifactKind::Agent, false);
         assert_eq!(result.dest_dir, expected_dir);
     }
 
     #[test]
     fn perform_install_bails_when_no_sources_registered() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
@@ -703,20 +673,17 @@ mod tests {
 
     #[test]
     fn install_agent_does_not_update_lock_when_copy_fails() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
-        fs.set_fail_on_copy(true);
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
+        t.fs.set_fail_on_copy(true);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
         assert!(result.is_err(), "expected Err when copy fails");
 
         // Lock file should have no entry for the agent
-        let lock = lockfile::load_with(false, &fs, &paths).unwrap();
+        let lock = lockfile::load_with(false, &t.fs, &t.paths).unwrap();
         assert!(
             !lock.packages.contains_key("my-agent"),
             "lock should not be updated after failed copy"
@@ -725,25 +692,22 @@ mod tests {
 
     #[test]
     fn install_agent_lock_save_failure_leaves_artifact_on_disk() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         // Cause the lock file write to fail
-        fs.set_fail_on_write(paths.lock_path(false));
+        t.fs.set_fail_on_write(t.paths.lock_path(false));
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
         assert!(result.is_err(), "expected Err when lock save fails");
 
         // Despite the lock save failure, the agent file was already copied to disk
         // (documents the current no-rollback behavior)
-        let expected_dest = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        let expected_dest = t.paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
         assert!(
-            fs.file_exists(&expected_dest),
+            t.fs.file_exists(&expected_dest),
             "agent file should still exist on disk even after lock save failure"
         );
     }

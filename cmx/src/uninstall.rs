@@ -58,19 +58,14 @@ pub fn uninstall_with(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::test_support::{make_ctx, sample_lock_entry, test_paths};
+    use crate::test_support::{TestContext, sample_lock_entry};
     use crate::types::{ArtifactKind, LockFile};
-    use chrono::Utc;
     use std::collections::BTreeMap;
 
     #[test]
     fn uninstall_bails_when_agent_not_installed() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let t = TestContext::new();
+        let ctx = t.ctx();
 
         let result = uninstall_with("nonexistent", ArtifactKind::Agent, false, &ctx);
         assert!(result.is_err());
@@ -80,46 +75,37 @@ mod tests {
 
     #[test]
     fn uninstall_removes_agent_file() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        let agent_path = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
-        fs.add_file(agent_path.clone(), "# agent");
+        let agent_path = t.paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        t.fs.add_file(agent_path.clone(), "# agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         uninstall_with("my-agent", ArtifactKind::Agent, false, &ctx).unwrap();
 
-        assert!(!fs.file_exists(&agent_path), "agent file should be removed");
+        assert!(!t.fs.file_exists(&agent_path), "agent file should be removed");
     }
 
     #[test]
     fn uninstall_removes_skill_dir() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        let skill_dir = paths.install_dir(ArtifactKind::Skill, false).join("my-skill");
-        fs.add_file(skill_dir.join("SKILL.md"), "---\n---\n");
-        fs.add_file(skill_dir.join("tool.py"), "code");
+        let skill_dir = t.paths.install_dir(ArtifactKind::Skill, false).join("my-skill");
+        t.fs.add_file(skill_dir.join("SKILL.md"), "---\n---\n");
+        t.fs.add_file(skill_dir.join("tool.py"), "code");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         uninstall_with("my-skill", ArtifactKind::Skill, false, &ctx).unwrap();
 
-        assert!(!fs.file_exists(&skill_dir.join("SKILL.md")), "skill dir should be removed");
+        assert!(!t.fs.file_exists(&skill_dir.join("SKILL.md")), "skill dir should be removed");
     }
 
     #[test]
     fn uninstall_removes_lock_entry() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        let agent_path = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
-        fs.add_file(agent_path.clone(), "# agent");
+        let agent_path = t.paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        t.fs.add_file(agent_path.clone(), "# agent");
 
         // Write a lock file with an entry
         let mut packages = BTreeMap::new();
@@ -128,9 +114,9 @@ mod tests {
             version: 1,
             packages,
         };
-        lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+        lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = uninstall_with("my-agent", ArtifactKind::Agent, false, &ctx).unwrap();
 
         // Verify result fields
@@ -139,21 +125,18 @@ mod tests {
         assert_eq!(result.scope, "global");
         assert!(result.was_tracked, "expected was_tracked to be true");
 
-        let updated_lock = lockfile::load_with(false, &fs, &paths).unwrap();
+        let updated_lock = lockfile::load_with(false, &t.fs, &t.paths).unwrap();
         assert!(!updated_lock.packages.contains_key("my-agent"), "lock entry should be removed");
     }
 
     #[test]
     fn uninstall_succeeds_even_without_lock_entry() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        let agent_path = paths.install_dir(ArtifactKind::Agent, false).join("untracked.md");
-        fs.add_file(agent_path, "# untracked agent");
+        let agent_path = t.paths.install_dir(ArtifactKind::Agent, false).join("untracked.md");
+        t.fs.add_file(agent_path, "# untracked agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = uninstall_with("untracked", ArtifactKind::Agent, false, &ctx);
         assert!(result.is_ok(), "uninstall should succeed even without lock entry");
 
@@ -163,15 +146,12 @@ mod tests {
 
     #[test]
     fn uninstall_with_delegates_to_perform_and_succeeds() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        let agent_path = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
-        fs.add_file(agent_path, "# agent");
+        let agent_path = t.paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        t.fs.add_file(agent_path, "# agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = uninstall_with("my-agent", ArtifactKind::Agent, false, &ctx);
         assert!(result.is_ok(), "uninstall_with should succeed: {:?}", result.err());
     }

@@ -177,15 +177,14 @@ pub(crate) fn collect_skill_files_with(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::gateway::fakes::FakeFilesystem;
     use crate::lockfile;
     use crate::test_support::{
-        agent_content, deprecated_agent_content, install_agent_on_disk, make_ctx,
+        TestContext, agent_content, deprecated_agent_content, install_agent_on_disk,
         make_lock_entry_with_checksum, save_lock_with_entry, setup_empty_sources, setup_source,
-        setup_source_with_agent, setup_source_with_versioned_agent, test_paths,
+        setup_source_with_agent, setup_source_with_versioned_agent,
     };
     use crate::types::{ArtifactKind, Deprecation, LockFile};
-    use chrono::Utc;
     use std::collections::BTreeMap;
 
     fn write_lock_entry(
@@ -210,16 +209,19 @@ mod tests {
 
     #[test]
     fn info_finds_global_agent() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        install_agent_on_disk(&fs, &paths, "my-agent", &agent_content("my-agent", "test"), false);
+        install_agent_on_disk(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            &agent_content("my-agent", "test"),
+            false,
+        );
 
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = info_with("my-agent", &ctx);
 
         assert!(result.is_ok(), "expected Ok for global agent: {:?}", result.err());
@@ -227,16 +229,19 @@ mod tests {
 
     #[test]
     fn info_finds_local_agent() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        install_agent_on_disk(&fs, &paths, "my-agent", &agent_content("my-agent", "test"), true);
+        install_agent_on_disk(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            &agent_content("my-agent", "test"),
+            true,
+        );
 
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = info_with("my-agent", &ctx);
 
         assert!(result.is_ok(), "expected Ok for local agent: {:?}", result.err());
@@ -244,14 +249,11 @@ mod tests {
 
     #[test]
     fn info_errors_when_not_found() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result = info_with("nonexistent-agent", &ctx);
 
         assert!(result.is_err());
@@ -266,24 +268,28 @@ mod tests {
 
     #[test]
     fn gather_info_tracked_agent_has_correct_fields() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let content = agent_content("my-agent", "A test agent");
-        install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
 
         // Compute the actual checksum to make it match
-        let install_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, false);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Use a checksum that matches the content (we'll rely on the file being there)
-        write_lock_entry(&fs, &paths, "my-agent", ArtifactKind::Agent, false, "sha256:somecheck");
+        write_lock_entry(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            ArtifactKind::Agent,
+            false,
+            "sha256:somecheck",
+        );
 
-        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
 
         assert_eq!(info.name, "my-agent");
@@ -298,19 +304,16 @@ mod tests {
 
     #[test]
     fn gather_info_untracked_agent_sets_untracked_flag() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let content = agent_content("my-agent", "A test agent");
-        install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
 
         // No lock entry — untracked
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let install_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let ctx = t.ctx();
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, false);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
         let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
 
@@ -322,15 +325,12 @@ mod tests {
 
     #[test]
     fn gather_info_locally_modified_sets_flag_and_disk_checksum() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         // Install with some content
-        install_agent_on_disk(&fs, &paths, "my-agent", "original content", false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", "original content", false);
 
-        let install_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, false);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Write a lock entry with a different checksum (simulating modification)
@@ -343,11 +343,11 @@ mod tests {
         );
         // Installed checksum does NOT match disk content
         entry.installed_checksum = "sha256:different_from_disk".to_string();
-        save_lock_with_entry(&fs, &paths, "my-agent", entry, false);
+        save_lock_with_entry(&t.fs, &t.paths, "my-agent", entry, false);
 
-        setup_empty_sources(&fs, &paths);
+        setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
 
         assert!(info.locally_modified, "expected locally_modified to be true");
@@ -356,21 +356,18 @@ mod tests {
 
     #[test]
     fn gather_info_deprecation_from_source() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let content = agent_content("my-agent", "A test agent");
-        install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
 
-        let install_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, false);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Setup sources with a deprecated agent
-        setup_source(&fs, &paths, "my-source", "/sources/my-source");
+        setup_source(&t.fs, &t.paths, "my-source", "/sources/my-source");
         // Deprecated agent in source (uses flat deprecation fields, not YAML block)
-        fs.add_file(
+        t.fs.add_file(
             "/sources/my-source/agents/my-agent.md",
             deprecated_agent_content("my-agent", "A test agent", "Too old", "new-agent"),
         );
@@ -382,12 +379,12 @@ mod tests {
                 packages: BTreeMap::new(),
             },
             false,
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
         )
         .unwrap();
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
 
         assert!(info.deprecation.is_some(), "expected deprecation to be present");
@@ -398,21 +395,18 @@ mod tests {
 
     #[test]
     fn gather_info_available_version_when_source_differs() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
         let content = agent_content("my-agent", "A test agent");
-        install_agent_on_disk(&fs, &paths, "my-agent", &content, false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
 
-        let install_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, false);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Lock entry with version 1.0.0
         save_lock_with_entry(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-agent",
             make_lock_entry_with_checksum(
                 ArtifactKind::Agent,
@@ -426,15 +420,15 @@ mod tests {
 
         // Source has version 2.0.0
         setup_source_with_versioned_agent(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-source",
             "/sources/my-source",
             "my-agent",
             "2.0.0",
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
 
         assert_eq!(
@@ -448,15 +442,12 @@ mod tests {
 
     #[test]
     fn collect_skill_files_returns_entries_for_nested_structure() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/skills/my-skill/SKILL.md", "---\ndescription: skill\n---\n");
-        fs.add_file("/skills/my-skill/lib/helper.sh", "#!/bin/bash");
+        t.fs.add_file("/skills/my-skill/SKILL.md", "---\ndescription: skill\n---\n");
+        t.fs.add_file("/skills/my-skill/lib/helper.sh", "#!/bin/bash");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result =
             collect_skill_files_with(std::path::Path::new("/skills/my-skill"), 0, &ctx).unwrap();
 
@@ -474,14 +465,11 @@ mod tests {
 
     #[test]
     fn collect_skill_files_empty_dir_returns_empty_vec() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_dir("/skills/empty-skill");
+        t.fs.add_dir("/skills/empty-skill");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result =
             collect_skill_files_with(std::path::Path::new("/skills/empty-skill"), 0, &ctx).unwrap();
 
@@ -490,15 +478,12 @@ mod tests {
 
     #[test]
     fn collect_skill_files_skips_dotfiles() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/skills/my-skill/SKILL.md", "---\ndescription: skill\n---\n");
-        fs.add_file("/skills/my-skill/.hidden", "hidden");
+        t.fs.add_file("/skills/my-skill/SKILL.md", "---\ndescription: skill\n---\n");
+        t.fs.add_file("/skills/my-skill/.hidden", "hidden");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result =
             collect_skill_files_with(std::path::Path::new("/skills/my-skill"), 0, &ctx).unwrap();
 
@@ -508,15 +493,12 @@ mod tests {
 
     #[test]
     fn collect_skill_files_marks_dirs_correctly() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths();
+        let t = TestContext::new();
 
-        fs.add_file("/skills/my-skill/SKILL.md", "---\ndescription: skill\n---\n");
-        fs.add_file("/skills/my-skill/lib/tool.py", "code");
+        t.fs.add_file("/skills/my-skill/SKILL.md", "---\ndescription: skill\n---\n");
+        t.fs.add_file("/skills/my-skill/lib/tool.py", "code");
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
         let result =
             collect_skill_files_with(std::path::Path::new("/skills/my-skill"), 0, &ctx).unwrap();
 
