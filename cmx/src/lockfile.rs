@@ -36,6 +36,21 @@ pub fn save_with(
     save_to_with(lock, &path, fs)
 }
 
+/// Load, mutate via `f`, and save a `LockFile` in one step.
+///
+/// The lock file is loaded from the appropriate scope, `f` is called with
+/// a mutable reference to the in-memory lock, and the result is written
+/// back to disk.  Returns whatever `f` returns.
+pub fn mutate_with<F, T>(local: bool, fs: &dyn Filesystem, paths: &ConfigPaths, f: F) -> Result<T>
+where
+    F: FnOnce(&mut LockFile) -> T,
+{
+    let mut lock = load_with(local, fs, paths)?;
+    let result = f(&mut lock);
+    save_with(&lock, local, fs, paths)?;
+    Ok(result)
+}
+
 /// Load both the global and local lock files in one call.
 ///
 /// Returns `(global_lock, local_lock)`.
@@ -69,7 +84,7 @@ pub fn find_entry_with(
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
-    use crate::test_support::{sample_lock_file, test_paths};
+    use crate::test_support::{sample_lock_entry, sample_lock_file, test_paths};
     use std::path::PathBuf;
 
     // --- load_from_with ---
@@ -157,6 +172,38 @@ mod tests {
         let result = find_entry_with("my-agent", &fs, &paths).unwrap();
         let (_, local) = result.unwrap();
         assert!(!local, "expected global to be preferred over local");
+    }
+
+    // --- mutate_with ---
+
+    #[test]
+    fn mutate_with_loads_applies_and_saves() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+
+        mutate_with(false, &fs, &paths, |lock| {
+            lock.packages.insert("test-agent".to_string(), sample_lock_entry());
+        })
+        .unwrap();
+
+        let loaded = load_with(false, &fs, &paths).unwrap();
+        assert!(loaded.packages.contains_key("test-agent"));
+    }
+
+    #[test]
+    fn mutate_with_returns_closure_value() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let lock = sample_lock_file();
+        save_with(&lock, false, &fs, &paths).unwrap();
+
+        let was_removed =
+            mutate_with(false, &fs, &paths, |lock| lock.packages.remove("my-agent").is_some())
+                .unwrap();
+
+        assert!(was_removed, "expected closure return value to be propagated");
+        let loaded = load_with(false, &fs, &paths).unwrap();
+        assert!(!loaded.packages.contains_key("my-agent"));
     }
 
     // --- round-trip via load_with / save_with ---

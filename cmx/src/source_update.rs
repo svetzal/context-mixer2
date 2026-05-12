@@ -53,20 +53,16 @@ pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpd
 }
 
 pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceScanResult> {
-    let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
-    let source_type = sources
+    let source_entry = sources
         .sources
         .get(name)
-        .with_context(|| format!("Source '{name}' not found."))?
-        .source_type
-        .clone();
+        .with_context(|| format!("Source '{name}' not found."))?;
+    let source_type = source_entry.source_type.clone();
 
     if matches!(source_type, SourceType::Git) {
-        let clone_path = sources
-            .sources
-            .get(name)
-            .expect("entry present")
+        let clone_path = source_entry
             .local_clone
             .as_ref()
             .context("Git source has no local clone path")?
@@ -82,13 +78,19 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
         ctx.git.pull(&clone_path)?;
     }
 
-    if let Some(entry) = sources.sources.get_mut(name) {
-        entry.last_updated = Some(ctx.clock.now().to_rfc3339());
-    }
-    config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
+    let now = ctx.clock.now().to_rfc3339();
+    let updated_entry = config::mutate_sources_with(ctx.fs, ctx.paths, |sources| {
+        if let Some(entry) = sources.sources.get_mut(name) {
+            entry.last_updated = Some(now);
+        }
+        sources
+            .sources
+            .get(name)
+            .cloned()
+            .with_context(|| format!("Source '{name}' not found."))
+    })?;
 
-    let entry = sources.sources.get(name).expect("entry present");
-    let (agents_found, skills_found, _) = crate::source::scan_and_count(entry, ctx.fs)?;
+    let (agents_found, skills_found, _) = crate::source::scan_and_count(&updated_entry, ctx.fs)?;
 
     Ok(SourceScanResult {
         name: name.to_string(),

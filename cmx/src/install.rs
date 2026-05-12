@@ -64,29 +64,36 @@ pub fn install_with(
 
     // Check for local modifications before overwriting
     if !force {
-        check_local_modifications(artifact_name, kind, &plan.dest_dir, local, ctx)?;
+        let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
+        check_local_modifications(
+            artifact_name,
+            kind,
+            &plan.dest_dir,
+            lock.packages.get(artifact_name),
+            ctx,
+        )?;
     }
 
     let dest_path =
         copy::copy_artifact(&found.artifact.path, &plan.dest_dir, kind, artifact_name, ctx)?;
     let installed_checksum = checksum::checksum_artifact_with(&dest_path, kind, ctx.fs)?;
 
-    let mut lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
-    lock.packages.insert(
-        artifact_name.to_string(),
-        LockEntry {
-            artifact_type: kind,
-            version: plan.version.clone(),
-            installed_at: ctx.clock.now().to_rfc3339(),
-            source: LockSource {
-                repo: plan.source_name.clone(),
-                path: plan.relative_path.clone(),
+    lockfile::mutate_with(local, ctx.fs, ctx.paths, |lock| {
+        lock.packages.insert(
+            artifact_name.to_string(),
+            LockEntry {
+                artifact_type: kind,
+                version: plan.version.clone(),
+                installed_at: ctx.clock.now().to_rfc3339(),
+                source: LockSource {
+                    repo: plan.source_name.clone(),
+                    path: plan.relative_path.clone(),
+                },
+                source_checksum,
+                installed_checksum,
             },
-            source_checksum,
-            installed_checksum,
-        },
-    );
-    lockfile::save_with(&lock, local, ctx.fs, ctx.paths)?;
+        );
+    })?;
 
     Ok(InstallResult {
         artifact_name: artifact_name.to_string(),
@@ -214,13 +221,12 @@ fn check_local_modifications(
     artifact_name: &str,
     kind: ArtifactKind,
     dest_dir: &std::path::Path,
-    local: bool,
+    lock_entry: Option<&LockEntry>,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
     let dest_check = kind.installed_path(artifact_name, dest_dir);
     if ctx.fs.exists(&dest_check) {
-        let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
-        if let Some(entry) = lock.packages.get(artifact_name) {
+        if let Some(entry) = lock_entry {
             if checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs)? {
                 bail!(
                     "'{artifact_name}' has local modifications. Use --force to overwrite, \

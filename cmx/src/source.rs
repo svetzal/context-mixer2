@@ -62,7 +62,7 @@ pub struct SourceRemoveResult {
 // ---------------------------------------------------------------------------
 
 pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<SourceScanResult> {
-    let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
 
     if sources.sources.contains_key(name) {
         bail!("Source '{name}' already exists. Remove it first to re-register.");
@@ -76,8 +76,10 @@ pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<S
 
     let (agents_found, skills_found, warnings) = scan_and_count(&entry, ctx.fs)?;
 
-    sources.sources.insert(name.to_string(), entry);
-    config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
+    config::mutate_sources_with(ctx.fs, ctx.paths, |sources| {
+        sources.sources.insert(name.to_string(), entry);
+        Ok(())
+    })?;
 
     Ok(SourceScanResult {
         name: name.to_string(),
@@ -159,14 +161,12 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResul
 }
 
 pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
-    let mut sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-
-    let entry = sources
-        .sources
-        .remove(name)
-        .with_context(|| format!("Source '{name}' not found."))?;
-
-    config::save_sources_with(&sources, ctx.fs, ctx.paths)?;
+    let entry = config::mutate_sources_with(ctx.fs, ctx.paths, |sources| {
+        sources
+            .sources
+            .remove(name)
+            .with_context(|| format!("Source '{name}' not found."))
+    })?;
 
     let clone_deleted = if let Some(clone_path) = &entry.local_clone {
         if ctx.fs.exists(clone_path) {

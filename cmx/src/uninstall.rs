@@ -37,9 +37,9 @@ pub fn uninstall_with(
     kind.remove_installed(&target, ctx.fs)?;
 
     // Remove from lock file
-    let mut lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
-    let was_tracked = lock.packages.remove(name).is_some();
-    lockfile::save_with(&lock, local, ctx.fs, ctx.paths)?;
+    let was_tracked = lockfile::mutate_with(local, ctx.fs, ctx.paths, |lock| {
+        lock.packages.remove(name).is_some()
+    })?;
 
     let scope = scope_label(local);
 

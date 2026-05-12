@@ -24,6 +24,21 @@ pub fn save_sources_with(
     crate::json_file::save_json(sources, &paths.sources_path(), fs)
 }
 
+/// Load, mutate via `f`, and save the `SourcesFile` in one step.
+///
+/// `f` is called with a mutable reference to the in-memory sources and may
+/// return `Err` to abort without writing; on success the file is saved and
+/// the value returned by `f` is propagated.
+pub fn mutate_sources_with<F, T>(fs: &dyn Filesystem, paths: &ConfigPaths, f: F) -> Result<T>
+where
+    F: FnOnce(&mut SourcesFile) -> Result<T>,
+{
+    let mut sources = load_sources_with(fs, paths)?;
+    let result = f(&mut sources)?;
+    save_sources_with(&sources, fs, paths)?;
+    Ok(result)
+}
+
 pub fn load_config_with(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<CmxConfig> {
     crate::json_file::load_json(&paths.config_path(), fs)
 }
@@ -211,6 +226,38 @@ mod tests {
         let sources = SourcesFile::default();
         save_sources_with(&sources, &fs, &paths).unwrap();
         assert!(fs.file_exists(&paths.sources_path()));
+    }
+
+    // --- mutate_sources_with ---
+
+    #[test]
+    fn mutate_sources_with_loads_applies_and_saves() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+
+        mutate_sources_with(&fs, &paths, |sources| {
+            sources
+                .sources
+                .insert("test-source".to_string(), make_local_entry("/path", None));
+            Ok(())
+        })
+        .unwrap();
+
+        let loaded = load_sources_with(&fs, &paths).unwrap();
+        assert!(loaded.sources.contains_key("test-source"));
+    }
+
+    #[test]
+    fn mutate_sources_with_does_not_save_on_closure_error() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+
+        let result: Result<()> =
+            mutate_sources_with(&fs, &paths, |_sources| Err(anyhow::anyhow!("closure error")));
+        assert!(result.is_err());
+
+        let loaded = load_sources_with(&fs, &paths).unwrap();
+        assert!(loaded.sources.is_empty(), "sources should not be saved after closure error");
     }
 
     #[test]
