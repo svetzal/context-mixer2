@@ -71,6 +71,7 @@ Prints errors first, then warnings. Exit code is 0 even with issues (use the out
 
 Reads plugin metadata from `.claude-plugin/plugin.json` or `marketplace.json` and writes equivalent manifests for other platforms:
 
-- `.codex-plugin/plugin.json`
+- `.copilot-plugin/plugin.json`
 - `.cursor-plugin/plugin.json`
-- `gemini-extension.json`
+- `.windsurf-plugin/plugin.json`
+- `.gemini-plugin/plugin.json`

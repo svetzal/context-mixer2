@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `cmf manifest generate` now emits `.windsurf-plugin/` manifests, so marketplaces built with cmf no longer silently exclude Windsurf users.
+
+### Changed
+
+- Renamed the `Codex` platform variant to `Copilot` and its generated manifest directory from `.codex-plugin/` to `.copilot-plugin/`, matching the documented platform name (GitHub Copilot). Re-run `cmf manifest generate` to refresh manifest directories.
+
 ### Fixed
 
 - `cmx agent install` and `cmx skill install` now roll back a freshly copied artifact when the lockfile write fails, eliminating the ghost-install state where an artifact exists on disk with no lockfile entry

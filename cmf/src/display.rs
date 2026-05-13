@@ -604,14 +604,16 @@ mod tests {
     #[test]
     fn format_manifest_summary_with_files_shows_platform_dirs() {
         let files = vec![
-            PathBuf::from("/repo/.codex-plugin/marketplace.json"),
+            PathBuf::from("/repo/.copilot-plugin/marketplace.json"),
             PathBuf::from("/repo/.cursor-plugin/marketplace.json"),
+            PathBuf::from("/repo/.windsurf-plugin/marketplace.json"),
             PathBuf::from("/repo/.gemini-plugin/marketplace.json"),
-            PathBuf::from("/repo/.codex-plugin/plugin.json"),
+            PathBuf::from("/repo/.copilot-plugin/plugin.json"),
         ];
         let out = format_manifest_summary(&files);
         assert!(out.starts_with("Generated manifests for"), "unexpected start: {out}");
-        assert!(out.contains(".codex-plugin/"), "missing .codex-plugin/ in: {out}");
+        assert!(out.contains(".copilot-plugin/"), "missing .copilot-plugin/ in: {out}");
+        assert!(out.contains(".windsurf-plugin/"), "missing .windsurf-plugin/ in: {out}");
     }
 
     // --- format_validation_issues ---

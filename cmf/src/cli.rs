@@ -86,7 +86,7 @@ pub enum PluginAction {
 
 #[derive(Subcommand)]
 pub enum ManifestAction {
-    /// Generate multi-platform manifests (.claude-plugin, .codex-plugin, .cursor-plugin, gemini-extension.json)
+    /// Generate multi-platform manifests (.claude-plugin, .copilot-plugin, .cursor-plugin, .windsurf-plugin, .gemini-plugin)
     Generate,
 }
 

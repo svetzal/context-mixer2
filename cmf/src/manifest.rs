@@ -8,8 +8,9 @@ use crate::repo::RepoRoot;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Platform {
     Claude,
-    Codex,
+    Copilot,
     Cursor,
+    Windsurf,
     Gemini,
 }
 
@@ -18,15 +19,16 @@ impl Platform {
     pub fn manifest_dir(&self) -> &str {
         match self {
             Self::Claude => ".claude-plugin",
-            Self::Codex => ".codex-plugin",
+            Self::Copilot => ".copilot-plugin",
             Self::Cursor => ".cursor-plugin",
+            Self::Windsurf => ".windsurf-plugin",
             Self::Gemini => ".gemini-plugin",
         }
     }
 
     /// All non-Claude platforms that we generate for.
     pub fn targets() -> &'static [Platform] {
-        &[Self::Codex, Self::Cursor, Self::Gemini]
+        &[Self::Copilot, Self::Cursor, Self::Windsurf, Self::Gemini]
     }
 }
 
@@ -119,8 +121,9 @@ mod tests {
     #[test]
     fn platform_manifest_dir_values() {
         assert_eq!(Platform::Claude.manifest_dir(), ".claude-plugin");
-        assert_eq!(Platform::Codex.manifest_dir(), ".codex-plugin");
+        assert_eq!(Platform::Copilot.manifest_dir(), ".copilot-plugin");
         assert_eq!(Platform::Cursor.manifest_dir(), ".cursor-plugin");
+        assert_eq!(Platform::Windsurf.manifest_dir(), ".windsurf-plugin");
         assert_eq!(Platform::Gemini.manifest_dir(), ".gemini-plugin");
     }
 
@@ -223,11 +226,11 @@ mod tests {
 
         let written = generate_manifests(&root, &fs).unwrap();
 
-        // 3 platforms x (1 marketplace.json + 2 per-plugin plugin.json) = 9
+        // 4 platforms x (1 marketplace.json + 2 per-plugin plugin.json) = 12
         assert_eq!(
             written.len(),
-            9,
-            "expected 3 platforms x (1 marketplace + 2 plugins), got: {written:?}"
+            12,
+            "expected 4 platforms x (1 marketplace + 2 plugins), got: {written:?}"
         );
 
         // Verify each platform has the right count
@@ -253,5 +256,40 @@ mod tests {
 
         let written = generate_manifests(&root, &fs).unwrap();
         assert!(written.is_empty(), "expected no files written when no .claude-plugin/ exists");
+    }
+
+    #[test]
+    fn targets_includes_windsurf() {
+        assert!(
+            Platform::targets().contains(&Platform::Windsurf),
+            "expected Windsurf in targets()"
+        );
+    }
+
+    #[test]
+    fn generate_emits_windsurf_manifest() {
+        let fs = FakeFilesystem::new();
+        let marketplace_json =
+            fake_marketplace_json(&[("alpha", "Alpha plugin", "./plugins/alpha")]);
+        let root = marketplace_root(&fs, &marketplace_json);
+
+        fs.add_file("/repo/plugins/alpha/.claude-plugin/plugin.json", fake_plugin_json("alpha"));
+
+        generate_manifests(&root, &fs).unwrap();
+
+        let marketplace_path =
+            PathBuf::from("/repo").join(".windsurf-plugin").join("marketplace.json");
+        assert!(
+            fs.exists(&marketplace_path),
+            "expected .windsurf-plugin/marketplace.json to exist"
+        );
+
+        let plugin_path = PathBuf::from("/repo/plugins/alpha")
+            .join(".windsurf-plugin")
+            .join("plugin.json");
+        assert!(
+            fs.exists(&plugin_path),
+            "expected plugins/alpha/.windsurf-plugin/plugin.json to exist"
+        );
     }
 }
