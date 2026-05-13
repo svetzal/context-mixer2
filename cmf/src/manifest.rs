@@ -2,35 +2,9 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use cmx::gateway::Filesystem;
+use cmx::platform::Platform;
 
 use crate::repo::RepoRoot;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Platform {
-    Claude,
-    Copilot,
-    Cursor,
-    Windsurf,
-    Gemini,
-}
-
-impl Platform {
-    /// The directory name for this platform's plugin manifest.
-    pub fn manifest_dir(&self) -> &str {
-        match self {
-            Self::Claude => ".claude-plugin",
-            Self::Copilot => ".copilot-plugin",
-            Self::Cursor => ".cursor-plugin",
-            Self::Windsurf => ".windsurf-plugin",
-            Self::Gemini => ".gemini-plugin",
-        }
-    }
-
-    /// All non-Claude platforms that we generate for.
-    pub fn targets() -> &'static [Platform] {
-        &[Self::Copilot, Self::Cursor, Self::Windsurf, Self::Gemini]
-    }
-}
 
 /// Collect all source files to replicate across platforms.
 ///
@@ -116,15 +90,6 @@ mod tests {
             has_facets: false,
             has_plugins_dir: true,
         }
-    }
-
-    #[test]
-    fn platform_manifest_dir_values() {
-        assert_eq!(Platform::Claude.manifest_dir(), ".claude-plugin");
-        assert_eq!(Platform::Copilot.manifest_dir(), ".copilot-plugin");
-        assert_eq!(Platform::Cursor.manifest_dir(), ".cursor-plugin");
-        assert_eq!(Platform::Windsurf.manifest_dir(), ".windsurf-plugin");
-        assert_eq!(Platform::Gemini.manifest_dir(), ".gemini-plugin");
     }
 
     #[test]
@@ -256,14 +221,6 @@ mod tests {
 
         let written = generate_manifests(&root, &fs).unwrap();
         assert!(written.is_empty(), "expected no files written when no .claude-plugin/ exists");
-    }
-
-    #[test]
-    fn targets_includes_windsurf() {
-        assert!(
-            Platform::targets().contains(&Platform::Windsurf),
-            "expected Windsurf in targets()"
-        );
     }
 
     #[test]

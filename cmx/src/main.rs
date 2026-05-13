@@ -9,7 +9,7 @@ use cmx::types::ArtifactKind;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let paths = ConfigPaths::from_env()?;
+    let paths = ConfigPaths::from_env(cli.platform)?;
 
     let ctx = AppContext {
         fs: &RealFilesystem,

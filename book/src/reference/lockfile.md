@@ -4,10 +4,18 @@ cmx records installed state in JSON lock files.
 
 ## Locations
 
-| Scope | Path | Purpose |
-|-------|------|---------|
-| Global | `~/.config/context-mixer/cmx-lock.json` | Personal install manifest |
-| Local | `.context-mixer/cmx-lock.json` | Project-level, can be committed for team sharing |
+Each platform has its own lock file so installations for different AI tools do not interfere.
+
+| Scope | Claude Code | Other platforms |
+|-------|-------------|-----------------|
+| Global | `~/.config/context-mixer/cmx-lock.json` | `~/.config/context-mixer/cmx-lock-<platform>.json` |
+| Local | `.context-mixer/cmx-lock.json` | `.context-mixer/cmx-lock-<platform>.json` |
+
+Where `<platform>` is one of `copilot`, `cursor`, `windsurf`, or `gemini`.
+
+Claude Code uses `cmx-lock.json` (no suffix) for backward compatibility.
+
+Local lock files can be committed to version control for team sharing.
 
 ## Format
 

@@ -8,12 +8,12 @@ use cmx::json_file::load_json;
 
 use crate::facet::{scan_facets, scan_recipes};
 use crate::facet_types::{Facet, Recipe};
-use crate::manifest::Platform;
 use crate::plugin::{PluginInfo, scan_plugins};
 use crate::plugin_types::Marketplace;
 use crate::repo::{RepoKind, RepoRoot};
 use crate::validate::validate_all;
 use crate::validation::{IssueLevel, ValidationIssue};
+use cmx::platform::Platform;
 
 pub fn format_plugin_list(plugins: &[PluginInfo]) -> String {
     let mut out = format!("Plugins ({}):\n", plugins.len());

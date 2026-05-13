@@ -16,6 +16,7 @@ pub mod list;
 pub mod lockfile;
 pub mod outdated;
 pub mod paths;
+pub mod platform;
 pub mod scan;
 pub(crate) mod scan_marketplace;
 pub mod search;

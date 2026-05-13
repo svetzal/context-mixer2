@@ -271,6 +271,19 @@ An optional `version` field in the artifact frontmatter gives the author a way t
 
 ## Commands (v2.0.0)
 
+### Global option: `--platform`
+
+All commands accept a `--platform` flag (also settable via `CMX_PLATFORM` env var):
+
+```
+cmx --platform <platform> <command>
+```
+
+Supported values: `claude` (default), `copilot`, `cursor`, `windsurf`, `gemini`.
+
+Selects the AI coding assistant whose directories and lock file are used for all
+install, uninstall, update, list, outdated, info, and search operations.
+
 ### `cmx source` — Manage marketplace sources
 
 ```
@@ -288,6 +301,7 @@ cmx agent install <name>                # Install from sources
 cmx agent install <source>:<name>       # From a specific source
 cmx agent install --all                 # Install all available
 cmx agent install <name> --local        # Into project scope
+cmx --platform cursor agent install <name>  # Install to Cursor
 
 cmx agent update <name>                 # Update from source
 cmx agent update --all                  # Update all tracked

@@ -292,6 +292,16 @@ pub(crate) fn test_paths() -> crate::paths::ConfigPaths {
 }
 
 #[cfg(test)]
+pub(crate) fn test_paths_for(platform: crate::platform::Platform) -> crate::paths::ConfigPaths {
+    use std::path::PathBuf;
+    crate::paths::ConfigPaths::for_test_with_platform(
+        PathBuf::from("/home/testuser"),
+        PathBuf::from("/home/testuser/.config/context-mixer"),
+        platform,
+    )
+}
+
+#[cfg(test)]
 pub(crate) fn setup_empty_sources(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,

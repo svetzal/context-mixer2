@@ -1,5 +1,14 @@
 # Command Reference
 
+## Global options
+
+| Option | Description |
+|--------|-------------|
+| `--platform <platform>` | Target platform: `claude` (default), `copilot`, `cursor`, `windsurf`, `gemini` |
+
+The `--platform` flag is global and can be placed anywhere on the command line.
+It can also be set via the `CMX_PLATFORM` environment variable.
+
 ## Source management
 
 | Command | Description |
@@ -18,8 +27,10 @@
 | `cmx agent install <source>:<name>` | Install from a specific source |
 | `cmx agent install --all` | Install all available agents |
 | `cmx agent install <name> --local` | Install into current project |
+| `cmx agent install <name> --platform cursor` | Install to Cursor |
 | `cmx agent update <name>` | Update an agent from its source |
 | `cmx agent update --all` | Update all tracked agents |
+| `cmx agent uninstall <name>` | Uninstall an agent |
 | `cmx agent list` | List installed agents |
 | `cmx agent diff <name>` | LLM-powered diff analysis (requires `llm` feature) |
 
@@ -34,6 +45,7 @@ Same commands as agent, using `cmx skill` instead of `cmx agent`.
 | `cmx list` | List all installed agents and skills |
 | `cmx outdated` | Show artifacts needing attention |
 | `cmx search <keyword>` | Search all sources by name and description |
+| `cmx info <name>` | Show detailed metadata for an installed artifact |
 
 ## Configuration
 

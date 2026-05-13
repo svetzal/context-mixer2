@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
 
+use crate::platform::Platform;
+
 #[derive(Parser)]
 #[command(
     name = "cmx",
@@ -7,6 +9,10 @@ use clap::{Parser, Subcommand};
     version
 )]
 pub struct Cli {
+    /// Target AI coding assistant platform (env: `CMX_PLATFORM`)
+    #[arg(long, value_enum, global = true, default_value_t = Platform::Claude, env = "CMX_PLATFORM")]
+    pub platform: Platform,
+
     #[command(subcommand)]
     pub command: Commands,
 }

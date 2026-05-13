@@ -58,7 +58,9 @@ pub fn uninstall_with(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::{TestContext, sample_lock_entry};
+    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::platform::Platform;
+    use crate::test_support::{TestContext, make_ctx, sample_lock_entry, test_paths_for};
     use crate::types::{ArtifactKind, LockFile};
     use std::collections::BTreeMap;
 
@@ -154,5 +156,53 @@ mod tests {
         let ctx = t.ctx();
         let result = uninstall_with("my-agent", ArtifactKind::Agent, false, &ctx);
         assert!(result.is_ok(), "uninstall_with should succeed: {:?}", result.err());
+    }
+
+    // --- Platform-aware uninstall tests ---
+
+    #[test]
+    fn uninstall_cursor_removes_from_cursor_dir_and_per_platform_lock() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(chrono::Utc::now());
+        let paths = test_paths_for(Platform::Cursor);
+
+        // Install a file at the Cursor global path
+        let agent_path = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        assert_eq!(
+            agent_path,
+            std::path::PathBuf::from("/home/testuser/.cursor/agents/my-agent.md")
+        );
+        fs.add_file(agent_path.clone(), "# agent");
+
+        // Write lock entry into the Cursor lock file
+        let mut packages = BTreeMap::new();
+        packages.insert("my-agent".to_string(), sample_lock_entry());
+        let lock = LockFile {
+            version: 1,
+            packages,
+        };
+        crate::lockfile::save_with(&lock, false, &fs, &paths).unwrap();
+
+        // Verify lock file path is Cursor-specific
+        let lock_path = paths.lock_path(false);
+        assert!(
+            lock_path.to_string_lossy().contains("cmx-lock-cursor.json"),
+            "expected cursor-specific lock file, got: {}",
+            lock_path.display()
+        );
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = uninstall_with("my-agent", ArtifactKind::Agent, false, &ctx).unwrap();
+
+        assert_eq!(result.name, "my-agent");
+        assert!(result.was_tracked);
+        assert!(!fs.file_exists(&agent_path), "agent file should be removed from cursor dir");
+
+        let updated_lock = crate::lockfile::load_with(false, &fs, &paths).unwrap();
+        assert!(
+            !updated_lock.packages.contains_key("my-agent"),
+            "lock entry should be removed from cursor lock"
+        );
     }
 }

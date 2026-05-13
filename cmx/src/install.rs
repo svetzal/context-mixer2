@@ -273,10 +273,11 @@ mod tests {
     use super::*;
     use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::platform::Platform;
     use crate::source_iter::SourceArtifact;
     use crate::test_support::{
         TestContext, agent_content, make_ctx, setup_empty_sources, setup_source,
-        setup_source_with_agent, setup_sources, test_paths,
+        setup_source_with_agent, setup_sources, test_paths, test_paths_for,
     };
     use crate::types::{Artifact, ArtifactKind, Deprecation, LockFile};
     use chrono::Utc;
@@ -759,6 +760,71 @@ mod tests {
         assert!(
             !t.fs.file_exists(&expected_dest),
             "skill directory should be rolled back after lock save failure on fresh install"
+        );
+    }
+
+    // --- Platform-aware install tests ---
+
+    #[test]
+    fn install_agent_with_cursor_platform_places_file_in_cursor_agents() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths_for(Platform::Cursor);
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
+
+        let expected_dest = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        assert_eq!(expected_dest, PathBuf::from("/home/testuser/.cursor/agents/my-agent.md"));
+        assert!(
+            fs.file_exists(&expected_dest),
+            "agent file should be installed at {}",
+            expected_dest.display()
+        );
+    }
+
+    #[test]
+    fn install_agent_with_cursor_platform_local_places_file_in_dot_cursor_agents() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths_for(Platform::Cursor);
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        install_with("my-agent", ArtifactKind::Agent, true, false, &ctx).unwrap();
+
+        let expected_dest = paths.install_dir(ArtifactKind::Agent, true).join("my-agent.md");
+        assert_eq!(expected_dest, PathBuf::from(".cursor/agents/my-agent.md"));
+        assert!(
+            fs.file_exists(&expected_dest),
+            "agent file should be installed at {}",
+            expected_dest.display()
+        );
+    }
+
+    #[test]
+    fn install_agent_default_platform_places_file_in_dot_claude_agents() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
+
+        let expected_dest = paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        assert_eq!(expected_dest, PathBuf::from("/home/testuser/.claude/agents/my-agent.md"));
+        assert!(
+            fs.file_exists(&expected_dest),
+            "agent file should be installed at {}",
+            expected_dest.display()
         );
     }
 
