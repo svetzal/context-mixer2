@@ -26,6 +26,7 @@ pub struct FakeFilesystem {
     files: RefCell<BTreeMap<PathBuf, Vec<u8>>>,
     dirs: RefCell<BTreeSet<PathBuf>>,
     fail_on_write: RefCell<Option<PathBuf>>,
+    fail_on_rename: RefCell<Option<PathBuf>>,
     fail_on_copy: RefCell<bool>,
 }
 
@@ -35,6 +36,7 @@ impl FakeFilesystem {
             files: RefCell::new(BTreeMap::new()),
             dirs: RefCell::new(BTreeSet::new()),
             fail_on_write: RefCell::new(None),
+            fail_on_rename: RefCell::new(None),
             fail_on_copy: RefCell::new(false),
         }
     }
@@ -42,6 +44,11 @@ impl FakeFilesystem {
     /// Cause the next `write()` to the given path to return an error.
     pub fn set_fail_on_write(&self, path: impl Into<PathBuf>) {
         *self.fail_on_write.borrow_mut() = Some(path.into());
+    }
+
+    /// Cause `rename()` targeting the given destination path to return an error.
+    pub fn set_fail_on_rename(&self, path: impl Into<PathBuf>) {
+        *self.fail_on_rename.borrow_mut() = Some(path.into());
     }
 
     /// Cause all `copy_file()` calls to return an error.
@@ -152,6 +159,18 @@ impl Filesystem for FakeFilesystem {
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("Source file not found: {}", src.display()))?;
         self.add_file(dest.to_path_buf(), bytes);
+        Ok(())
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> Result<()> {
+        if self.fail_on_rename.borrow().as_deref() == Some(to) {
+            bail!("FakeFilesystem: rename configured to fail for {}", to.display());
+        }
+        let bytes = self.files.borrow().get(from).cloned().ok_or_else(|| {
+            anyhow::anyhow!("Source file not found for rename: {}", from.display())
+        })?;
+        self.add_file(to.to_path_buf(), bytes);
+        self.files.borrow_mut().remove(from);
         Ok(())
     }
 
@@ -469,5 +488,58 @@ mod tests {
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("configured to fail"), "unexpected: {msg}");
+    }
+
+    #[test]
+    fn fake_filesystem_rename_moves_file_and_removes_source() {
+        let fs = FakeFilesystem::new();
+        let from = PathBuf::from("/tmp/source.txt");
+        let to = PathBuf::from("/tmp/dest.txt");
+        fs.add_file(from.clone(), "content");
+
+        fs.rename(&from, &to).unwrap();
+
+        assert!(!fs.file_exists(&from), "source should be removed after rename");
+        assert!(fs.file_exists(&to), "destination should exist after rename");
+        assert_eq!(fs.read_to_string(&to).unwrap(), "content");
+    }
+
+    #[test]
+    fn fake_filesystem_rename_replaces_existing_destination() {
+        let fs = FakeFilesystem::new();
+        let from = PathBuf::from("/tmp/source.txt");
+        let to = PathBuf::from("/tmp/dest.txt");
+        fs.add_file(from.clone(), "new content");
+        fs.add_file(to.clone(), "old content");
+
+        fs.rename(&from, &to).unwrap();
+
+        assert!(!fs.file_exists(&from));
+        assert_eq!(fs.read_to_string(&to).unwrap(), "new content");
+    }
+
+    #[test]
+    fn fake_filesystem_rename_fails_on_configured_destination() {
+        let fs = FakeFilesystem::new();
+        let from = PathBuf::from("/tmp/source.txt");
+        let to = PathBuf::from("/tmp/restricted.txt");
+        fs.add_file(from.clone(), "content");
+        fs.set_fail_on_rename(to.clone());
+
+        assert!(fs.rename(&from, &to).is_err());
+        // Source file should be untouched after failed rename
+        assert!(fs.file_exists(&from), "source should remain after failed rename");
+    }
+
+    #[test]
+    fn fake_filesystem_rename_errors_when_source_absent() {
+        let fs = FakeFilesystem::new();
+        let from = PathBuf::from("/tmp/nonexistent.txt");
+        let to = PathBuf::from("/tmp/dest.txt");
+
+        let result = fs.rename(&from, &to);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("nonexistent.txt"), "unexpected: {msg}");
     }
 }

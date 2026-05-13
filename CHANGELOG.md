@@ -5,6 +5,13 @@ All notable changes to cmx and cmf will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `cmx agent install` and `cmx skill install` now roll back a freshly copied artifact when the lockfile write fails, eliminating the ghost-install state where an artifact exists on disk with no lockfile entry
+- `json_file::save_json` now writes atomically via a sibling `.tmp` file followed by a rename, preventing partial writes from corrupting an existing JSON file
+
 ## [2.5.3] - 2026-04-11
 
 ### Changed

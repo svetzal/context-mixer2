@@ -74,11 +74,15 @@ pub fn install_with(
         )?;
     }
 
+    // Record whether this is a fresh install (vs. an update/reinstall) so that
+    // we can roll back if the lockfile write fails.
+    let already_installed = ctx.fs.exists(&kind.installed_path(artifact_name, &plan.dest_dir));
+
     let dest_path =
         copy::copy_artifact(&found.artifact.path, &plan.dest_dir, kind, artifact_name, ctx)?;
     let installed_checksum = checksum::checksum_artifact_with(&dest_path, kind, ctx.fs)?;
 
-    lockfile::mutate_with(local, ctx.fs, ctx.paths, |lock| {
+    let lock_result = lockfile::mutate_with(local, ctx.fs, ctx.paths, |lock| {
         lock.packages.insert(
             artifact_name.to_string(),
             LockEntry {
@@ -93,7 +97,21 @@ pub fn install_with(
                 installed_checksum,
             },
         );
-    })?;
+    });
+
+    if let Err(lock_err) = lock_result {
+        // If we performed a fresh install and the lockfile write failed, roll
+        // back by removing the artifact we just copied.  This avoids leaving a
+        // ghost: an artifact on disk with no lockfile entry.  We ignore any
+        // remove error to ensure the original lock error is surfaced.
+        if !already_installed {
+            let _ = match kind {
+                types::ArtifactKind::Agent => ctx.fs.remove_file(&dest_path),
+                types::ArtifactKind::Skill => ctx.fs.remove_dir_all(&dest_path),
+            };
+        }
+        return Err(lock_err);
+    }
 
     Ok(InstallResult {
         artifact_name: artifact_name.to_string(),
@@ -697,24 +715,76 @@ mod tests {
     }
 
     #[test]
-    fn install_agent_lock_save_failure_leaves_artifact_on_disk() {
+    fn install_agent_lock_save_failure_rolls_back_copy() {
         let t = TestContext::new();
 
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-        // Cause the lock file write to fail
-        t.fs.set_fail_on_write(t.paths.lock_path(false));
+        // Cause the lock file rename (atomic write) to fail
+        t.fs.set_fail_on_rename(t.paths.lock_path(false));
 
         let ctx = t.ctx();
         let result = install_with("my-agent", ArtifactKind::Agent, false, false, &ctx);
         assert!(result.is_err(), "expected Err when lock save fails");
 
-        // Despite the lock save failure, the agent file was already copied to disk
-        // (documents the current no-rollback behavior)
+        // Because this was a fresh install, the copied agent file should be rolled back
         let expected_dest = t.paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
         assert!(
+            !t.fs.file_exists(&expected_dest),
+            "agent file should be rolled back after lock save failure on fresh install"
+        );
+    }
+
+    #[test]
+    fn install_skill_lock_save_failure_rolls_back_directory() {
+        let t = TestContext::new();
+
+        setup_source(&t.fs, &t.paths, "my-source", "/sources/my-source");
+        t.fs.add_file("/sources/my-source/my-skill/SKILL.md", "---\ndescription: My skill\n---\n");
+        t.fs.add_file("/sources/my-source/my-skill/tool.py", "code");
+
+        // Cause the lock file rename (atomic write) to fail
+        t.fs.set_fail_on_rename(t.paths.lock_path(false));
+
+        let ctx = t.ctx();
+        let result = install_with("my-skill", ArtifactKind::Skill, false, false, &ctx);
+        assert!(result.is_err(), "expected Err when lock save fails");
+
+        // Because this was a fresh install, the copied skill directory should be rolled back
+        let expected_dest = t
+            .paths
+            .install_dir(ArtifactKind::Skill, false)
+            .join("my-skill")
+            .join("SKILL.md");
+        assert!(
+            !t.fs.file_exists(&expected_dest),
+            "skill directory should be rolled back after lock save failure on fresh install"
+        );
+    }
+
+    #[test]
+    fn install_force_reinstall_lock_save_failure_keeps_existing_artifact() {
+        let t = TestContext::new();
+
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
+
+        // First install succeeds
+        let ctx = t.ctx();
+        install_with("my-agent", ArtifactKind::Agent, false, false, &ctx).unwrap();
+
+        let expected_dest = t.paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md");
+        assert!(t.fs.file_exists(&expected_dest), "agent should be installed");
+
+        // Now force-reinstall with a failing lock save
+        t.fs.set_fail_on_rename(t.paths.lock_path(false));
+
+        let result = install_with("my-agent", ArtifactKind::Agent, false, true, &ctx);
+        assert!(result.is_err(), "expected Err when lock save fails on reinstall");
+
+        // Because the artifact already existed before reinstall, it should NOT be removed
+        assert!(
             t.fs.file_exists(&expected_dest),
-            "agent file should still exist on disk even after lock save failure"
+            "existing agent should be kept when lock save fails on reinstall (already_installed=true)"
         );
     }
 }

@@ -229,8 +229,8 @@ mod tests {
         let paths = test_paths();
         let lock_path = paths.lock_path(false);
 
-        // Cause the write to the lock file path to fail
-        fs.set_fail_on_write(lock_path);
+        // save_json writes to a sibling .tmp file first — fail that write
+        fs.set_fail_on_write(crate::json_file::tmp_path(&lock_path));
 
         let lock = sample_lock_file();
         let result = save_with(&lock, false, &fs, &paths);

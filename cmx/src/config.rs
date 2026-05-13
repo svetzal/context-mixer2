@@ -552,8 +552,8 @@ mod tests {
         let paths = test_paths();
         let sources_path = paths.sources_path();
 
-        // Cause the write to the sources file to fail
-        fs.set_fail_on_write(sources_path);
+        // save_json writes to a sibling .tmp file first — fail that write
+        fs.set_fail_on_write(crate::json_file::tmp_path(&sources_path));
 
         let sources = SourcesFile::default();
         let result = save_sources_with(&sources, &fs, &paths);

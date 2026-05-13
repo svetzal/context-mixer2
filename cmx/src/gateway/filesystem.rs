@@ -26,6 +26,8 @@ pub trait Filesystem {
     fn write_bytes(&self, path: &Path, contents: &[u8]) -> Result<()>;
     fn create_dir_all(&self, path: &Path) -> Result<()>;
     fn copy_file(&self, src: &Path, dest: &Path) -> Result<()>;
+    /// Atomically rename `from` to `to`, replacing `to` if it already exists.
+    fn rename(&self, from: &Path, to: &Path) -> Result<()>;
     fn remove_file(&self, path: &Path) -> Result<()>;
     fn remove_dir_all(&self, path: &Path) -> Result<()>;
     fn read_dir(&self, path: &Path) -> Result<Vec<DirEntry>>;

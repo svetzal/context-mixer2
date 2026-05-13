@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use serde::{Serialize, de::DeserializeOwned};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::gateway::filesystem::Filesystem;
 
@@ -19,6 +19,22 @@ where
     Ok(value)
 }
 
+/// Return the sibling temporary path used during an atomic write of `path`.
+///
+/// The temp path is `path` with `.tmp` appended to the file name, so it sits
+/// in the same directory and can be renamed atomically onto the target.
+pub(crate) fn tmp_path(path: &Path) -> PathBuf {
+    let mut name = path.file_name().map(std::ffi::OsStr::to_os_string).unwrap_or_default();
+    name.push(".tmp");
+    path.with_file_name(name)
+}
+
+/// Write `value` as pretty-printed JSON to `path` atomically.
+///
+/// The JSON is first written to a sibling `.tmp` file in the same directory,
+/// then renamed onto `path`.  This ensures that a partially-written or failed
+/// write never corrupts an existing file: the rename only happens after the
+/// write succeeds.
 pub fn save_json<T>(value: &T, path: &Path, fs: &dyn Filesystem) -> Result<()>
 where
     T: Serialize,
@@ -28,7 +44,10 @@ where
             .with_context(|| format!("Failed to create {}", parent.display()))?;
     }
     let content = serde_json::to_string_pretty(value)?;
-    fs.write(path, &content)
+    let tmp = tmp_path(path);
+    fs.write(&tmp, &content)
+        .with_context(|| format!("Failed to write {}", tmp.display()))?;
+    fs.rename(&tmp, path)
         .with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
@@ -74,5 +93,63 @@ mod tests {
         fs.add_file(path.clone(), "not json {{{{");
         let result: Result<TestData> = load_json(&path, &fs);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn tmp_path_appends_tmp_suffix() {
+        let path = PathBuf::from("/config/data.json");
+        assert_eq!(tmp_path(&path), PathBuf::from("/config/data.json.tmp"));
+    }
+
+    #[test]
+    fn save_json_failed_write_leaves_existing_file_intact() {
+        let fs = FakeFilesystem::new();
+        let path = PathBuf::from("/config/data.json");
+        let original = TestData {
+            value: "original".to_string(),
+            count: 1,
+        };
+        // Write the original file first
+        save_json(&original, &path, &fs).unwrap();
+
+        // Now cause the temp-file write to fail
+        fs.set_fail_on_write(tmp_path(&path));
+
+        let new_data = TestData {
+            value: "new".to_string(),
+            count: 2,
+        };
+        let result = save_json(&new_data, &path, &fs);
+        assert!(result.is_err(), "expected Err when temp write fails");
+
+        // The existing file should be unmodified
+        let loaded: TestData = load_json(&path, &fs).unwrap();
+        assert_eq!(loaded, original, "existing file should be intact after failed temp write");
+    }
+
+    #[test]
+    fn save_json_failed_rename_leaves_existing_file_intact() {
+        let fs = FakeFilesystem::new();
+        let path = PathBuf::from("/config/data.json");
+        let original = TestData {
+            value: "original".to_string(),
+            count: 1,
+        };
+        // Write the original file first
+        save_json(&original, &path, &fs).unwrap();
+
+        // Cause the rename (onto the final path) to fail
+        fs.set_fail_on_rename(path.clone());
+
+        let new_data = TestData {
+            value: "new".to_string(),
+            count: 2,
+        };
+        let result = save_json(&new_data, &path, &fs);
+        assert!(result.is_err(), "expected Err when rename fails");
+
+        // The existing file should be unmodified
+        let loaded: TestData = load_json(&path, &fs).unwrap();
+        assert_eq!(loaded, original, "existing file should be intact after failed rename");
     }
 }

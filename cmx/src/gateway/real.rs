@@ -72,6 +72,11 @@ impl Filesystem for RealFilesystem {
         Ok(())
     }
 
+    fn rename(&self, from: &Path, to: &Path) -> Result<()> {
+        std::fs::rename(from, to)
+            .with_context(|| format!("Failed to rename {} to {}", from.display(), to.display()))
+    }
+
     fn remove_file(&self, path: &Path) -> Result<()> {
         std::fs::remove_file(path)
             .with_context(|| format!("Failed to remove file {}", path.display()))
