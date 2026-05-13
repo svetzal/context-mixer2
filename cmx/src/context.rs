@@ -1,10 +1,11 @@
 use anyhow::Result;
+use std::collections::BTreeMap;
 
 use crate::config;
 use crate::gateway::{Clock, Filesystem, GitClient, LlmClient};
 use crate::lockfile;
 use crate::paths::ConfigPaths;
-use crate::types::{LockFile, SourcesFile};
+use crate::types::{InstallScope, LockFile, SourcesFile};
 
 /// Bundles all I/O gateway dependencies for a command invocation.
 ///
@@ -26,18 +27,23 @@ pub struct AppContext<'a> {
 /// functions that accept no `&AppContext`.
 pub struct LoadedState {
     pub sources: SourcesFile,
-    pub global_lock: LockFile,
-    pub local_lock: LockFile,
+    pub locks: BTreeMap<InstallScope, LockFile>,
 }
 
 impl LoadedState {
     pub fn load(ctx: &AppContext<'_>) -> Result<Self> {
         let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-        let (global_lock, local_lock) = lockfile::load_both_with(ctx.fs, ctx.paths)?;
-        Ok(Self {
-            sources,
-            global_lock,
-            local_lock,
-        })
+        let locks = lockfile::load_both_with(ctx.fs, ctx.paths)?;
+        Ok(Self { sources, locks })
+    }
+
+    /// Return a reference to the lock file for the given scope.
+    pub fn lock(&self, scope: InstallScope) -> &LockFile {
+        &self.locks[&scope]
+    }
+
+    /// Iterate over all scopes and their lock files (global first, then local).
+    pub fn scopes(&self) -> impl Iterator<Item = (InstallScope, &LockFile)> {
+        self.locks.iter().map(|(s, l)| (*s, l))
     }
 }

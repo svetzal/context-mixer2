@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::path::PathBuf;
 
 use crate::platform::Platform;
-use crate::types::ArtifactKind;
+use crate::types::{ArtifactKind, InstallScope};
 
 /// Centralizes all path resolution for cmx configuration and install directories.
 ///
@@ -65,14 +65,14 @@ impl ConfigPaths {
     ///
     /// Claude uses `cmx-lock.json` for backward compatibility. All other
     /// platforms use `cmx-lock-<slug>.json`.
-    pub fn lock_path(&self, local: bool) -> PathBuf {
+    pub fn lock_path(&self, scope: InstallScope) -> PathBuf {
         let file_name = if self.platform.slug().is_empty() {
             "cmx-lock.json".to_string()
         } else {
             format!("cmx-lock-{}.json", self.platform.slug())
         };
 
-        if local {
+        if scope.is_local() {
             PathBuf::from(".context-mixer").join(&file_name)
         } else {
             self.config_dir.join(&file_name)
@@ -80,9 +80,9 @@ impl ConfigPaths {
     }
 
     /// Directory where artifacts of the given kind and scope are installed.
-    pub fn install_dir(&self, kind: ArtifactKind, local: bool) -> PathBuf {
+    pub fn install_dir(&self, kind: ArtifactKind, scope: InstallScope) -> PathBuf {
         let subdir = kind.subdir_name();
-        if local {
+        if scope.is_local() {
             self.platform.project_base().join(subdir)
         } else {
             self.home_dir.join(self.platform.user_base()).join(subdir)
@@ -93,6 +93,7 @@ impl ConfigPaths {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::InstallScope;
 
     fn test_paths() -> ConfigPaths {
         ConfigPaths::for_test(
@@ -142,7 +143,7 @@ mod tests {
     fn lock_path_global_returns_config_dir_lock_file() {
         let paths = test_paths();
         assert_eq!(
-            paths.lock_path(false),
+            paths.lock_path(InstallScope::Global),
             PathBuf::from("/home/testuser/.config/context-mixer/cmx-lock.json")
         );
     }
@@ -150,14 +151,17 @@ mod tests {
     #[test]
     fn lock_path_local_returns_relative_path() {
         let paths = test_paths();
-        assert_eq!(paths.lock_path(true), PathBuf::from(".context-mixer/cmx-lock.json"));
+        assert_eq!(
+            paths.lock_path(InstallScope::Local),
+            PathBuf::from(".context-mixer/cmx-lock.json")
+        );
     }
 
     #[test]
     fn install_dir_agent_global_returns_home_claude_agents() {
         let paths = test_paths();
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, false),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
             PathBuf::from("/home/testuser/.claude/agents")
         );
     }
@@ -166,7 +170,7 @@ mod tests {
     fn install_dir_skill_global_returns_home_claude_skills() {
         let paths = test_paths();
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, false),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
             PathBuf::from("/home/testuser/.claude/skills")
         );
     }
@@ -174,13 +178,19 @@ mod tests {
     #[test]
     fn install_dir_agent_local_returns_relative_claude_agents() {
         let paths = test_paths();
-        assert_eq!(paths.install_dir(ArtifactKind::Agent, true), PathBuf::from(".claude/agents"));
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            PathBuf::from(".claude/agents")
+        );
     }
 
     #[test]
     fn install_dir_skill_local_returns_relative_claude_skills() {
         let paths = test_paths();
-        assert_eq!(paths.install_dir(ArtifactKind::Skill, true), PathBuf::from(".claude/skills"));
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Local),
+            PathBuf::from(".claude/skills")
+        );
     }
 
     // --- Cursor ---
@@ -188,20 +198,26 @@ mod tests {
     #[test]
     fn install_dir_cursor_agent_local_returns_cursor_agents() {
         let paths = test_paths_for(Platform::Cursor);
-        assert_eq!(paths.install_dir(ArtifactKind::Agent, true), PathBuf::from(".cursor/agents"));
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            PathBuf::from(".cursor/agents")
+        );
     }
 
     #[test]
     fn install_dir_cursor_skill_local_returns_cursor_skills() {
         let paths = test_paths_for(Platform::Cursor);
-        assert_eq!(paths.install_dir(ArtifactKind::Skill, true), PathBuf::from(".cursor/skills"));
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Local),
+            PathBuf::from(".cursor/skills")
+        );
     }
 
     #[test]
     fn install_dir_cursor_agent_global_returns_home_cursor_agents() {
         let paths = test_paths_for(Platform::Cursor);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, false),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
             PathBuf::from("/home/testuser/.cursor/agents")
         );
     }
@@ -210,7 +226,7 @@ mod tests {
     fn install_dir_cursor_skill_global_returns_home_cursor_skills() {
         let paths = test_paths_for(Platform::Cursor);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, false),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
             PathBuf::from("/home/testuser/.cursor/skills")
         );
     }
@@ -219,7 +235,7 @@ mod tests {
     fn lock_path_cursor_global_uses_cursor_slug() {
         let paths = test_paths_for(Platform::Cursor);
         assert_eq!(
-            paths.lock_path(false),
+            paths.lock_path(InstallScope::Global),
             PathBuf::from("/home/testuser/.config/context-mixer/cmx-lock-cursor.json")
         );
     }
@@ -227,7 +243,10 @@ mod tests {
     #[test]
     fn lock_path_cursor_local_uses_cursor_slug() {
         let paths = test_paths_for(Platform::Cursor);
-        assert_eq!(paths.lock_path(true), PathBuf::from(".context-mixer/cmx-lock-cursor.json"));
+        assert_eq!(
+            paths.lock_path(InstallScope::Local),
+            PathBuf::from(".context-mixer/cmx-lock-cursor.json")
+        );
     }
 
     // --- Copilot ---
@@ -235,14 +254,17 @@ mod tests {
     #[test]
     fn install_dir_copilot_agent_local_returns_github_agents() {
         let paths = test_paths_for(Platform::Copilot);
-        assert_eq!(paths.install_dir(ArtifactKind::Agent, true), PathBuf::from(".github/agents"));
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            PathBuf::from(".github/agents")
+        );
     }
 
     #[test]
     fn install_dir_copilot_agent_global_returns_home_copilot_agents() {
         let paths = test_paths_for(Platform::Copilot);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, false),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
             PathBuf::from("/home/testuser/.copilot/agents")
         );
     }
@@ -251,7 +273,7 @@ mod tests {
     fn lock_path_copilot_global_uses_copilot_slug() {
         let paths = test_paths_for(Platform::Copilot);
         assert_eq!(
-            paths.lock_path(false),
+            paths.lock_path(InstallScope::Global),
             PathBuf::from("/home/testuser/.config/context-mixer/cmx-lock-copilot.json")
         );
     }
@@ -262,7 +284,7 @@ mod tests {
     fn install_dir_windsurf_skill_global_returns_codeium_windsurf_skills() {
         let paths = test_paths_for(Platform::Windsurf);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, false),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
             PathBuf::from("/home/testuser/.codeium/windsurf/skills")
         );
     }
@@ -270,14 +292,17 @@ mod tests {
     #[test]
     fn install_dir_windsurf_agent_local_returns_windsurf_agents() {
         let paths = test_paths_for(Platform::Windsurf);
-        assert_eq!(paths.install_dir(ArtifactKind::Agent, true), PathBuf::from(".windsurf/agents"));
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            PathBuf::from(".windsurf/agents")
+        );
     }
 
     #[test]
     fn lock_path_windsurf_global_uses_windsurf_slug() {
         let paths = test_paths_for(Platform::Windsurf);
         assert_eq!(
-            paths.lock_path(false),
+            paths.lock_path(InstallScope::Global),
             PathBuf::from("/home/testuser/.config/context-mixer/cmx-lock-windsurf.json")
         );
     }
@@ -288,7 +313,7 @@ mod tests {
     fn install_dir_gemini_agent_global_returns_home_gemini_agents() {
         let paths = test_paths_for(Platform::Gemini);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, false),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
             PathBuf::from("/home/testuser/.gemini/agents")
         );
     }
@@ -297,7 +322,7 @@ mod tests {
     fn lock_path_gemini_global_uses_gemini_slug() {
         let paths = test_paths_for(Platform::Gemini);
         assert_eq!(
-            paths.lock_path(false),
+            paths.lock_path(InstallScope::Global),
             PathBuf::from("/home/testuser/.config/context-mixer/cmx-lock-gemini.json")
         );
     }

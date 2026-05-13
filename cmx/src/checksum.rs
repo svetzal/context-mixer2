@@ -96,11 +96,13 @@ mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
     use crate::test_support::{make_lock_entry_with_checksum, test_paths};
-    use crate::types::ArtifactKind;
+    use crate::types::{ArtifactKind, InstallScope};
 
     fn agent_path(paths: &crate::paths::ConfigPaths) -> std::path::PathBuf {
-        ArtifactKind::Agent
-            .installed_path("my-agent", &paths.install_dir(ArtifactKind::Agent, false))
+        ArtifactKind::Agent.installed_path(
+            "my-agent",
+            &paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
+        )
     }
 
     #[test]

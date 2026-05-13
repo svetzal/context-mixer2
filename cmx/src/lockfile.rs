@@ -1,9 +1,10 @@
 use anyhow::Result;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::gateway::filesystem::Filesystem;
 use crate::paths::ConfigPaths;
-use crate::types::{LockEntry, LockFile};
+use crate::types::{InstallScope, LockEntry, LockFile};
 
 // ---------------------------------------------------------------------------
 // Testable variants (accept injected Filesystem + ConfigPaths)
@@ -21,18 +22,22 @@ pub fn save_to_with(lock: &LockFile, path: &Path, fs: &dyn Filesystem) -> Result
     crate::json_file::save_json(lock, path, fs)
 }
 
-pub fn load_with(local: bool, fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<LockFile> {
-    let path = paths.lock_path(local);
+pub fn load_with(
+    scope: InstallScope,
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+) -> Result<LockFile> {
+    let path = paths.lock_path(scope);
     load_from_with(&path, fs)
 }
 
 pub fn save_with(
     lock: &LockFile,
-    local: bool,
+    scope: InstallScope,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<()> {
-    let path = paths.lock_path(local);
+    let path = paths.lock_path(scope);
     save_to_with(lock, &path, fs)
 }
 
@@ -41,36 +46,46 @@ pub fn save_with(
 /// The lock file is loaded from the appropriate scope, `f` is called with
 /// a mutable reference to the in-memory lock, and the result is written
 /// back to disk.  Returns whatever `f` returns.
-pub fn mutate_with<F, T>(local: bool, fs: &dyn Filesystem, paths: &ConfigPaths, f: F) -> Result<T>
+pub fn mutate_with<F, T>(
+    scope: InstallScope,
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+    f: F,
+) -> Result<T>
 where
     F: FnOnce(&mut LockFile) -> T,
 {
-    let mut lock = load_with(local, fs, paths)?;
+    let mut lock = load_with(scope, fs, paths)?;
     let result = f(&mut lock);
-    save_with(&lock, local, fs, paths)?;
+    save_with(&lock, scope, fs, paths)?;
     Ok(result)
 }
 
 /// Load both the global and local lock files in one call.
 ///
-/// Returns `(global_lock, local_lock)`.
-pub fn load_both_with(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<(LockFile, LockFile)> {
-    let global = load_with(false, fs, paths)?;
-    let local = load_with(true, fs, paths)?;
-    Ok((global, local))
+/// Returns a `BTreeMap` keyed by `InstallScope`.
+pub fn load_both_with(
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+) -> Result<BTreeMap<InstallScope, LockFile>> {
+    let mut locks = BTreeMap::new();
+    for scope in InstallScope::ALL {
+        locks.insert(scope, load_with(scope, fs, paths)?);
+    }
+    Ok(locks)
 }
 
 /// Search both scopes (global first, then local) for a lock entry by name.
-/// Returns the entry and the lock's `local` flag, or `None` if not found.
+/// Returns the entry and the scope it was found in, or `None` if not found.
 pub fn find_entry_with(
     name: &str,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
-) -> Result<Option<(LockEntry, bool)>> {
-    for local in [false, true] {
-        let lock = load_with(local, fs, paths)?;
+) -> Result<Option<(LockEntry, InstallScope)>> {
+    for scope in InstallScope::ALL {
+        let lock = load_with(scope, fs, paths)?;
         if let Some(entry) = lock.packages.get(name) {
-            return Ok(Some((entry.clone(), local)));
+            return Ok(Some((entry.clone(), scope)));
         }
     }
     Ok(None)
@@ -140,12 +155,12 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let lock = sample_lock_file();
-        save_with(&lock, false, &fs, &paths).unwrap();
+        save_with(&lock, InstallScope::Global, &fs, &paths).unwrap();
 
         let result = find_entry_with("my-agent", &fs, &paths).unwrap();
         assert!(result.is_some());
-        let (_, local) = result.unwrap();
-        assert!(!local, "expected global scope (local=false)");
+        let (_, scope) = result.unwrap();
+        assert_eq!(scope, InstallScope::Global, "expected global scope");
     }
 
     #[test]
@@ -153,12 +168,12 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let lock = sample_lock_file();
-        save_with(&lock, true, &fs, &paths).unwrap();
+        save_with(&lock, InstallScope::Local, &fs, &paths).unwrap();
 
         let result = find_entry_with("my-agent", &fs, &paths).unwrap();
         assert!(result.is_some());
-        let (_, local) = result.unwrap();
-        assert!(local, "expected local scope (local=true)");
+        let (_, scope) = result.unwrap();
+        assert_eq!(scope, InstallScope::Local, "expected local scope");
     }
 
     #[test]
@@ -166,12 +181,12 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let lock = sample_lock_file();
-        save_with(&lock, false, &fs, &paths).unwrap();
-        save_with(&lock, true, &fs, &paths).unwrap();
+        save_with(&lock, InstallScope::Global, &fs, &paths).unwrap();
+        save_with(&lock, InstallScope::Local, &fs, &paths).unwrap();
 
         let result = find_entry_with("my-agent", &fs, &paths).unwrap();
-        let (_, local) = result.unwrap();
-        assert!(!local, "expected global to be preferred over local");
+        let (_, scope) = result.unwrap();
+        assert_eq!(scope, InstallScope::Global, "expected global to be preferred over local");
     }
 
     // --- mutate_with ---
@@ -181,12 +196,12 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
 
-        mutate_with(false, &fs, &paths, |lock| {
+        mutate_with(InstallScope::Global, &fs, &paths, |lock| {
             lock.packages.insert("test-agent".to_string(), sample_lock_entry());
         })
         .unwrap();
 
-        let loaded = load_with(false, &fs, &paths).unwrap();
+        let loaded = load_with(InstallScope::Global, &fs, &paths).unwrap();
         assert!(loaded.packages.contains_key("test-agent"));
     }
 
@@ -195,14 +210,15 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let lock = sample_lock_file();
-        save_with(&lock, false, &fs, &paths).unwrap();
+        save_with(&lock, InstallScope::Global, &fs, &paths).unwrap();
 
-        let was_removed =
-            mutate_with(false, &fs, &paths, |lock| lock.packages.remove("my-agent").is_some())
-                .unwrap();
+        let was_removed = mutate_with(InstallScope::Global, &fs, &paths, |lock| {
+            lock.packages.remove("my-agent").is_some()
+        })
+        .unwrap();
 
         assert!(was_removed, "expected closure return value to be propagated");
-        let loaded = load_with(false, &fs, &paths).unwrap();
+        let loaded = load_with(InstallScope::Global, &fs, &paths).unwrap();
         assert!(!loaded.packages.contains_key("my-agent"));
     }
 
@@ -213,8 +229,8 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let lock = sample_lock_file();
-        save_with(&lock, false, &fs, &paths).unwrap();
-        let loaded = load_with(false, &fs, &paths).unwrap();
+        save_with(&lock, InstallScope::Global, &fs, &paths).unwrap();
+        let loaded = load_with(InstallScope::Global, &fs, &paths).unwrap();
         assert_eq!(loaded.packages.len(), 1);
         let entry = loaded.packages.get("my-agent").unwrap();
         assert_eq!(entry.version.as_deref(), Some("1.0.0"));
@@ -227,13 +243,13 @@ mod tests {
     fn save_lock_returns_error_with_context_when_write_fails() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let lock_path = paths.lock_path(false);
+        let lock_path = paths.lock_path(InstallScope::Global);
 
         // save_json writes to a sibling .tmp file first — fail that write
         fs.set_fail_on_write(crate::json_file::tmp_path(&lock_path));
 
         let lock = sample_lock_file();
-        let result = save_with(&lock, false, &fs, &paths);
+        let result = save_with(&lock, InstallScope::Global, &fs, &paths);
         assert!(result.is_err(), "expected Err when lock file write fails");
 
         let msg = result.unwrap_err().to_string();

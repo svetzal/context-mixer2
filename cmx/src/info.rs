@@ -7,7 +7,7 @@ use crate::context::AppContext;
 use crate::lockfile;
 use crate::source_iter;
 use crate::source_update;
-use crate::types::{ArtifactKind, Deprecation, scope_label};
+use crate::types::{ArtifactKind, Deprecation, InstallScope};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -46,8 +46,8 @@ pub struct SkillFileEntry {
 pub fn info_with(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
     // Search both kinds, global then local for each
     for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-        if let Some((path, local)) = config::find_installed_path(name, kind, ctx.fs, ctx.paths) {
-            return gather_info_with(name, kind, local, &path, ctx);
+        if let Some((path, scope)) = config::find_installed_path(name, kind, ctx.fs, ctx.paths) {
+            return gather_info_with(name, kind, scope, &path, ctx);
         }
     }
 
@@ -61,12 +61,11 @@ pub fn info_with(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
 pub(crate) fn gather_info_with(
     name: &str,
     kind: ArtifactKind,
-    local: bool,
+    scope: InstallScope,
     path: &Path,
     ctx: &AppContext<'_>,
 ) -> Result<ArtifactInfo> {
-    let scope = scope_label(local);
-    let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
+    let lock = lockfile::load_with(scope, ctx.fs, ctx.paths)?;
     let installed = config::installed_single_with_lock_data(name, &lock, kind);
     let lock_entry = installed.as_ref().and_then(|ia| ia.lock_entry);
 
@@ -125,7 +124,7 @@ pub(crate) fn gather_info_with(
     Ok(ArtifactInfo {
         name: name.to_string(),
         kind,
-        scope,
+        scope: scope.label(),
         path: path.to_path_buf(),
         version,
         installed_at,
@@ -184,7 +183,7 @@ mod tests {
         make_lock_entry_with_checksum, save_lock_with_entry, setup_empty_sources, setup_source,
         setup_source_with_agent, setup_source_with_versioned_agent,
     };
-    use crate::types::{ArtifactKind, Deprecation, LockFile};
+    use crate::types::{ArtifactKind, Deprecation, InstallScope, LockFile};
     use std::collections::BTreeMap;
 
     fn write_lock_entry(
@@ -192,7 +191,7 @@ mod tests {
         paths: &crate::paths::ConfigPaths,
         name: &str,
         kind: ArtifactKind,
-        local: bool,
+        scope: InstallScope,
         source_checksum: &str,
     ) {
         let entry = make_lock_entry_with_checksum(
@@ -202,7 +201,7 @@ mod tests {
             &format!("{name}.md"),
             source_checksum,
         );
-        save_lock_with_entry(fs, paths, name, entry, local);
+        save_lock_with_entry(fs, paths, name, entry, scope);
     }
 
     // --- info_with ---
@@ -216,7 +215,7 @@ mod tests {
             &t.paths,
             "my-agent",
             &agent_content("my-agent", "test"),
-            false,
+            InstallScope::Global,
         );
 
         setup_empty_sources(&t.fs, &t.paths);
@@ -236,7 +235,7 @@ mod tests {
             &t.paths,
             "my-agent",
             &agent_content("my-agent", "test"),
-            true,
+            InstallScope::Local,
         );
 
         setup_empty_sources(&t.fs, &t.paths);
@@ -271,10 +270,10 @@ mod tests {
         let t = TestContext::new();
 
         let content = agent_content("my-agent", "A test agent");
-        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
         // Compute the actual checksum to make it match
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, false);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Use a checksum that matches the content (we'll rely on the file being there)
@@ -283,14 +282,16 @@ mod tests {
             &t.paths,
             "my-agent",
             ArtifactKind::Agent,
-            false,
+            InstallScope::Global,
             "sha256:somecheck",
         );
 
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = t.ctx();
-        let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
+        let info =
+            gather_info_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+                .unwrap();
 
         assert_eq!(info.name, "my-agent");
         assert_eq!(info.kind, ArtifactKind::Agent);
@@ -307,15 +308,17 @@ mod tests {
         let t = TestContext::new();
 
         let content = agent_content("my-agent", "A test agent");
-        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
         // No lock entry — untracked
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, false);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
-        let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
+        let info =
+            gather_info_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+                .unwrap();
 
         assert!(info.untracked, "expected untracked flag to be set");
         assert!(info.version.is_none());
@@ -328,9 +331,15 @@ mod tests {
         let t = TestContext::new();
 
         // Install with some content
-        install_agent_on_disk(&t.fs, &t.paths, "my-agent", "original content", false);
+        install_agent_on_disk(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            "original content",
+            InstallScope::Global,
+        );
 
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, false);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Write a lock entry with a different checksum (simulating modification)
@@ -343,12 +352,14 @@ mod tests {
         );
         // Installed checksum does NOT match disk content
         entry.installed_checksum = "sha256:different_from_disk".to_string();
-        save_lock_with_entry(&t.fs, &t.paths, "my-agent", entry, false);
+        save_lock_with_entry(&t.fs, &t.paths, "my-agent", entry, InstallScope::Global);
 
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
+        let info =
+            gather_info_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+                .unwrap();
 
         assert!(info.locally_modified, "expected locally_modified to be true");
         assert!(info.disk_checksum.is_some(), "expected disk_checksum to be present");
@@ -359,9 +370,9 @@ mod tests {
         let t = TestContext::new();
 
         let content = agent_content("my-agent", "A test agent");
-        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, false);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Setup sources with a deprecated agent
@@ -378,14 +389,16 @@ mod tests {
                 version: 1,
                 packages: BTreeMap::new(),
             },
-            false,
+            InstallScope::Global,
             &t.fs,
             &t.paths,
         )
         .unwrap();
 
         let ctx = t.ctx();
-        let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
+        let info =
+            gather_info_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+                .unwrap();
 
         assert!(info.deprecation.is_some(), "expected deprecation to be present");
         let dep = info.deprecation.unwrap();
@@ -398,9 +411,9 @@ mod tests {
         let t = TestContext::new();
 
         let content = agent_content("my-agent", "A test agent");
-        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, false);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Lock entry with version 1.0.0
@@ -415,7 +428,7 @@ mod tests {
                 "my-agent.md",
                 "sha256:old",
             ),
-            false,
+            InstallScope::Global,
         );
 
         // Source has version 2.0.0
@@ -429,7 +442,9 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let info = gather_info_with("my-agent", ArtifactKind::Agent, false, &path, &ctx).unwrap();
+        let info =
+            gather_info_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+                .unwrap();
 
         assert_eq!(
             info.available_version.as_deref(),

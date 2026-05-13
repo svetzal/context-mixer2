@@ -7,7 +7,9 @@ use crate::context::{AppContext, LoadedState};
 use crate::scan;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
-use crate::types::{ArtifactKind, InstalledArtifact, LockEntry, LockFile, display_version};
+use crate::types::{
+    ArtifactKind, InstallScope, InstalledArtifact, LockEntry, LockFile, display_version,
+};
 
 pub struct Row {
     pub name: String,
@@ -19,15 +21,12 @@ pub struct Row {
 
 pub struct ListKindOutput {
     pub kind: ArtifactKind,
-    pub global_rows: Vec<Row>,
-    pub local_rows: Vec<Row>,
+    pub rows: BTreeMap<InstallScope, Vec<Row>>,
 }
 
 pub struct ListOutput {
-    pub global_agents: Vec<Row>,
-    pub local_agents: Vec<Row>,
-    pub global_skills: Vec<Row>,
-    pub local_skills: Vec<Row>,
+    pub agents: BTreeMap<InstallScope, Vec<Row>>,
+    pub skills: BTreeMap<InstallScope, Vec<Row>>,
 }
 
 fn status_indicator(
@@ -48,67 +47,55 @@ fn status_indicator(
 pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKindOutput> {
     let loaded = LoadedState::load(ctx)?;
     let source_versions = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
-    let global_rows = build_rows_with(kind, false, &loaded.global_lock, &source_versions, ctx)?;
-    let local_rows = build_rows_with(kind, true, &loaded.local_lock, &source_versions, ctx)?;
-    Ok(ListKindOutput {
-        kind,
-        global_rows,
-        local_rows,
-    })
+    let mut rows = BTreeMap::new();
+    for (scope, lock) in loaded.scopes() {
+        rows.insert(scope, build_rows_with(kind, scope, lock, &source_versions, ctx)?);
+    }
+    Ok(ListKindOutput { kind, rows })
 }
 
 pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
     let loaded = LoadedState::load(ctx)?;
     let source_versions = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
-    let mut output = ListOutput {
-        global_agents: Vec::new(),
-        local_agents: Vec::new(),
-        global_skills: Vec::new(),
-        local_skills: Vec::new(),
-    };
-
-    for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-        let global = build_rows_with(kind, false, &loaded.global_lock, &source_versions, ctx)?;
-        let local = build_rows_with(kind, true, &loaded.local_lock, &source_versions, ctx)?;
-        match kind {
-            ArtifactKind::Agent => {
-                output.global_agents = global;
-                output.local_agents = local;
-            }
-            ArtifactKind::Skill => {
-                output.global_skills = global;
-                output.local_skills = local;
-            }
-        }
+    let mut agents = BTreeMap::new();
+    let mut skills = BTreeMap::new();
+    for (scope, lock) in loaded.scopes() {
+        agents.insert(
+            scope,
+            build_rows_with(ArtifactKind::Agent, scope, lock, &source_versions, ctx)?,
+        );
+        skills.insert(
+            scope,
+            build_rows_with(ArtifactKind::Skill, scope, lock, &source_versions, ctx)?,
+        );
     }
-
-    Ok(output)
+    Ok(ListOutput { agents, skills })
 }
 
 fn build_rows_with(
     kind: ArtifactKind,
-    local: bool,
+    scope: InstallScope,
     lock: &LockFile,
     source_versions: &BTreeMap<String, Vec<SourceArtifactInfo>>,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Row>> {
     let pairs =
-        config::match_installed_to_sources(kind, local, lock, source_versions, ctx.fs, ctx.paths)?;
+        config::match_installed_to_sources(kind, scope, lock, source_versions, ctx.fs, ctx.paths)?;
     let names: Vec<&str> = pairs.iter().map(|(ia, _)| ia.name.as_str()).collect();
-    let installed_versions = load_installed_versions(kind, local, &names, ctx);
+    let installed_versions = load_installed_versions(kind, scope, &names, ctx);
     Ok(assemble_rows(pairs, &installed_versions))
 }
 
 /// Pre-load installed artifact versions from disk for a batch of artifact names.
 fn load_installed_versions(
     kind: ArtifactKind,
-    local: bool,
+    scope: InstallScope,
     names: &[&str],
     ctx: &AppContext<'_>,
 ) -> HashMap<String, Option<String>> {
     names
         .iter()
-        .map(|&name| (name.to_string(), read_installed_version(kind, name, local, ctx)))
+        .map(|&name| (name.to_string(), read_installed_version(kind, name, scope, ctx)))
         .collect()
 }
 
@@ -209,10 +196,10 @@ fn format_source(repo: &str, path: &str) -> String {
 fn read_installed_version(
     kind: ArtifactKind,
     name: &str,
-    local: bool,
+    scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Option<String> {
-    let dir = ctx.paths.install_dir(kind, local);
+    let dir = ctx.paths.install_dir(kind, scope);
     let file_path = kind.content_path(&kind.installed_path(name, &dir));
     let content = ctx.fs.read_to_string(&file_path).ok()?;
     scan::extract_version_from_content(&content)
@@ -231,7 +218,7 @@ mod tests {
         setup_source_with_agent, setup_source_with_skill, setup_sources, versioned_agent_content,
         versioned_skill_content,
     };
-    use crate::types::{ArtifactKind, LockFile};
+    use crate::types::{ArtifactKind, InstallScope, LockFile};
     use std::collections::BTreeMap;
 
     // --- assemble_rows (pure, no gateway fakes needed) ---
@@ -361,9 +348,9 @@ mod tests {
         paths: &crate::paths::ConfigPaths,
         skill_name: &str,
         skill_version: &str,
-        local: bool,
+        scope: InstallScope,
     ) {
-        let skill_dir = paths.install_dir(ArtifactKind::Skill, local);
+        let skill_dir = paths.install_dir(ArtifactKind::Skill, scope);
         fs.add_file(
             skill_dir.join(skill_name).join("SKILL.md"),
             versioned_skill_content("A test skill", skill_version),
@@ -385,7 +372,7 @@ mod tests {
         );
 
         // Installed skill at version 1.0.0
-        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", false);
+        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", InstallScope::Global);
 
         // Lockfile records installed version 1.0.0 from guidelines
         let mut lock = LockFile {
@@ -396,12 +383,18 @@ mod tests {
             "my-skill".to_string(),
             make_lock_entry_versioned(ArtifactKind::Skill, "1.0.0", "guidelines", "my-skill"),
         );
-        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
-        let rows =
-            build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
+        let rows = build_rows_with(
+            ArtifactKind::Skill,
+            InstallScope::Global,
+            &lock,
+            &source_versions,
+            &ctx,
+        )
+        .unwrap();
 
         assert_eq!(rows.len(), 1);
         let row = &rows[0];
@@ -435,7 +428,7 @@ mod tests {
         );
 
         // Install the skill
-        install_skill_dir(&t.fs, &t.paths, "pdf-tool", "1.0.0", false);
+        install_skill_dir(&t.fs, &t.paths, "pdf-tool", "1.0.0", InstallScope::Global);
 
         // Lockfile records source path as a nested marketplace location
         let mut lock = LockFile {
@@ -451,12 +444,18 @@ mod tests {
                 "plugins/doc-tools/skills/pdf-tool",
             ),
         );
-        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
-        let rows =
-            build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
+        let rows = build_rows_with(
+            ArtifactKind::Skill,
+            InstallScope::Global,
+            &lock,
+            &source_versions,
+            &ctx,
+        )
+        .unwrap();
 
         assert_eq!(rows.len(), 1);
         let row = &rows[0];
@@ -481,7 +480,7 @@ mod tests {
         );
 
         // Skill installed on disk but NOT in lockfile
-        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", false);
+        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", InstallScope::Global);
 
         let lock = LockFile {
             version: 1,
@@ -490,8 +489,14 @@ mod tests {
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
-        let rows =
-            build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
+        let rows = build_rows_with(
+            ArtifactKind::Skill,
+            InstallScope::Global,
+            &lock,
+            &source_versions,
+            &ctx,
+        )
+        .unwrap();
 
         assert_eq!(rows.len(), 1);
         let row = &rows[0];
@@ -508,7 +513,7 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         // Skill installed on disk
-        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", false);
+        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", InstallScope::Global);
 
         // Lockfile still has the provenance
         let mut lock = LockFile {
@@ -524,12 +529,18 @@ mod tests {
                 "skills/my-skill",
             ),
         );
-        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
-        let rows =
-            build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
+        let rows = build_rows_with(
+            ArtifactKind::Skill,
+            InstallScope::Global,
+            &lock,
+            &source_versions,
+            &ctx,
+        )
+        .unwrap();
 
         assert_eq!(rows.len(), 1);
         let row = &rows[0];
@@ -554,7 +565,7 @@ mod tests {
             &t.paths,
             "my-agent",
             &crate::test_support::agent_content("my-agent", "A test agent"),
-            false,
+            InstallScope::Global,
         );
 
         // Lockfile records installed version 1.0.0
@@ -566,12 +577,18 @@ mod tests {
             "my-agent".to_string(),
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "guidelines", "my-agent.md"),
         );
-        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
-        let rows =
-            build_rows_with(ArtifactKind::Agent, false, &lock, &source_versions, &ctx).unwrap();
+        let rows = build_rows_with(
+            ArtifactKind::Agent,
+            InstallScope::Global,
+            &lock,
+            &source_versions,
+            &ctx,
+        )
+        .unwrap();
 
         assert_eq!(rows.len(), 1);
         let row = &rows[0];
@@ -609,7 +626,7 @@ mod tests {
             &t.paths,
             "my-agent",
             &versioned_agent_content("my-agent", "A test agent", "1.0.0"),
-            false,
+            InstallScope::Global,
         );
 
         // Lockfile records installed from guidelines
@@ -621,12 +638,18 @@ mod tests {
             "my-agent".to_string(),
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "guidelines", "my-agent.md"),
         );
-        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
-        let rows =
-            build_rows_with(ArtifactKind::Agent, false, &lock, &source_versions, &ctx).unwrap();
+        let rows = build_rows_with(
+            ArtifactKind::Agent,
+            InstallScope::Global,
+            &lock,
+            &source_versions,
+            &ctx,
+        )
+        .unwrap();
 
         assert_eq!(rows.len(), 2, "should have one row per source");
 
@@ -671,7 +694,7 @@ mod tests {
         );
 
         // Install skill on disk
-        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", false);
+        install_skill_dir(&t.fs, &t.paths, "my-skill", "1.0.0", InstallScope::Global);
 
         // Lockfile records installed from guidelines
         let mut lock = LockFile {
@@ -682,12 +705,18 @@ mod tests {
             "my-skill".to_string(),
             make_lock_entry_versioned(ArtifactKind::Skill, "1.0.0", "guidelines", "my-skill"),
         );
-        crate::lockfile::save_with(&lock, false, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
-        let rows =
-            build_rows_with(ArtifactKind::Skill, false, &lock, &source_versions, &ctx).unwrap();
+        let rows = build_rows_with(
+            ArtifactKind::Skill,
+            InstallScope::Global,
+            &lock,
+            &source_versions,
+            &ctx,
+        )
+        .unwrap();
 
         assert_eq!(rows.len(), 2, "should have one row per source");
 

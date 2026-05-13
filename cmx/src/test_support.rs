@@ -131,7 +131,7 @@ pub(crate) fn save_lock_with_entry(
     paths: &crate::paths::ConfigPaths,
     name: &str,
     entry: crate::types::LockEntry,
-    local: bool,
+    scope: crate::types::InstallScope,
 ) {
     use crate::types::LockFile;
     use std::collections::BTreeMap;
@@ -141,7 +141,7 @@ pub(crate) fn save_lock_with_entry(
         version: 1,
         packages,
     };
-    crate::lockfile::save_with(&lock, local, fs, paths).unwrap();
+    crate::lockfile::save_with(&lock, scope, fs, paths).unwrap();
 }
 
 #[cfg(test)]
@@ -260,9 +260,9 @@ pub(crate) fn install_agent_on_disk(
     paths: &crate::paths::ConfigPaths,
     name: &str,
     content: &str,
-    local: bool,
+    scope: crate::types::InstallScope,
 ) {
-    let dir = paths.install_dir(crate::types::ArtifactKind::Agent, local);
+    let dir = paths.install_dir(crate::types::ArtifactKind::Agent, scope);
     let path = crate::types::ArtifactKind::Agent.installed_path(name, &dir);
     fs.add_file(path, content);
 }

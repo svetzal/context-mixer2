@@ -209,7 +209,7 @@ mod tests {
         TestContext, agent_content, install_agent_on_disk, make_lock_entry_versioned,
         save_lock_with_entry, setup_source_with_agent, test_paths,
     };
-    use crate::types::ArtifactKind;
+    use crate::types::{ArtifactKind, InstallScope};
     use chrono::Utc;
 
     // --- collect_relative_files_with ---
@@ -416,7 +416,7 @@ mod tests {
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
         // Override the source file with specific content
         t.fs.add_file("/sources/my-source/agents/my-agent.md", content.clone());
-        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
         // Write a lock file entry so load_with succeeds
         save_lock_with_entry(
@@ -424,7 +424,7 @@ mod tests {
             &t.paths,
             "my-agent",
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
-            false,
+            InstallScope::Global,
         );
 
         let ctx = t.ctx();
@@ -440,14 +440,20 @@ mod tests {
 
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
         // Install a different version so checksums differ
-        install_agent_on_disk(&t.fs, &t.paths, "my-agent", "different installed content", false);
+        install_agent_on_disk(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            "different installed content",
+            InstallScope::Global,
+        );
 
         save_lock_with_entry(
             &t.fs,
             &t.paths,
             "my-agent",
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
-            false,
+            InstallScope::Global,
         );
 
         // No LLM configured — should bail when it tries to analyze
@@ -468,14 +474,20 @@ mod tests {
         let llm = FakeLlmClient::new("LLM analysis result");
 
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
-        install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
+        install_agent_on_disk(
+            &fs,
+            &paths,
+            "my-agent",
+            "different installed content",
+            InstallScope::Global,
+        );
 
         save_lock_with_entry(
             &fs,
             &paths,
             "my-agent",
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
-            false,
+            InstallScope::Global,
         );
 
         let ctx = AppContext {
@@ -499,14 +511,14 @@ mod tests {
         let content = agent_content("my-agent", "A test agent");
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
         t.fs.add_file("/sources/my-source/agents/my-agent.md", content.clone());
-        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, false);
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
         save_lock_with_entry(
             &t.fs,
             &t.paths,
             "my-agent",
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
-            false,
+            InstallScope::Global,
         );
 
         let ctx = t.ctx();
@@ -529,14 +541,20 @@ mod tests {
         let llm = FakeLlmClient::new("LLM analysis result");
 
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
-        install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
+        install_agent_on_disk(
+            &fs,
+            &paths,
+            "my-agent",
+            "different installed content",
+            InstallScope::Global,
+        );
 
         save_lock_with_entry(
             &fs,
             &paths,
             "my-agent",
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
-            false,
+            InstallScope::Global,
         );
 
         let ctx = AppContext {
@@ -570,14 +588,20 @@ mod tests {
 
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
         // Install a different version so checksums differ and LLM is invoked
-        install_agent_on_disk(&fs, &paths, "my-agent", "different installed content", false);
+        install_agent_on_disk(
+            &fs,
+            &paths,
+            "my-agent",
+            "different installed content",
+            InstallScope::Global,
+        );
 
         save_lock_with_entry(
             &fs,
             &paths,
             "my-agent",
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
-            false,
+            InstallScope::Global,
         );
 
         let ctx = AppContext {

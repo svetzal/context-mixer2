@@ -5,7 +5,8 @@ use std::path::PathBuf;
 use crate::gateway::filesystem::Filesystem;
 use crate::paths::ConfigPaths;
 use crate::types::{
-    ArtifactKind, CmxConfig, InstalledArtifact, LockFile, SourceEntry, SourceType, SourcesFile,
+    ArtifactKind, CmxConfig, InstallScope, InstalledArtifact, LockFile, SourceEntry, SourceType,
+    SourcesFile,
 };
 
 // ---------------------------------------------------------------------------
@@ -53,11 +54,11 @@ pub fn save_config_with(
 
 pub fn installed_names_with(
     kind: ArtifactKind,
-    local: bool,
+    scope: InstallScope,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<Vec<String>> {
-    let dir = paths.install_dir(kind, local);
+    let dir = paths.install_dir(kind, scope);
     if !fs.exists(&dir) {
         return Ok(Vec::new());
     }
@@ -79,12 +80,12 @@ pub fn installed_names_with(
 
 pub fn installed_with_lock_data<'a>(
     kind: ArtifactKind,
-    local: bool,
+    scope: InstallScope,
     lock: &'a LockFile,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<Vec<InstalledArtifact<'a>>> {
-    let names = installed_names_with(kind, local, fs, paths)?;
+    let names = installed_names_with(kind, scope, fs, paths)?;
     Ok(names
         .into_iter()
         .map(|name| {
@@ -130,13 +131,13 @@ pub type InstalledWithSources<'a, S> = (InstalledArtifact<'a>, Option<&'a Vec<S>
 /// name), returning `None` for the source slot when no entry exists.
 pub fn match_installed_to_sources<'a, S>(
     kind: ArtifactKind,
-    local: bool,
+    scope: InstallScope,
     lock: &'a LockFile,
     source_map: &'a BTreeMap<String, Vec<S>>,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<Vec<InstalledWithSources<'a, S>>> {
-    let installed = installed_with_lock_data(kind, local, lock, fs, paths)?;
+    let installed = installed_with_lock_data(kind, scope, lock, fs, paths)?;
     Ok(installed
         .into_iter()
         .map(|ia| {
@@ -147,19 +148,19 @@ pub fn match_installed_to_sources<'a, S>(
 }
 
 /// Search for an installed artifact on disk, checking global scope first then
-/// local.  Returns the path and whether the artifact is in local scope, or
-/// `None` if not found in either scope.
+/// local.  Returns the path and scope it was found in, or `None` if not found
+/// in either scope.
 pub fn find_installed_path(
     name: &str,
     kind: ArtifactKind,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
-) -> Option<(PathBuf, bool)> {
-    for local in [false, true] {
-        let dir = paths.install_dir(kind, local);
+) -> Option<(PathBuf, InstallScope)> {
+    for scope in InstallScope::ALL {
+        let dir = paths.install_dir(kind, scope);
         let path = kind.installed_path(name, &dir);
         if fs.exists(&path) {
-            return Some((path, local));
+            return Some((path, scope));
         }
     }
     None
@@ -187,7 +188,7 @@ mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
     use crate::test_support::{make_local_entry, make_lock_entry_versioned, test_paths};
-    use crate::types::LockFile;
+    use crate::types::{InstallScope, LockFile};
 
     // --- load_sources_with ---
 
@@ -282,7 +283,8 @@ mod tests {
     fn installed_names_returns_empty_when_dir_absent() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let names = installed_names_with(ArtifactKind::Agent, false, &fs, &paths).unwrap();
+        let names =
+            installed_names_with(ArtifactKind::Agent, InstallScope::Global, &fs, &paths).unwrap();
         assert!(names.is_empty());
     }
 
@@ -290,12 +292,13 @@ mod tests {
     fn installed_names_filters_md_files_for_agents() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         fs.add_file(agent_dir.join("alpha.md"), "# agent");
         fs.add_file(agent_dir.join("beta.md"), "# agent");
         fs.add_file(agent_dir.join("not-an-agent.txt"), "ignored");
 
-        let names = installed_names_with(ArtifactKind::Agent, false, &fs, &paths).unwrap();
+        let names =
+            installed_names_with(ArtifactKind::Agent, InstallScope::Global, &fs, &paths).unwrap();
         assert_eq!(names, vec!["alpha", "beta"]);
     }
 
@@ -303,12 +306,13 @@ mod tests {
     fn installed_names_returns_dirs_for_skills() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let skill_dir = paths.install_dir(ArtifactKind::Skill, false);
+        let skill_dir = paths.install_dir(ArtifactKind::Skill, InstallScope::Global);
         // Skills are directories — add a file inside each to register the dir
         fs.add_file(skill_dir.join("my-skill").join("SKILL.md"), "---\n---\n");
         fs.add_file(skill_dir.join("other-skill").join("SKILL.md"), "---\n---\n");
 
-        let names = installed_names_with(ArtifactKind::Skill, false, &fs, &paths).unwrap();
+        let names =
+            installed_names_with(ArtifactKind::Skill, InstallScope::Global, &fs, &paths).unwrap();
         assert_eq!(names, vec!["my-skill", "other-skill"]);
     }
 
@@ -316,11 +320,12 @@ mod tests {
     fn installed_names_skips_hidden_entries() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         fs.add_file(agent_dir.join("visible.md"), "# agent");
         fs.add_file(agent_dir.join(".hidden.md"), "# hidden");
 
-        let names = installed_names_with(ArtifactKind::Agent, false, &fs, &paths).unwrap();
+        let names =
+            installed_names_with(ArtifactKind::Agent, InstallScope::Global, &fs, &paths).unwrap();
         assert_eq!(names, vec!["visible"]);
     }
 
@@ -364,26 +369,26 @@ mod tests {
     fn find_installed_path_finds_global_agent() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         fs.add_file(agent_dir.join("my-agent.md"), "# agent");
 
         let result = find_installed_path("my-agent", ArtifactKind::Agent, &fs, &paths);
         assert!(result.is_some(), "expected Some for installed global agent");
-        let (_, local) = result.unwrap();
-        assert!(!local, "expected global scope (local=false)");
+        let (_, scope) = result.unwrap();
+        assert_eq!(scope, InstallScope::Global, "expected global scope");
     }
 
     #[test]
     fn find_installed_path_finds_local_agent() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, true);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Local);
         fs.add_file(agent_dir.join("my-agent.md"), "# agent");
 
         let result = find_installed_path("my-agent", ArtifactKind::Agent, &fs, &paths);
         assert!(result.is_some(), "expected Some for installed local agent");
-        let (_, local) = result.unwrap();
-        assert!(local, "expected local scope (local=true)");
+        let (_, scope) = result.unwrap();
+        assert_eq!(scope, InstallScope::Local, "expected local scope");
     }
 
     #[test]
@@ -391,25 +396,32 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         // Install in both scopes
-        fs.add_file(paths.install_dir(ArtifactKind::Agent, false).join("my-agent.md"), "global");
-        fs.add_file(paths.install_dir(ArtifactKind::Agent, true).join("my-agent.md"), "local");
+        fs.add_file(
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).join("my-agent.md"),
+            "global",
+        );
+        fs.add_file(
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local).join("my-agent.md"),
+            "local",
+        );
 
         let result = find_installed_path("my-agent", ArtifactKind::Agent, &fs, &paths);
-        let (_, local) = result.unwrap();
-        assert!(!local, "expected global to be preferred over local");
+        let (_, scope) = result.unwrap();
+        assert_eq!(scope, InstallScope::Global, "expected global to be preferred over local");
     }
 
     #[test]
     fn find_installed_path_finds_skill_directory() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let skill_dir = paths.install_dir(ArtifactKind::Skill, false).join("my-skill");
+        let skill_dir =
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global).join("my-skill");
         fs.add_file(skill_dir.join("SKILL.md"), "---\n---\n");
 
         let result = find_installed_path("my-skill", ArtifactKind::Skill, &fs, &paths);
         assert!(result.is_some(), "expected Some for installed global skill");
-        let (_, local) = result.unwrap();
-        assert!(!local, "expected global scope (local=false)");
+        let (_, scope) = result.unwrap();
+        assert_eq!(scope, InstallScope::Global, "expected global scope");
     }
 
     // --- installed_with_lock_data ---
@@ -418,7 +430,7 @@ mod tests {
     fn installed_with_lock_data_returns_name_and_lock_entry() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         fs.add_file(agent_dir.join("my-agent.md"), "# agent");
 
         let mut lock = LockFile::default();
@@ -433,7 +445,8 @@ mod tests {
         );
 
         let artifacts =
-            installed_with_lock_data(ArtifactKind::Agent, false, &lock, &fs, &paths).unwrap();
+            installed_with_lock_data(ArtifactKind::Agent, InstallScope::Global, &lock, &fs, &paths)
+                .unwrap();
         assert_eq!(artifacts.len(), 1);
         assert_eq!(artifacts[0].name, "my-agent");
         assert!(artifacts[0].lock_entry.is_some());
@@ -444,13 +457,14 @@ mod tests {
     fn installed_with_lock_data_absent_lock_entry_gives_none_version() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         fs.add_file(agent_dir.join("my-agent.md"), "# agent");
 
         let lock = LockFile::default();
 
         let artifacts =
-            installed_with_lock_data(ArtifactKind::Agent, false, &lock, &fs, &paths).unwrap();
+            installed_with_lock_data(ArtifactKind::Agent, InstallScope::Global, &lock, &fs, &paths)
+                .unwrap();
         assert_eq!(artifacts.len(), 1);
         assert_eq!(artifacts[0].name, "my-agent");
         assert!(artifacts[0].lock_entry.is_none());
@@ -495,7 +509,7 @@ mod tests {
     fn match_installed_to_sources_pairs_artifact_with_matching_sources() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         fs.add_file(agent_dir.join("my-agent.md"), "# agent");
 
         let mut lock = LockFile::default();
@@ -512,9 +526,15 @@ mod tests {
         let mut source_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
         source_map.insert("my-agent".to_string(), vec!["source-entry".to_string()]);
 
-        let pairs =
-            match_installed_to_sources(ArtifactKind::Agent, false, &lock, &source_map, &fs, &paths)
-                .unwrap();
+        let pairs = match_installed_to_sources(
+            ArtifactKind::Agent,
+            InstallScope::Global,
+            &lock,
+            &source_map,
+            &fs,
+            &paths,
+        )
+        .unwrap();
 
         assert_eq!(pairs.len(), 1);
         let (ia, sources) = &pairs[0];
@@ -528,15 +548,21 @@ mod tests {
     fn match_installed_to_sources_returns_none_when_no_matching_source() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, false);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         fs.add_file(agent_dir.join("orphan-agent.md"), "# agent");
 
         let lock = LockFile::default();
         let source_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
-        let pairs =
-            match_installed_to_sources(ArtifactKind::Agent, false, &lock, &source_map, &fs, &paths)
-                .unwrap();
+        let pairs = match_installed_to_sources(
+            ArtifactKind::Agent,
+            InstallScope::Global,
+            &lock,
+            &source_map,
+            &fs,
+            &paths,
+        )
+        .unwrap();
 
         assert_eq!(pairs.len(), 1);
         let (ia, sources) = &pairs[0];

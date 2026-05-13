@@ -12,13 +12,14 @@ use crate::search::SearchOutput;
 use crate::source::{SourceBrowseResult, SourceListResult, SourceRemoveResult, SourceScanResult};
 use crate::source_update::SourceUpdateOutput;
 use crate::table::Table;
-use crate::types::format_version_prefix;
+use crate::types::{InstallScope, format_version_prefix};
 use crate::uninstall::UninstallResult;
 
 pub fn format_list_kind_output(output: &ListKindOutput) -> String {
     let kind = output.kind;
-    let global = &output.global_rows;
-    let local = &output.local_rows;
+    let empty = vec![];
+    let global = output.rows.get(&InstallScope::Global).unwrap_or(&empty);
+    let local = output.rows.get(&InstallScope::Local).unwrap_or(&empty);
 
     if global.is_empty() && local.is_empty() {
         return format!("No {kind}s installed.\n");
@@ -43,19 +44,25 @@ pub fn format_list_kind_output(output: &ListKindOutput) -> String {
 }
 
 pub fn format_list_all_output(output: &ListOutput) -> String {
-    if output.global_agents.is_empty()
-        && output.local_agents.is_empty()
-        && output.global_skills.is_empty()
-        && output.local_skills.is_empty()
+    let empty = vec![];
+    let global_agents = output.agents.get(&InstallScope::Global).unwrap_or(&empty);
+    let local_agents = output.agents.get(&InstallScope::Local).unwrap_or(&empty);
+    let global_skills = output.skills.get(&InstallScope::Global).unwrap_or(&empty);
+    let local_skills = output.skills.get(&InstallScope::Local).unwrap_or(&empty);
+
+    if global_agents.is_empty()
+        && local_agents.is_empty()
+        && global_skills.is_empty()
+        && local_skills.is_empty()
     {
         return "Nothing installed.\n".to_string();
     }
 
     let mut out = String::new();
-    out.push_str(&format_section("Global agents", &output.global_agents));
-    out.push_str(&format_section("Local agents", &output.local_agents));
-    out.push_str(&format_section("Global skills", &output.global_skills));
-    out.push_str(&format_section("Local skills", &output.local_skills));
+    out.push_str(&format_section("Global agents", global_agents));
+    out.push_str(&format_section("Local agents", local_agents));
+    out.push_str(&format_section("Global skills", global_skills));
+    out.push_str(&format_section("Local skills", local_skills));
     out
 }
 
@@ -386,7 +393,7 @@ mod tests {
         SourceRemoveResult, SourceScanResult,
     };
     use crate::source_update::SourceUpdateOutput;
-    use crate::types::{ArtifactKind, Deprecation};
+    use crate::types::{ArtifactKind, Deprecation, InstallScope};
     use crate::uninstall::UninstallResult;
 
     fn make_row(name: &str, installed: &str, source: &str, available: &str) -> Row {
@@ -405,18 +412,18 @@ mod tests {
     fn format_list_kind_output_empty() {
         let output = ListKindOutput {
             kind: ArtifactKind::Agent,
-            global_rows: vec![],
-            local_rows: vec![],
+            rows: std::collections::BTreeMap::new(),
         };
         assert_eq!(format_list_kind_output(&output), "No agents installed.\n");
     }
 
     #[test]
     fn format_list_kind_output_global_only() {
+        let mut rows = std::collections::BTreeMap::new();
+        rows.insert(InstallScope::Global, vec![make_row("my-agent", "1.0.0", "src", "1.0.0")]);
         let output = ListKindOutput {
             kind: ArtifactKind::Agent,
-            global_rows: vec![make_row("my-agent", "1.0.0", "src", "1.0.0")],
-            local_rows: vec![],
+            rows,
         };
         let result = format_list_kind_output(&output);
         assert!(result.contains("Global agents:"), "missing section header");
@@ -426,10 +433,12 @@ mod tests {
 
     #[test]
     fn format_list_kind_output_both_sections() {
+        let mut rows = std::collections::BTreeMap::new();
+        rows.insert(InstallScope::Global, vec![make_row("skill-a", "1.0", "src", "1.0")]);
+        rows.insert(InstallScope::Local, vec![make_row("skill-b", "2.0", "src", "2.0")]);
         let output = ListKindOutput {
             kind: ArtifactKind::Skill,
-            global_rows: vec![make_row("skill-a", "1.0", "src", "1.0")],
-            local_rows: vec![make_row("skill-b", "2.0", "src", "2.0")],
+            rows,
         };
         let result = format_list_kind_output(&output);
         assert!(result.contains("Global skills:"));
@@ -443,21 +452,19 @@ mod tests {
     #[test]
     fn format_list_all_output_empty() {
         let output = ListOutput {
-            global_agents: vec![],
-            local_agents: vec![],
-            global_skills: vec![],
-            local_skills: vec![],
+            agents: std::collections::BTreeMap::new(),
+            skills: std::collections::BTreeMap::new(),
         };
         assert_eq!(format_list_all_output(&output), "Nothing installed.\n");
     }
 
     #[test]
     fn format_list_all_output_with_data() {
+        let mut agents = std::collections::BTreeMap::new();
+        agents.insert(InstallScope::Global, vec![make_row("agent-x", "1.0", "src", "1.0")]);
         let output = ListOutput {
-            global_agents: vec![make_row("agent-x", "1.0", "src", "1.0")],
-            local_agents: vec![],
-            global_skills: vec![],
-            local_skills: vec![],
+            agents,
+            skills: std::collections::BTreeMap::new(),
         };
         let result = format_list_all_output(&output);
         assert!(result.contains("Global agents:"));

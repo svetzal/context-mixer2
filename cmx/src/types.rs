@@ -143,6 +143,27 @@ pub struct LockSource {
     pub path: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum InstallScope {
+    Global,
+    Local,
+}
+
+impl InstallScope {
+    pub fn label(&self) -> &'static str {
+        match self {
+            InstallScope::Global => "global",
+            InstallScope::Local => "local",
+        }
+    }
+
+    pub fn is_local(&self) -> bool {
+        matches!(self, InstallScope::Local)
+    }
+
+    pub const ALL: [InstallScope; 2] = [InstallScope::Global, InstallScope::Local];
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ArtifactKind {
@@ -288,10 +309,6 @@ pub fn relative_path_string(path: &Path, base: &Path) -> String {
 /// Render an optional version for display, substituting `"-"` when absent.
 pub fn display_version(v: Option<&str>) -> &str {
     v.unwrap_or("-")
-}
-
-pub fn scope_label(local: bool) -> &'static str {
-    if local { "local" } else { "global" }
 }
 
 pub fn format_version_prefix(version: Option<&str>) -> String {

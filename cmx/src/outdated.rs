@@ -8,7 +8,7 @@ use crate::context::{AppContext, LoadedState};
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
 use crate::source_update;
-use crate::types::{ArtifactKind, LockFile, display_version};
+use crate::types::{ArtifactKind, InstallScope, LockFile, display_version};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -35,9 +35,9 @@ pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
 
     let mut rows = Vec::new();
 
-    for (local, lock) in [(false, &loaded.global_lock), (true, &loaded.local_lock)] {
+    for (scope, lock) in loaded.scopes() {
         for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-            collect_outdated_for_scope_with(kind, local, lock, &source_artifacts, &mut rows, ctx)?;
+            collect_outdated_for_scope_with(kind, scope, lock, &source_artifacts, &mut rows, ctx)?;
         }
     }
 
@@ -93,13 +93,13 @@ fn check_locally_modified(
     lock_entry: Option<&crate::types::LockEntry>,
     kind: ArtifactKind,
     name: &str,
-    local: bool,
+    scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<bool> {
     let Some(entry) = lock_entry else {
         return Ok(false);
     };
-    let install_path = kind.installed_path(name, &ctx.paths.install_dir(kind, local));
+    let install_path = kind.installed_path(name, &ctx.paths.install_dir(kind, scope));
     if !ctx.fs.exists(&install_path) {
         return Ok(false);
     }
@@ -108,16 +108,16 @@ fn check_locally_modified(
 
 fn collect_outdated_for_scope_with(
     kind: ArtifactKind,
-    local: bool,
+    scope: InstallScope,
     lock: &LockFile,
     source_artifacts: &BTreeMap<String, Vec<SourceArtifactInfo>>,
     rows: &mut Vec<OutdatedRow>,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
     let pairs =
-        config::match_installed_to_sources(kind, local, lock, source_artifacts, ctx.fs, ctx.paths)?;
+        config::match_installed_to_sources(kind, scope, lock, source_artifacts, ctx.fs, ctx.paths)?;
     let names: Vec<&str> = pairs.iter().map(|(ia, _)| ia.name.as_str()).collect();
-    let modifications = compute_modification_status(kind, local, &names, lock, ctx)?;
+    let modifications = compute_modification_status(kind, scope, &names, lock, ctx)?;
     rows.extend(compare_versions(kind, pairs, &modifications));
     Ok(())
 }
@@ -125,7 +125,7 @@ fn collect_outdated_for_scope_with(
 /// Pre-compute whether each artifact has been locally modified since installation.
 fn compute_modification_status(
     kind: ArtifactKind,
-    local: bool,
+    scope: InstallScope,
     names: &[&str],
     lock: &LockFile,
     ctx: &AppContext<'_>,
@@ -134,7 +134,7 @@ fn compute_modification_status(
         .iter()
         .map(|&name| {
             let lock_entry = lock.packages.get(name);
-            let modified = check_locally_modified(lock_entry, kind, name, local, ctx)?;
+            let modified = check_locally_modified(lock_entry, kind, name, scope, ctx)?;
             Ok((name.to_string(), modified))
         })
         .collect()
@@ -200,7 +200,7 @@ mod tests {
         save_lock_with_entry, setup_empty_sources, setup_source_with_versioned_agent,
         setup_sources, versioned_agent_content,
     };
-    use crate::types::{ArtifactKind, InstalledArtifact, LockFile};
+    use crate::types::{ArtifactKind, InstallScope, InstalledArtifact, LockFile};
     use std::collections::{BTreeMap, HashMap};
 
     // --- compare_versions (pure, no gateway fakes needed) ---
@@ -387,7 +387,7 @@ mod tests {
             &t.paths,
             "my-agent",
             &agent_content("my-agent", "A test agent"),
-            false,
+            InstallScope::Global,
         );
         save_lock_with_entry(
             &t.fs,
@@ -400,7 +400,7 @@ mod tests {
                 "my-agent.md",
                 "sha256:old",
             ),
-            false,
+            InstallScope::Global,
         );
 
         let ctx = t.ctx();
@@ -446,7 +446,7 @@ mod tests {
             &t.paths,
             "my-agent",
             &agent_content("my-agent", "A test agent"),
-            false,
+            InstallScope::Global,
         );
         // Empty lock file — no lock entry
         lockfile::save_with(
@@ -454,7 +454,7 @@ mod tests {
                 version: 1,
                 packages: BTreeMap::new(),
             },
-            false,
+            InstallScope::Global,
             &t.fs,
             &t.paths,
         )
@@ -489,7 +489,7 @@ mod tests {
             &t.paths,
             "my-agent",
             &agent_content("my-agent", "A test agent"),
-            false,
+            InstallScope::Global,
         );
 
         // Lock entry says installed_checksum doesn't match disk content
@@ -502,7 +502,7 @@ mod tests {
         );
         // Installed checksum doesn't match disk content
         entry.installed_checksum = "sha256:different".to_string();
-        save_lock_with_entry(&t.fs, &t.paths, "my-agent", entry, false);
+        save_lock_with_entry(&t.fs, &t.paths, "my-agent", entry, InstallScope::Global);
 
         let ctx = t.ctx();
         let rows = outdated_with(&ctx).unwrap();
@@ -543,7 +543,7 @@ mod tests {
             &t.paths,
             "my-agent",
             &agent_content("my-agent", "A test agent"),
-            false,
+            InstallScope::Global,
         );
         save_lock_with_entry(
             &t.fs,
@@ -556,7 +556,7 @@ mod tests {
                 "my-agent.md",
                 "sha256:old",
             ),
-            false,
+            InstallScope::Global,
         );
 
         let ctx = t.ctx();

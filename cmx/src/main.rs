@@ -5,7 +5,7 @@ use cmx::cli::{ArtifactAction, Cli, Commands, ConfigAction, SourceAction};
 use cmx::context::AppContext;
 use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use cmx::paths::ConfigPaths;
-use cmx::types::ArtifactKind;
+use cmx::types::{ArtifactKind, InstallScope};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -109,12 +109,17 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
             local,
             force,
         } => {
+            let scope = if local {
+                InstallScope::Local
+            } else {
+                InstallScope::Global
+            };
             if all {
-                let result = cmx::install::install_all_with(kind, local, force, ctx)?;
+                let result = cmx::install::install_all_with(kind, scope, force, ctx)?;
                 print!("{}", cmx::display::format_install_all_result(&result));
                 Ok(())
             } else if let Some(name) = name {
-                let result = cmx::install::install_with(&name, kind, local, force, ctx)?;
+                let result = cmx::install::install_with(&name, kind, scope, force, ctx)?;
                 print!("{}", cmx::display::format_install_result(&result));
                 Ok(())
             } else {
@@ -157,7 +162,12 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
             }
         }
         ArtifactAction::Uninstall { name, local } => {
-            let result = cmx::uninstall::uninstall_with(&name, kind, local, ctx)?;
+            let scope = if local {
+                InstallScope::Local
+            } else {
+                InstallScope::Global
+            };
+            let result = cmx::uninstall::uninstall_with(&name, kind, scope, ctx)?;
             print!("{}", cmx::display::format_uninstall_result(&result));
             Ok(())
         }
