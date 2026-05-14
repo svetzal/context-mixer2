@@ -27,7 +27,7 @@ pub struct SearchOutput {
 // ---------------------------------------------------------------------------
 
 pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
-    source_update::auto_update_all_with(ctx)?;
+    source_update::ensure_fresh(ctx)?;
 
     let query_lower = query.to_lowercase();
     let mut results = Vec::new();

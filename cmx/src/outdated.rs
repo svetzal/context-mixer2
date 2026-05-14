@@ -28,7 +28,7 @@ pub struct OutdatedRow {
 // ---------------------------------------------------------------------------
 
 pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
-    source_update::auto_update_all_with(ctx)?;
+    source_update::ensure_fresh(ctx)?;
 
     let loaded = LoadedState::load(ctx)?;
     let source_artifacts = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;

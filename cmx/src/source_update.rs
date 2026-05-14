@@ -118,6 +118,11 @@ pub fn auto_update_source_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
     Ok(())
 }
 
+/// Ensure sources are current before operating on them.
+pub fn ensure_fresh(ctx: &AppContext<'_>) -> Result<()> {
+    auto_update_all_with(ctx)
+}
+
 /// Auto-update all stale git sources.
 pub fn auto_update_all_with(ctx: &AppContext<'_>) -> Result<()> {
     let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
