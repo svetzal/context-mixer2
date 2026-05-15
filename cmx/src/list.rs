@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::collections::{BTreeMap, HashMap};
+use std::fmt;
 
 use crate::config;
 use crate::config::InstalledWithSources;
@@ -7,6 +8,7 @@ use crate::context::{AppContext, LoadedState};
 use crate::scan;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
+use crate::table::Table;
 use crate::types::{
     ArtifactKind, InstallScope, InstalledArtifact, LockEntry, LockFile, display_version,
 };
@@ -27,6 +29,92 @@ pub struct ListKindOutput {
 pub struct ListOutput {
     pub agents: BTreeMap<InstallScope, Vec<Row>>,
     pub skills: BTreeMap<InstallScope, Vec<Row>>,
+}
+
+impl fmt::Display for ListKindOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let kind = self.kind;
+        let empty = vec![];
+        let global = self.rows.get(&InstallScope::Global).unwrap_or(&empty);
+        let local = self.rows.get(&InstallScope::Local).unwrap_or(&empty);
+
+        if global.is_empty() && local.is_empty() {
+            return writeln!(f, "No {kind}s installed.");
+        }
+
+        if !global.is_empty() {
+            writeln!(f, "Global {kind}s:")?;
+            write!(f, "{}", table_str(global))?;
+        }
+
+        if !local.is_empty() {
+            if !global.is_empty() {
+                writeln!(f)?;
+            }
+            writeln!(f, "Local {kind}s:")?;
+            write!(f, "{}", table_str(local))?;
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Display for ListOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let empty = vec![];
+        let global_agents = self.agents.get(&InstallScope::Global).unwrap_or(&empty);
+        let local_agents = self.agents.get(&InstallScope::Local).unwrap_or(&empty);
+        let global_skills = self.skills.get(&InstallScope::Global).unwrap_or(&empty);
+        let local_skills = self.skills.get(&InstallScope::Local).unwrap_or(&empty);
+
+        if global_agents.is_empty()
+            && local_agents.is_empty()
+            && global_skills.is_empty()
+            && local_skills.is_empty()
+        {
+            return writeln!(f, "Nothing installed.");
+        }
+
+        write!(f, "{}", section_str("Global agents", global_agents))?;
+        write!(f, "{}", section_str("Local agents", local_agents))?;
+        write!(f, "{}", section_str("Global skills", global_skills))?;
+        write!(f, "{}", section_str("Local skills", local_skills))?;
+        Ok(())
+    }
+}
+
+fn table_str(rows: &[Row]) -> String {
+    if rows.is_empty() {
+        return String::new();
+    }
+    Table {
+        headers: vec!["Name", "Installed", "Source", "Available"],
+        padded_cols: 4,
+        rows: rows
+            .iter()
+            .map(|r| {
+                vec![
+                    r.name.clone(),
+                    r.installed.clone(),
+                    r.source.clone(),
+                    r.available.clone(),
+                    r.status.to_string(),
+                ]
+            })
+            .collect(),
+    }
+    .render()
+}
+
+fn section_str(label: &str, rows: &[Row]) -> String {
+    let mut out = format!("{label}:\n");
+    if rows.is_empty() {
+        out.push_str("  (none)\n");
+    } else {
+        out.push_str(&table_str(rows));
+    }
+    out.push('\n');
+    out
 }
 
 fn status_indicator(
@@ -220,6 +308,98 @@ mod tests {
     };
     use crate::types::{ArtifactKind, InstallScope, LockFile};
     use std::collections::BTreeMap;
+
+    fn make_row(name: &str, installed: &str, source: &str, available: &str) -> Row {
+        Row {
+            name: name.to_string(),
+            installed: installed.to_string(),
+            source: source.to_string(),
+            available: available.to_string(),
+            status: "✅",
+        }
+    }
+
+    // --- Display for ListKindOutput ---
+
+    #[test]
+    fn list_kind_output_display_empty() {
+        let output = ListKindOutput {
+            kind: ArtifactKind::Agent,
+            rows: BTreeMap::new(),
+        };
+        assert_eq!(output.to_string(), "No agents installed.\n");
+    }
+
+    #[test]
+    fn list_kind_output_display_global_only() {
+        let mut rows = BTreeMap::new();
+        rows.insert(InstallScope::Global, vec![make_row("my-agent", "1.0.0", "src", "1.0.0")]);
+        let output = ListKindOutput {
+            kind: ArtifactKind::Agent,
+            rows,
+        };
+        let result = output.to_string();
+        assert!(result.contains("Global agents:"), "missing section header");
+        assert!(result.contains("my-agent"), "missing row data");
+        assert!(!result.contains("Local agents:"), "unexpected local section");
+    }
+
+    #[test]
+    fn list_kind_output_display_both_sections() {
+        let mut rows = BTreeMap::new();
+        rows.insert(InstallScope::Global, vec![make_row("skill-a", "1.0", "src", "1.0")]);
+        rows.insert(InstallScope::Local, vec![make_row("skill-b", "2.0", "src", "2.0")]);
+        let output = ListKindOutput {
+            kind: ArtifactKind::Skill,
+            rows,
+        };
+        let result = output.to_string();
+        assert!(result.contains("Global skills:"));
+        assert!(result.contains("Local skills:"));
+        assert!(result.contains("skill-a"));
+        assert!(result.contains("skill-b"));
+    }
+
+    // --- Display for ListOutput ---
+
+    #[test]
+    fn list_output_display_empty() {
+        let output = ListOutput {
+            agents: BTreeMap::new(),
+            skills: BTreeMap::new(),
+        };
+        assert_eq!(output.to_string(), "Nothing installed.\n");
+    }
+
+    #[test]
+    fn list_output_display_with_data() {
+        let mut agents = BTreeMap::new();
+        agents.insert(InstallScope::Global, vec![make_row("agent-x", "1.0", "src", "1.0")]);
+        let output = ListOutput {
+            agents,
+            skills: BTreeMap::new(),
+        };
+        let result = output.to_string();
+        assert!(result.contains("Global agents:"));
+        assert!(result.contains("agent-x"));
+    }
+
+    // --- section_str ---
+
+    #[test]
+    fn section_str_empty_rows_shows_none() {
+        let result = section_str("My Section", &[]);
+        assert_eq!(result, "My Section:\n  (none)\n\n");
+    }
+
+    #[test]
+    fn section_str_with_rows() {
+        let rows = vec![make_row("item", "1.0", "src", "1.0")];
+        let result = section_str("My Section", &rows);
+        assert!(result.starts_with("My Section:\n"));
+        assert!(result.contains("item"));
+        assert!(result.ends_with('\n'));
+    }
 
     // --- assemble_rows (pure, no gateway fakes needed) ---
 

@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use cmx::scan::{extract_field, extract_version};
@@ -22,6 +23,62 @@ pub struct Recipe {
     pub facets: Vec<String>,
     #[serde(default)]
     pub runtime_skills: Vec<String>,
+}
+
+pub struct FacetList(pub Vec<Facet>);
+
+impl fmt::Display for FacetList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let facets = &self.0;
+        writeln!(f, "Facets ({}):", facets.len())?;
+
+        if facets.is_empty() {
+            return Ok(());
+        }
+
+        let mut groups: Vec<(String, Vec<String>)> = Vec::new();
+        for facet in facets {
+            if let Some(last) = groups.last_mut() {
+                if last.0 == facet.category {
+                    last.1.push(facet.name.clone());
+                    continue;
+                }
+            }
+            groups.push((facet.category.clone(), vec![facet.name.clone()]));
+        }
+
+        let max_cat_width = groups.iter().map(|(cat, _)| cat.len() + 1).max().unwrap_or(0);
+
+        for (category, names) in &groups {
+            let label = format!("{category}/");
+            writeln!(f, "  {:<width$} {}", label, names.join(", "), width = max_cat_width)?;
+        }
+
+        Ok(())
+    }
+}
+
+pub struct RecipeList(pub Vec<Recipe>);
+
+impl fmt::Display for RecipeList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let recipes = &self.0;
+        writeln!(f, "Recipes ({}):", recipes.len())?;
+
+        for recipe in recipes {
+            let count = recipe.facets.len();
+            writeln!(
+                f,
+                "  {} -> {} ({} {})",
+                recipe.name,
+                recipe.produces,
+                count,
+                if count == 1 { "facet" } else { "facets" }
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 /// Parse facet frontmatter from a markdown file.
@@ -55,6 +112,77 @@ pub fn parse_facet(path: &Path, content: &str) -> Option<Facet> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_facet(name: &str, category: &str) -> Facet {
+        Facet {
+            name: name.to_string(),
+            category: category.to_string(),
+            scope: None,
+            does_not_cover: None,
+            version: None,
+            path: PathBuf::from(format!("/facets/{name}.md")),
+        }
+    }
+
+    // --- Display for FacetList ---
+
+    #[test]
+    fn facet_list_display_empty() {
+        assert_eq!(FacetList(vec![]).to_string(), "Facets (0):\n");
+    }
+
+    #[test]
+    fn facet_list_display_groups_by_category() {
+        let facets = vec![
+            make_facet("error-handling", "rust"),
+            make_facet("testing", "rust"),
+            make_facet("commits", "git"),
+        ];
+        let out = FacetList(facets).to_string();
+        assert!(out.starts_with("Facets (3):"));
+        assert!(out.contains("rust/"));
+        assert!(out.contains("git/"));
+        assert!(out.contains("error-handling"));
+        assert!(out.contains("commits"));
+    }
+
+    // --- Display for RecipeList ---
+
+    #[test]
+    fn recipe_list_display_empty() {
+        assert_eq!(RecipeList(vec![]).to_string(), "Recipes (0):\n");
+    }
+
+    #[test]
+    fn recipe_list_display_singular_facet() {
+        let recipes = vec![Recipe {
+            name: "my-recipe".to_string(),
+            description: String::new(),
+            produces: "AGENTS.md".to_string(),
+            facets: vec!["rust/error-handling".to_string()],
+            runtime_skills: Vec::new(),
+        }];
+        let out = RecipeList(recipes).to_string();
+        assert!(out.contains("my-recipe"));
+        assert!(out.contains("1 facet"));
+        assert!(!out.contains("1 facets"));
+    }
+
+    #[test]
+    fn recipe_list_display_plural_facets() {
+        let recipes = vec![Recipe {
+            name: "full-recipe".to_string(),
+            description: String::new(),
+            produces: "AGENTS.md".to_string(),
+            facets: vec![
+                "rust/error-handling".to_string(),
+                "rust/testing".to_string(),
+            ],
+            runtime_skills: Vec::new(),
+        }];
+        let out = RecipeList(recipes).to_string();
+        assert!(out.contains("2 facets"));
+    }
 
     #[test]
     fn parse_valid_facet() {

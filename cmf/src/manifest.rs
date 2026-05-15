@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -5,6 +6,47 @@ use cmx::gateway::Filesystem;
 use cmx::platform::Platform;
 
 use crate::repo::RepoRoot;
+
+pub struct ManifestSummary(pub Vec<PathBuf>);
+
+impl fmt::Display for ManifestSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let files = &self.0;
+        if files.is_empty() {
+            return writeln!(f, "No .claude-plugin/ sources found — nothing to generate.");
+        }
+
+        writeln!(f, "Generated manifests for {} platforms:", Platform::targets().len())?;
+
+        for platform in Platform::targets() {
+            let dir_name = platform.manifest_dir();
+
+            let platform_files: Vec<_> = files
+                .iter()
+                .filter(|p| p.components().any(|c| c.as_os_str() == dir_name))
+                .collect();
+
+            let marketplace_count =
+                platform_files.iter().filter(|p| p.ends_with("marketplace.json")).count();
+            let plugin_count = platform_files.iter().filter(|p| p.ends_with("plugin.json")).count();
+
+            let mut parts = Vec::new();
+            if marketplace_count > 0 {
+                parts.push("marketplace.json".to_string());
+            }
+            if plugin_count > 0 {
+                parts.push(format!(
+                    "{plugin_count} plugin manifest{}",
+                    if plugin_count == 1 { "" } else { "s" }
+                ));
+            }
+
+            writeln!(f, "  {dir_name}/ — {}", parts.join(" + "))?;
+        }
+
+        Ok(())
+    }
+}
 
 /// Collect all source files to replicate across platforms.
 ///
@@ -80,6 +122,25 @@ mod tests {
     use crate::repo::RepoKind;
     use crate::test_support::{fake_marketplace_json, fake_plugin_json};
     use cmx::gateway::fakes::FakeFilesystem;
+
+    // --- Display for ManifestSummary ---
+
+    #[test]
+    fn manifest_summary_display_empty() {
+        let out = ManifestSummary(vec![]).to_string();
+        assert!(out.contains("No .claude-plugin/ sources found"));
+    }
+
+    #[test]
+    fn manifest_summary_display_with_files() {
+        let files = vec![
+            PathBuf::from("/repo/.copilot-plugin/marketplace.json"),
+            PathBuf::from("/repo/.copilot-plugin/plugin.json"),
+        ];
+        let out = ManifestSummary(files).to_string();
+        assert!(out.starts_with("Generated manifests for"), "unexpected start: {out}");
+        assert!(out.contains(".copilot-plugin/"), "missing .copilot-plugin/ in: {out}");
+    }
 
     fn marketplace_root(fs: &FakeFilesystem, marketplace_json: &str) -> RepoRoot {
         fs.add_file("/repo/.claude-plugin/marketplace.json", marketplace_json);

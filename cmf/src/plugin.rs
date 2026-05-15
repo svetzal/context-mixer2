@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
@@ -19,6 +20,53 @@ pub struct PluginInfo {
     pub path: PathBuf,
     pub agents: Vec<cmx::types::Artifact>,
     pub skills: Vec<cmx::types::Artifact>,
+}
+
+pub struct PluginList(pub Vec<PluginInfo>);
+
+impl fmt::Display for PluginList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let plugins = &self.0;
+        writeln!(f, "Plugins ({}):", plugins.len())?;
+
+        if plugins.is_empty() {
+            return Ok(());
+        }
+
+        let max_name = plugins.iter().map(|p| p.name.len()).max().unwrap_or(0);
+        let max_version = plugins
+            .iter()
+            .map(|p| p.version.as_deref().unwrap_or("-").len())
+            .max()
+            .unwrap_or(0);
+        let max_category = plugins
+            .iter()
+            .map(|p| p.category.as_deref().unwrap_or("-").len())
+            .max()
+            .unwrap_or(0);
+
+        for plugin in plugins {
+            let version = plugin.version.as_deref().unwrap_or("-");
+            let category = plugin.category.as_deref().unwrap_or("-");
+            let agents = plugin.agents.len();
+            let skills = plugin.skills.len();
+            writeln!(
+                f,
+                "  {:<name_w$}  {:>ver_w$}  {:<cat_w$}  {} {}  {} {}",
+                plugin.name,
+                version,
+                category,
+                agents,
+                if agents == 1 { "agent " } else { "agents" },
+                skills,
+                if skills == 1 { "skill " } else { "skills" },
+                name_w = max_name,
+                ver_w = max_version,
+                cat_w = max_category,
+            )?;
+        }
+        Ok(())
+    }
 }
 
 /// Scan all plugins in a marketplace repo.
@@ -326,6 +374,70 @@ mod tests {
     use cmx::gateway::fakes::FakeFilesystem;
 
     use crate::test_support::{fake_marketplace_json_with_categories, fake_plugin_json};
+
+    fn make_plugin(
+        name: &str,
+        version: Option<&str>,
+        category: Option<&str>,
+        agents: usize,
+        skills: usize,
+    ) -> PluginInfo {
+        PluginInfo {
+            name: name.to_string(),
+            version: version.map(str::to_string),
+            description: None,
+            category: category.map(str::to_string),
+            path: PathBuf::from("/tmp"),
+            agents: (0..agents)
+                .map(|_| cmx::types::Artifact {
+                    kind: cmx::types::ArtifactKind::Agent,
+                    name: "test".to_string(),
+                    description: String::new(),
+                    path: PathBuf::from("/tmp/test"),
+                    version: None,
+                    deprecation: None,
+                })
+                .collect(),
+            skills: (0..skills)
+                .map(|_| cmx::types::Artifact {
+                    kind: cmx::types::ArtifactKind::Skill,
+                    name: "test".to_string(),
+                    description: String::new(),
+                    path: PathBuf::from("/tmp/test"),
+                    version: None,
+                    deprecation: None,
+                })
+                .collect(),
+        }
+    }
+
+    // --- Display for PluginList ---
+
+    #[test]
+    fn plugin_list_display_empty() {
+        let out = PluginList(vec![]).to_string();
+        assert_eq!(out, "Plugins (0):\n");
+    }
+
+    #[test]
+    fn plugin_list_display_single_plugin() {
+        let plugins = vec![make_plugin("my-plugin", Some("1.0.0"), Some("tools"), 1, 2)];
+        let out = PluginList(plugins).to_string();
+        assert!(out.starts_with("Plugins (1):"));
+        assert!(out.contains("my-plugin"));
+        assert!(out.contains("1.0.0"));
+        assert!(out.contains("tools"));
+        assert!(out.contains("1 agent "));
+        assert!(out.contains("2 skills"));
+    }
+
+    #[test]
+    fn plugin_list_display_missing_optional_fields() {
+        let plugins = vec![make_plugin("my-plugin", None, None, 0, 0)];
+        let out = PluginList(plugins).to_string();
+        assert!(out.contains("my-plugin"));
+        assert!(out.contains('-'));
+    }
 
     /// Helper to build agent markdown content with valid frontmatter.
     fn agent_md(name: &str, description: &str) -> String {

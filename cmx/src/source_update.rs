@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
+use std::fmt;
 
 use crate::config;
 use crate::context::AppContext;
@@ -16,6 +17,29 @@ pub enum SourceUpdateOutput {
     SingleUpdate(SourceScanResult),
     BatchUpdate(Vec<SourceScanResult>),
     NoGitSources,
+}
+
+impl fmt::Display for SourceUpdateOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SourceUpdateOutput::NoGitSources => writeln!(f, "No git-backed sources to update."),
+            SourceUpdateOutput::SingleUpdate(result) => writeln!(
+                f,
+                "Source '{}': {} agent(s), {} skill(s).",
+                result.name, result.agents_found, result.skills_found
+            ),
+            SourceUpdateOutput::BatchUpdate(results) => {
+                for result in results {
+                    writeln!(
+                        f,
+                        "Source '{}': {} agent(s), {} skill(s).",
+                        result.name, result.agents_found, result.skills_found
+                    )?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +184,7 @@ fn is_stale_at(entry: &SourceEntry, now: DateTime<Utc>) -> bool {
 mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::source::SourceScanResult;
     use crate::test_support::{
         TestContext, make_ctx, make_git_entry, make_local_entry, setup_source_git,
         setup_sources_from_entries, test_paths,
@@ -167,6 +192,51 @@ mod tests {
     use chrono::Utc;
     use std::cell::RefCell;
     use std::path::PathBuf;
+
+    // --- Display for SourceUpdateOutput ---
+
+    #[test]
+    fn source_update_output_display_no_git_sources() {
+        let out = SourceUpdateOutput::NoGitSources.to_string();
+        assert_eq!(out, "No git-backed sources to update.\n");
+    }
+
+    #[test]
+    fn source_update_output_display_single_update() {
+        let out = SourceUpdateOutput::SingleUpdate(SourceScanResult {
+            name: "guidelines".to_string(),
+            agents_found: 5,
+            skills_found: 3,
+            warnings: vec![],
+        })
+        .to_string();
+        assert!(out.contains("guidelines"));
+        assert!(out.contains("5 agent(s)"));
+        assert!(out.contains("3 skill(s)"));
+    }
+
+    #[test]
+    fn source_update_output_display_batch_update() {
+        let out = SourceUpdateOutput::BatchUpdate(vec![
+            SourceScanResult {
+                name: "source-a".to_string(),
+                agents_found: 1,
+                skills_found: 0,
+                warnings: vec![],
+            },
+            SourceScanResult {
+                name: "source-b".to_string(),
+                agents_found: 2,
+                skills_found: 4,
+                warnings: vec![],
+            },
+        ])
+        .to_string();
+        assert!(out.contains("source-a"));
+        assert!(out.contains("source-b"));
+        assert!(out.contains("2 agent(s)"));
+        assert!(out.contains("4 skill(s)"));
+    }
 
     // --- is_stale_at ---
 

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use std::fmt::Write as _;
+use std::fmt::{self, Write as _};
 use std::path::{Path, PathBuf};
 
 use crate::checksum;
@@ -25,6 +25,33 @@ pub struct DiffOutput {
     pub source_name: String,
     pub diff_text: Option<String>,
     pub analysis: Option<String>,
+}
+
+impl fmt::Display for DiffOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_up_to_date {
+            return writeln!(f, "{} is up to date with source.", self.artifact_name);
+        }
+
+        let installed_ver = self.installed_version.as_deref().unwrap_or("unversioned");
+        let source_ver = self.source_version.as_deref().unwrap_or("unversioned");
+
+        writeln!(f, "Comparing {} ({})", self.artifact_name, self.kind)?;
+        writeln!(f, "  Installed: {installed_ver}")?;
+        writeln!(f, "  Source ({}): {source_ver}", self.source_name)?;
+        writeln!(f)?;
+
+        if let Some(analysis) = &self.analysis {
+            writeln!(f, "Analyzing differences...")?;
+            writeln!(f)?;
+            writeln!(f, "{analysis}")?;
+        } else if let Some(diff) = &self.diff_text {
+            writeln!(f, "Differences:")?;
+            writeln!(f, "{diff}")?;
+        }
+
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------

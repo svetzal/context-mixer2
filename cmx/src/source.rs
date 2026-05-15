@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use std::collections::HashMap;
+use std::fmt;
 use std::path::PathBuf;
 
 use crate::config;
@@ -8,7 +9,7 @@ use crate::gateway::{DirEntry, Filesystem};
 use crate::scan;
 use crate::source_iter;
 use crate::source_update;
-use crate::types::{Artifact, ArtifactKind, SourceEntry, SourceType};
+use crate::types::{Artifact, ArtifactKind, SourceEntry, SourceType, format_version_prefix};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -55,6 +56,75 @@ pub struct SourceBrowseResult {
 pub struct SourceRemoveResult {
     pub name: String,
     pub clone_deleted: bool,
+}
+
+impl fmt::Display for SourceListResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.entries.is_empty() {
+            return write!(
+                f,
+                "No sources registered.\n\nAdd one with: cmx source add <name> <path-or-url>\n"
+            );
+        }
+        for entry in &self.entries {
+            writeln!(f, "  {:<28} ({}) {}", entry.name, entry.kind, entry.location)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for SourceBrowseResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = &self.source_name;
+        if self.agents.is_empty() && self.skills.is_empty() {
+            return writeln!(f, "No agents or skills found in '{name}'.");
+        }
+        if !self.agents.is_empty() {
+            writeln!(f, "Agents:")?;
+            for a in &self.agents {
+                let v = format_version_prefix(a.version.as_deref());
+                writeln!(f, "  {}{v}{}", a.name, a.deprecation_display)?;
+            }
+        }
+        if !self.skills.is_empty() {
+            if !self.agents.is_empty() {
+                writeln!(f)?;
+            }
+            writeln!(f, "Skills:")?;
+            for s in &self.skills {
+                let v = format_version_prefix(s.version.as_deref());
+                writeln!(f, "  {}{v}{}", s.name, s.deprecation_display)?;
+                for file in &s.files {
+                    writeln!(f, "    {file}")?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for SourceScanResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "Source '{}' registered: {} agent(s), {} skill(s) found.",
+            self.name, self.agents_found, self.skills_found
+        )?;
+        for warning in &self.warnings {
+            writeln!(f, "Warning: {}", warning.message)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for SourceRemoveResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.clone_deleted {
+            writeln!(f, "Source '{}' removed (cloned repo deleted).", self.name)
+        } else {
+            writeln!(f, "Source '{}' removed.", self.name)
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -348,6 +418,7 @@ mod tests {
     use super::*;
     use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::scan::ScanWarning;
     use crate::test_support::{
         TestContext, make_ctx, make_git_entry, make_local_entry, setup_empty_sources,
         setup_sources_from_entries, test_paths,
@@ -356,6 +427,159 @@ mod tests {
     use chrono::Utc;
     use std::cell::RefCell;
     use std::path::PathBuf;
+
+    // --- Display for SourceListResult ---
+
+    #[test]
+    fn source_list_result_display_empty() {
+        let result = SourceListResult { entries: vec![] };
+        let out = result.to_string();
+        assert!(out.contains("No sources registered."));
+        assert!(out.contains("cmx source add"));
+    }
+
+    #[test]
+    fn source_list_result_display_with_entries() {
+        let result = SourceListResult {
+            entries: vec![SourceListEntry {
+                name: "guidelines".to_string(),
+                kind: "local",
+                location: "/home/user/repos/guidelines".to_string(),
+            }],
+        };
+        let out = result.to_string();
+        assert!(out.contains("guidelines"));
+        assert!(out.contains("local"));
+        assert!(out.contains("/home/user/repos/guidelines"));
+    }
+
+    // --- Display for SourceBrowseResult ---
+
+    #[test]
+    fn source_browse_result_display_empty() {
+        let result = SourceBrowseResult {
+            source_name: "my-source".to_string(),
+            agents: vec![],
+            skills: vec![],
+        };
+        let out = result.to_string();
+        assert!(out.contains("No agents or skills found in 'my-source'"));
+    }
+
+    #[test]
+    fn source_browse_result_display_agents_only() {
+        let result = SourceBrowseResult {
+            source_name: "my-source".to_string(),
+            agents: vec![BrowseArtifact {
+                name: "rust-craftsperson".to_string(),
+                version: Some("1.0.0".to_string()),
+                deprecation_display: String::new(),
+            }],
+            skills: vec![],
+        };
+        let out = result.to_string();
+        assert!(out.contains("Agents:"));
+        assert!(out.contains("rust-craftsperson"));
+        assert!(out.contains("v1.0.0"));
+        assert!(!out.contains("Skills:"));
+    }
+
+    #[test]
+    fn source_browse_result_display_skills_only() {
+        let result = SourceBrowseResult {
+            source_name: "my-source".to_string(),
+            agents: vec![],
+            skills: vec![BrowseSkill {
+                name: "my-skill".to_string(),
+                version: None,
+                deprecation_display: String::new(),
+                files: vec!["tool.md".to_string()],
+            }],
+        };
+        let out = result.to_string();
+        assert!(!out.contains("Agents:"));
+        assert!(out.contains("Skills:"));
+        assert!(out.contains("my-skill"));
+        assert!(out.contains("tool.md"));
+    }
+
+    #[test]
+    fn source_browse_result_display_agents_and_skills() {
+        let result = SourceBrowseResult {
+            source_name: "my-source".to_string(),
+            agents: vec![BrowseArtifact {
+                name: "my-agent".to_string(),
+                version: None,
+                deprecation_display: String::new(),
+            }],
+            skills: vec![BrowseSkill {
+                name: "my-skill".to_string(),
+                version: Some("2.0.0".to_string()),
+                deprecation_display: String::new(),
+                files: vec![],
+            }],
+        };
+        let out = result.to_string();
+        assert!(out.contains("Agents:"));
+        assert!(out.contains("my-agent"));
+        assert!(out.contains("Skills:"));
+        assert!(out.contains("my-skill"));
+        assert!(out.contains("v2.0.0"));
+    }
+
+    // --- Display for SourceScanResult ---
+
+    #[test]
+    fn source_scan_result_display_no_warnings() {
+        let result = SourceScanResult {
+            name: "my-source".to_string(),
+            agents_found: 3,
+            skills_found: 1,
+            warnings: vec![],
+        };
+        let out = result.to_string();
+        assert!(out.contains("my-source"));
+        assert!(out.contains("3 agent(s)"));
+        assert!(!out.contains("Warning:"));
+    }
+
+    #[test]
+    fn source_scan_result_display_with_warnings() {
+        let result = SourceScanResult {
+            name: "my-source".to_string(),
+            agents_found: 0,
+            skills_found: 0,
+            warnings: vec![ScanWarning {
+                message: "something fishy".to_string(),
+            }],
+        };
+        let out = result.to_string();
+        assert!(out.contains("Warning: something fishy"));
+    }
+
+    // --- Display for SourceRemoveResult ---
+
+    #[test]
+    fn source_remove_result_display_with_clone_deleted() {
+        let result = SourceRemoveResult {
+            name: "git-source".to_string(),
+            clone_deleted: true,
+        };
+        let out = result.to_string();
+        assert!(out.contains("git-source"));
+        assert!(out.contains("cloned repo deleted"));
+    }
+
+    #[test]
+    fn source_remove_result_display_without_clone() {
+        let result = SourceRemoveResult {
+            name: "local-source".to_string(),
+            clone_deleted: false,
+        };
+        let out = result.to_string();
+        assert!(out.contains("local-source"));
+        assert!(!out.contains("cloned repo deleted"));
+    }
 
     // --- looks_like_url ---
 

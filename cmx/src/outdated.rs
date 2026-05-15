@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::fmt;
 
 use crate::checksum;
 use crate::config;
@@ -8,6 +9,7 @@ use crate::context::{AppContext, LoadedState};
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
 use crate::source_update;
+use crate::table::Table;
 use crate::types::{ArtifactKind, InstallScope, LockFile, display_version};
 
 // ---------------------------------------------------------------------------
@@ -23,11 +25,44 @@ pub struct OutdatedRow {
     pub status: String,
 }
 
+pub struct OutdatedReport(pub Vec<OutdatedRow>);
+
+impl fmt::Display for OutdatedReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let rows = &self.0;
+        if rows.is_empty() {
+            return writeln!(f, "Everything is up to date.");
+        }
+        write!(
+            f,
+            "{}",
+            Table {
+                headers: vec!["Name", "Type", "Installed", "Available", "Source", "Status"],
+                padded_cols: 6,
+                rows: rows
+                    .iter()
+                    .map(|r| {
+                        vec![
+                            r.name.clone(),
+                            r.kind.to_string(),
+                            r.installed_version.clone(),
+                            r.available_version.clone(),
+                            r.source.clone(),
+                            r.status.clone(),
+                        ]
+                    })
+                    .collect(),
+            }
+            .render()
+        )
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
+pub fn outdated_with(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
     source_update::ensure_fresh(ctx)?;
 
     let loaded = LoadedState::load(ctx)?;
@@ -45,7 +80,7 @@ pub fn outdated_with(ctx: &AppContext<'_>) -> Result<Vec<OutdatedRow>> {
     let mut seen = BTreeSet::new();
     rows.retain(|r| seen.insert((r.name.clone(), r.source.clone())));
 
-    Ok(rows)
+    Ok(OutdatedReport(rows))
 }
 
 // ---------------------------------------------------------------------------
@@ -202,6 +237,30 @@ mod tests {
     };
     use crate::types::{ArtifactKind, InstallScope, InstalledArtifact, LockFile};
     use std::collections::{BTreeMap, HashMap};
+
+    // --- Display for OutdatedReport ---
+
+    #[test]
+    fn outdated_report_display_empty() {
+        let report = OutdatedReport(vec![]);
+        assert_eq!(report.to_string(), "Everything is up to date.\n");
+    }
+
+    #[test]
+    fn outdated_report_display_with_rows() {
+        let report = OutdatedReport(vec![OutdatedRow {
+            name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            installed_version: "1.0.0".to_string(),
+            available_version: "2.0.0".to_string(),
+            source: "guidelines".to_string(),
+            status: "update".to_string(),
+        }]);
+        let out = report.to_string();
+        assert!(out.contains("my-agent"));
+        assert!(out.contains("1.0.0"));
+        assert!(out.contains("2.0.0"));
+    }
 
     // --- compare_versions (pure, no gateway fakes needed) ---
 
@@ -404,13 +463,13 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let rows = outdated_with(&ctx).unwrap();
+        let report = outdated_with(&ctx).unwrap();
 
-        assert_eq!(rows.len(), 1, "expected one outdated artifact");
-        assert_eq!(rows[0].name, "my-agent");
-        assert_eq!(rows[0].installed_version, "1.0.0");
-        assert_eq!(rows[0].available_version, "2.0.0");
-        assert_eq!(rows[0].source, "guidelines");
+        assert_eq!(report.0.len(), 1, "expected one outdated artifact");
+        assert_eq!(report.0[0].name, "my-agent");
+        assert_eq!(report.0[0].installed_version, "1.0.0");
+        assert_eq!(report.0[0].available_version, "2.0.0");
+        assert_eq!(report.0[0].source, "guidelines");
     }
 
     #[test]
@@ -421,9 +480,9 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let rows = outdated_with(&ctx).unwrap();
+        let report = outdated_with(&ctx).unwrap();
 
-        assert!(rows.is_empty(), "expected no rows when everything is up to date");
+        assert!(report.0.is_empty(), "expected no rows when everything is up to date");
     }
 
     #[test]
@@ -461,12 +520,12 @@ mod tests {
         .unwrap();
 
         let ctx = t.ctx();
-        let rows = outdated_with(&ctx).unwrap();
+        let report = outdated_with(&ctx).unwrap();
 
-        assert_eq!(rows.len(), 1, "untracked artifact should appear");
-        assert_eq!(rows[0].name, "my-agent");
-        assert_eq!(rows[0].installed_version, "-");
-        assert_eq!(rows[0].status, "untracked");
+        assert_eq!(report.0.len(), 1, "untracked artifact should appear");
+        assert_eq!(report.0[0].name, "my-agent");
+        assert_eq!(report.0[0].installed_version, "-");
+        assert_eq!(report.0[0].status, "untracked");
     }
 
     #[test]
@@ -505,13 +564,13 @@ mod tests {
         save_lock_with_entry(&t.fs, &t.paths, "my-agent", entry, InstallScope::Global);
 
         let ctx = t.ctx();
-        let rows = outdated_with(&ctx).unwrap();
+        let report = outdated_with(&ctx).unwrap();
 
-        assert_eq!(rows.len(), 1);
+        assert_eq!(report.0.len(), 1);
         assert!(
-            rows[0].status.contains("modified"),
+            report.0[0].status.contains("modified"),
             "status should contain 'modified': {}",
-            rows[0].status
+            report.0[0].status
         );
     }
 
@@ -560,16 +619,16 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let rows = outdated_with(&ctx).unwrap();
+        let report = outdated_with(&ctx).unwrap();
 
-        assert_eq!(rows.len(), 2, "should show outdated row for each source");
+        assert_eq!(report.0.len(), 2, "should show outdated row for each source");
 
-        let source_names: Vec<&str> = rows.iter().map(|r| r.source.as_str()).collect();
+        let source_names: Vec<&str> = report.0.iter().map(|r| r.source.as_str()).collect();
         assert!(source_names.contains(&"guidelines"));
         assert!(source_names.contains(&"marketplace"));
 
-        let guidelines_row = rows.iter().find(|r| r.source == "guidelines").unwrap();
-        let marketplace_row = rows.iter().find(|r| r.source == "marketplace").unwrap();
+        let guidelines_row = report.0.iter().find(|r| r.source == "guidelines").unwrap();
+        let marketplace_row = report.0.iter().find(|r| r.source == "marketplace").unwrap();
         assert_eq!(guidelines_row.available_version, "2.0.0");
         assert_eq!(marketplace_row.available_version, "3.0.0");
     }

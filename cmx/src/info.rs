@@ -1,4 +1,5 @@
 use anyhow::{Result, bail};
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use crate::checksum;
@@ -37,6 +38,66 @@ pub struct SkillFileEntry {
     pub name: String,
     pub is_dir: bool,
     pub indent_level: usize,
+}
+
+impl fmt::Display for ArtifactInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Name:        {}", self.name)?;
+        writeln!(f, "Type:        {}", self.kind)?;
+        writeln!(f, "Scope:       {}", self.scope)?;
+        writeln!(f, "Path:        {}", self.path.display())?;
+
+        if let Some(v) = &self.version {
+            writeln!(f, "Version:     {v}")?;
+        }
+        if let Some(at) = &self.installed_at {
+            writeln!(f, "Installed:   {at}")?;
+        }
+        if let Some(src) = &self.source_display {
+            writeln!(f, "Source:      {src}")?;
+        }
+        if let Some(cs) = &self.source_checksum {
+            writeln!(f, "Source SHA:  {cs}")?;
+        }
+        if let Some(cs) = &self.installed_checksum {
+            writeln!(f, "Install SHA: {cs}")?;
+        }
+        if self.locally_modified {
+            let disk_cs = self.disk_checksum.as_deref().unwrap_or("unknown");
+            writeln!(f, "Disk SHA:    {disk_cs}  (locally modified)")?;
+        }
+        if self.untracked {
+            writeln!(f, "Lock entry:  (none — untracked)")?;
+        }
+
+        if let Some(dep) = &self.deprecation {
+            writeln!(f, "Status:      DEPRECATED")?;
+            if let Some(reason) = &dep.reason {
+                writeln!(f, "  Reason:    {reason}")?;
+            }
+            if let Some(repl) = &dep.replacement {
+                writeln!(f, "  Replace:   {repl}")?;
+            }
+        }
+        if let Some(v) = &self.available_version {
+            writeln!(f, "Available:   v{v} (update available)")?;
+        }
+
+        if !self.skill_files.is_empty() {
+            writeln!(f)?;
+            writeln!(f, "Files:")?;
+            for entry in &self.skill_files {
+                let indent = "  ".repeat(entry.indent_level + 1);
+                if entry.is_dir {
+                    writeln!(f, "{indent}{}/", entry.name)?;
+                } else {
+                    writeln!(f, "{indent}{}", entry.name)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +244,116 @@ mod tests {
     };
     use crate::types::{ArtifactKind, Deprecation, InstallScope, LockFile};
     use std::collections::BTreeMap;
+
+    fn minimal_info(name: &str, kind: ArtifactKind) -> ArtifactInfo {
+        ArtifactInfo {
+            name: name.to_string(),
+            kind,
+            scope: "global",
+            path: PathBuf::from(format!("{name}.md")),
+            version: None,
+            installed_at: None,
+            source_display: None,
+            source_checksum: None,
+            installed_checksum: None,
+            disk_checksum: None,
+            locally_modified: false,
+            untracked: false,
+            deprecation: None,
+            available_version: None,
+            skill_files: vec![],
+        }
+    }
+
+    // --- Display for ArtifactInfo ---
+
+    #[test]
+    fn artifact_info_display_basic_fields() {
+        let info = minimal_info("my-agent", ArtifactKind::Agent);
+        let out = info.to_string();
+        assert!(out.contains("Name:        my-agent"));
+        assert!(out.contains("Type:        agent"));
+        assert!(out.contains("Scope:       global"));
+    }
+
+    #[test]
+    fn artifact_info_display_with_version_and_source() {
+        let mut info = minimal_info("my-agent", ArtifactKind::Agent);
+        info.version = Some("1.2.3".to_string());
+        info.installed_at = Some("2024-01-01T00:00:00Z".to_string());
+        info.source_display = Some("guidelines".to_string());
+        let out = info.to_string();
+        assert!(out.contains("Version:     1.2.3"));
+        assert!(out.contains("Installed:   2024-01-01T00:00:00Z"));
+        assert!(out.contains("Source:      guidelines"));
+    }
+
+    #[test]
+    fn artifact_info_display_locally_modified() {
+        let mut info = minimal_info("my-agent", ArtifactKind::Agent);
+        info.locally_modified = true;
+        info.disk_checksum = Some("sha256:abcdef".to_string());
+        let out = info.to_string();
+        assert!(out.contains("locally modified"));
+        assert!(out.contains("sha256:abcdef"));
+    }
+
+    #[test]
+    fn artifact_info_display_untracked() {
+        let mut info = minimal_info("my-agent", ArtifactKind::Agent);
+        info.untracked = true;
+        let out = info.to_string();
+        assert!(out.contains("untracked"));
+    }
+
+    #[test]
+    fn artifact_info_display_deprecated_with_reason_and_replacement() {
+        let mut info = minimal_info("old-agent", ArtifactKind::Agent);
+        info.deprecation = Some(Deprecation {
+            reason: Some("Too old".to_string()),
+            replacement: Some("new-agent".to_string()),
+        });
+        let out = info.to_string();
+        assert!(out.contains("DEPRECATED"));
+        assert!(out.contains("Too old"));
+        assert!(out.contains("new-agent"));
+    }
+
+    #[test]
+    fn artifact_info_display_with_available_version() {
+        let mut info = minimal_info("my-agent", ArtifactKind::Agent);
+        info.available_version = Some("2.0.0".to_string());
+        let out = info.to_string();
+        assert!(out.contains("v2.0.0"));
+        assert!(out.contains("update available"));
+    }
+
+    #[test]
+    fn artifact_info_display_with_skill_files() {
+        let mut info = minimal_info("my-skill", ArtifactKind::Skill);
+        info.skill_files = vec![
+            SkillFileEntry {
+                name: "SKILL.md".to_string(),
+                is_dir: false,
+                indent_level: 0,
+            },
+            SkillFileEntry {
+                name: "tools".to_string(),
+                is_dir: true,
+                indent_level: 0,
+            },
+            SkillFileEntry {
+                name: "helper.py".to_string(),
+                is_dir: false,
+                indent_level: 1,
+            },
+        ];
+        let out = info.to_string();
+        assert!(out.contains("Files:"));
+        assert!(out.contains("SKILL.md"));
+        assert!(out.contains("tools/"));
+        assert!(out.contains("helper.py"));
+    }
 
     fn write_lock_entry(
         fs: &FakeFilesystem,

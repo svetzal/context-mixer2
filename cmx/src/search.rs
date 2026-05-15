@@ -1,8 +1,10 @@
 use anyhow::Result;
+use std::fmt;
 
 use crate::context::AppContext;
 use crate::source_iter;
 use crate::source_update;
+use crate::table::Table;
 use crate::types::display_version;
 
 // ---------------------------------------------------------------------------
@@ -20,6 +22,37 @@ pub struct SearchResult {
 pub struct SearchOutput {
     pub results: Vec<SearchResult>,
     pub query: String,
+}
+
+impl fmt::Display for SearchOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let query = &self.query;
+        let results = &self.results;
+
+        if results.is_empty() {
+            return writeln!(f, "No results for '{query}'.");
+        }
+
+        let table = Table {
+            headers: vec!["Name", "Type", "Version", "Source", "Description"],
+            padded_cols: 4,
+            rows: results
+                .iter()
+                .map(|r| {
+                    vec![
+                        r.name.clone(),
+                        r.kind.clone(),
+                        r.version.clone(),
+                        r.source.clone(),
+                        r.description.clone(),
+                    ]
+                })
+                .collect(),
+        }
+        .render();
+
+        write!(f, "{table}\n{} result(s) found.\n", results.len())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +118,34 @@ fn truncate_description(desc: &str, max_len: usize) -> String {
 mod tests {
     use super::*;
     use crate::test_support::{TestContext, setup_source_with_agent};
+
+    // --- Display for SearchOutput ---
+
+    #[test]
+    fn search_output_display_empty() {
+        let output = SearchOutput {
+            query: "foo".to_string(),
+            results: vec![],
+        };
+        assert_eq!(output.to_string(), "No results for 'foo'.\n");
+    }
+
+    #[test]
+    fn search_output_display_with_data() {
+        let output = SearchOutput {
+            query: "rust".to_string(),
+            results: vec![SearchResult {
+                name: "rust-craftsperson".to_string(),
+                kind: "agent".to_string(),
+                version: "1.0.0".to_string(),
+                source: "guidelines".to_string(),
+                description: "Rust expert".to_string(),
+            }],
+        };
+        let out = output.to_string();
+        assert!(out.contains("rust-craftsperson"));
+        assert!(out.contains("1 result(s) found."));
+    }
 
     // --- truncate_description ---
 

@@ -1,4 +1,5 @@
 use anyhow::{Result, bail};
+use std::fmt;
 
 use crate::context::AppContext;
 use crate::lockfile;
@@ -13,6 +14,16 @@ pub struct UninstallResult {
     pub kind: ArtifactKind,
     pub scope: &'static str,
     pub was_tracked: bool,
+}
+
+impl fmt::Display for UninstallResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Uninstalled {} ({}) from {} scope.", self.name, self.kind, self.scope)?;
+        if !self.was_tracked {
+            writeln!(f, "  (no lock file entry found — artifact was untracked)")?;
+        }
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +71,33 @@ mod tests {
     use crate::test_support::{TestContext, make_ctx, sample_lock_entry, test_paths_for};
     use crate::types::{ArtifactKind, InstallScope, LockFile};
     use std::collections::BTreeMap;
+
+    // --- Display for UninstallResult ---
+
+    #[test]
+    fn uninstall_result_display_tracked() {
+        let result = UninstallResult {
+            name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            scope: "global",
+            was_tracked: true,
+        };
+        let out = result.to_string();
+        assert!(out.contains("Uninstalled my-agent"));
+        assert!(!out.contains("untracked"));
+    }
+
+    #[test]
+    fn uninstall_result_display_untracked() {
+        let result = UninstallResult {
+            name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            scope: "global",
+            was_tracked: false,
+        };
+        let out = result.to_string();
+        assert!(out.contains("untracked"));
+    }
 
     #[test]
     fn uninstall_bails_when_agent_not_installed() {

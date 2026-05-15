@@ -1,4 +1,5 @@
 /// Shared validation types used across plugin, marketplace, and facet validation.
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IssueLevel {
@@ -31,6 +32,36 @@ impl ValidationIssue {
     }
 }
 
+pub struct ValidationReport(pub Vec<ValidationIssue>);
+
+impl fmt::Display for ValidationReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let issues = &self.0;
+        if issues.is_empty() {
+            return writeln!(f, "All plugins valid.");
+        }
+
+        let errors: Vec<_> = issues.iter().filter(|i| i.level == IssueLevel::Error).collect();
+        let warnings: Vec<_> = issues.iter().filter(|i| i.level == IssueLevel::Warning).collect();
+
+        if !errors.is_empty() {
+            writeln!(f, "Errors:")?;
+            for issue in &errors {
+                writeln!(f, "  {}: {}", issue.context, issue.message)?;
+            }
+        }
+
+        if !warnings.is_empty() {
+            writeln!(f, "Warnings:")?;
+            for issue in &warnings {
+                writeln!(f, "  {}: {}", issue.context, issue.message)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40,5 +71,48 @@ mod tests {
         assert_eq!(IssueLevel::Error, IssueLevel::Error);
         assert_eq!(IssueLevel::Warning, IssueLevel::Warning);
         assert_ne!(IssueLevel::Error, IssueLevel::Warning);
+    }
+
+    // --- Display for ValidationReport ---
+
+    #[test]
+    fn validation_report_display_empty() {
+        let out = ValidationReport(vec![]).to_string();
+        assert_eq!(out, "All plugins valid.\n");
+    }
+
+    #[test]
+    fn validation_report_display_errors_only() {
+        let issues = vec![ValidationIssue::error(
+            "plugin/alpha",
+            "Missing description",
+        )];
+        let out = ValidationReport(issues).to_string();
+        assert!(out.contains("Errors:"));
+        assert!(out.contains("plugin/alpha"));
+        assert!(out.contains("Missing description"));
+        assert!(!out.contains("Warnings:"));
+    }
+
+    #[test]
+    fn validation_report_display_warnings_only() {
+        let issues = vec![ValidationIssue::warning(
+            "plugin/beta",
+            "Version not semver",
+        )];
+        let out = ValidationReport(issues).to_string();
+        assert!(out.contains("Warnings:"));
+        assert!(!out.contains("Errors:"));
+    }
+
+    #[test]
+    fn validation_report_display_both() {
+        let issues = vec![
+            ValidationIssue::error("plugin/alpha", "Missing description"),
+            ValidationIssue::warning("plugin/beta", "Version not semver"),
+        ];
+        let out = ValidationReport(issues).to_string();
+        assert!(out.contains("Errors:"));
+        assert!(out.contains("Warnings:"));
     }
 }

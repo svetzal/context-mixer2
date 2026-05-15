@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail};
+use std::fmt;
 use std::path::PathBuf;
 
 use crate::checksum;
@@ -8,7 +9,9 @@ use crate::lockfile;
 use crate::paths::ConfigPaths;
 use crate::source_iter;
 use crate::source_update;
-use crate::types::{self, ArtifactKind, InstallScope, LockEntry, LockSource};
+use crate::types::{
+    self, ArtifactKind, InstallScope, LockEntry, LockSource, format_version_prefix,
+};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -23,10 +26,42 @@ pub struct InstallResult {
     pub dest_dir: PathBuf,
 }
 
+impl fmt::Display for InstallResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let version_info = format_version_prefix(self.version.as_deref());
+        writeln!(
+            f,
+            "Installed {}{version_info} ({}) from '{}' -> {}",
+            self.artifact_name,
+            self.kind,
+            self.source_name,
+            self.dest_dir.display()
+        )
+    }
+}
+
 #[derive(Debug)]
 pub struct BatchInstallResult {
     pub items: Vec<InstallResult>,
     pub kind: ArtifactKind,
+    pub is_update: bool,
+}
+
+impl fmt::Display for BatchInstallResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.items.is_empty() {
+            if self.is_update {
+                writeln!(f, "All tracked {}s are up to date.", self.kind)
+            } else {
+                writeln!(f, "All available {}s are already installed and up to date.", self.kind)
+            }
+        } else {
+            for item in &self.items {
+                write!(f, "{item}")?;
+            }
+            Ok(())
+        }
+    }
 }
 
 /// Pure description of an intended installation — computed from source metadata
@@ -169,6 +204,7 @@ pub fn install_all_with(
     Ok(BatchInstallResult {
         items: installed,
         kind,
+        is_update: false,
     })
 }
 
@@ -204,6 +240,7 @@ pub fn update_all_with(
     Ok(BatchInstallResult {
         items: updated,
         kind,
+        is_update: true,
     })
 }
 
@@ -273,6 +310,99 @@ mod tests {
     use super::*;
     use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+
+    // --- Display for InstallResult ---
+
+    #[test]
+    fn install_result_display_with_version() {
+        let result = InstallResult {
+            artifact_name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            source_name: "guidelines".to_string(),
+            dest_dir: PathBuf::from("/home/user/.config/cmx/agents"),
+            version: Some("1.0.0".to_string()),
+        };
+        let out = result.to_string();
+        assert!(out.contains("my-agent"));
+        assert!(out.contains("v1.0.0"));
+        assert!(out.contains("guidelines"));
+    }
+
+    #[test]
+    fn install_result_display_without_version() {
+        let result = InstallResult {
+            artifact_name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            source_name: "guidelines".to_string(),
+            dest_dir: PathBuf::from("/home/user/.config/cmx/agents"),
+            version: None,
+        };
+        let out = result.to_string();
+        assert!(!out.contains(" v"));
+    }
+
+    // --- Display for BatchInstallResult (install mode) ---
+
+    #[test]
+    fn batch_install_result_display_empty_install_mode() {
+        let result = BatchInstallResult {
+            items: vec![],
+            kind: ArtifactKind::Agent,
+            is_update: false,
+        };
+        let out = result.to_string();
+        assert!(out.contains("already installed and up to date"));
+        assert!(out.contains("agent"));
+    }
+
+    #[test]
+    fn batch_install_result_display_with_items() {
+        let result = BatchInstallResult {
+            items: vec![InstallResult {
+                artifact_name: "my-agent".to_string(),
+                kind: ArtifactKind::Agent,
+                source_name: "guidelines".to_string(),
+                dest_dir: PathBuf::from("/home/user/.config/cmx/agents"),
+                version: Some("1.0.0".to_string()),
+            }],
+            kind: ArtifactKind::Agent,
+            is_update: false,
+        };
+        let out = result.to_string();
+        assert!(out.contains("my-agent"));
+        assert!(out.contains("guidelines"));
+    }
+
+    // --- Display for BatchInstallResult (update mode) ---
+
+    #[test]
+    fn batch_install_result_display_empty_update_mode() {
+        let result = BatchInstallResult {
+            items: vec![],
+            kind: ArtifactKind::Skill,
+            is_update: true,
+        };
+        let out = result.to_string();
+        assert!(out.contains("up to date"));
+        assert!(out.contains("skill"));
+    }
+
+    #[test]
+    fn batch_install_result_display_update_with_items() {
+        let result = BatchInstallResult {
+            items: vec![InstallResult {
+                artifact_name: "my-skill".to_string(),
+                kind: ArtifactKind::Skill,
+                source_name: "guidelines".to_string(),
+                dest_dir: PathBuf::from("/home/user/.config/cmx/skills"),
+                version: None,
+            }],
+            kind: ArtifactKind::Skill,
+            is_update: true,
+        };
+        let out = result.to_string();
+        assert!(out.contains("my-skill"));
+    }
     use crate::platform::Platform;
     use crate::source_iter::SourceArtifact;
     use crate::test_support::{

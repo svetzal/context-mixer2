@@ -1,4 +1,5 @@
 use anyhow::{Result, bail};
+use std::fmt;
 
 use crate::config;
 use crate::context::AppContext;
@@ -9,9 +10,21 @@ pub struct ConfigShowResult {
     pub model: String,
 }
 
+impl fmt::Display for ConfigShowResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LLM gateway: {}\nLLM model:   {}\n", self.gateway, self.model)
+    }
+}
+
 pub struct ConfigSetResult {
     pub field: &'static str,
     pub value: String,
+}
+
+impl fmt::Display for ConfigSetResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "LLM {} set to: {}", self.field, self.value)
+    }
 }
 
 pub fn show_with(ctx: &AppContext<'_>) -> Result<ConfigShowResult> {
@@ -50,6 +63,39 @@ pub fn set_model_with(value: &str, ctx: &AppContext<'_>) -> Result<ConfigSetResu
 mod tests {
     use super::*;
     use crate::test_support::TestContext;
+
+    // --- Display for ConfigShowResult ---
+
+    #[test]
+    fn config_show_result_display() {
+        let result = ConfigShowResult {
+            gateway: "ollama".to_string(),
+            model: "llama3".to_string(),
+        };
+        let out = result.to_string();
+        assert!(out.contains("LLM gateway: ollama"));
+        assert!(out.contains("LLM model:   llama3"));
+    }
+
+    // --- Display for ConfigSetResult ---
+
+    #[test]
+    fn config_set_result_display_gateway() {
+        let result = ConfigSetResult {
+            field: "gateway",
+            value: "ollama".to_string(),
+        };
+        assert_eq!(result.to_string(), "LLM gateway set to: ollama\n");
+    }
+
+    #[test]
+    fn config_set_result_display_model() {
+        let result = ConfigSetResult {
+            field: "model",
+            value: "gemma2".to_string(),
+        };
+        assert_eq!(result.to_string(), "LLM model set to: gemma2\n");
+    }
 
     #[test]
     fn show_returns_defaults_when_no_config_file() {

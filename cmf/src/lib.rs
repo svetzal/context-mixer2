@@ -1,4 +1,3 @@
-pub mod display;
 pub mod facet;
 pub mod facet_types;
 pub mod manifest;
