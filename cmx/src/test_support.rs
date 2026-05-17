@@ -141,7 +141,7 @@ pub(crate) fn save_lock_with_entry(
         version: 1,
         packages,
     };
-    crate::lockfile::save_with(&lock, scope, fs, paths).unwrap();
+    crate::lockfile::save(&lock, scope, fs, paths).unwrap();
 }
 
 #[cfg(test)]

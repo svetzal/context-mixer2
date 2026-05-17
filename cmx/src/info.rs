@@ -104,11 +104,11 @@ impl fmt::Display for ArtifactInfo {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-pub fn info_with(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
+pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
     // Search both kinds, global then local for each
     for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
         if let Some((path, scope)) = config::find_installed_path(name, kind, ctx.fs, ctx.paths) {
-            return gather_info_with(name, kind, scope, &path, ctx);
+            return gather_info(name, kind, scope, &path, ctx);
         }
     }
 
@@ -119,14 +119,14 @@ pub fn info_with(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
 // Gather (pure logic, no println!)
 // ---------------------------------------------------------------------------
 
-pub(crate) fn gather_info_with(
+pub(crate) fn gather_info(
     name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
     path: &Path,
     ctx: &AppContext<'_>,
 ) -> Result<ArtifactInfo> {
-    let lock = lockfile::load_with(scope, ctx.fs, ctx.paths)?;
+    let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
     let installed = config::installed_single_with_lock_data(name, &lock, kind);
     let lock_entry = installed.as_ref().and_then(|ia| ia.lock_entry);
 
@@ -390,7 +390,7 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let result = info_with("my-agent", &ctx);
+        let result = info("my-agent", &ctx);
 
         assert!(result.is_ok(), "expected Ok for global agent: {:?}", result.err());
     }
@@ -410,7 +410,7 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let result = info_with("my-agent", &ctx);
+        let result = info("my-agent", &ctx);
 
         assert!(result.is_ok(), "expected Ok for local agent: {:?}", result.err());
     }
@@ -422,7 +422,7 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let result = info_with("nonexistent-agent", &ctx);
+        let result = info("nonexistent-agent", &ctx);
 
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
@@ -458,9 +458,8 @@ mod tests {
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = t.ctx();
-        let info =
-            gather_info_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
-                .unwrap();
+        let info = gather_info("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+            .unwrap();
 
         assert_eq!(info.name, "my-agent");
         assert_eq!(info.kind, ArtifactKind::Agent);
@@ -485,9 +484,8 @@ mod tests {
         let ctx = t.ctx();
         let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
-        let info =
-            gather_info_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
-                .unwrap();
+        let info = gather_info("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+            .unwrap();
 
         assert!(info.untracked, "expected untracked flag to be set");
         assert!(info.version.is_none());
@@ -526,9 +524,8 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let info =
-            gather_info_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
-                .unwrap();
+        let info = gather_info("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+            .unwrap();
 
         assert!(info.locally_modified, "expected locally_modified to be true");
         assert!(info.disk_checksum.is_some(), "expected disk_checksum to be present");
@@ -553,7 +550,7 @@ mod tests {
         );
 
         // Empty lock file
-        lockfile::save_with(
+        lockfile::save(
             &LockFile {
                 version: 1,
                 packages: BTreeMap::new(),
@@ -565,9 +562,8 @@ mod tests {
         .unwrap();
 
         let ctx = t.ctx();
-        let info =
-            gather_info_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
-                .unwrap();
+        let info = gather_info("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+            .unwrap();
 
         assert!(info.deprecation.is_some(), "expected deprecation to be present");
         let dep = info.deprecation.unwrap();
@@ -611,9 +607,8 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let info =
-            gather_info_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
-                .unwrap();
+        let info = gather_info("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+            .unwrap();
 
         assert_eq!(
             info.available_version.as_deref(),

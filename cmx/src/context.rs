@@ -32,8 +32,8 @@ pub struct LoadedState {
 
 impl LoadedState {
     pub fn load(ctx: &AppContext<'_>) -> Result<Self> {
-        let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
-        let locks = lockfile::load_both_with(ctx.fs, ctx.paths)?;
+        let sources = config::load_sources(ctx.fs, ctx.paths)?;
+        let locks = lockfile::load_both(ctx.fs, ctx.paths)?;
         Ok(Self { sources, locks })
     }
 

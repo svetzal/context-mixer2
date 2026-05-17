@@ -255,15 +255,15 @@ impl ArtifactKind {
     /// counterpart, dispatching to the correct strategy (file diff for agents,
     /// directory diff for skills).
     #[cfg(feature = "llm")]
-    pub fn diff_with(
+    pub fn diff(
         &self,
         installed: &Path,
         source: &Path,
         ctx: &crate::context::AppContext<'_>,
     ) -> anyhow::Result<String> {
         match self {
-            ArtifactKind::Agent => crate::diff::diff_files_with(installed, source, ctx),
-            ArtifactKind::Skill => crate::diff::diff_dirs_with(installed, source, ctx),
+            ArtifactKind::Agent => crate::diff::diff_files(installed, source, ctx),
+            ArtifactKind::Skill => crate::diff::diff_dirs(installed, source, ctx),
         }
     }
 

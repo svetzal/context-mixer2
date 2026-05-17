@@ -58,7 +58,7 @@ impl fmt::Display for DiffOutput {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-pub async fn diff_with(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<DiffOutput> {
+pub async fn diff(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<DiffOutput> {
     gather_diff_with(name, kind, ctx).await
 }
 
@@ -81,8 +81,8 @@ pub(crate) async fn gather_diff_with(
     let (source_path, source_name, source_version) = find_in_sources_with(name, kind, ctx)?;
 
     // Compare checksums
-    let installed_checksum = checksum::checksum_artifact_with(&installed_path, kind, ctx.fs)?;
-    let source_checksum = checksum::checksum_artifact_with(&source_path, kind, ctx.fs)?;
+    let installed_checksum = checksum::checksum_artifact(&installed_path, kind, ctx.fs)?;
+    let source_checksum = checksum::checksum_artifact(&source_path, kind, ctx.fs)?;
 
     if installed_checksum == source_checksum {
         return Ok(DiffOutput {
@@ -98,11 +98,11 @@ pub(crate) async fn gather_diff_with(
     }
 
     // Get installed version from lock file if available
-    let lock = lockfile::load_with(local, ctx.fs, ctx.paths)?;
+    let lock = lockfile::load(local, ctx.fs, ctx.paths)?;
     let installed_version = lock.packages.get(name).and_then(|e| e.version.clone());
 
     // Build diff text
-    let diff_text = kind.diff_with(&installed_path, &source_path, ctx)?;
+    let diff_text = kind.diff(&installed_path, &source_path, ctx)?;
 
     let installed_ver_display = installed_version.as_deref().unwrap_or("unversioned");
     let source_ver_display = source_version.as_deref().unwrap_or("unversioned");
@@ -149,11 +149,7 @@ fn find_in_sources_with(
     bail!("No {kind} named '{name}' found in any registered source.");
 }
 
-pub(crate) fn diff_files_with(
-    installed: &Path,
-    source: &Path,
-    ctx: &AppContext<'_>,
-) -> Result<String> {
+pub(crate) fn diff_files(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Result<String> {
     let installed_content = ctx
         .fs
         .read_to_string(installed)
@@ -168,11 +164,7 @@ pub(crate) fn diff_files_with(
     ))
 }
 
-pub(crate) fn diff_dirs_with(
-    installed: &Path,
-    source: &Path,
-    ctx: &AppContext<'_>,
-) -> Result<String> {
+pub(crate) fn diff_dirs(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Result<String> {
     let mut result = String::new();
 
     let installed_files = collect_relative_files_with(installed, ctx)?;
@@ -277,7 +269,7 @@ mod tests {
         t.fs.add_file("/source/agent.md", "source content");
 
         let ctx = t.ctx();
-        let result = diff_files_with(
+        let result = diff_files(
             std::path::Path::new("/installed/agent.md"),
             std::path::Path::new("/source/agent.md"),
             &ctx,
@@ -300,7 +292,7 @@ mod tests {
         t.fs.add_file("/source/agent.md", "source content");
 
         let ctx = t.ctx();
-        let result = diff_files_with(
+        let result = diff_files(
             std::path::Path::new("/installed/agent.md"),
             std::path::Path::new("/source/agent.md"),
             &ctx,
@@ -320,7 +312,7 @@ mod tests {
         t.fs.add_file("/source/my-skill/SKILL.md", content);
 
         let ctx = t.ctx();
-        let result = diff_dirs_with(
+        let result = diff_dirs(
             std::path::Path::new("/installed/my-skill"),
             std::path::Path::new("/source/my-skill"),
             &ctx,
@@ -339,7 +331,7 @@ mod tests {
         t.fs.add_file("/source/my-skill/SKILL.md", "skill");
 
         let ctx = t.ctx();
-        let result = diff_dirs_with(
+        let result = diff_dirs(
             std::path::Path::new("/installed/my-skill"),
             std::path::Path::new("/source/my-skill"),
             &ctx,
@@ -359,7 +351,7 @@ mod tests {
         t.fs.add_file("/source/my-skill/new-file.md", "new");
 
         let ctx = t.ctx();
-        let result = diff_dirs_with(
+        let result = diff_dirs(
             std::path::Path::new("/installed/my-skill"),
             std::path::Path::new("/source/my-skill"),
             &ctx,
@@ -378,7 +370,7 @@ mod tests {
         t.fs.add_file("/source/my-skill/SKILL.md", "updated skill content");
 
         let ctx = t.ctx();
-        let result = diff_dirs_with(
+        let result = diff_dirs(
             std::path::Path::new("/installed/my-skill"),
             std::path::Path::new("/source/my-skill"),
             &ctx,
@@ -455,7 +447,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
+        let result = diff("my-agent", ArtifactKind::Agent, &ctx).await;
 
         // Same content => checksums match => returns Ok immediately (no LLM needed)
         assert!(result.is_ok(), "expected Ok for up-to-date artifact: {:?}", result.err());
@@ -485,7 +477,7 @@ mod tests {
 
         // No LLM configured — should bail when it tries to analyze
         let ctx = t.ctx();
-        let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
+        let result = diff("my-agent", ArtifactKind::Agent, &ctx).await;
 
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
@@ -524,7 +516,7 @@ mod tests {
             paths: &paths,
             llm: Some(&llm),
         };
-        let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
+        let result = diff("my-agent", ArtifactKind::Agent, &ctx).await;
 
         assert!(result.is_ok(), "expected Ok with LLM configured: {:?}", result.err());
     }
@@ -638,7 +630,7 @@ mod tests {
             paths: &paths,
             llm: Some(&llm),
         };
-        let result = diff_with("my-agent", ArtifactKind::Agent, &ctx).await;
+        let result = diff("my-agent", ArtifactKind::Agent, &ctx).await;
 
         assert!(result.is_err(), "expected Err when LLM call fails");
         let msg = result.unwrap_err().to_string();

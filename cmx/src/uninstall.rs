@@ -30,7 +30,7 @@ impl fmt::Display for UninstallResult {
 // Public API
 // ---------------------------------------------------------------------------
 
-pub fn uninstall_with(
+pub fn uninstall(
     name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
@@ -47,9 +47,8 @@ pub fn uninstall_with(
     kind.remove_installed(&target, ctx.fs)?;
 
     // Remove from lock file
-    let was_tracked = lockfile::mutate_with(scope, ctx.fs, ctx.paths, |lock| {
-        lock.packages.remove(name).is_some()
-    })?;
+    let was_tracked =
+        lockfile::mutate(scope, ctx.fs, ctx.paths, |lock| lock.packages.remove(name).is_some())?;
 
     Ok(UninstallResult {
         name: name.to_string(),
@@ -104,7 +103,7 @@ mod tests {
         let t = TestContext::new();
         let ctx = t.ctx();
 
-        let result = uninstall_with("nonexistent", ArtifactKind::Agent, InstallScope::Global, &ctx);
+        let result = uninstall("nonexistent", ArtifactKind::Agent, InstallScope::Global, &ctx);
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("nonexistent"), "unexpected: {msg}");
@@ -121,7 +120,7 @@ mod tests {
         t.fs.add_file(agent_path.clone(), "# agent");
 
         let ctx = t.ctx();
-        uninstall_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
+        uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
 
         assert!(!t.fs.file_exists(&agent_path), "agent file should be removed");
     }
@@ -136,7 +135,7 @@ mod tests {
         t.fs.add_file(skill_dir.join("tool.py"), "code");
 
         let ctx = t.ctx();
-        uninstall_with("my-skill", ArtifactKind::Skill, InstallScope::Global, &ctx).unwrap();
+        uninstall("my-skill", ArtifactKind::Skill, InstallScope::Global, &ctx).unwrap();
 
         assert!(!t.fs.file_exists(&skill_dir.join("SKILL.md")), "skill dir should be removed");
     }
@@ -158,11 +157,11 @@ mod tests {
             version: 1,
             packages,
         };
-        lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
+        lockfile::save(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let result =
-            uninstall_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
+            uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
 
         // Verify result fields
         assert_eq!(result.name, "my-agent");
@@ -170,7 +169,7 @@ mod tests {
         assert_eq!(result.scope, "global");
         assert!(result.was_tracked, "expected was_tracked to be true");
 
-        let updated_lock = lockfile::load_with(InstallScope::Global, &t.fs, &t.paths).unwrap();
+        let updated_lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert!(!updated_lock.packages.contains_key("my-agent"), "lock entry should be removed");
     }
 
@@ -185,7 +184,7 @@ mod tests {
         t.fs.add_file(agent_path, "# untracked agent");
 
         let ctx = t.ctx();
-        let result = uninstall_with("untracked", ArtifactKind::Agent, InstallScope::Global, &ctx);
+        let result = uninstall("untracked", ArtifactKind::Agent, InstallScope::Global, &ctx);
         assert!(result.is_ok(), "uninstall should succeed even without lock entry");
 
         let result = result.unwrap();
@@ -203,7 +202,7 @@ mod tests {
         t.fs.add_file(agent_path, "# agent");
 
         let ctx = t.ctx();
-        let result = uninstall_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx);
+        let result = uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx);
         assert!(result.is_ok(), "uninstall_with should succeed: {:?}", result.err());
     }
 
@@ -232,7 +231,7 @@ mod tests {
             version: 1,
             packages,
         };
-        crate::lockfile::save_with(&lock, InstallScope::Global, &fs, &paths).unwrap();
+        crate::lockfile::save(&lock, InstallScope::Global, &fs, &paths).unwrap();
 
         // Verify lock file path is Cursor-specific
         let lock_path = paths.lock_path(InstallScope::Global);
@@ -244,13 +243,13 @@ mod tests {
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result =
-            uninstall_with("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
+            uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
 
         assert_eq!(result.name, "my-agent");
         assert!(result.was_tracked);
         assert!(!fs.file_exists(&agent_path), "agent file should be removed from cursor dir");
 
-        let updated_lock = crate::lockfile::load_with(InstallScope::Global, &fs, &paths).unwrap();
+        let updated_lock = crate::lockfile::load(InstallScope::Global, &fs, &paths).unwrap();
         assert!(
             !updated_lock.packages.contains_key("my-agent"),
             "lock entry should be removed from cursor lock"

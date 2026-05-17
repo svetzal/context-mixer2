@@ -24,22 +24,22 @@ fn main() -> Result<()> {
         Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, &ctx),
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, &ctx),
         Commands::List => {
-            let output = cmx::list::list_all_with(&ctx)?;
+            let output = cmx::list::list_all(&ctx)?;
             print!("{output}");
             Ok(())
         }
         Commands::Info { name } => {
-            let info = cmx::info::info_with(&name, &ctx)?;
+            let info = cmx::info::info(&name, &ctx)?;
             print!("{info}");
             Ok(())
         }
         Commands::Outdated => {
-            let report = cmx::outdated::outdated_with(&ctx)?;
+            let report = cmx::outdated::outdated(&ctx)?;
             print!("{report}");
             Ok(())
         }
         Commands::Search { query } => {
-            let output = cmx::search::search_with(&query, &ctx)?;
+            let output = cmx::search::search(&query, &ctx)?;
             print!("{output}");
             Ok(())
         }
@@ -54,27 +54,27 @@ fn handle_source(action: SourceAction, paths: &ConfigPaths, ctx: &AppContext<'_>
                 let clone_dir = paths.git_clones_dir().join(&name);
                 println!("Cloning {path_or_url} to {}...", clone_dir.display());
             }
-            let result = cmx::source::add_with(&name, &path_or_url, ctx)?;
+            let result = cmx::source::add(&name, &path_or_url, ctx)?;
             print!("{result}");
             Ok(())
         }
         SourceAction::List => {
-            let result = cmx::source::list_with(ctx)?;
+            let result = cmx::source::list(ctx)?;
             print!("{result}");
             Ok(())
         }
         SourceAction::Browse { name } => {
-            let result = cmx::source::browse_with(&name, ctx)?;
+            let result = cmx::source::browse(&name, ctx)?;
             print!("{result}");
             Ok(())
         }
         SourceAction::Update { name } => {
-            let output = cmx::source_update::update_with(name.as_deref(), ctx)?;
+            let output = cmx::source_update::update(name.as_deref(), ctx)?;
             print!("{output}");
             Ok(())
         }
         SourceAction::Remove { name } => {
-            let result = cmx::source::remove_with(&name, ctx)?;
+            let result = cmx::source::remove(&name, ctx)?;
             print!("{result}");
             Ok(())
         }
@@ -84,17 +84,17 @@ fn handle_source(action: SourceAction, paths: &ConfigPaths, ctx: &AppContext<'_>
 fn handle_config(action: ConfigAction, ctx: &AppContext<'_>) -> Result<()> {
     match action {
         ConfigAction::Show => {
-            let result = cmx::cmx_config::show_with(ctx)?;
+            let result = cmx::cmx_config::show(ctx)?;
             print!("{result}");
             Ok(())
         }
         ConfigAction::Gateway { value } => {
-            let result = cmx::cmx_config::set_gateway_with(&value, ctx)?;
+            let result = cmx::cmx_config::set_gateway(&value, ctx)?;
             print!("{result}");
             Ok(())
         }
         ConfigAction::Model { value } => {
-            let result = cmx::cmx_config::set_model_with(&value, ctx)?;
+            let result = cmx::cmx_config::set_model(&value, ctx)?;
             print!("{result}");
             Ok(())
         }
@@ -115,11 +115,11 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
                 InstallScope::Global
             };
             if all {
-                let result = cmx::install::install_all_with(kind, scope, force, ctx)?;
+                let result = cmx::install::install_all(kind, scope, force, ctx)?;
                 print!("{result}");
                 Ok(())
             } else if let Some(name) = name {
-                let result = cmx::install::install_with(&name, kind, scope, force, ctx)?;
+                let result = cmx::install::install(&name, kind, scope, force, ctx)?;
                 print!("{result}");
                 Ok(())
             } else {
@@ -127,14 +127,14 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
             }
         }
         ArtifactAction::List => {
-            let output = cmx::list::list_kind_with(kind, ctx)?;
+            let output = cmx::list::list_kind(kind, ctx)?;
             print!("{output}");
             Ok(())
         }
         #[cfg(feature = "llm")]
         ArtifactAction::Diff { name } => {
             use cmx::gateway::real::MojenticLlmClient;
-            let cfg = cmx::config::load_config_with(ctx.fs, ctx.paths)?;
+            let cfg = cmx::config::load_config(ctx.fs, ctx.paths)?;
             let llm = MojenticLlmClient::new(cfg.llm);
             let diff_ctx = AppContext {
                 fs: ctx.fs,
@@ -144,17 +144,17 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
                 llm: Some(&llm),
             };
             let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
-            let output = rt.block_on(cmx::diff::diff_with(&name, kind, &diff_ctx))?;
+            let output = rt.block_on(cmx::diff::diff(&name, kind, &diff_ctx))?;
             print!("{output}");
             Ok(())
         }
         ArtifactAction::Update { name, all, force } => {
             if all {
-                let result = cmx::install::update_all_with(kind, force, ctx)?;
+                let result = cmx::install::update_all(kind, force, ctx)?;
                 print!("{result}");
                 Ok(())
             } else if let Some(name) = name {
-                let result = cmx::install::update_with(&name, kind, force, ctx)?;
+                let result = cmx::install::update(&name, kind, force, ctx)?;
                 print!("{result}");
                 Ok(())
             } else {
@@ -167,7 +167,7 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
             } else {
                 InstallScope::Global
             };
-            let result = cmx::uninstall::uninstall_with(&name, kind, scope, ctx)?;
+            let result = cmx::uninstall::uninstall(&name, kind, scope, ctx)?;
             print!("{result}");
             Ok(())
         }

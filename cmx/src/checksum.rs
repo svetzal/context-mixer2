@@ -11,7 +11,7 @@ use crate::types::{ArtifactKind, LockEntry};
 // ---------------------------------------------------------------------------
 
 /// Compute SHA-256 checksum for an agent (single .md file) via the given filesystem.
-pub fn checksum_file_with(path: &Path, fs: &dyn Filesystem) -> Result<String> {
+pub fn checksum_file(path: &Path, fs: &dyn Filesystem) -> Result<String> {
     let content = fs.read(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let hash = Sha256::digest(&content);
     Ok(format!("sha256:{}", hex_encode(&hash)))
@@ -19,7 +19,7 @@ pub fn checksum_file_with(path: &Path, fs: &dyn Filesystem) -> Result<String> {
 
 /// Compute SHA-256 checksum for a skill (directory) via the given filesystem.
 /// Hashes all files in sorted order for determinism.
-pub fn checksum_dir_with(path: &Path, fs: &dyn Filesystem) -> Result<String> {
+pub fn checksum_dir(path: &Path, fs: &dyn Filesystem) -> Result<String> {
     let mut hasher = Sha256::new();
     let mut files = fs_util::collect_files_recursive(path, fs)?;
     files.sort();
@@ -38,14 +38,10 @@ pub fn checksum_dir_with(path: &Path, fs: &dyn Filesystem) -> Result<String> {
 
 /// Compute the checksum for an artifact, dispatching to the correct strategy
 /// based on its kind: file checksum for agents, directory checksum for skills.
-pub fn checksum_artifact_with(
-    path: &Path,
-    kind: ArtifactKind,
-    fs: &dyn Filesystem,
-) -> Result<String> {
+pub fn checksum_artifact(path: &Path, kind: ArtifactKind, fs: &dyn Filesystem) -> Result<String> {
     match kind {
-        ArtifactKind::Agent => checksum_file_with(path, fs),
-        ArtifactKind::Skill => checksum_dir_with(path, fs),
+        ArtifactKind::Agent => checksum_file(path, fs),
+        ArtifactKind::Skill => checksum_dir(path, fs),
     }
 }
 
@@ -57,7 +53,7 @@ pub fn is_locally_modified(
     lock_entry: &LockEntry,
     fs: &dyn Filesystem,
 ) -> Result<bool> {
-    let current = checksum_artifact_with(path, kind, fs)?;
+    let current = checksum_artifact(path, kind, fs)?;
     Ok(current != lock_entry.installed_checksum)
 }
 
@@ -70,7 +66,7 @@ pub fn current_checksum_if_modified(
     lock_entry: &LockEntry,
     fs: &dyn Filesystem,
 ) -> Result<(bool, Option<String>)> {
-    let current = checksum_artifact_with(path, kind, fs)?;
+    let current = checksum_artifact(path, kind, fs)?;
     if current == lock_entry.installed_checksum {
         Ok((false, None))
     } else {
@@ -115,7 +111,7 @@ mod tests {
         fs.add_file(path.clone(), content);
 
         // Compute the real checksum
-        let cs = checksum_file_with(&path, &fs).unwrap();
+        let cs = checksum_file(&path, &fs).unwrap();
         let mut entry = make_lock_entry_with_checksum(
             ArtifactKind::Agent,
             Some("1.0.0"),
@@ -160,7 +156,7 @@ mod tests {
         let path = agent_path(&paths);
         fs.add_file(path.clone(), content);
 
-        let cs = checksum_file_with(&path, &fs).unwrap();
+        let cs = checksum_file(&path, &fs).unwrap();
         let mut entry = make_lock_entry_with_checksum(
             ArtifactKind::Agent,
             Some("1.0.0"),

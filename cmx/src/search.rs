@@ -59,7 +59,7 @@ impl fmt::Display for SearchOutput {
 // Public API
 // ---------------------------------------------------------------------------
 
-pub fn search_with(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
+pub fn search(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
     source_update::ensure_fresh(ctx)?;
 
     let query_lower = query.to_lowercase();
@@ -207,7 +207,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let output = search_with("rust", &ctx).unwrap();
+        let output = search("rust", &ctx).unwrap();
 
         assert_eq!(output.query, "rust");
         assert_eq!(output.results.len(), 1);
@@ -223,7 +223,7 @@ mod tests {
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = t.ctx();
-        let output = search_with("test agent", &ctx).unwrap();
+        let output = search("test agent", &ctx).unwrap();
 
         assert_eq!(output.results.len(), 1);
         assert_eq!(output.results[0].name, "my-agent");
@@ -236,7 +236,7 @@ mod tests {
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = t.ctx();
-        let output = search_with("nonexistent-xyz", &ctx).unwrap();
+        let output = search("nonexistent-xyz", &ctx).unwrap();
 
         assert!(output.results.is_empty(), "expected no results for non-matching query");
     }
@@ -248,7 +248,7 @@ mod tests {
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = t.ctx();
-        let output = search_with("MY-AGENT", &ctx).unwrap();
+        let output = search("MY-AGENT", &ctx).unwrap();
 
         assert_eq!(output.results.len(), 1, "search should be case-insensitive");
     }

@@ -131,8 +131,8 @@ impl fmt::Display for SourceRemoveResult {
 // Public API
 // ---------------------------------------------------------------------------
 
-pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<SourceScanResult> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+pub fn add(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<SourceScanResult> {
+    let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
     if sources.sources.contains_key(name) {
         bail!("Source '{name}' already exists. Remove it first to re-register.");
@@ -146,7 +146,7 @@ pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<S
 
     let (agents_found, skills_found, warnings) = scan_and_count(&entry, ctx.fs)?;
 
-    config::mutate_sources_with(ctx.fs, ctx.paths, |sources| {
+    config::mutate_sources(ctx.fs, ctx.paths, |sources| {
         sources.sources.insert(name.to_string(), entry);
         Ok(())
     })?;
@@ -159,8 +159,8 @@ pub fn add_with(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<S
     })
 }
 
-pub fn list_with(ctx: &AppContext<'_>) -> Result<SourceListResult> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+pub fn list(ctx: &AppContext<'_>) -> Result<SourceListResult> {
+    let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
     let entries = sources
         .sources
@@ -185,10 +185,10 @@ pub fn list_with(ctx: &AppContext<'_>) -> Result<SourceListResult> {
     Ok(SourceListResult { entries })
 }
 
-pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
-    source_update::auto_update_source_with(name, ctx)?;
+pub fn browse(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
+    source_update::auto_update_source(name, ctx)?;
 
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+    let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
     let entry = sources
         .get_source(name)
@@ -206,7 +206,7 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResul
         );
     }
 
-    let all_artifacts = source_iter::each_source_artifact_with(&sources.sources, ctx.fs)?;
+    let all_artifacts = source_iter::each_source_artifact(&sources.sources, ctx.fs)?;
     let artifacts: Vec<_> = all_artifacts
         .into_iter()
         .filter(|sa| sa.source_name == name)
@@ -230,8 +230,8 @@ pub fn browse_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResul
     Ok(build_browse_result(name, &artifacts, &skill_dirs))
 }
 
-pub fn remove_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
-    let entry = config::mutate_sources_with(ctx.fs, ctx.paths, |sources| {
+pub fn remove(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
+    let entry = config::mutate_sources(ctx.fs, ctx.paths, |sources| {
         sources
             .sources
             .remove(name)
@@ -379,7 +379,7 @@ pub(crate) fn scan_and_count(
     fs: &dyn Filesystem,
 ) -> Result<(usize, usize, Vec<ScanWarning>)> {
     let local_path = config::resolve_local_path(entry)?;
-    let scan_result = scan::scan_source_with(&local_path, fs)?;
+    let scan_result = scan::scan_source(&local_path, fs)?;
     let (agents_found, skills_found) = count_artifacts(&scan_result.artifacts);
     Ok((agents_found, skills_found, scan_result.warnings))
 }
@@ -748,7 +748,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let result = add_with("my-source", "/new/path", &ctx);
+        let result = add("my-source", "/new/path", &ctx);
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("already exists"), "unexpected: {msg}");
@@ -764,7 +764,7 @@ mod tests {
         t.fs.add_dir("/local/repo");
 
         let ctx = t.ctx();
-        let result = add_with("local-source", "/local/repo", &ctx);
+        let result = add("local-source", "/local/repo", &ctx);
         assert!(result.is_ok(), "expected ok: {:?}", result.err());
 
         // No git clone should have been called
@@ -779,7 +779,7 @@ mod tests {
         t.fs.add_dir("/local/repo");
 
         let ctx = t.ctx();
-        let result = add_with("local-source", "/local/repo", &ctx).unwrap();
+        let result = add("local-source", "/local/repo", &ctx).unwrap();
 
         assert_eq!(result.name, "local-source");
         assert_eq!(result.agents_found, 0, "empty repo has no agents");
@@ -793,7 +793,7 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let result = add_with("git-source", "https://github.com/example/repo.git", &ctx);
+        let result = add("git-source", "https://github.com/example/repo.git", &ctx);
         assert!(result.is_ok(), "expected ok: {:?}", result.err());
 
         let cloned = t.git.cloned.borrow();
@@ -809,9 +809,9 @@ mod tests {
         t.fs.add_dir("/local/repo");
 
         let ctx = t.ctx();
-        add_with("new-source", "/local/repo", &ctx).unwrap();
+        add("new-source", "/local/repo", &ctx).unwrap();
 
-        let sources = config::load_sources_with(&t.fs, &t.paths).unwrap();
+        let sources = config::load_sources(&t.fs, &t.paths).unwrap();
         assert!(sources.sources.contains_key("new-source"), "source should be saved");
     }
 
@@ -822,7 +822,7 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let result = list_with(&ctx).unwrap();
+        let result = list(&ctx).unwrap();
 
         assert!(result.entries.is_empty(), "expected empty entries for no sources");
     }
@@ -838,7 +838,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let result = list_with(&ctx).unwrap();
+        let result = list(&ctx).unwrap();
 
         assert_eq!(result.entries.len(), 1);
         assert_eq!(result.entries[0].name, "my-source");
@@ -867,7 +867,7 @@ mod tests {
         t.fs.add_file(clone_path.join("README.md"), "# repo");
 
         let ctx = t.ctx();
-        let result = remove_with("git-source", &ctx).unwrap();
+        let result = remove("git-source", &ctx).unwrap();
 
         assert_eq!(result.name, "git-source");
         assert!(result.clone_deleted, "expected clone_deleted to be true");
@@ -896,10 +896,10 @@ mod tests {
         t.fs.add_file(clone_path.join("README.md"), "# repo");
 
         let ctx = t.ctx();
-        remove_with("git-source", &ctx).unwrap();
+        remove("git-source", &ctx).unwrap();
 
         assert!(!t.fs.exists(&clone_path), "clone directory should be removed");
-        let updated_sources = config::load_sources_with(&t.fs, &t.paths).unwrap();
+        let updated_sources = config::load_sources(&t.fs, &t.paths).unwrap();
         assert!(!updated_sources.sources.contains_key("git-source"));
     }
 
@@ -916,11 +916,11 @@ mod tests {
         t.fs.add_dir(local_dir.clone());
 
         let ctx = t.ctx();
-        remove_with("local-source", &ctx).unwrap();
+        remove("local-source", &ctx).unwrap();
 
         // Local dir should still exist (we only remove git clones)
         assert!(t.fs.exists(&local_dir), "local dir should not be removed");
-        let updated_sources = config::load_sources_with(&t.fs, &t.paths).unwrap();
+        let updated_sources = config::load_sources(&t.fs, &t.paths).unwrap();
         assert!(!updated_sources.sources.contains_key("local-source"));
     }
 
@@ -940,11 +940,11 @@ mod tests {
         setup_empty_sources(&fs, &paths);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = add_with("new-source", "https://github.com/example/repo.git", &ctx);
+        let result = add("new-source", "https://github.com/example/repo.git", &ctx);
         assert!(result.is_err(), "expected Err when clone fails");
 
         // Sources file should remain empty — no partial save
-        let sources = config::load_sources_with(&fs, &paths).unwrap();
+        let sources = config::load_sources(&fs, &paths).unwrap();
         assert!(sources.sources.is_empty(), "sources should not be modified after failed clone");
     }
 

@@ -76,7 +76,7 @@ pub struct InstallPlan {
     pub relative_path: String,
 }
 
-pub fn install_with(
+pub fn install(
     name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
@@ -95,11 +95,11 @@ pub fn install_with(
         .create_dir_all(&plan.dest_dir)
         .with_context(|| format!("Failed to create {}", plan.dest_dir.display()))?;
 
-    let source_checksum = checksum::checksum_artifact_with(&found.artifact.path, kind, ctx.fs)?;
+    let source_checksum = checksum::checksum_artifact(&found.artifact.path, kind, ctx.fs)?;
 
     // Check for local modifications before overwriting
     if !force {
-        let lock = lockfile::load_with(scope, ctx.fs, ctx.paths)?;
+        let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
         check_local_modifications(
             artifact_name,
             kind,
@@ -115,9 +115,9 @@ pub fn install_with(
 
     let dest_path =
         copy::copy_artifact(&found.artifact.path, &plan.dest_dir, kind, artifact_name, ctx)?;
-    let installed_checksum = checksum::checksum_artifact_with(&dest_path, kind, ctx.fs)?;
+    let installed_checksum = checksum::checksum_artifact(&dest_path, kind, ctx.fs)?;
 
-    let lock_result = lockfile::mutate_with(scope, ctx.fs, ctx.paths, |lock| {
+    let lock_result = lockfile::mutate(scope, ctx.fs, ctx.paths, |lock| {
         lock.packages.insert(
             artifact_name.to_string(),
             LockEntry {
@@ -157,22 +157,22 @@ pub fn install_with(
     })
 }
 
-pub fn update_with(
+pub fn update(
     name: &str,
     kind: ArtifactKind,
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<InstallResult> {
-    let Some((entry, scope)) = lockfile::find_entry_with(name, ctx.fs, ctx.paths)? else {
+    let Some((entry, scope)) = lockfile::find_entry(name, ctx.fs, ctx.paths)? else {
         bail!(
             "No installed {kind} named '{name}' found. Install it first with 'cmx {kind} install {name}'."
         );
     };
     let pinned = format!("{}:{}", entry.source.repo, name);
-    install_with(&pinned, kind, scope, force, ctx)
+    install(&pinned, kind, scope, force, ctx)
 }
 
-pub fn install_all_with(
+pub fn install_all(
     kind: ArtifactKind,
     scope: InstallScope,
     force: bool,
@@ -180,7 +180,7 @@ pub fn install_all_with(
 ) -> Result<BatchInstallResult> {
     source_update::ensure_fresh(ctx)?;
 
-    let lock = lockfile::load_with(scope, ctx.fs, ctx.paths)?;
+    let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
     let mut installed = Vec::new();
 
     for sa in source_iter::all_artifacts(ctx)? {
@@ -189,7 +189,7 @@ pub fn install_all_with(
         }
         // Skip if already tracked with matching version AND checksum
         if let Some(lock_entry) = lock.packages.get(&sa.artifact.name) {
-            let source_cs = checksum::checksum_artifact_with(&sa.artifact.path, kind, ctx.fs)?;
+            let source_cs = checksum::checksum_artifact(&sa.artifact.path, kind, ctx.fs)?;
             if lock_entry.version.as_deref() == sa.artifact.version.as_deref()
                 && lock_entry.source_checksum == source_cs
             {
@@ -197,7 +197,7 @@ pub fn install_all_with(
             }
         }
         let pinned = format!("{}:{}", sa.source_name, sa.artifact.name);
-        let result = install_with(&pinned, kind, scope, force, ctx)?;
+        let result = install(&pinned, kind, scope, force, ctx)?;
         installed.push(result);
     }
 
@@ -208,7 +208,7 @@ pub fn install_all_with(
     })
 }
 
-pub fn update_all_with(
+pub fn update_all(
     kind: ArtifactKind,
     force: bool,
     ctx: &AppContext<'_>,
@@ -218,7 +218,7 @@ pub fn update_all_with(
     let all_source_info = source_iter::all_with_checksums(ctx)?;
     let mut updated = Vec::new();
 
-    let locks = lockfile::load_both_with(ctx.fs, ctx.paths)?;
+    let locks = lockfile::load_both(ctx.fs, ctx.paths)?;
     for (scope, lock) in &locks {
         for (name, entry) in &lock.packages {
             if entry.artifact_type != kind {
@@ -231,7 +231,7 @@ pub fn update_all_with(
                 })
             {
                 let pinned = format!("{}:{name}", entry.source.repo);
-                let result = install_with(&pinned, kind, *scope, force, ctx)?;
+                let result = install(&pinned, kind, *scope, force, ctx)?;
                 updated.push(result);
             }
         }
@@ -527,8 +527,7 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let result =
-            install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+        let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("No sources registered"), "unexpected: {msg}");
@@ -547,13 +546,8 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let result = install_with(
-            "nonexistent-agent",
-            ArtifactKind::Agent,
-            InstallScope::Global,
-            false,
-            &ctx,
-        );
+        let result =
+            install("nonexistent-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("nonexistent-agent"), "unexpected: {msg}");
@@ -575,8 +569,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let result =
-            install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+        let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("multiple sources"), "unexpected: {msg}");
@@ -589,13 +582,8 @@ mod tests {
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = t.ctx();
-        let result = install_with(
-            "my-source:my-agent",
-            ArtifactKind::Agent,
-            InstallScope::Global,
-            false,
-            &ctx,
-        );
+        let result =
+            install("my-source:my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
         assert!(result.is_ok(), "expected ok, got: {:?}", result.err());
 
         // Verify the artifact was installed
@@ -617,7 +605,7 @@ mod tests {
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = t.ctx();
-        install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
         let expected_dest = t
             .paths
@@ -637,9 +625,9 @@ mod tests {
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = t.ctx();
-        install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
-        let lock = lockfile::load_with(InstallScope::Global, &t.fs, &t.paths).unwrap();
+        let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
         let entry = lock.packages.get("my-agent").expect("lock entry must exist");
         assert!(!entry.source_checksum.is_empty());
         assert!(!entry.installed_checksum.is_empty());
@@ -659,9 +647,9 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
-        let lock = lockfile::load_with(InstallScope::Global, &fs, &paths).unwrap();
+        let lock = lockfile::load(InstallScope::Global, &fs, &paths).unwrap();
         let entry = lock.packages.get("my-agent").unwrap();
         assert!(
             entry.installed_at.starts_with("2024-06-01"),
@@ -678,7 +666,7 @@ mod tests {
 
         // First install
         let ctx = t.ctx();
-        install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
         // Modify the installed file (different content than the recorded checksum)
         let installed_path = t
@@ -689,8 +677,7 @@ mod tests {
             .unwrap();
 
         // Second install should fail without force
-        let result =
-            install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+        let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("local modifications"), "unexpected: {msg}");
@@ -704,7 +691,7 @@ mod tests {
 
         // First install
         let ctx = t.ctx();
-        install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
         // Modify the installed file
         let installed_path = t
@@ -714,8 +701,7 @@ mod tests {
         t.fs.write(&installed_path, "modified content").unwrap();
 
         // Second install with force should succeed
-        let result =
-            install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, true, &ctx);
+        let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, true, &ctx);
         assert!(result.is_ok(), "force install should succeed: {:?}", result.err());
     }
 
@@ -748,8 +734,7 @@ mod tests {
         t.fs.add_file("/sources/my-source/my-skill/tool.py", "code");
 
         let ctx = t.ctx();
-        let result =
-            install_with("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
+        let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
         assert!(result.is_err());
         // Either "not found in registered sources" or "missing SKILL.md"
         let msg = result.unwrap_err().to_string();
@@ -783,8 +768,7 @@ mod tests {
         t.fs.add_file("/sources/my-source/my-skill/tool.py", "code");
 
         let ctx = t.ctx();
-        let result =
-            install_with("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
+        let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
         assert!(result.is_ok(), "skill with SKILL.md should install: {:?}", result.err());
 
         // Verify SKILL.md was copied to dest
@@ -800,9 +784,9 @@ mod tests {
         setup_source_with_agent(&t.fs, &t.paths, "guidelines", "/sources/guidelines", "my-agent");
 
         let ctx = t.ctx();
-        install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
-        let lock = lockfile::load_with(InstallScope::Global, &t.fs, &t.paths).unwrap();
+        let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
         let entry = lock.packages.get("my-agent").unwrap();
         assert_eq!(entry.source.repo, "guidelines");
     }
@@ -811,7 +795,7 @@ mod tests {
     #[test]
     fn fresh_lock_file_has_no_entries() {
         let t = TestContext::new();
-        let lock: LockFile = lockfile::load_with(InstallScope::Global, &t.fs, &t.paths).unwrap();
+        let lock: LockFile = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert!(lock.packages.is_empty());
     }
 
@@ -825,8 +809,7 @@ mod tests {
 
         let ctx = t.ctx();
         let result =
-            install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx)
-                .unwrap();
+            install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
         assert_eq!(result.artifact_name, "my-agent");
         assert_eq!(result.kind, ArtifactKind::Agent);
@@ -841,8 +824,7 @@ mod tests {
 
         let ctx = t.ctx();
         let result =
-            install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx)
-                .unwrap();
+            install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
         let expected_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
         assert_eq!(result.dest_dir, expected_dir);
@@ -855,8 +837,7 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let result =
-            install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+        let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("No sources registered"), "unexpected: {msg}");
@@ -872,12 +853,11 @@ mod tests {
         t.fs.set_fail_on_copy(true);
 
         let ctx = t.ctx();
-        let result =
-            install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+        let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
         assert!(result.is_err(), "expected Err when copy fails");
 
         // Lock file should have no entry for the agent
-        let lock = lockfile::load_with(InstallScope::Global, &t.fs, &t.paths).unwrap();
+        let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert!(
             !lock.packages.contains_key("my-agent"),
             "lock should not be updated after failed copy"
@@ -894,8 +874,7 @@ mod tests {
         t.fs.set_fail_on_rename(t.paths.lock_path(InstallScope::Global));
 
         let ctx = t.ctx();
-        let result =
-            install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+        let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
         assert!(result.is_err(), "expected Err when lock save fails");
 
         // Because this was a fresh install, the copied agent file should be rolled back
@@ -921,8 +900,7 @@ mod tests {
         t.fs.set_fail_on_rename(t.paths.lock_path(InstallScope::Global));
 
         let ctx = t.ctx();
-        let result =
-            install_with("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
+        let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
         assert!(result.is_err(), "expected Err when lock save fails");
 
         // Because this was a fresh install, the copied skill directory should be rolled back
@@ -949,7 +927,7 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
         let expected_dest =
             paths.install_dir(ArtifactKind::Agent, InstallScope::Global).join("my-agent.md");
@@ -971,7 +949,7 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        install_with("my-agent", ArtifactKind::Agent, InstallScope::Local, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Local, false, &ctx).unwrap();
 
         let expected_dest =
             paths.install_dir(ArtifactKind::Agent, InstallScope::Local).join("my-agent.md");
@@ -993,7 +971,7 @@ mod tests {
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
         let expected_dest =
             paths.install_dir(ArtifactKind::Agent, InstallScope::Global).join("my-agent.md");
@@ -1013,7 +991,7 @@ mod tests {
 
         // First install succeeds
         let ctx = t.ctx();
-        install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
         let expected_dest = t
             .paths
@@ -1024,8 +1002,7 @@ mod tests {
         // Now force-reinstall with a failing lock save
         t.fs.set_fail_on_rename(t.paths.lock_path(InstallScope::Global));
 
-        let result =
-            install_with("my-agent", ArtifactKind::Agent, InstallScope::Global, true, &ctx);
+        let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, true, &ctx);
         assert!(result.is_err(), "expected Err when lock save fails on reinstall");
 
         // Because the artifact already existed before reinstall, it should NOT be removed

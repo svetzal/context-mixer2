@@ -46,8 +46,8 @@ impl fmt::Display for SourceUpdateOutput {
 // Public API
 // ---------------------------------------------------------------------------
 
-pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpdateOutput> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+pub fn update(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpdateOutput> {
+    let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
     if let Some(n) = name {
         if !sources.sources.contains_key(n) {
@@ -77,7 +77,7 @@ pub fn update_with(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpd
 }
 
 pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceScanResult> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+    let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
     let source_entry = sources
         .sources
@@ -103,7 +103,7 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
     }
 
     let now = ctx.clock.now().to_rfc3339();
-    let updated_entry = config::mutate_sources_with(ctx.fs, ctx.paths, |sources| {
+    let updated_entry = config::mutate_sources(ctx.fs, ctx.paths, |sources| {
         if let Some(entry) = sources.sources.get_mut(name) {
             entry.last_updated = Some(now);
         }
@@ -125,8 +125,8 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
 }
 
 /// Auto-update a git source if it hasn't been updated recently.
-pub fn auto_update_source_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+pub fn auto_update_source(name: &str, ctx: &AppContext<'_>) -> Result<()> {
+    let sources = config::load_sources(ctx.fs, ctx.paths)?;
     let Some(entry) = sources.sources.get(name) else {
         return Ok(());
     };
@@ -144,12 +144,12 @@ pub fn auto_update_source_with(name: &str, ctx: &AppContext<'_>) -> Result<()> {
 
 /// Ensure sources are current before operating on them.
 pub fn ensure_fresh(ctx: &AppContext<'_>) -> Result<()> {
-    auto_update_all_with(ctx)
+    auto_update_all(ctx)
 }
 
 /// Auto-update all stale git sources.
-pub fn auto_update_all_with(ctx: &AppContext<'_>) -> Result<()> {
-    let sources = config::load_sources_with(ctx.fs, ctx.paths)?;
+pub fn auto_update_all(ctx: &AppContext<'_>) -> Result<()> {
+    let sources = config::load_sources(ctx.fs, ctx.paths)?;
     let now = ctx.clock.now();
     let stale_names: Vec<String> = sources
         .sources
@@ -280,7 +280,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        auto_update_source_with("local-source", &ctx).unwrap();
+        auto_update_source("local-source", &ctx).unwrap();
 
         assert!(t.git.pulled.borrow().is_empty(), "no git pull expected for local source");
     }
@@ -302,7 +302,7 @@ mod tests {
         t.fs.add_dir(clone_path);
 
         let ctx = t.ctx();
-        auto_update_source_with("git-source", &ctx).unwrap();
+        auto_update_source("git-source", &ctx).unwrap();
 
         assert!(t.git.pulled.borrow().is_empty(), "fresh source should not be pulled");
     }
@@ -325,7 +325,7 @@ mod tests {
         t.fs.add_dir(clone_path.clone());
 
         let ctx = t.ctx();
-        auto_update_source_with("git-source", &ctx).unwrap();
+        auto_update_source("git-source", &ctx).unwrap();
 
         let pulled = t.git.pulled.borrow();
         assert_eq!(pulled.len(), 1, "stale source should be pulled");
@@ -353,7 +353,7 @@ mod tests {
 
         assert_eq!(result.name, "git-source");
 
-        let updated_sources = crate::config::load_sources_with(&t.fs, &t.paths).unwrap();
+        let updated_sources = crate::config::load_sources(&t.fs, &t.paths).unwrap();
         let entry = updated_sources.sources.get("git-source").unwrap();
         assert!(entry.last_updated.is_some(), "timestamp should be updated after pull");
     }
@@ -386,7 +386,7 @@ mod tests {
         let result = perform_pull_with("git-source", &ctx);
         assert!(result.is_err(), "expected Err when pull fails");
 
-        let updated_sources = crate::config::load_sources_with(&fs, &paths).unwrap();
+        let updated_sources = crate::config::load_sources(&fs, &paths).unwrap();
         let entry = updated_sources.sources.get("git-source").unwrap();
         assert_eq!(
             entry.last_updated.as_deref(),
@@ -438,7 +438,7 @@ mod tests {
         fs.add_dir(clone_b);
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = auto_update_all_with(&ctx);
+        let result = auto_update_all(&ctx);
         assert!(result.is_err(), "expected Err when any pull fails");
 
         let pulled = git.pulled.borrow();

@@ -1,5 +1,5 @@
 use cmx::gateway::real::RealFilesystem;
-use cmx::lockfile::{load_from_with, save_to_with};
+use cmx::lockfile::{load_from, save_to};
 use cmx::types::{ArtifactKind, LockEntry, LockFile, LockSource};
 use std::collections::BTreeMap;
 use tempfile::TempDir;
@@ -32,8 +32,8 @@ fn save_and_load_round_trips_all_fields() {
     let path = dir.path().join("cmx-lock.json");
 
     let original = sample_lock_file();
-    save_to_with(&original, &path, &RealFilesystem).unwrap();
-    let restored = load_from_with(&path, &RealFilesystem).unwrap();
+    save_to(&original, &path, &RealFilesystem).unwrap();
+    let restored = load_from(&path, &RealFilesystem).unwrap();
 
     assert_eq!(restored.version, original.version);
     let entry = restored.packages.get("rust-craftsperson").expect("entry present");
@@ -54,7 +54,7 @@ fn save_creates_parent_directories() {
         version: 1,
         packages: BTreeMap::new(),
     };
-    save_to_with(&lock, &path, &RealFilesystem).unwrap();
+    save_to(&lock, &path, &RealFilesystem).unwrap();
     assert!(path.exists());
 }
 
@@ -63,7 +63,7 @@ fn load_nonexistent_path_returns_empty_default() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("does-not-exist.json");
 
-    let lock = load_from_with(&path, &RealFilesystem).unwrap();
+    let lock = load_from(&path, &RealFilesystem).unwrap();
     assert_eq!(lock.version, 1);
     assert!(lock.packages.is_empty());
 }
@@ -74,7 +74,7 @@ fn load_invalid_json_returns_error() {
     let path = dir.path().join("bad.json");
     std::fs::write(&path, b"not valid json").unwrap();
 
-    let result = load_from_with(&path, &RealFilesystem);
+    let result = load_from(&path, &RealFilesystem);
     assert!(result.is_err(), "expected Err for invalid JSON");
 }
 
@@ -87,7 +87,7 @@ fn load_empty_packages_produces_empty_map() {
         version: 1,
         packages: BTreeMap::new(),
     };
-    save_to_with(&empty, &path, &RealFilesystem).unwrap();
-    let restored = load_from_with(&path, &RealFilesystem).unwrap();
+    save_to(&empty, &path, &RealFilesystem).unwrap();
+    let restored = load_from(&path, &RealFilesystem).unwrap();
     assert!(restored.packages.is_empty());
 }

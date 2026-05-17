@@ -13,15 +13,11 @@ use crate::types::{
 // Testable variants (accept injected Filesystem + ConfigPaths)
 // ---------------------------------------------------------------------------
 
-pub fn load_sources_with(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<SourcesFile> {
+pub fn load_sources(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<SourcesFile> {
     crate::json_file::load_json(&paths.sources_path(), fs)
 }
 
-pub fn save_sources_with(
-    sources: &SourcesFile,
-    fs: &dyn Filesystem,
-    paths: &ConfigPaths,
-) -> Result<()> {
+pub fn save_sources(sources: &SourcesFile, fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<()> {
     crate::json_file::save_json(sources, &paths.sources_path(), fs)
 }
 
@@ -30,29 +26,25 @@ pub fn save_sources_with(
 /// `f` is called with a mutable reference to the in-memory sources and may
 /// return `Err` to abort without writing; on success the file is saved and
 /// the value returned by `f` is propagated.
-pub fn mutate_sources_with<F, T>(fs: &dyn Filesystem, paths: &ConfigPaths, f: F) -> Result<T>
+pub fn mutate_sources<F, T>(fs: &dyn Filesystem, paths: &ConfigPaths, f: F) -> Result<T>
 where
     F: FnOnce(&mut SourcesFile) -> Result<T>,
 {
-    let mut sources = load_sources_with(fs, paths)?;
+    let mut sources = load_sources(fs, paths)?;
     let result = f(&mut sources)?;
-    save_sources_with(&sources, fs, paths)?;
+    save_sources(&sources, fs, paths)?;
     Ok(result)
 }
 
-pub fn load_config_with(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<CmxConfig> {
+pub fn load_config(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<CmxConfig> {
     crate::json_file::load_json(&paths.config_path(), fs)
 }
 
-pub fn save_config_with(
-    config: &CmxConfig,
-    fs: &dyn Filesystem,
-    paths: &ConfigPaths,
-) -> Result<()> {
+pub fn save_config(config: &CmxConfig, fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<()> {
     crate::json_file::save_json(config, &paths.config_path(), fs)
 }
 
-pub fn installed_names_with(
+pub fn installed_names(
     kind: ArtifactKind,
     scope: InstallScope,
     fs: &dyn Filesystem,
@@ -85,7 +77,7 @@ pub fn installed_with_lock_data<'a>(
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<Vec<InstalledArtifact<'a>>> {
-    let names = installed_names_with(kind, scope, fs, paths)?;
+    let names = installed_names(kind, scope, fs, paths)?;
     Ok(names
         .into_iter()
         .map(|name| {
@@ -196,7 +188,7 @@ mod tests {
     fn load_sources_returns_default_when_file_absent() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let sources = load_sources_with(&fs, &paths).unwrap();
+        let sources = load_sources(&fs, &paths).unwrap();
         assert!(sources.sources.is_empty());
         assert_eq!(sources.version, 1);
     }
@@ -207,7 +199,7 @@ mod tests {
         let paths = test_paths();
         let json = r#"{"version":1,"sources":{"my-source":{"type":"local","path":"/some/path","last_updated":"2024-01-01T00:00:00Z"}}}"#;
         fs.add_file(paths.sources_path(), json);
-        let sources = load_sources_with(&fs, &paths).unwrap();
+        let sources = load_sources(&fs, &paths).unwrap();
         assert!(sources.sources.contains_key("my-source"));
     }
 
@@ -216,7 +208,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         fs.add_file(paths.sources_path(), "not valid json{{{{");
-        let result = load_sources_with(&fs, &paths);
+        let result = load_sources(&fs, &paths);
         assert!(result.is_err());
     }
 
@@ -225,7 +217,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let sources = SourcesFile::default();
-        save_sources_with(&sources, &fs, &paths).unwrap();
+        save_sources(&sources, &fs, &paths).unwrap();
         assert!(fs.file_exists(&paths.sources_path()));
     }
 
@@ -236,7 +228,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
 
-        mutate_sources_with(&fs, &paths, |sources| {
+        mutate_sources(&fs, &paths, |sources| {
             sources
                 .sources
                 .insert("test-source".to_string(), make_local_entry("/path", None));
@@ -244,7 +236,7 @@ mod tests {
         })
         .unwrap();
 
-        let loaded = load_sources_with(&fs, &paths).unwrap();
+        let loaded = load_sources(&fs, &paths).unwrap();
         assert!(loaded.sources.contains_key("test-source"));
     }
 
@@ -254,10 +246,10 @@ mod tests {
         let paths = test_paths();
 
         let result: Result<()> =
-            mutate_sources_with(&fs, &paths, |_sources| Err(anyhow::anyhow!("closure error")));
+            mutate_sources(&fs, &paths, |_sources| Err(anyhow::anyhow!("closure error")));
         assert!(result.is_err());
 
-        let loaded = load_sources_with(&fs, &paths).unwrap();
+        let loaded = load_sources(&fs, &paths).unwrap();
         assert!(loaded.sources.is_empty(), "sources should not be saved after closure error");
     }
 
@@ -271,8 +263,8 @@ mod tests {
             .sources
             .insert("test-source".to_string(), make_local_entry("/some/path", None));
 
-        save_sources_with(&sources, &fs, &paths).unwrap();
-        let loaded = load_sources_with(&fs, &paths).unwrap();
+        save_sources(&sources, &fs, &paths).unwrap();
+        let loaded = load_sources(&fs, &paths).unwrap();
         assert_eq!(loaded.sources.len(), 1);
         assert!(loaded.sources.contains_key("test-source"));
     }
@@ -284,7 +276,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let names =
-            installed_names_with(ArtifactKind::Agent, InstallScope::Global, &fs, &paths).unwrap();
+            installed_names(ArtifactKind::Agent, InstallScope::Global, &fs, &paths).unwrap();
         assert!(names.is_empty());
     }
 
@@ -298,7 +290,7 @@ mod tests {
         fs.add_file(agent_dir.join("not-an-agent.txt"), "ignored");
 
         let names =
-            installed_names_with(ArtifactKind::Agent, InstallScope::Global, &fs, &paths).unwrap();
+            installed_names(ArtifactKind::Agent, InstallScope::Global, &fs, &paths).unwrap();
         assert_eq!(names, vec!["alpha", "beta"]);
     }
 
@@ -312,7 +304,7 @@ mod tests {
         fs.add_file(skill_dir.join("other-skill").join("SKILL.md"), "---\n---\n");
 
         let names =
-            installed_names_with(ArtifactKind::Skill, InstallScope::Global, &fs, &paths).unwrap();
+            installed_names(ArtifactKind::Skill, InstallScope::Global, &fs, &paths).unwrap();
         assert_eq!(names, vec!["my-skill", "other-skill"]);
     }
 
@@ -325,7 +317,7 @@ mod tests {
         fs.add_file(agent_dir.join(".hidden.md"), "# hidden");
 
         let names =
-            installed_names_with(ArtifactKind::Agent, InstallScope::Global, &fs, &paths).unwrap();
+            installed_names(ArtifactKind::Agent, InstallScope::Global, &fs, &paths).unwrap();
         assert_eq!(names, vec!["visible"]);
     }
 
@@ -335,7 +327,7 @@ mod tests {
     fn load_config_returns_default_when_absent() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let cfg = load_config_with(&fs, &paths).unwrap();
+        let cfg = load_config(&fs, &paths).unwrap();
         assert_eq!(cfg.version, 1);
     }
 
@@ -345,8 +337,8 @@ mod tests {
         let paths = test_paths();
         let mut cfg = CmxConfig::default();
         cfg.llm.model = "test-model".to_string();
-        save_config_with(&cfg, &fs, &paths).unwrap();
-        let loaded = load_config_with(&fs, &paths).unwrap();
+        save_config(&cfg, &fs, &paths).unwrap();
+        let loaded = load_config(&fs, &paths).unwrap();
         assert_eq!(loaded.llm.model, "test-model");
     }
 
@@ -582,7 +574,7 @@ mod tests {
         fs.set_fail_on_write(crate::json_file::tmp_path(&sources_path));
 
         let sources = SourcesFile::default();
-        let result = save_sources_with(&sources, &fs, &paths);
+        let result = save_sources(&sources, &fs, &paths);
         assert!(result.is_err(), "expected Err when sources file write fails");
 
         let msg = result.unwrap_err().to_string();

@@ -132,7 +132,7 @@ fn status_indicator(
     }
 }
 
-pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKindOutput> {
+pub fn list_kind(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKindOutput> {
     let loaded = LoadedState::load(ctx)?;
     let source_versions = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
     let mut rows = BTreeMap::new();
@@ -142,7 +142,7 @@ pub fn list_kind_with(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKi
     Ok(ListKindOutput { kind, rows })
 }
 
-pub fn list_all_with(ctx: &AppContext<'_>) -> Result<ListOutput> {
+pub fn list_all(ctx: &AppContext<'_>) -> Result<ListOutput> {
     let loaded = LoadedState::load(ctx)?;
     let source_versions = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
     let mut agents = BTreeMap::new();
@@ -563,7 +563,7 @@ mod tests {
             "my-skill".to_string(),
             make_lock_entry_versioned(ArtifactKind::Skill, "1.0.0", "guidelines", "my-skill"),
         );
-        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
@@ -624,7 +624,7 @@ mod tests {
                 "plugins/doc-tools/skills/pdf-tool",
             ),
         );
-        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
@@ -709,7 +709,7 @@ mod tests {
                 "skills/my-skill",
             ),
         );
-        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
@@ -757,7 +757,7 @@ mod tests {
             "my-agent".to_string(),
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "guidelines", "my-agent.md"),
         );
-        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
@@ -818,7 +818,7 @@ mod tests {
             "my-agent".to_string(),
             make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "guidelines", "my-agent.md"),
         );
-        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();
@@ -885,7 +885,7 @@ mod tests {
             "my-skill".to_string(),
             make_lock_entry_versioned(ArtifactKind::Skill, "1.0.0", "guidelines", "my-skill"),
         );
-        crate::lockfile::save_with(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
+        crate::lockfile::save(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
 
         let ctx = t.ctx();
         let source_versions = source_iter::all_with_checksums(&ctx).unwrap();

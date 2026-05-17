@@ -1,5 +1,5 @@
 use cmx::gateway::real::RealFilesystem;
-use cmx::scan::scan_source_with;
+use cmx::scan::scan_source;
 use cmx::types::ArtifactKind;
 use std::fs;
 use tempfile::TempDir;
@@ -21,7 +21,7 @@ fn skill_frontmatter(description: &str) -> String {
 #[test]
 fn scan_empty_directory_returns_empty() {
     let dir = TempDir::new().unwrap();
-    let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
+    let result = scan_source(dir.path(), &RealFilesystem).unwrap();
     assert!(result.artifacts.is_empty());
 }
 
@@ -31,7 +31,7 @@ fn scan_finds_agent_with_valid_frontmatter() {
     let agents_dir = dir.path().join("agents");
     fs::create_dir_all(&agents_dir).unwrap();
     write_file(&agents_dir, "my-agent.md", &agent_frontmatter("my-agent", "Does something"));
-    let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
+    let result = scan_source(dir.path(), &RealFilesystem).unwrap();
     assert_eq!(result.artifacts.len(), 1);
     assert_eq!(result.artifacts[0].name, "my-agent");
     assert_eq!(result.artifacts[0].description, "Does something");
@@ -43,7 +43,7 @@ fn scan_ignores_md_file_without_agent_frontmatter() {
     let dir = TempDir::new().unwrap();
     // Missing "name:" field — not an agent
     write_file(dir.path(), "readme.md", "---\ndescription: Just a readme\n---\n# Readme\n");
-    let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
+    let result = scan_source(dir.path(), &RealFilesystem).unwrap();
     assert!(result.artifacts.is_empty(), "expected empty, got {:?}", result.artifacts);
 }
 
@@ -51,7 +51,7 @@ fn scan_ignores_md_file_without_agent_frontmatter() {
 fn scan_ignores_md_file_without_any_frontmatter() {
     let dir = TempDir::new().unwrap();
     write_file(dir.path(), "notes.md", "# Notes\n\nJust notes.\n");
-    let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
+    let result = scan_source(dir.path(), &RealFilesystem).unwrap();
     assert!(result.artifacts.is_empty());
 }
 
@@ -63,7 +63,7 @@ fn scan_finds_skill_with_skill_md() {
     write_file(&skill_dir, "SKILL.md", &skill_frontmatter("A useful skill"));
     write_file(&skill_dir, "prompt.md", "# Prompt\n");
 
-    let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
+    let result = scan_source(dir.path(), &RealFilesystem).unwrap();
     assert_eq!(result.artifacts.len(), 1);
     assert_eq!(result.artifacts[0].name, "my-skill");
     assert_eq!(result.artifacts[0].description, "A useful skill");
@@ -77,7 +77,7 @@ fn scan_skips_hidden_directories() {
     fs::create_dir_all(&hidden).unwrap();
     write_file(&hidden, "secret-agent.md", &agent_frontmatter("secret-agent", "Hidden"));
 
-    let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
+    let result = scan_source(dir.path(), &RealFilesystem).unwrap();
     assert!(result.artifacts.is_empty(), "hidden dirs must be skipped");
 }
 
@@ -90,7 +90,7 @@ fn scan_finds_multiple_agents_sorted_by_name() {
     write_file(&agents_dir, "alpha.md", &agent_frontmatter("alpha", "First"));
     write_file(&agents_dir, "middle.md", &agent_frontmatter("middle", "Middle"));
 
-    let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
+    let result = scan_source(dir.path(), &RealFilesystem).unwrap();
     assert_eq!(result.artifacts.len(), 3);
     let names: Vec<_> = result.artifacts.iter().map(|a| a.name.as_str()).collect();
     assert_eq!(names, ["alpha", "middle", "zebra"]);
@@ -106,7 +106,7 @@ fn scan_finds_both_agents_and_skills() {
     fs::create_dir_all(&skill_dir).unwrap();
     write_file(&skill_dir, "SKILL.md", &skill_frontmatter("A skill"));
 
-    let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
+    let result = scan_source(dir.path(), &RealFilesystem).unwrap();
     assert_eq!(result.artifacts.len(), 2);
     let kinds: Vec<_> = result.artifacts.iter().map(|a| a.kind).collect();
     assert!(kinds.contains(&ArtifactKind::Agent));
@@ -133,7 +133,7 @@ fn scan_marketplace_finds_declared_agents() {
     });
     fs::write(plugin_dir.join("marketplace.json"), manifest.to_string()).unwrap();
 
-    let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
+    let result = scan_source(dir.path(), &RealFilesystem).unwrap();
     assert_eq!(result.artifacts.len(), 1);
     assert_eq!(result.artifacts[0].name, "my-agent");
     assert_eq!(result.artifacts[0].kind, ArtifactKind::Agent);
@@ -159,7 +159,7 @@ fn scan_marketplace_finds_declared_skills() {
     });
     fs::write(plugin_dir.join("marketplace.json"), manifest.to_string()).unwrap();
 
-    let result = scan_source_with(dir.path(), &RealFilesystem).unwrap();
+    let result = scan_source(dir.path(), &RealFilesystem).unwrap();
     assert_eq!(result.artifacts.len(), 1);
     assert_eq!(result.artifacts[0].name, "my-skill");
     assert_eq!(result.artifacts[0].kind, ArtifactKind::Skill);

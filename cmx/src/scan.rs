@@ -24,7 +24,7 @@ pub struct ScanResult {
 // Testable variant (accepts injected Filesystem)
 // ---------------------------------------------------------------------------
 
-pub fn scan_source_with(root: &Path, fs: &dyn Filesystem) -> Result<ScanResult> {
+pub fn scan_source(root: &Path, fs: &dyn Filesystem) -> Result<ScanResult> {
     let marketplace = root.join(".claude-plugin").join("marketplace.json");
     let mut warnings = Vec::new();
 
@@ -513,7 +513,7 @@ mod tests {
     fn scan_empty_directory_returns_empty() {
         let fs = FakeFilesystem::new();
         fs.add_dir("/repo");
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert!(result.artifacts.is_empty());
     }
 
@@ -521,7 +521,7 @@ mod tests {
     fn scan_ignores_md_file_without_any_frontmatter() {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/plain.md", "# No frontmatter here");
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert!(result.artifacts.is_empty());
     }
 
@@ -530,7 +530,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         // Has frontmatter but no 'name:' field — not an agent
         fs.add_file("/repo/agents/not-agent.md", "---\ndescription: only desc\n---\n");
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert!(result.artifacts.is_empty());
     }
 
@@ -539,7 +539,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         // Valid agent frontmatter but not in an agents/ directory
         fs.add_file("/repo/docs/my-agent.md", agent_content("my-agent", "Does things"));
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert!(result.artifacts.is_empty());
     }
 
@@ -547,7 +547,7 @@ mod tests {
     fn scan_finds_agent_with_valid_frontmatter() {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/agents/my-agent.md", agent_content("my-agent", "Does things"));
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 1);
         assert_eq!(result.artifacts[0].name, "my-agent");
         assert_eq!(result.artifacts[0].kind, ArtifactKind::Agent);
@@ -562,7 +562,7 @@ mod tests {
             "/repo/agents/my-agent.md",
             metadata_versioned_agent_content("my-agent", "Does things", "1.3.2"),
         );
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 1);
         assert_eq!(result.artifacts[0].version.as_deref(), Some("1.3.2"));
     }
@@ -574,7 +574,7 @@ mod tests {
             "/repo/my-skill/SKILL.md",
             metadata_versioned_skill_content("A skill", "2.1.0"),
         );
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 1);
         assert_eq!(result.artifacts[0].version.as_deref(), Some("2.1.0"));
     }
@@ -584,7 +584,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         // File inside a hidden dir — should be ignored even if parent is named agents
         fs.add_file("/repo/.hidden/agents/secret.md", agent_content("secret", "Hidden"));
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert!(result.artifacts.is_empty());
     }
 
@@ -593,7 +593,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/agents/zebra.md", agent_content("zebra", "Z agent"));
         fs.add_file("/repo/agents/alpha.md", agent_content("alpha", "A agent"));
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 2);
         assert_eq!(result.artifacts[0].name, "alpha");
         assert_eq!(result.artifacts[1].name, "zebra");
@@ -603,7 +603,7 @@ mod tests {
     fn scan_finds_skill_with_skill_md() {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/my-skill/SKILL.md", skill_content("A skill"));
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 1);
         assert_eq!(result.artifacts[0].name, "my-skill");
         assert_eq!(result.artifacts[0].kind, ArtifactKind::Skill);
@@ -622,7 +622,7 @@ mod tests {
             "/repo/my-skill/references/another-feature.md",
             agent_content("another-feature", "Another reference doc"),
         );
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 1);
         assert_eq!(result.artifacts[0].name, "my-skill");
         assert_eq!(result.artifacts[0].kind, ArtifactKind::Skill);
@@ -633,7 +633,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/agents/alpha.md", agent_content("alpha", "An agent"));
         fs.add_file("/repo/my-skill/SKILL.md", skill_content("A skill"));
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 2);
         let kinds: Vec<_> = result.artifacts.iter().map(|a| a.kind).collect();
         assert!(kinds.contains(&ArtifactKind::Agent));
@@ -665,7 +665,7 @@ mod tests {
             "/repo/plugins/my-plugin/agents/reviewer.md",
             agent_content("reviewer", "Reviews code"),
         );
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 1);
         assert_eq!(result.artifacts[0].name, "reviewer");
         assert_eq!(result.artifacts[0].kind, ArtifactKind::Agent);
@@ -682,7 +682,7 @@ mod tests {
             "/repo/plugins/my-plugin/my-skill/SKILL.md",
             skill_content("A discovered skill"),
         );
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 1);
         assert_eq!(result.artifacts[0].name, "my-skill");
         assert_eq!(result.artifacts[0].kind, ArtifactKind::Skill);
@@ -700,7 +700,7 @@ mod tests {
             agent_content("checker", "Checks things"),
         );
         fs.add_file("/repo/plugins/my-plugin/pdf/SKILL.md", skill_content("PDF processing"));
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 2);
         let names: Vec<_> = result.artifacts.iter().map(|a| a.name.as_str()).collect();
         assert!(names.contains(&"checker"));
@@ -725,7 +725,7 @@ mod tests {
         fs.add_file("/repo/skills/pdf/SKILL.md", skill_content("PDF skill"));
         // This agent exists in the repo but isn't in the explicit arrays
         fs.add_file("/repo/agents/extra-agent.md", agent_content("extra", "Should not appear"));
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 1);
         assert_eq!(result.artifacts[0].name, "pdf");
         assert_eq!(result.artifacts[0].kind, ArtifactKind::Skill);
@@ -743,7 +743,7 @@ mod tests {
         );
         fs.add_file("/repo/plugins/a/agents/agent-a.md", agent_content("agent-a", "From plugin A"));
         fs.add_file("/repo/plugins/b/agents/agent-b.md", agent_content("agent-b", "From plugin B"));
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert_eq!(result.artifacts.len(), 2);
         let names: Vec<_> = result.artifacts.iter().map(|a| a.name.as_str()).collect();
         assert!(names.contains(&"agent-a"));
@@ -758,7 +758,7 @@ mod tests {
             marketplace_json(r#"{ "name": "ghost", "source": "./nonexistent" }"#),
         );
         // Should not error, just warn and return a warning
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert!(result.artifacts.is_empty());
         assert_eq!(result.warnings.len(), 1);
         assert!(
@@ -778,7 +778,7 @@ mod tests {
             ),
         );
         // Remote sources are not supported — should warn and return empty
-        let result = scan_source_with(Path::new("/repo"), &fs).unwrap();
+        let result = scan_source(Path::new("/repo"), &fs).unwrap();
         assert!(result.artifacts.is_empty());
         assert_eq!(result.warnings.len(), 1);
         assert!(

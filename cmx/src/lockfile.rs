@@ -12,33 +12,29 @@ use crate::types::{InstallScope, LockEntry, LockFile};
 
 /// Load a `LockFile` from an explicit path via the given filesystem.
 /// Returns a default (empty) lock file if the path does not exist.
-pub fn load_from_with(path: &Path, fs: &dyn Filesystem) -> Result<LockFile> {
+pub fn load_from(path: &Path, fs: &dyn Filesystem) -> Result<LockFile> {
     crate::json_file::load_json(path, fs)
 }
 
 /// Save a `LockFile` to an explicit path via the given filesystem,
 /// creating parent directories as needed.
-pub fn save_to_with(lock: &LockFile, path: &Path, fs: &dyn Filesystem) -> Result<()> {
+pub fn save_to(lock: &LockFile, path: &Path, fs: &dyn Filesystem) -> Result<()> {
     crate::json_file::save_json(lock, path, fs)
 }
 
-pub fn load_with(
-    scope: InstallScope,
-    fs: &dyn Filesystem,
-    paths: &ConfigPaths,
-) -> Result<LockFile> {
+pub fn load(scope: InstallScope, fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<LockFile> {
     let path = paths.lock_path(scope);
-    load_from_with(&path, fs)
+    load_from(&path, fs)
 }
 
-pub fn save_with(
+pub fn save(
     lock: &LockFile,
     scope: InstallScope,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<()> {
     let path = paths.lock_path(scope);
-    save_to_with(lock, &path, fs)
+    save_to(lock, &path, fs)
 }
 
 /// Load, mutate via `f`, and save a `LockFile` in one step.
@@ -46,7 +42,7 @@ pub fn save_with(
 /// The lock file is loaded from the appropriate scope, `f` is called with
 /// a mutable reference to the in-memory lock, and the result is written
 /// back to disk.  Returns whatever `f` returns.
-pub fn mutate_with<F, T>(
+pub fn mutate<F, T>(
     scope: InstallScope,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
@@ -55,35 +51,35 @@ pub fn mutate_with<F, T>(
 where
     F: FnOnce(&mut LockFile) -> T,
 {
-    let mut lock = load_with(scope, fs, paths)?;
+    let mut lock = load(scope, fs, paths)?;
     let result = f(&mut lock);
-    save_with(&lock, scope, fs, paths)?;
+    save(&lock, scope, fs, paths)?;
     Ok(result)
 }
 
 /// Load both the global and local lock files in one call.
 ///
 /// Returns a `BTreeMap` keyed by `InstallScope`.
-pub fn load_both_with(
+pub fn load_both(
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<BTreeMap<InstallScope, LockFile>> {
     let mut locks = BTreeMap::new();
     for scope in InstallScope::ALL {
-        locks.insert(scope, load_with(scope, fs, paths)?);
+        locks.insert(scope, load(scope, fs, paths)?);
     }
     Ok(locks)
 }
 
 /// Search both scopes (global first, then local) for a lock entry by name.
 /// Returns the entry and the scope it was found in, or `None` if not found.
-pub fn find_entry_with(
+pub fn find_entry(
     name: &str,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<Option<(LockEntry, InstallScope)>> {
     for scope in InstallScope::ALL {
-        let lock = load_with(scope, fs, paths)?;
+        let lock = load(scope, fs, paths)?;
         if let Some(entry) = lock.packages.get(name) {
             return Ok(Some((entry.clone(), scope)));
         }
@@ -107,7 +103,7 @@ mod tests {
     #[test]
     fn load_from_returns_empty_when_path_absent() {
         let fs = FakeFilesystem::new();
-        let lock = load_from_with(Path::new("/nonexistent/cmx-lock.json"), &fs).unwrap();
+        let lock = load_from(Path::new("/nonexistent/cmx-lock.json"), &fs).unwrap();
         assert!(lock.packages.is_empty());
         assert_eq!(lock.version, 1);
     }
@@ -118,7 +114,7 @@ mod tests {
         let path = PathBuf::from("/config/cmx-lock.json");
         let json = serde_json::to_string(&sample_lock_file()).unwrap();
         fs.add_file(path.clone(), json);
-        let lock = load_from_with(&path, &fs).unwrap();
+        let lock = load_from(&path, &fs).unwrap();
         assert!(lock.packages.contains_key("my-agent"));
     }
 
@@ -127,7 +123,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let path = PathBuf::from("/config/cmx-lock.json");
         fs.add_file(path.clone(), "not json");
-        assert!(load_from_with(&path, &fs).is_err());
+        assert!(load_from(&path, &fs).is_err());
     }
 
     // --- save_to_with ---
@@ -136,7 +132,7 @@ mod tests {
     fn save_to_creates_parent_dirs_and_writes() {
         let fs = FakeFilesystem::new();
         let path = PathBuf::from("/config/context-mixer/cmx-lock.json");
-        save_to_with(&sample_lock_file(), &path, &fs).unwrap();
+        save_to(&sample_lock_file(), &path, &fs).unwrap();
         assert!(fs.file_exists(&path));
     }
 
@@ -146,7 +142,7 @@ mod tests {
     fn find_entry_returns_none_when_absent_in_both_scopes() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let result = find_entry_with("missing", &fs, &paths).unwrap();
+        let result = find_entry("missing", &fs, &paths).unwrap();
         assert!(result.is_none());
     }
 
@@ -155,9 +151,9 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let lock = sample_lock_file();
-        save_with(&lock, InstallScope::Global, &fs, &paths).unwrap();
+        save(&lock, InstallScope::Global, &fs, &paths).unwrap();
 
-        let result = find_entry_with("my-agent", &fs, &paths).unwrap();
+        let result = find_entry("my-agent", &fs, &paths).unwrap();
         assert!(result.is_some());
         let (_, scope) = result.unwrap();
         assert_eq!(scope, InstallScope::Global, "expected global scope");
@@ -168,9 +164,9 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let lock = sample_lock_file();
-        save_with(&lock, InstallScope::Local, &fs, &paths).unwrap();
+        save(&lock, InstallScope::Local, &fs, &paths).unwrap();
 
-        let result = find_entry_with("my-agent", &fs, &paths).unwrap();
+        let result = find_entry("my-agent", &fs, &paths).unwrap();
         assert!(result.is_some());
         let (_, scope) = result.unwrap();
         assert_eq!(scope, InstallScope::Local, "expected local scope");
@@ -181,10 +177,10 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let lock = sample_lock_file();
-        save_with(&lock, InstallScope::Global, &fs, &paths).unwrap();
-        save_with(&lock, InstallScope::Local, &fs, &paths).unwrap();
+        save(&lock, InstallScope::Global, &fs, &paths).unwrap();
+        save(&lock, InstallScope::Local, &fs, &paths).unwrap();
 
-        let result = find_entry_with("my-agent", &fs, &paths).unwrap();
+        let result = find_entry("my-agent", &fs, &paths).unwrap();
         let (_, scope) = result.unwrap();
         assert_eq!(scope, InstallScope::Global, "expected global to be preferred over local");
     }
@@ -196,12 +192,12 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
 
-        mutate_with(InstallScope::Global, &fs, &paths, |lock| {
+        mutate(InstallScope::Global, &fs, &paths, |lock| {
             lock.packages.insert("test-agent".to_string(), sample_lock_entry());
         })
         .unwrap();
 
-        let loaded = load_with(InstallScope::Global, &fs, &paths).unwrap();
+        let loaded = load(InstallScope::Global, &fs, &paths).unwrap();
         assert!(loaded.packages.contains_key("test-agent"));
     }
 
@@ -210,15 +206,15 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let lock = sample_lock_file();
-        save_with(&lock, InstallScope::Global, &fs, &paths).unwrap();
+        save(&lock, InstallScope::Global, &fs, &paths).unwrap();
 
-        let was_removed = mutate_with(InstallScope::Global, &fs, &paths, |lock| {
+        let was_removed = mutate(InstallScope::Global, &fs, &paths, |lock| {
             lock.packages.remove("my-agent").is_some()
         })
         .unwrap();
 
         assert!(was_removed, "expected closure return value to be propagated");
-        let loaded = load_with(InstallScope::Global, &fs, &paths).unwrap();
+        let loaded = load(InstallScope::Global, &fs, &paths).unwrap();
         assert!(!loaded.packages.contains_key("my-agent"));
     }
 
@@ -229,8 +225,8 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let lock = sample_lock_file();
-        save_with(&lock, InstallScope::Global, &fs, &paths).unwrap();
-        let loaded = load_with(InstallScope::Global, &fs, &paths).unwrap();
+        save(&lock, InstallScope::Global, &fs, &paths).unwrap();
+        let loaded = load(InstallScope::Global, &fs, &paths).unwrap();
         assert_eq!(loaded.packages.len(), 1);
         let entry = loaded.packages.get("my-agent").unwrap();
         assert_eq!(entry.version.as_deref(), Some("1.0.0"));
@@ -249,7 +245,7 @@ mod tests {
         fs.set_fail_on_write(crate::json_file::tmp_path(&lock_path));
 
         let lock = sample_lock_file();
-        let result = save_with(&lock, InstallScope::Global, &fs, &paths);
+        let result = save(&lock, InstallScope::Global, &fs, &paths);
         assert!(result.is_err(), "expected Err when lock file write fails");
 
         let msg = result.unwrap_err().to_string();

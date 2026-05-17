@@ -62,7 +62,7 @@ impl fmt::Display for OutdatedReport {
 // Public API
 // ---------------------------------------------------------------------------
 
-pub fn outdated_with(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
+pub fn outdated(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
     source_update::ensure_fresh(ctx)?;
 
     let loaded = LoadedState::load(ctx)?;
@@ -463,7 +463,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let report = outdated_with(&ctx).unwrap();
+        let report = outdated(&ctx).unwrap();
 
         assert_eq!(report.0.len(), 1, "expected one outdated artifact");
         assert_eq!(report.0[0].name, "my-agent");
@@ -480,7 +480,7 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let report = outdated_with(&ctx).unwrap();
+        let report = outdated(&ctx).unwrap();
 
         assert!(report.0.is_empty(), "expected no rows when everything is up to date");
     }
@@ -508,7 +508,7 @@ mod tests {
             InstallScope::Global,
         );
         // Empty lock file — no lock entry
-        lockfile::save_with(
+        lockfile::save(
             &LockFile {
                 version: 1,
                 packages: BTreeMap::new(),
@@ -520,7 +520,7 @@ mod tests {
         .unwrap();
 
         let ctx = t.ctx();
-        let report = outdated_with(&ctx).unwrap();
+        let report = outdated(&ctx).unwrap();
 
         assert_eq!(report.0.len(), 1, "untracked artifact should appear");
         assert_eq!(report.0[0].name, "my-agent");
@@ -564,7 +564,7 @@ mod tests {
         save_lock_with_entry(&t.fs, &t.paths, "my-agent", entry, InstallScope::Global);
 
         let ctx = t.ctx();
-        let report = outdated_with(&ctx).unwrap();
+        let report = outdated(&ctx).unwrap();
 
         assert_eq!(report.0.len(), 1);
         assert!(
@@ -619,7 +619,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let report = outdated_with(&ctx).unwrap();
+        let report = outdated(&ctx).unwrap();
 
         assert_eq!(report.0.len(), 2, "should show outdated row for each source");
 

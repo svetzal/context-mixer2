@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, bail};
 use cmx::gateway::Filesystem;
 use cmx::json_file::{load_json, save_json};
-use cmx::scan::scan_source_with;
+use cmx::scan::scan_source;
 use cmx::types::ArtifactKind;
 
 use crate::plugin_types::{Author, Marketplace, PluginManifest};
@@ -73,7 +73,7 @@ impl fmt::Display for PluginList {
 ///
 /// Reads `marketplace.json` for the plugin list, then for each plugin:
 /// 1. Loads `plugin.json` for metadata
-/// 2. Uses `cmx::scan::scan_source_with()` to discover agents/skills
+/// 2. Uses `cmx::scan::scan_source()` to discover agents/skills
 pub fn scan_plugins(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<PluginInfo>> {
     let marketplace_path = root.path.join(".claude-plugin").join("marketplace.json");
     let marketplace: Marketplace = load_json(&marketplace_path, fs)?;
@@ -94,7 +94,7 @@ pub fn scan_plugins(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<PluginIn
         let manifest_path = plugin_path.join(".claude-plugin").join("plugin.json");
         let manifest: PluginManifest = load_json(&manifest_path, fs)?;
 
-        let scan_result = scan_source_with(&plugin_path, fs)?;
+        let scan_result = scan_source(&plugin_path, fs)?;
         let (agents, skills) = partition_artifacts(scan_result.artifacts);
 
         plugins.push(PluginInfo {
@@ -186,7 +186,7 @@ pub fn validate_plugin(
     validate_manifest_fields(&manifest, dir_name, &mut issues);
 
     // Use cmx scan to discover what agents/skills have valid frontmatter
-    let scan_result = scan_source_with(plugin_path, fs)?;
+    let scan_result = scan_source(plugin_path, fs)?;
     let (discovered_agents, discovered_skills) = artifact_names_by_kind(&scan_result.artifacts);
 
     validate_artifact_dir(
