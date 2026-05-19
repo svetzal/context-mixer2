@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use std::fmt;
 use std::path::PathBuf;
 
@@ -91,9 +91,7 @@ pub fn install(
 
     let plan = plan_install(artifact_name, kind, scope, &found, ctx.paths);
 
-    ctx.fs
-        .create_dir_all(&plan.dest_dir)
-        .with_context(|| format!("Failed to create {}", plan.dest_dir.display()))?;
+    ctx.fs.create_dir_all(&plan.dest_dir)?;
 
     let source_checksum = checksum::checksum_artifact(&found.artifact.path, kind, ctx.fs)?;
 

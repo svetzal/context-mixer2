@@ -11,9 +11,7 @@ where
     if !fs.exists(path) {
         return Ok(T::default());
     }
-    let content = fs
-        .read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content = fs.read_to_string(path)?;
     let value: T = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse {}", path.display()))?;
     Ok(value)
@@ -40,15 +38,12 @@ where
     T: Serialize,
 {
     if let Some(parent) = path.parent() {
-        fs.create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
+        fs.create_dir_all(parent)?;
     }
     let content = serde_json::to_string_pretty(value)?;
     let tmp = tmp_path(path);
-    fs.write(&tmp, &content)
-        .with_context(|| format!("Failed to write {}", tmp.display()))?;
-    fs.rename(&tmp, path)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
+    fs.write(&tmp, &content)?;
+    fs.rename(&tmp, path)?;
     Ok(())
 }
 

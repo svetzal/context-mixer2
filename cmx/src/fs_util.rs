@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::path::{Path, PathBuf};
 
 use crate::gateway::filesystem::Filesystem;
@@ -6,9 +6,7 @@ use crate::gateway::filesystem::Filesystem;
 /// Recursively collect all non-hidden files under `dir` via the given filesystem.
 pub(crate) fn collect_files_recursive(dir: &Path, fs: &dyn Filesystem) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
-    let entries = fs
-        .read_dir(dir)
-        .with_context(|| format!("Failed to read directory {}", dir.display()))?;
+    let entries = fs.read_dir(dir)?;
 
     for entry in entries {
         if entry.file_name.starts_with('.') {

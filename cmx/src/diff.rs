@@ -150,14 +150,8 @@ fn find_in_sources_with(
 }
 
 pub(crate) fn diff_files(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Result<String> {
-    let installed_content = ctx
-        .fs
-        .read_to_string(installed)
-        .with_context(|| format!("Failed to read {}", installed.display()))?;
-    let source_content = ctx
-        .fs
-        .read_to_string(source)
-        .with_context(|| format!("Failed to read {}", source.display()))?;
+    let installed_content = ctx.fs.read_to_string(installed)?;
+    let source_content = ctx.fs.read_to_string(source)?;
 
     Ok(format!(
         "=== INSTALLED VERSION ===\n{installed_content}\n\n=== SOURCE VERSION ===\n{source_content}"

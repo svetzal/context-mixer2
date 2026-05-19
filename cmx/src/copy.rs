@@ -1,4 +1,4 @@
-use anyhow::{Context as _, Result, bail};
+use anyhow::{Result, bail};
 use std::path::{Path, PathBuf};
 
 use crate::context::AppContext;
@@ -27,8 +27,7 @@ pub(crate) fn copy_artifact(
 }
 
 pub(crate) fn copy_dir_recursive_with(src: &Path, dest: &Path, fs: &dyn Filesystem) -> Result<()> {
-    fs.create_dir_all(dest)
-        .with_context(|| format!("Failed to create {}", dest.display()))?;
+    fs.create_dir_all(dest)?;
 
     for entry in fs.read_dir(src)? {
         let dest_path = dest.join(&entry.file_name);

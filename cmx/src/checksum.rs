@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
@@ -12,7 +12,7 @@ use crate::types::{ArtifactKind, LockEntry};
 
 /// Compute SHA-256 checksum for an agent (single .md file) via the given filesystem.
 pub fn checksum_file(path: &Path, fs: &dyn Filesystem) -> Result<String> {
-    let content = fs.read(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let content = fs.read(path)?;
     let hash = Sha256::digest(&content);
     Ok(format!("sha256:{}", hex_encode(&hash)))
 }
@@ -27,8 +27,7 @@ pub fn checksum_dir(path: &Path, fs: &dyn Filesystem) -> Result<String> {
     for file in &files {
         let relative = file.strip_prefix(path).unwrap_or(file);
         hasher.update(relative.to_string_lossy().as_bytes());
-        let content =
-            fs.read(file).with_context(|| format!("Failed to read {}", file.display()))?;
+        let content = fs.read(file)?;
         hasher.update(&content);
     }
 

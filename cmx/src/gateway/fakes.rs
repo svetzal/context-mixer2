@@ -122,7 +122,7 @@ impl Filesystem for FakeFilesystem {
 
     fn write(&self, path: &Path, contents: &str) -> Result<()> {
         if self.fail_on_write.borrow().as_deref() == Some(path) {
-            bail!("FakeFilesystem: write configured to fail for {}", path.display());
+            bail!("Failed to write {}", path.display());
         }
         self.add_file(path.to_path_buf(), contents.as_bytes().to_vec());
         Ok(())
@@ -192,7 +192,7 @@ impl Filesystem for FakeFilesystem {
 
     fn read_dir(&self, path: &Path) -> Result<Vec<DirEntry>> {
         if !self.dirs.borrow().contains(path) && !self.files.borrow().contains_key(path) {
-            bail!("Directory not found: {}", path.display());
+            bail!("Failed to read directory {}", path.display());
         }
 
         let mut seen: BTreeSet<PathBuf> = BTreeSet::new();

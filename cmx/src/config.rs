@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -56,7 +56,7 @@ pub fn installed_names(
     }
 
     let mut names = Vec::new();
-    for entry in fs.read_dir(&dir).with_context(|| format!("Failed to read {}", dir.display()))? {
+    for entry in fs.read_dir(&dir)? {
         if entry.file_name.starts_with('.') {
             continue;
         }
