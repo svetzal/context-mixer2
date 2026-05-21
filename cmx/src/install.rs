@@ -1,5 +1,4 @@
 use anyhow::{Result, bail};
-use std::fmt;
 use std::path::PathBuf;
 
 use crate::checksum;
@@ -9,9 +8,7 @@ use crate::lockfile;
 use crate::paths::ConfigPaths;
 use crate::source_iter;
 use crate::source_update;
-use crate::types::{
-    self, ArtifactKind, InstallScope, LockEntry, LockSource, format_version_prefix,
-};
+use crate::types::{self, ArtifactKind, InstallScope, LockEntry, LockSource};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -26,42 +23,11 @@ pub struct InstallResult {
     pub dest_dir: PathBuf,
 }
 
-impl fmt::Display for InstallResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let version_info = format_version_prefix(self.version.as_deref());
-        writeln!(
-            f,
-            "Installed {}{version_info} ({}) from '{}' -> {}",
-            self.artifact_name,
-            self.kind,
-            self.source_name,
-            self.dest_dir.display()
-        )
-    }
-}
-
 #[derive(Debug)]
 pub struct BatchInstallResult {
     pub items: Vec<InstallResult>,
     pub kind: ArtifactKind,
     pub is_update: bool,
-}
-
-impl fmt::Display for BatchInstallResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.items.is_empty() {
-            if self.is_update {
-                writeln!(f, "All tracked {}s are up to date.", self.kind)
-            } else {
-                writeln!(f, "All available {}s are already installed and up to date.", self.kind)
-            }
-        } else {
-            for item in &self.items {
-                write!(f, "{item}")?;
-            }
-            Ok(())
-        }
-    }
 }
 
 /// Pure description of an intended installation — computed from source metadata

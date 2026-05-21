@@ -1,6 +1,5 @@
 use anyhow::Result;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fmt;
 
 use crate::checksum;
 use crate::config;
@@ -9,7 +8,6 @@ use crate::context::{AppContext, LoadedState};
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
 use crate::source_update;
-use crate::table::Table;
 use crate::types::{ArtifactKind, InstallScope, LockFile, display_version};
 
 // ---------------------------------------------------------------------------
@@ -26,37 +24,6 @@ pub struct OutdatedRow {
 }
 
 pub struct OutdatedReport(pub Vec<OutdatedRow>);
-
-impl fmt::Display for OutdatedReport {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let rows = &self.0;
-        if rows.is_empty() {
-            return writeln!(f, "Everything is up to date.");
-        }
-        write!(
-            f,
-            "{}",
-            Table {
-                headers: vec!["Name", "Type", "Installed", "Available", "Source", "Status"],
-                padded_cols: 6,
-                rows: rows
-                    .iter()
-                    .map(|r| {
-                        vec![
-                            r.name.clone(),
-                            r.kind.to_string(),
-                            r.installed_version.clone(),
-                            r.available_version.clone(),
-                            r.source.clone(),
-                            r.status.clone(),
-                        ]
-                    })
-                    .collect(),
-            }
-            .render()
-        )
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Public API

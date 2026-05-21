@@ -1,10 +1,8 @@
 use anyhow::Result;
-use std::fmt;
 
 use crate::context::AppContext;
 use crate::source_iter;
 use crate::source_update;
-use crate::table::Table;
 use crate::types::display_version;
 
 // ---------------------------------------------------------------------------
@@ -22,37 +20,6 @@ pub struct SearchResult {
 pub struct SearchOutput {
     pub results: Vec<SearchResult>,
     pub query: String,
-}
-
-impl fmt::Display for SearchOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let query = &self.query;
-        let results = &self.results;
-
-        if results.is_empty() {
-            return writeln!(f, "No results for '{query}'.");
-        }
-
-        let table = Table {
-            headers: vec!["Name", "Type", "Version", "Source", "Description"],
-            padded_cols: 4,
-            rows: results
-                .iter()
-                .map(|r| {
-                    vec![
-                        r.name.clone(),
-                        r.kind.clone(),
-                        r.version.clone(),
-                        r.source.clone(),
-                        r.description.clone(),
-                    ]
-                })
-                .collect(),
-        }
-        .render();
-
-        write!(f, "{table}\n{} result(s) found.\n", results.len())
-    }
 }
 
 // ---------------------------------------------------------------------------

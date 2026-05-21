@@ -1,5 +1,4 @@
 use anyhow::{Result, bail};
-use std::fmt;
 use std::path::{Path, PathBuf};
 
 use crate::checksum;
@@ -38,66 +37,6 @@ pub struct SkillFileEntry {
     pub name: String,
     pub is_dir: bool,
     pub indent_level: usize,
-}
-
-impl fmt::Display for ArtifactInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Name:        {}", self.name)?;
-        writeln!(f, "Type:        {}", self.kind)?;
-        writeln!(f, "Scope:       {}", self.scope)?;
-        writeln!(f, "Path:        {}", self.path.display())?;
-
-        if let Some(v) = &self.version {
-            writeln!(f, "Version:     {v}")?;
-        }
-        if let Some(at) = &self.installed_at {
-            writeln!(f, "Installed:   {at}")?;
-        }
-        if let Some(src) = &self.source_display {
-            writeln!(f, "Source:      {src}")?;
-        }
-        if let Some(cs) = &self.source_checksum {
-            writeln!(f, "Source SHA:  {cs}")?;
-        }
-        if let Some(cs) = &self.installed_checksum {
-            writeln!(f, "Install SHA: {cs}")?;
-        }
-        if self.locally_modified {
-            let disk_cs = self.disk_checksum.as_deref().unwrap_or("unknown");
-            writeln!(f, "Disk SHA:    {disk_cs}  (locally modified)")?;
-        }
-        if self.untracked {
-            writeln!(f, "Lock entry:  (none — untracked)")?;
-        }
-
-        if let Some(dep) = &self.deprecation {
-            writeln!(f, "Status:      DEPRECATED")?;
-            if let Some(reason) = &dep.reason {
-                writeln!(f, "  Reason:    {reason}")?;
-            }
-            if let Some(repl) = &dep.replacement {
-                writeln!(f, "  Replace:   {repl}")?;
-            }
-        }
-        if let Some(v) = &self.available_version {
-            writeln!(f, "Available:   v{v} (update available)")?;
-        }
-
-        if !self.skill_files.is_empty() {
-            writeln!(f)?;
-            writeln!(f, "Files:")?;
-            for entry in &self.skill_files {
-                let indent = "  ".repeat(entry.indent_level + 1);
-                if entry.is_dir {
-                    writeln!(f, "{indent}{}/", entry.name)?;
-                } else {
-                    writeln!(f, "{indent}{}", entry.name)?;
-                }
-            }
-        }
-
-        Ok(())
-    }
 }
 
 // ---------------------------------------------------------------------------

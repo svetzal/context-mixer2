@@ -1,4 +1,3 @@
-use std::fmt;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -8,45 +7,6 @@ use cmx::platform::Platform;
 use crate::repo::RepoRoot;
 
 pub struct ManifestSummary(pub Vec<PathBuf>);
-
-impl fmt::Display for ManifestSummary {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let files = &self.0;
-        if files.is_empty() {
-            return writeln!(f, "No .claude-plugin/ sources found — nothing to generate.");
-        }
-
-        writeln!(f, "Generated manifests for {} platforms:", Platform::targets().len())?;
-
-        for platform in Platform::targets() {
-            let dir_name = platform.manifest_dir();
-
-            let platform_files: Vec<_> = files
-                .iter()
-                .filter(|p| p.components().any(|c| c.as_os_str() == dir_name))
-                .collect();
-
-            let marketplace_count =
-                platform_files.iter().filter(|p| p.ends_with("marketplace.json")).count();
-            let plugin_count = platform_files.iter().filter(|p| p.ends_with("plugin.json")).count();
-
-            let mut parts = Vec::new();
-            if marketplace_count > 0 {
-                parts.push("marketplace.json".to_string());
-            }
-            if plugin_count > 0 {
-                parts.push(format!(
-                    "{plugin_count} plugin manifest{}",
-                    if plugin_count == 1 { "" } else { "s" }
-                ));
-            }
-
-            writeln!(f, "  {dir_name}/ — {}", parts.join(" + "))?;
-        }
-
-        Ok(())
-    }
-}
 
 /// Collect all source files to replicate across platforms.
 ///

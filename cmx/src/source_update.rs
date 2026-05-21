@@ -1,6 +1,5 @@
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
-use std::fmt;
 
 use crate::config;
 use crate::context::AppContext;
@@ -17,29 +16,6 @@ pub enum SourceUpdateOutput {
     SingleUpdate(SourceScanResult),
     BatchUpdate(Vec<SourceScanResult>),
     NoGitSources,
-}
-
-impl fmt::Display for SourceUpdateOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SourceUpdateOutput::NoGitSources => writeln!(f, "No git-backed sources to update."),
-            SourceUpdateOutput::SingleUpdate(result) => writeln!(
-                f,
-                "Source '{}': {} agent(s), {} skill(s).",
-                result.name, result.agents_found, result.skills_found
-            ),
-            SourceUpdateOutput::BatchUpdate(results) => {
-                for result in results {
-                    writeln!(
-                        f,
-                        "Source '{}': {} agent(s), {} skill(s).",
-                        result.name, result.agents_found, result.skills_found
-                    )?;
-                }
-                Ok(())
-            }
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------

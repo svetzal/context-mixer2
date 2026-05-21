@@ -1,5 +1,4 @@
 use anyhow::{Result, bail};
-use std::fmt;
 
 use crate::context::AppContext;
 use crate::lockfile;
@@ -14,16 +13,6 @@ pub struct UninstallResult {
     pub kind: ArtifactKind,
     pub scope: &'static str,
     pub was_tracked: bool,
-}
-
-impl fmt::Display for UninstallResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Uninstalled {} ({}) from {} scope.", self.name, self.kind, self.scope)?;
-        if !self.was_tracked {
-            writeln!(f, "  (no lock file entry found — artifact was untracked)")?;
-        }
-        Ok(())
-    }
 }
 
 // ---------------------------------------------------------------------------

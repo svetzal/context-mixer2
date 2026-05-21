@@ -1,4 +1,3 @@
-use std::fmt;
 use std::path::{Path, PathBuf};
 
 use cmx::scan::{extract_field, extract_version};
@@ -27,59 +26,7 @@ pub struct Recipe {
 
 pub struct FacetList(pub Vec<Facet>);
 
-impl fmt::Display for FacetList {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let facets = &self.0;
-        writeln!(f, "Facets ({}):", facets.len())?;
-
-        if facets.is_empty() {
-            return Ok(());
-        }
-
-        let mut groups: Vec<(String, Vec<String>)> = Vec::new();
-        for facet in facets {
-            if let Some(last) = groups.last_mut() {
-                if last.0 == facet.category {
-                    last.1.push(facet.name.clone());
-                    continue;
-                }
-            }
-            groups.push((facet.category.clone(), vec![facet.name.clone()]));
-        }
-
-        let max_cat_width = groups.iter().map(|(cat, _)| cat.len() + 1).max().unwrap_or(0);
-
-        for (category, names) in &groups {
-            let label = format!("{category}/");
-            writeln!(f, "  {:<width$} {}", label, names.join(", "), width = max_cat_width)?;
-        }
-
-        Ok(())
-    }
-}
-
 pub struct RecipeList(pub Vec<Recipe>);
-
-impl fmt::Display for RecipeList {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let recipes = &self.0;
-        writeln!(f, "Recipes ({}):", recipes.len())?;
-
-        for recipe in recipes {
-            let count = recipe.facets.len();
-            writeln!(
-                f,
-                "  {} -> {} ({} {})",
-                recipe.name,
-                recipe.produces,
-                count,
-                if count == 1 { "facet" } else { "facets" }
-            )?;
-        }
-
-        Ok(())
-    }
-}
 
 /// Parse facet frontmatter from a markdown file.
 ///

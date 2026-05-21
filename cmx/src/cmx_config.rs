@@ -1,5 +1,4 @@
 use anyhow::{Result, bail};
-use std::fmt;
 
 use crate::config;
 use crate::context::AppContext;
@@ -10,21 +9,9 @@ pub struct ConfigShowResult {
     pub model: String,
 }
 
-impl fmt::Display for ConfigShowResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "LLM gateway: {}\nLLM model:   {}\n", self.gateway, self.model)
-    }
-}
-
 pub struct ConfigSetResult {
     pub field: &'static str,
     pub value: String,
-}
-
-impl fmt::Display for ConfigSetResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "LLM {} set to: {}", self.field, self.value)
-    }
 }
 
 pub fn show(ctx: &AppContext<'_>) -> Result<ConfigShowResult> {

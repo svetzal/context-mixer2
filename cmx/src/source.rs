@@ -1,6 +1,5 @@
 use anyhow::{Context, Result, bail};
 use std::collections::HashMap;
-use std::fmt;
 use std::path::PathBuf;
 
 use crate::config;
@@ -9,7 +8,7 @@ use crate::gateway::{DirEntry, Filesystem};
 use crate::scan;
 use crate::source_iter;
 use crate::source_update;
-use crate::types::{Artifact, ArtifactKind, SourceEntry, SourceType, format_version_prefix};
+use crate::types::{Artifact, ArtifactKind, SourceEntry, SourceType};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -56,75 +55,6 @@ pub struct SourceBrowseResult {
 pub struct SourceRemoveResult {
     pub name: String,
     pub clone_deleted: bool,
-}
-
-impl fmt::Display for SourceListResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.entries.is_empty() {
-            return write!(
-                f,
-                "No sources registered.\n\nAdd one with: cmx source add <name> <path-or-url>\n"
-            );
-        }
-        for entry in &self.entries {
-            writeln!(f, "  {:<28} ({}) {}", entry.name, entry.kind, entry.location)?;
-        }
-        Ok(())
-    }
-}
-
-impl fmt::Display for SourceBrowseResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = &self.source_name;
-        if self.agents.is_empty() && self.skills.is_empty() {
-            return writeln!(f, "No agents or skills found in '{name}'.");
-        }
-        if !self.agents.is_empty() {
-            writeln!(f, "Agents:")?;
-            for a in &self.agents {
-                let v = format_version_prefix(a.version.as_deref());
-                writeln!(f, "  {}{v}{}", a.name, a.deprecation_display)?;
-            }
-        }
-        if !self.skills.is_empty() {
-            if !self.agents.is_empty() {
-                writeln!(f)?;
-            }
-            writeln!(f, "Skills:")?;
-            for s in &self.skills {
-                let v = format_version_prefix(s.version.as_deref());
-                writeln!(f, "  {}{v}{}", s.name, s.deprecation_display)?;
-                for file in &s.files {
-                    writeln!(f, "    {file}")?;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-impl fmt::Display for SourceScanResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "Source '{}' registered: {} agent(s), {} skill(s) found.",
-            self.name, self.agents_found, self.skills_found
-        )?;
-        for warning in &self.warnings {
-            writeln!(f, "Warning: {}", warning.message)?;
-        }
-        Ok(())
-    }
-}
-
-impl fmt::Display for SourceRemoveResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.clone_deleted {
-            writeln!(f, "Source '{}' removed (cloned repo deleted).", self.name)
-        } else {
-            writeln!(f, "Source '{}' removed.", self.name)
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------

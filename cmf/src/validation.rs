@@ -1,5 +1,4 @@
 /// Shared validation types used across plugin, marketplace, and facet validation.
-use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IssueLevel {
@@ -33,34 +32,6 @@ impl ValidationIssue {
 }
 
 pub struct ValidationReport(pub Vec<ValidationIssue>);
-
-impl fmt::Display for ValidationReport {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let issues = &self.0;
-        if issues.is_empty() {
-            return writeln!(f, "All plugins valid.");
-        }
-
-        let errors: Vec<_> = issues.iter().filter(|i| i.level == IssueLevel::Error).collect();
-        let warnings: Vec<_> = issues.iter().filter(|i| i.level == IssueLevel::Warning).collect();
-
-        if !errors.is_empty() {
-            writeln!(f, "Errors:")?;
-            for issue in &errors {
-                writeln!(f, "  {}: {}", issue.context, issue.message)?;
-            }
-        }
-
-        if !warnings.is_empty() {
-            writeln!(f, "Warnings:")?;
-            for issue in &warnings {
-                writeln!(f, "  {}: {}", issue.context, issue.message)?;
-            }
-        }
-
-        Ok(())
-    }
-}
 
 #[cfg(test)]
 mod tests {

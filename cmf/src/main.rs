@@ -1,21 +1,19 @@
-use std::collections::BTreeMap;
 use std::env;
 
 use anyhow::Result;
 use clap::Parser;
 use cmx::gateway::{Filesystem, RealFilesystem};
-use cmx::json_file::load_json;
 
+use cmf::display::status_report;
 use cmf::facet::{scan_facets, scan_recipes, validate_facets};
 use cmf::facet_types::{FacetList, RecipeList};
 use cmf::manifest::{ManifestSummary, generate_manifests};
 use cmf::marketplace::{generate_marketplace, validate_marketplace};
 use cmf::plugin::{PluginList, init_plugin, scan_plugins, validate_all_plugins};
-use cmf::plugin_types::Marketplace;
 use cmf::recipe::{assemble_recipe, diff_recipe, write_assembled};
-use cmf::repo::{RepoKind, RepoRoot, detect_repo};
+use cmf::repo::{RepoRoot, detect_repo};
 use cmf::validate::validate_all;
-use cmf::validation::{IssueLevel, ValidationReport};
+use cmf::validation::ValidationReport;
 
 mod cli;
 
@@ -155,128 +153,4 @@ fn handle_marketplace(
         }
     }
     Ok(())
-}
-
-fn status_report(root: &RepoRoot, fs: &dyn Filesystem) -> String {
-    let mut out = String::new();
-    out.push_str(&repo_identity_str(root, fs));
-    out.push_str(&plugin_summary_str(root, fs));
-    out.push_str(&facet_summary_str(root, fs));
-    out.push_str(&validation_summary_str(root, fs));
-    out
-}
-
-fn repo_identity_str(root: &RepoRoot, fs: &dyn Filesystem) -> String {
-    let marketplace_path = root.path.join(".claude-plugin").join("marketplace.json");
-    let name = load_json::<Marketplace>(&marketplace_path, fs)
-        .ok()
-        .map(|m| m.name)
-        .filter(|n| !n.is_empty());
-
-    let kind_label = match root.kind {
-        RepoKind::Marketplace => "marketplace",
-        RepoKind::Plugin => "plugin",
-        RepoKind::FacetsOnly => "facets-only",
-        RepoKind::Unknown => "unknown",
-    };
-
-    let mut out = match name {
-        Some(n) => format!("Repository: {n} ({kind_label})\n"),
-        None => format!("Repository: ({kind_label})\n"),
-    };
-    let _ = std::fmt::write(&mut out, format_args!("Root: {}\n", root.path.display()));
-    out
-}
-
-fn plugin_summary_str(root: &RepoRoot, fs: &dyn Filesystem) -> String {
-    let Ok(plugins) = scan_plugins(root, fs) else {
-        return String::new();
-    };
-
-    if plugins.is_empty() {
-        return String::new();
-    }
-
-    let mut by_category: BTreeMap<String, usize> = BTreeMap::new();
-    let mut total_agents = 0usize;
-    let mut total_skills = 0usize;
-
-    for plugin in &plugins {
-        let cat = plugin.category.as_deref().unwrap_or("uncategorized").to_string();
-        *by_category.entry(cat).or_default() += 1;
-        total_agents += plugin.agents.len();
-        total_skills += plugin.skills.len();
-    }
-
-    let breakdown: Vec<String> =
-        by_category.iter().map(|(cat, count)| format!("{count} {cat}")).collect();
-
-    let plugin_count = plugins.len();
-    let breakdown = breakdown.join(", ");
-    format!(
-        "Plugins: {plugin_count} ({breakdown})\nAgents: {total_agents} | Skills: {total_skills}\n"
-    )
-}
-
-fn facet_summary_str(root: &RepoRoot, fs: &dyn Filesystem) -> String {
-    if !root.has_facets {
-        return String::new();
-    }
-
-    let Ok(facets) = scan_facets(root, fs) else {
-        return String::new();
-    };
-
-    let mut out = String::new();
-
-    if !facets.is_empty() {
-        let mut by_category: BTreeMap<String, usize> = BTreeMap::new();
-        for facet in &facets {
-            *by_category.entry(facet.category.clone()).or_default() += 1;
-        }
-
-        let breakdown: Vec<String> =
-            by_category.iter().map(|(cat, count)| format!("{count} {cat}")).collect();
-
-        let facet_count = facets.len();
-        let breakdown = breakdown.join(", ");
-        let _ = std::fmt::write(&mut out, format_args!("Facets: {facet_count} ({breakdown})\n"));
-    }
-
-    let Ok(recipes) = scan_recipes(root, fs) else {
-        return out;
-    };
-
-    if !recipes.is_empty() {
-        let recipe_count = recipes.len();
-        let _ = std::fmt::write(&mut out, format_args!("Recipes: {recipe_count}\n"));
-    }
-
-    out
-}
-
-fn validation_summary_str(root: &RepoRoot, fs: &dyn Filesystem) -> String {
-    let Ok(issues) = validate_all(root, fs) else {
-        return String::new();
-    };
-
-    if issues.is_empty() {
-        return "Validation: all clean\n".to_string();
-    }
-
-    let errors = issues.iter().filter(|i| i.level == IssueLevel::Error).count();
-    let warnings = issues.iter().filter(|i| i.level == IssueLevel::Warning).count();
-
-    let mut parts = Vec::new();
-    if errors > 0 {
-        let label = if errors == 1 { "error" } else { "errors" };
-        parts.push(format!("{errors} {label}"));
-    }
-    if warnings > 0 {
-        let label = if warnings == 1 { "warning" } else { "warnings" };
-        parts.push(format!("{warnings} {label}"));
-    }
-
-    let summary = parts.join(", ");
-    format!("Validation: {summary}\n")
 }

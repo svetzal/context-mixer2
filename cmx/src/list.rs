@@ -1,6 +1,5 @@
 use anyhow::Result;
 use std::collections::{BTreeMap, HashMap};
-use std::fmt;
 
 use crate::config;
 use crate::config::InstalledWithSources;
@@ -31,59 +30,7 @@ pub struct ListOutput {
     pub skills: BTreeMap<InstallScope, Vec<Row>>,
 }
 
-impl fmt::Display for ListKindOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let kind = self.kind;
-        let empty = vec![];
-        let global = self.rows.get(&InstallScope::Global).unwrap_or(&empty);
-        let local = self.rows.get(&InstallScope::Local).unwrap_or(&empty);
-
-        if global.is_empty() && local.is_empty() {
-            return writeln!(f, "No {kind}s installed.");
-        }
-
-        if !global.is_empty() {
-            writeln!(f, "Global {kind}s:")?;
-            write!(f, "{}", table_str(global))?;
-        }
-
-        if !local.is_empty() {
-            if !global.is_empty() {
-                writeln!(f)?;
-            }
-            writeln!(f, "Local {kind}s:")?;
-            write!(f, "{}", table_str(local))?;
-        }
-
-        Ok(())
-    }
-}
-
-impl fmt::Display for ListOutput {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let empty = vec![];
-        let global_agents = self.agents.get(&InstallScope::Global).unwrap_or(&empty);
-        let local_agents = self.agents.get(&InstallScope::Local).unwrap_or(&empty);
-        let global_skills = self.skills.get(&InstallScope::Global).unwrap_or(&empty);
-        let local_skills = self.skills.get(&InstallScope::Local).unwrap_or(&empty);
-
-        if global_agents.is_empty()
-            && local_agents.is_empty()
-            && global_skills.is_empty()
-            && local_skills.is_empty()
-        {
-            return writeln!(f, "Nothing installed.");
-        }
-
-        write!(f, "{}", section_str("Global agents", global_agents))?;
-        write!(f, "{}", section_str("Local agents", local_agents))?;
-        write!(f, "{}", section_str("Global skills", global_skills))?;
-        write!(f, "{}", section_str("Local skills", local_skills))?;
-        Ok(())
-    }
-}
-
-fn table_str(rows: &[Row]) -> String {
+pub(crate) fn table_str(rows: &[Row]) -> String {
     if rows.is_empty() {
         return String::new();
     }
@@ -106,7 +53,7 @@ fn table_str(rows: &[Row]) -> String {
     .render()
 }
 
-fn section_str(label: &str, rows: &[Row]) -> String {
+pub(crate) fn section_str(label: &str, rows: &[Row]) -> String {
     let mut out = format!("{label}:\n");
     if rows.is_empty() {
         out.push_str("  (none)\n");
