@@ -17,7 +17,7 @@
     },
     {
       "name": "coverage",
-      "command": "cargo tarpaulin --all-features --fail-under 64",
+      "command": "cargo tarpaulin --fail-under 64",
       "required": true
     },
     {

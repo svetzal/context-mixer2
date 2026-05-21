@@ -9,4 +9,6 @@ output-dir = "coverage"
 
 [run]
 # Timeout for test execution (in seconds)
-timeout = "300s"
+timeout = "120s"
+# Avoid cleaning instrumented build artifacts on each run
+skip-clean = true
