@@ -301,3 +301,362 @@ fn validation_summary_str(root: &RepoRoot, fs: &dyn Filesystem) -> String {
     let summary = parts.join(", ");
     format!("Validation: {summary}\n")
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use cmx::gateway::fakes::FakeFilesystem;
+
+    use crate::facet_types::{Facet, FacetList, Recipe, RecipeList};
+    use crate::manifest::ManifestSummary;
+    use crate::plugin::{PluginInfo, PluginList};
+    use crate::repo::{RepoKind, RepoRoot};
+    use crate::test_support::{fake_marketplace_json, fake_plugin_json};
+    use crate::validation::{IssueLevel, ValidationIssue, ValidationReport};
+
+    use super::{
+        facet_summary_str, plugin_summary_str, repo_identity_str, status_report,
+        validation_summary_str,
+    };
+
+    fn unknown_root(path: &str) -> RepoRoot {
+        RepoRoot {
+            path: PathBuf::from(path),
+            kind: RepoKind::Unknown,
+            has_facets: false,
+            has_plugins_dir: false,
+        }
+    }
+
+    fn marketplace_root(path: &str) -> RepoRoot {
+        RepoRoot {
+            path: PathBuf::from(path),
+            kind: RepoKind::Marketplace,
+            has_facets: false,
+            has_plugins_dir: false,
+        }
+    }
+
+    // --- PluginList Display ---
+
+    #[test]
+    fn plugin_list_display_empty() {
+        assert!(PluginList(vec![]).to_string().starts_with("Plugins (0):"));
+    }
+
+    #[test]
+    fn plugin_list_display_single_plugin() {
+        let plugin = PluginInfo {
+            name: "rust-craft".to_string(),
+            version: Some("1.0.0".to_string()),
+            description: None,
+            category: Some("dev".to_string()),
+            path: PathBuf::from("/plugins/rust-craft"),
+            agents: vec![],
+            skills: vec![],
+        };
+        let out = PluginList(vec![plugin]).to_string();
+        assert!(out.contains("Plugins (1):"));
+        assert!(out.contains("rust-craft"));
+        assert!(out.contains("1.0.0"));
+    }
+
+    #[test]
+    fn plugin_list_display_optional_fields_absent() {
+        let plugin = PluginInfo {
+            name: "bare-plugin".to_string(),
+            version: None,
+            description: None,
+            category: None,
+            path: PathBuf::from("/plugins/bare-plugin"),
+            agents: vec![],
+            skills: vec![],
+        };
+        let out = PluginList(vec![plugin]).to_string();
+        assert!(out.contains("bare-plugin"));
+        assert!(out.contains('-'));
+    }
+
+    // --- ManifestSummary Display ---
+
+    #[test]
+    fn manifest_summary_display_empty() {
+        let out = ManifestSummary(vec![]).to_string();
+        assert!(out.contains("nothing to generate"));
+    }
+
+    #[test]
+    fn manifest_summary_display_with_files() {
+        use cmx::platform::Platform;
+        let dir = Platform::targets()[0].manifest_dir();
+        let files = vec![
+            PathBuf::from(format!("/{dir}/marketplace.json")),
+            PathBuf::from(format!("/{dir}/plugin.json")),
+        ];
+        let out = ManifestSummary(files).to_string();
+        assert!(out.contains("Generated manifests"));
+        assert!(out.contains(dir));
+    }
+
+    // --- FacetList Display ---
+
+    #[test]
+    fn facet_list_display_empty() {
+        assert_eq!(FacetList(vec![]).to_string(), "Facets (0):\n");
+    }
+
+    #[test]
+    fn facet_list_display_single_category() {
+        let facet = Facet {
+            name: "error-handling".to_string(),
+            category: "rust".to_string(),
+            scope: None,
+            does_not_cover: None,
+            version: None,
+            path: PathBuf::from("/facets/rust/error-handling.md"),
+        };
+        let out = FacetList(vec![facet]).to_string();
+        assert!(out.contains("rust/"));
+        assert!(out.contains("error-handling"));
+    }
+
+    #[test]
+    fn facet_list_display_multiple_categories() {
+        let f1 = Facet {
+            name: "errors".to_string(),
+            category: "rust".to_string(),
+            scope: None,
+            does_not_cover: None,
+            version: None,
+            path: PathBuf::from("/facets/rust/errors.md"),
+        };
+        let f2 = Facet {
+            name: "testing".to_string(),
+            category: "testing".to_string(),
+            scope: None,
+            does_not_cover: None,
+            version: None,
+            path: PathBuf::from("/facets/testing/testing.md"),
+        };
+        let out = FacetList(vec![f1, f2]).to_string();
+        assert!(out.contains("rust/"));
+        assert!(out.contains("testing/"));
+    }
+
+    // --- RecipeList Display ---
+
+    #[test]
+    fn recipe_list_display_empty() {
+        assert_eq!(RecipeList(vec![]).to_string(), "Recipes (0):\n");
+    }
+
+    #[test]
+    fn recipe_list_display_singular_facet() {
+        let recipe = Recipe {
+            name: "rust-agent".to_string(),
+            description: String::new(),
+            produces: "AGENTS.md".to_string(),
+            facets: vec!["errors".to_string()],
+            runtime_skills: vec![],
+        };
+        let out = RecipeList(vec![recipe]).to_string();
+        assert!(out.contains("rust-agent"));
+        assert!(out.contains("1 facet)"));
+    }
+
+    #[test]
+    fn recipe_list_display_plural_facets() {
+        let recipe = Recipe {
+            name: "rust-agent".to_string(),
+            description: String::new(),
+            produces: "AGENTS.md".to_string(),
+            facets: vec!["errors".to_string(), "testing".to_string()],
+            runtime_skills: vec![],
+        };
+        let out = RecipeList(vec![recipe]).to_string();
+        assert!(out.contains("2 facets)"));
+    }
+
+    // --- ValidationReport Display ---
+
+    #[test]
+    fn validation_report_display_clean() {
+        let report = ValidationReport(vec![]);
+        assert_eq!(report.to_string(), "All plugins valid.\n");
+    }
+
+    #[test]
+    fn validation_report_display_with_errors_and_warnings() {
+        let issues = vec![
+            ValidationIssue {
+                level: IssueLevel::Error,
+                context: "p1".to_string(),
+                message: "bad".to_string(),
+            },
+            ValidationIssue {
+                level: IssueLevel::Warning,
+                context: "p2".to_string(),
+                message: "iffy".to_string(),
+            },
+        ];
+        let out = ValidationReport(issues).to_string();
+        assert!(out.contains("Errors:"));
+        assert!(out.contains("bad"));
+        assert!(out.contains("Warnings:"));
+        assert!(out.contains("iffy"));
+    }
+
+    // --- repo_identity_str ---
+
+    #[test]
+    fn repo_identity_str_marketplace_with_name() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            r#"{"name":"My Marketplace","plugins":[]}"#,
+        );
+        let root = marketplace_root("/repo");
+        let out = repo_identity_str(&root, &fs);
+        assert!(out.contains("My Marketplace"));
+        assert!(out.contains("marketplace"));
+    }
+
+    #[test]
+    fn repo_identity_str_plugin_without_name() {
+        let fs = FakeFilesystem::new();
+        let root = RepoRoot {
+            path: PathBuf::from("/plugin"),
+            kind: RepoKind::Plugin,
+            has_facets: false,
+            has_plugins_dir: false,
+        };
+        let out = repo_identity_str(&root, &fs);
+        assert!(out.contains("(plugin)"));
+    }
+
+    #[test]
+    fn repo_identity_str_unknown_kind() {
+        let fs = FakeFilesystem::new();
+        let root = unknown_root("/somewhere");
+        let out = repo_identity_str(&root, &fs);
+        assert!(out.contains("(unknown)"));
+    }
+
+    // --- plugin_summary_str ---
+
+    #[test]
+    fn plugin_summary_str_no_plugins_returns_empty() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/repo/.claude-plugin/marketplace.json", r#"{"name":"empty","plugins":[]}"#);
+        let root = marketplace_root("/repo");
+        assert_eq!(plugin_summary_str(&root, &fs), "");
+    }
+
+    #[test]
+    fn plugin_summary_str_with_plugins_shows_counts() {
+        let fs = FakeFilesystem::new();
+        let json = fake_marketplace_json(&[("my-plugin", "A plugin", "./plugins/my-plugin")]);
+        fs.add_file("/repo/.claude-plugin/marketplace.json", json.as_str());
+        fs.add_dir("/repo/plugins/my-plugin");
+        fs.add_file(
+            "/repo/plugins/my-plugin/.claude-plugin/plugin.json",
+            fake_plugin_json("my-plugin"),
+        );
+        let root = marketplace_root("/repo");
+        let out = plugin_summary_str(&root, &fs);
+        assert!(out.contains("Plugins:"));
+        assert!(out.contains('1'));
+    }
+
+    // --- facet_summary_str ---
+
+    #[test]
+    fn facet_summary_str_no_facets_flag_returns_empty() {
+        let fs = FakeFilesystem::new();
+        let root = unknown_root("/repo");
+        assert_eq!(facet_summary_str(&root, &fs), "");
+    }
+
+    #[test]
+    fn facet_summary_str_with_facets_shows_count() {
+        use crate::test_support::fake_facet_content;
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/facets/rust/errors.md",
+            fake_facet_content("errors", "rust", "Error handling"),
+        );
+        let root = RepoRoot {
+            path: PathBuf::from("/repo"),
+            kind: RepoKind::FacetsOnly,
+            has_facets: true,
+            has_plugins_dir: false,
+        };
+        let out = facet_summary_str(&root, &fs);
+        assert!(out.contains("Facets:"));
+        assert!(out.contains('1'));
+    }
+
+    // --- validation_summary_str ---
+
+    #[test]
+    fn validation_summary_str_all_clean() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/repo/.claude-plugin/marketplace.json", r#"{"name":"clean","plugins":[]}"#);
+        let root = marketplace_root("/repo");
+        assert_eq!(validation_summary_str(&root, &fs), "Validation: all clean\n");
+    }
+
+    #[test]
+    fn validation_summary_str_with_errors() {
+        let fs = FakeFilesystem::new();
+        let root = unknown_root("/nowhere");
+        let out = validation_summary_str(&root, &fs);
+        assert!(out.contains("Validation:"));
+        assert!(out.contains("error"));
+    }
+
+    #[test]
+    fn validation_summary_str_warnings_only() {
+        let fs = FakeFilesystem::new();
+        let json = fake_marketplace_json(&[("my-plugin", "A plugin", "./plugins/my-plugin")]);
+        fs.add_file("/repo/.claude-plugin/marketplace.json", json.as_str());
+        fs.add_dir("/repo/plugins/my-plugin");
+        fs.add_file(
+            "/repo/plugins/my-plugin/.claude-plugin/plugin.json",
+            fake_plugin_json("mismatched-name"),
+        );
+        let root = RepoRoot {
+            path: PathBuf::from("/repo"),
+            kind: RepoKind::Marketplace,
+            has_facets: false,
+            has_plugins_dir: true,
+        };
+        let out = validation_summary_str(&root, &fs);
+        assert!(out.contains("Validation:"));
+        assert!(out.contains("warning"));
+    }
+
+    // --- status_report integration ---
+
+    #[test]
+    fn status_report_clean_marketplace() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            r#"{"name":"My Marketplace","plugins":[]}"#,
+        );
+        let root = marketplace_root("/repo");
+        let out = status_report(&root, &fs);
+        assert!(out.contains("My Marketplace"));
+        assert!(out.contains("Validation: all clean"));
+    }
+
+    #[test]
+    fn status_report_unknown_repo_includes_identity() {
+        let fs = FakeFilesystem::new();
+        let root = unknown_root("/somewhere");
+        let out = status_report(&root, &fs);
+        assert!(out.contains("(unknown)"));
+    }
+}
