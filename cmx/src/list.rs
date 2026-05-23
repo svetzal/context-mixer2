@@ -292,6 +292,19 @@ mod tests {
     }
 
     #[test]
+    fn list_kind_output_display_local_only() {
+        let mut rows = BTreeMap::new();
+        rows.insert(InstallScope::Local, vec![make_row("skill-a", "2.0", "src", "2.0")]);
+        let output = ListKindOutput {
+            kind: ArtifactKind::Skill,
+            rows,
+        };
+        let result = output.to_string();
+        assert!(result.contains("Local skills:"), "missing local section header");
+        assert!(!result.contains("Global skills:"), "unexpected global section");
+    }
+
+    #[test]
     fn list_kind_output_display_both_sections() {
         let mut rows = BTreeMap::new();
         rows.insert(InstallScope::Global, vec![make_row("skill-a", "1.0", "src", "1.0")]);
