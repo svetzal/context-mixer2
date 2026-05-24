@@ -559,6 +559,58 @@ mod tests {
         assert_eq!(output.installed_version.as_deref(), Some("1.0.0"));
     }
 
+    // --- DiffOutput Display ---
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn diff_output_up_to_date() {
+        let r = DiffOutput {
+            artifact_name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            is_up_to_date: true,
+            installed_version: None,
+            source_version: None,
+            source_name: "src".to_string(),
+            diff_text: None,
+            analysis: None,
+        };
+        assert!(r.to_string().contains("is up to date with source."));
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn diff_output_with_analysis() {
+        let r = DiffOutput {
+            artifact_name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            is_up_to_date: false,
+            installed_version: Some("1.0.0".to_string()),
+            source_version: Some("2.0.0".to_string()),
+            source_name: "src".to_string(),
+            diff_text: Some("--- a\n+++ b\n".to_string()),
+            analysis: Some("Breaking changes added.".to_string()),
+        };
+        let out = r.to_string();
+        assert!(out.contains("Comparing my-agent"));
+        assert!(out.contains("Breaking changes added."));
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn diff_output_diff_text_only() {
+        let r = DiffOutput {
+            artifact_name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            is_up_to_date: false,
+            installed_version: None,
+            source_version: None,
+            source_name: "src".to_string(),
+            diff_text: Some("--- a\n+++ b\n".to_string()),
+            analysis: None,
+        };
+        assert!(r.to_string().contains("Differences:"));
+    }
+
     // --- failure-path tests ---
 
     #[tokio::test]
