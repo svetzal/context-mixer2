@@ -7,8 +7,8 @@ use cmx::scan::scan_source;
 use cmx::types::ArtifactKind;
 
 use crate::plugin_types::{Author, Marketplace, PluginManifest};
-use crate::repo::{RepoKind, RepoRoot};
-use crate::validation::ValidationIssue;
+use crate::repo::{RepoKind, RepoRoot, resolve_source_path};
+use crate::validation::{ValidationIssue, load_and_validate_json};
 
 #[derive(Debug)]
 pub struct PluginInfo {
@@ -115,27 +115,16 @@ pub fn validate_plugin(
     dir_name: &str,
     fs: &dyn Filesystem,
 ) -> Result<Vec<ValidationIssue>> {
-    let mut issues = Vec::new();
     let manifest_path = plugin_path.join(".claude-plugin").join("plugin.json");
 
-    // Check 1: plugin.json exists
-    if !fs.exists(&manifest_path) {
-        issues.push(ValidationIssue::error(dir_name, "plugin.json is missing"));
-        return Ok(issues);
+    let (maybe_manifest, early_issues) =
+        load_and_validate_json::<PluginManifest>(&manifest_path, dir_name, "plugin.json", fs)?;
+    if !early_issues.is_empty() {
+        return Ok(early_issues);
     }
+    let manifest = maybe_manifest.unwrap();
 
-    // Check 2: plugin.json reads and parses as valid JSON
-    let Ok(content) = fs.read_to_string(&manifest_path) else {
-        issues.push(ValidationIssue::error(dir_name, "plugin.json could not be read"));
-        return Ok(issues);
-    };
-    let manifest: PluginManifest = match serde_json::from_str(&content) {
-        Ok(m) => m,
-        Err(e) => {
-            issues.push(ValidationIssue::error(dir_name, format!("plugin.json is malformed: {e}")));
-            return Ok(issues);
-        }
-    };
+    let mut issues = Vec::new();
 
     validate_manifest_fields(&manifest, dir_name, &mut issues);
 
@@ -312,13 +301,6 @@ pub fn validate_all_plugins(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
     }
 
     Ok(all_issues)
-}
-
-/// Resolve a marketplace source path (which may start with `./`) relative to
-/// the repository root.
-fn resolve_source_path(root: &Path, source: &str) -> PathBuf {
-    let cleaned = source.strip_prefix("./").unwrap_or(source);
-    root.join(cleaned)
 }
 
 #[cfg(test)]

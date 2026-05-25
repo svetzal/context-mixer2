@@ -3,8 +3,8 @@ use cmx::gateway::Filesystem;
 use cmx::json_file::{load_json, save_json};
 
 use crate::plugin_types::{Marketplace, MarketplaceEntry, PluginManifest};
-use crate::repo::RepoRoot;
-use crate::validation::ValidationIssue;
+use crate::repo::{RepoRoot, resolve_source_path};
+use crate::validation::{ValidationIssue, load_and_validate_json};
 
 /// Validate marketplace.json against the actual plugin directories.
 ///
@@ -12,30 +12,20 @@ use crate::validation::ValidationIssue;
 /// source resolves to a real directory with a plugin.json, and that all plugin
 /// directories are listed.
 pub fn validate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<ValidationIssue>> {
-    let mut issues = Vec::new();
     let marketplace_path = root.path.join(".claude-plugin").join("marketplace.json");
 
-    // Check 1: marketplace.json exists
-    if !fs.exists(&marketplace_path) {
-        issues.push(ValidationIssue::error("marketplace", "marketplace.json is missing"));
-        return Ok(issues);
+    let (maybe_marketplace, early_issues) = load_and_validate_json::<Marketplace>(
+        &marketplace_path,
+        "marketplace",
+        "marketplace.json",
+        fs,
+    )?;
+    if !early_issues.is_empty() {
+        return Ok(early_issues);
     }
+    let marketplace = maybe_marketplace.unwrap();
 
-    // Check 2: parses as valid JSON
-    let Ok(content) = fs.read_to_string(&marketplace_path) else {
-        issues.push(ValidationIssue::error("marketplace", "marketplace.json could not be read"));
-        return Ok(issues);
-    };
-    let marketplace: Marketplace = match serde_json::from_str(&content) {
-        Ok(m) => m,
-        Err(e) => {
-            issues.push(ValidationIssue::error(
-                "marketplace",
-                format!("marketplace.json is malformed: {e}"),
-            ));
-            return Ok(issues);
-        }
-    };
+    let mut issues = Vec::new();
 
     // Check 3: each entry's source resolves to a directory with plugin.json
     issues.extend(validate_marketplace_entries(&marketplace.plugins, root, fs));
@@ -222,13 +212,6 @@ pub fn generate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<usiz
     let plugin_count = marketplace.plugins.len();
     save_json(&marketplace, &marketplace_path, fs)?;
     Ok(plugin_count)
-}
-
-/// Resolve a marketplace source path (which may start with `./`) relative to
-/// the repository root.
-fn resolve_source_path(root: &std::path::Path, source: &str) -> std::path::PathBuf {
-    let cleaned = source.strip_prefix("./").unwrap_or(source);
-    root.join(cleaned)
 }
 
 #[cfg(test)]

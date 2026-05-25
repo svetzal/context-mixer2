@@ -55,6 +55,13 @@ pub fn detect_repo(start: &Path, fs: &dyn Filesystem) -> Result<RepoRoot> {
     })
 }
 
+/// Resolve a marketplace source path (which may start with `./`) relative to
+/// the repository root.
+pub fn resolve_source_path(root: &Path, source: &str) -> PathBuf {
+    let cleaned = source.strip_prefix("./").unwrap_or(source);
+    root.join(cleaned)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

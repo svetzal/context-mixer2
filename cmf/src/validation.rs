@@ -1,4 +1,51 @@
 /// Shared validation types used across plugin, marketplace, and facet validation.
+use std::path::Path;
+
+use anyhow::Result;
+use cmx::gateway::Filesystem;
+
+/// Load and parse a JSON file, collecting validation issues for missing,
+/// unreadable, or malformed files.
+///
+/// Returns `(Some(value), [])` on success or `(None, [issue])` on failure.
+/// Callers should return early when the returned issue list is non-empty.
+pub fn load_and_validate_json<T: serde::de::DeserializeOwned>(
+    path: &Path,
+    context: &str,
+    file_label: &str,
+    fs: &dyn Filesystem,
+) -> Result<(Option<T>, Vec<ValidationIssue>)> {
+    if !fs.exists(path) {
+        return Ok((
+            None,
+            vec![ValidationIssue::error(
+                context,
+                format!("{file_label} is missing"),
+            )],
+        ));
+    }
+
+    let Ok(raw) = fs.read_to_string(path) else {
+        return Ok((
+            None,
+            vec![ValidationIssue::error(
+                context,
+                format!("{file_label} could not be read"),
+            )],
+        ));
+    };
+
+    match serde_json::from_str(&raw) {
+        Ok(v) => Ok((Some(v), vec![])),
+        Err(e) => Ok((
+            None,
+            vec![ValidationIssue::error(
+                context,
+                format!("{file_label} is malformed: {e}"),
+            )],
+        )),
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IssueLevel {
