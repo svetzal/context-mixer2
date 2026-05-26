@@ -360,3 +360,555 @@ impl fmt::Display for SourceUpdateOutput {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::cmx_config::{ConfigSetResult, ConfigShowResult};
+    use crate::info::{ArtifactInfo, SkillFileEntry};
+    use crate::install::{BatchInstallResult, InstallResult};
+    use crate::list::{ListKindOutput, ListOutput, Row};
+    use crate::outdated::{OutdatedReport, OutdatedRow};
+    use crate::scan::ScanWarning;
+    use crate::search::{SearchOutput, SearchResult};
+    use crate::source::{
+        BrowseArtifact, BrowseSkill, SourceBrowseResult, SourceListEntry, SourceListResult,
+        SourceRemoveResult, SourceScanResult,
+    };
+    use crate::source_update::SourceUpdateOutput;
+    use crate::types::{ArtifactKind, Deprecation, InstallScope};
+    use crate::uninstall::UninstallResult;
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+
+    fn make_row(name: &str) -> Row {
+        Row {
+            name: name.to_string(),
+            installed: "1.0.0".to_string(),
+            source: "src".to_string(),
+            available: "1.0.0".to_string(),
+            status: "✅",
+        }
+    }
+
+    fn minimal_artifact_info(name: &str) -> ArtifactInfo {
+        ArtifactInfo {
+            name: name.to_string(),
+            kind: ArtifactKind::Agent,
+            scope: "global",
+            path: PathBuf::from(format!("{name}.md")),
+            version: None,
+            installed_at: None,
+            source_display: None,
+            source_checksum: None,
+            installed_checksum: None,
+            disk_checksum: None,
+            locally_modified: false,
+            untracked: false,
+            deprecation: None,
+            available_version: None,
+            skill_files: vec![],
+        }
+    }
+
+    // --- Step 1: SourceListResult ---
+
+    #[test]
+    fn source_list_result_empty_shows_hint() {
+        let r = SourceListResult { entries: vec![] };
+        let out = r.to_string();
+        assert!(out.contains("No sources registered."));
+        assert!(out.contains("cmx source add"));
+    }
+
+    #[test]
+    fn source_list_result_populated_shows_name_kind_location() {
+        let r = SourceListResult {
+            entries: vec![SourceListEntry {
+                name: "my-source".to_string(),
+                kind: "local",
+                location: "/repos/my-source".to_string(),
+            }],
+        };
+        let out = r.to_string();
+        assert!(out.contains("my-source"));
+        assert!(out.contains("local"));
+        assert!(out.contains("/repos/my-source"));
+    }
+
+    // --- Step 2: SourceBrowseResult ---
+
+    #[test]
+    fn source_browse_result_empty_source() {
+        let r = SourceBrowseResult {
+            source_name: "empty-src".to_string(),
+            agents: vec![],
+            skills: vec![],
+        };
+        assert!(r.to_string().contains("No agents or skills found in 'empty-src'"));
+    }
+
+    #[test]
+    fn source_browse_result_agents_only_shows_agents_header() {
+        let r = SourceBrowseResult {
+            source_name: "src".to_string(),
+            agents: vec![BrowseArtifact {
+                name: "my-agent".to_string(),
+                version: Some("1.0.0".to_string()),
+                deprecation_display: String::new(),
+            }],
+            skills: vec![],
+        };
+        let out = r.to_string();
+        assert!(out.contains("Agents:"));
+        assert!(out.contains("my-agent"));
+        assert!(!out.contains("Skills:"));
+    }
+
+    #[test]
+    fn source_browse_result_both_sections_skill_files_indented() {
+        let r = SourceBrowseResult {
+            source_name: "src".to_string(),
+            agents: vec![BrowseArtifact {
+                name: "agent-x".to_string(),
+                version: None,
+                deprecation_display: String::new(),
+            }],
+            skills: vec![BrowseSkill {
+                name: "skill-y".to_string(),
+                version: None,
+                deprecation_display: String::new(),
+                files: vec!["tool.md".to_string()],
+            }],
+        };
+        let out = r.to_string();
+        assert!(out.contains("Agents:"));
+        assert!(out.contains("Skills:"));
+        assert!(out.contains("    tool.md"));
+    }
+
+    // --- Step 3: SourceScanResult ---
+
+    #[test]
+    fn source_scan_result_no_warnings_single_line() {
+        let r = SourceScanResult {
+            name: "src".to_string(),
+            agents_found: 2,
+            skills_found: 3,
+            warnings: vec![],
+        };
+        let out = r.to_string();
+        assert!(out.contains("src"));
+        assert!(out.contains("2 agent(s)"));
+        assert!(out.contains("3 skill(s)"));
+        assert!(!out.contains("Warning:"));
+    }
+
+    #[test]
+    fn source_scan_result_warnings_appended() {
+        let r = SourceScanResult {
+            name: "src".to_string(),
+            agents_found: 0,
+            skills_found: 0,
+            warnings: vec![ScanWarning {
+                message: "bad frontmatter".to_string(),
+            }],
+        };
+        assert!(r.to_string().contains("Warning: bad frontmatter"));
+    }
+
+    // --- Step 4: SourceRemoveResult ---
+
+    #[test]
+    fn source_remove_result_no_clone() {
+        let r = SourceRemoveResult {
+            name: "local-src".to_string(),
+            clone_deleted: false,
+        };
+        let out = r.to_string();
+        assert!(out.contains("local-src"));
+        assert!(out.contains("removed."));
+        assert!(!out.contains("cloned repo deleted"));
+    }
+
+    #[test]
+    fn source_remove_result_clone_deleted() {
+        let r = SourceRemoveResult {
+            name: "git-src".to_string(),
+            clone_deleted: true,
+        };
+        assert!(r.to_string().contains("cloned repo deleted"));
+    }
+
+    // --- Step 5: InstallResult and BatchInstallResult ---
+
+    #[test]
+    fn install_result_with_version_includes_version_prefix() {
+        let r = InstallResult {
+            artifact_name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            source_name: "guidelines".to_string(),
+            dest_dir: PathBuf::from("/home/user/.claude/agents"),
+            version: Some("1.2.3".to_string()),
+        };
+        let out = r.to_string();
+        assert!(out.contains("my-agent"));
+        assert!(out.contains("v1.2.3"));
+        assert!(out.contains("guidelines"));
+    }
+
+    #[test]
+    fn batch_install_result_empty_update_up_to_date() {
+        let r = BatchInstallResult {
+            items: vec![],
+            kind: ArtifactKind::Agent,
+            is_update: true,
+        };
+        assert!(r.to_string().contains("up to date"));
+    }
+
+    #[test]
+    fn batch_install_result_empty_install_already_installed() {
+        let r = BatchInstallResult {
+            items: vec![],
+            kind: ArtifactKind::Agent,
+            is_update: false,
+        };
+        assert!(r.to_string().contains("already installed"));
+    }
+
+    #[test]
+    fn batch_install_result_with_items_delegates_to_install_result() {
+        let r = BatchInstallResult {
+            items: vec![InstallResult {
+                artifact_name: "my-skill".to_string(),
+                kind: ArtifactKind::Skill,
+                source_name: "src".to_string(),
+                dest_dir: PathBuf::from("/home/user/.claude/skills"),
+                version: None,
+            }],
+            kind: ArtifactKind::Skill,
+            is_update: false,
+        };
+        let out = r.to_string();
+        assert!(out.contains("my-skill"));
+        assert!(out.contains("src"));
+    }
+
+    // --- Step 6: UninstallResult ---
+
+    #[test]
+    fn uninstall_result_tracked_single_line() {
+        let r = UninstallResult {
+            name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            scope: "global",
+            was_tracked: true,
+        };
+        let out = r.to_string();
+        assert!(out.contains("Uninstalled my-agent"));
+        assert!(!out.contains("untracked"));
+    }
+
+    #[test]
+    fn uninstall_result_untracked_includes_note() {
+        let r = UninstallResult {
+            name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            scope: "global",
+            was_tracked: false,
+        };
+        assert!(r.to_string().contains("untracked"));
+    }
+
+    // --- Step 7: ListKindOutput and ListOutput ---
+
+    #[test]
+    fn list_kind_output_empty_shows_none_installed() {
+        let r = ListKindOutput {
+            kind: ArtifactKind::Agent,
+            rows: BTreeMap::new(),
+        };
+        assert_eq!(r.to_string(), "No agents installed.\n");
+    }
+
+    #[test]
+    fn list_kind_output_global_only_shows_global_header() {
+        let mut rows = BTreeMap::new();
+        rows.insert(InstallScope::Global, vec![make_row("agent-a")]);
+        let r = ListKindOutput {
+            kind: ArtifactKind::Agent,
+            rows,
+        };
+        let out = r.to_string();
+        assert!(out.contains("Global agents:"));
+        assert!(out.contains("agent-a"));
+    }
+
+    #[test]
+    fn list_kind_output_both_scopes_shows_both_headers() {
+        let mut rows = BTreeMap::new();
+        rows.insert(InstallScope::Global, vec![make_row("agent-g")]);
+        rows.insert(InstallScope::Local, vec![make_row("agent-l")]);
+        let r = ListKindOutput {
+            kind: ArtifactKind::Agent,
+            rows,
+        };
+        let out = r.to_string();
+        assert!(out.contains("Global agents:"));
+        assert!(out.contains("Local agents:"));
+    }
+
+    #[test]
+    fn list_output_empty_shows_nothing_installed() {
+        let r = ListOutput {
+            agents: BTreeMap::new(),
+            skills: BTreeMap::new(),
+        };
+        assert_eq!(r.to_string(), "Nothing installed.\n");
+    }
+
+    #[test]
+    fn list_output_with_agents_shows_section() {
+        let mut agents = BTreeMap::new();
+        agents.insert(InstallScope::Global, vec![make_row("my-agent")]);
+        let r = ListOutput {
+            agents,
+            skills: BTreeMap::new(),
+        };
+        let out = r.to_string();
+        assert!(out.contains("Global agents:"));
+        assert!(out.contains("my-agent"));
+    }
+
+    // --- Step 8: OutdatedReport ---
+
+    #[test]
+    fn outdated_report_empty_up_to_date() {
+        let r = OutdatedReport(vec![]);
+        assert_eq!(r.to_string(), "Everything is up to date.\n");
+    }
+
+    #[test]
+    fn outdated_report_populated_shows_rows() {
+        let r = OutdatedReport(vec![OutdatedRow {
+            name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            installed_version: "1.0.0".to_string(),
+            available_version: "2.0.0".to_string(),
+            source: "guidelines".to_string(),
+            status: "update".to_string(),
+        }]);
+        let out = r.to_string();
+        assert!(out.contains("my-agent"));
+        assert!(out.contains("1.0.0"));
+        assert!(out.contains("2.0.0"));
+    }
+
+    // --- Step 9: SearchOutput ---
+
+    #[test]
+    fn search_output_empty_no_results_message() {
+        let r = SearchOutput {
+            query: "my-query".to_string(),
+            results: vec![],
+        };
+        assert_eq!(r.to_string(), "No results for 'my-query'.\n");
+    }
+
+    #[test]
+    fn search_output_populated_result_count() {
+        let r = SearchOutput {
+            query: "rust".to_string(),
+            results: vec![SearchResult {
+                name: "rust-craftsperson".to_string(),
+                kind: "agent".to_string(),
+                version: "1.0.0".to_string(),
+                source: "guidelines".to_string(),
+                description: "Rust expert".to_string(),
+            }],
+        };
+        let out = r.to_string();
+        assert!(out.contains("rust-craftsperson"));
+        assert!(out.contains("1 result(s) found."));
+    }
+
+    // --- Step 10: ArtifactInfo ---
+
+    #[test]
+    fn artifact_info_minimal_shows_required_fields() {
+        let r = minimal_artifact_info("my-agent");
+        let out = r.to_string();
+        assert!(out.contains("Name:        my-agent"));
+        assert!(out.contains("Type:        agent"));
+        assert!(out.contains("Scope:       global"));
+        assert!(out.contains("Path:"));
+    }
+
+    #[test]
+    fn artifact_info_all_optional_fields_rendered() {
+        let mut r = minimal_artifact_info("my-agent");
+        r.version = Some("1.0.0".to_string());
+        r.installed_at = Some("2024-01-01T00:00:00Z".to_string());
+        r.source_display = Some("guidelines (my-agent.md)".to_string());
+        r.source_checksum = Some("sha256:source".to_string());
+        r.installed_checksum = Some("sha256:installed".to_string());
+        r.available_version = Some("2.0.0".to_string());
+        r.deprecation = Some(Deprecation {
+            reason: Some("obsolete".to_string()),
+            replacement: Some("new-agent".to_string()),
+        });
+        r.skill_files = vec![SkillFileEntry {
+            name: "SKILL.md".to_string(),
+            is_dir: false,
+            indent_level: 0,
+        }];
+        let out = r.to_string();
+        assert!(out.contains("Version:     1.0.0"));
+        assert!(out.contains("Installed:   2024-01-01T00:00:00Z"));
+        assert!(out.contains("Source:      guidelines (my-agent.md)"));
+        assert!(out.contains("DEPRECATED"));
+        assert!(out.contains("obsolete"));
+        assert!(out.contains("new-agent"));
+        assert!(out.contains("v2.0.0"));
+        assert!(out.contains("SKILL.md"));
+    }
+
+    #[test]
+    fn artifact_info_locally_modified_suffix() {
+        let mut r = minimal_artifact_info("my-agent");
+        r.locally_modified = true;
+        r.disk_checksum = Some("sha256:disk".to_string());
+        assert!(r.to_string().contains("(locally modified)"));
+    }
+
+    #[test]
+    fn artifact_info_untracked_note() {
+        let mut r = minimal_artifact_info("my-agent");
+        r.untracked = true;
+        assert!(r.to_string().contains("untracked"));
+    }
+
+    // --- Step 11: DiffOutput (feature-gated) ---
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn diff_output_is_up_to_date_message() {
+        use crate::diff::DiffOutput;
+        let r = DiffOutput {
+            artifact_name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            is_up_to_date: true,
+            installed_version: None,
+            source_version: None,
+            source_name: "src".to_string(),
+            diff_text: None,
+            analysis: None,
+        };
+        assert!(r.to_string().contains("is up to date with source."));
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn diff_output_with_analysis_shows_analyzing() {
+        use crate::diff::DiffOutput;
+        let r = DiffOutput {
+            artifact_name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            is_up_to_date: false,
+            installed_version: Some("1.0.0".to_string()),
+            source_version: Some("2.0.0".to_string()),
+            source_name: "src".to_string(),
+            diff_text: Some("--- a\n+++ b\n".to_string()),
+            analysis: Some("Notable changes found.".to_string()),
+        };
+        let out = r.to_string();
+        assert!(out.contains("Analyzing differences..."));
+        assert!(out.contains("Notable changes found."));
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn diff_output_diff_text_only_shows_differences() {
+        use crate::diff::DiffOutput;
+        let r = DiffOutput {
+            artifact_name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            is_up_to_date: false,
+            installed_version: None,
+            source_version: None,
+            source_name: "src".to_string(),
+            diff_text: Some("--- a\n+++ b\n".to_string()),
+            analysis: None,
+        };
+        assert!(r.to_string().contains("Differences:"));
+    }
+
+    // --- Step 12: ConfigShowResult and ConfigSetResult ---
+
+    #[test]
+    fn config_show_result_contains_gateway_and_model_labels() {
+        let r = ConfigShowResult {
+            gateway: "ollama".to_string(),
+            model: "llama3".to_string(),
+        };
+        let out = r.to_string();
+        assert!(out.contains("LLM gateway:"));
+        assert!(out.contains("LLM model:"));
+    }
+
+    #[test]
+    fn config_set_result_contains_field_and_value() {
+        let r = ConfigSetResult {
+            field: "model",
+            value: "gpt-4".to_string(),
+        };
+        let out = r.to_string();
+        assert!(out.contains("model"));
+        assert!(out.contains("gpt-4"));
+    }
+
+    // --- Step 13: SourceUpdateOutput ---
+
+    #[test]
+    fn source_update_output_no_git_sources() {
+        assert!(
+            SourceUpdateOutput::NoGitSources
+                .to_string()
+                .contains("No git-backed sources to update.")
+        );
+    }
+
+    #[test]
+    fn source_update_output_single_update_shows_counts() {
+        let r = SourceUpdateOutput::SingleUpdate(SourceScanResult {
+            name: "guidelines".to_string(),
+            agents_found: 4,
+            skills_found: 2,
+            warnings: vec![],
+        });
+        let out = r.to_string();
+        assert!(out.contains("guidelines"));
+        assert!(out.contains("4 agent(s)"));
+    }
+
+    #[test]
+    fn source_update_output_batch_shows_multiple_lines() {
+        let r = SourceUpdateOutput::BatchUpdate(vec![
+            SourceScanResult {
+                name: "src-a".to_string(),
+                agents_found: 1,
+                skills_found: 0,
+                warnings: vec![],
+            },
+            SourceScanResult {
+                name: "src-b".to_string(),
+                agents_found: 0,
+                skills_found: 2,
+                warnings: vec![],
+            },
+        ]);
+        let out = r.to_string();
+        assert!(out.contains("src-a"));
+        assert!(out.contains("src-b"));
+    }
+}

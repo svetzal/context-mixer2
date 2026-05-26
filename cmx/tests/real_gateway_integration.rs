@@ -138,3 +138,16 @@ fn read_to_string_on_missing_file_returns_error() {
     let result = fs().read_to_string(&missing);
     assert!(result.is_err());
 }
+
+#[test]
+fn rename_moves_file_old_path_gone_new_path_has_content() {
+    let dir = TempDir::new().unwrap();
+    let old_path = dir.path().join("original.txt");
+    let new_path = dir.path().join("renamed.txt");
+    fs().write(&old_path, "original content").unwrap();
+    fs().rename(&old_path, &new_path).unwrap();
+    assert!(!fs().exists(&old_path));
+    assert!(fs().exists(&new_path));
+    let content = fs().read_to_string(&new_path).unwrap();
+    assert_eq!(content, "original content");
+}
