@@ -309,7 +309,9 @@ mod tests {
     use crate::validation::IssueLevel;
     use cmx::gateway::fakes::FakeFilesystem;
 
-    use crate::test_support::{fake_marketplace_json_with_categories, fake_plugin_json};
+    use crate::test_support::{
+        fake_marketplace_json_with_categories, fake_marketplace_root, fake_plugin_json,
+    };
 
     fn make_plugin(
         name: &str,
@@ -385,17 +387,6 @@ mod tests {
         format!("---\ndescription: {description}\n---\n# Skill\n\nSkill body.\n")
     }
 
-    fn marketplace_root(fs: &FakeFilesystem, marketplace_json: &str) -> RepoRoot {
-        fs.add_file("/repo/.claude-plugin/marketplace.json", marketplace_json);
-        fs.add_dir("/repo/plugins");
-        RepoRoot {
-            path: PathBuf::from("/repo"),
-            kind: RepoKind::Marketplace,
-            has_facets: false,
-            has_plugins_dir: true,
-        }
-    }
-
     #[test]
     fn scan_plugins_finds_all() {
         let fs = FakeFilesystem::new();
@@ -404,7 +395,7 @@ mod tests {
             ("alpha-ecosystem", "Alpha tools", "./plugins/alpha-ecosystem", Some("ecosystem")),
             ("beta-ecosystem", "Beta tools", "./plugins/beta-ecosystem", Some("ecosystem")),
         ]);
-        let root = marketplace_root(&fs, &marketplace_json);
+        let root = fake_marketplace_root(&fs, &marketplace_json);
 
         // alpha has 1 agent
         fs.add_file(
@@ -445,7 +436,7 @@ mod tests {
     fn scan_plugins_empty_marketplace() {
         let fs = FakeFilesystem::new();
         let marketplace_json = fake_marketplace_json_with_categories(&[]);
-        let root = marketplace_root(&fs, &marketplace_json);
+        let root = fake_marketplace_root(&fs, &marketplace_json);
 
         let plugins = scan_plugins(&root, &fs).unwrap();
         assert!(plugins.is_empty());
@@ -459,7 +450,7 @@ mod tests {
             ("exists", "Exists", "./plugins/exists", None),
             ("ghost", "Ghost", "./plugins/ghost", None),
         ]);
-        let root = marketplace_root(&fs, &marketplace_json);
+        let root = fake_marketplace_root(&fs, &marketplace_json);
 
         // Only "exists" has a real directory
         fs.add_file("/repo/plugins/exists/.claude-plugin/plugin.json", fake_plugin_json("exists"));

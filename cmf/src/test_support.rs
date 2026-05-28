@@ -1,3 +1,34 @@
+use std::path::PathBuf;
+
+use cmx::gateway::fakes::FakeFilesystem;
+
+use crate::repo::{RepoKind, RepoRoot};
+
+/// Set up a fake marketplace repo and return its `RepoRoot`.
+///
+/// Writes `marketplace_json` to the `FakeFilesystem` under `/repo/.claude-plugin/marketplace.json`,
+/// creates `/repo/plugins`, and returns a `RepoRoot` with `has_plugins_dir: true`.
+pub fn fake_marketplace_root(fs: &FakeFilesystem, marketplace_json: &str) -> RepoRoot {
+    fs.add_file("/repo/.claude-plugin/marketplace.json", marketplace_json);
+    fs.add_dir("/repo/plugins");
+    RepoRoot {
+        path: PathBuf::from("/repo"),
+        kind: RepoKind::Marketplace,
+        has_facets: false,
+        has_plugins_dir: true,
+    }
+}
+
+/// Return a minimal marketplace `RepoRoot` for display tests that don't need filesystem state.
+pub fn fake_marketplace_root_simple(path: &str) -> RepoRoot {
+    RepoRoot {
+        path: PathBuf::from(path),
+        kind: RepoKind::Marketplace,
+        has_facets: false,
+        has_plugins_dir: false,
+    }
+}
+
 /// Generate a valid `marketplace.json` string with the given plugin entries.
 ///
 /// Each tuple is `(name, description, source_path)`.

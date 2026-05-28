@@ -80,7 +80,7 @@ pub fn generate_manifests(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<Pa
 mod tests {
     use super::*;
     use crate::repo::RepoKind;
-    use crate::test_support::{fake_marketplace_json, fake_plugin_json};
+    use crate::test_support::{fake_marketplace_json, fake_marketplace_root, fake_plugin_json};
     use cmx::gateway::fakes::FakeFilesystem;
 
     // --- Display for ManifestSummary ---
@@ -102,17 +102,6 @@ mod tests {
         assert!(out.contains(".copilot-plugin/"), "missing .copilot-plugin/ in: {out}");
     }
 
-    fn marketplace_root(fs: &FakeFilesystem, marketplace_json: &str) -> RepoRoot {
-        fs.add_file("/repo/.claude-plugin/marketplace.json", marketplace_json);
-        fs.add_dir("/repo/plugins");
-        RepoRoot {
-            path: PathBuf::from("/repo"),
-            kind: RepoKind::Marketplace,
-            has_facets: false,
-            has_plugins_dir: true,
-        }
-    }
-
     #[test]
     fn generate_creates_all_platform_dirs() {
         let fs = FakeFilesystem::new();
@@ -120,7 +109,7 @@ mod tests {
             ("alpha", "Alpha plugin", "./plugins/alpha"),
             ("beta", "Beta plugin", "./plugins/beta"),
         ]);
-        let root = marketplace_root(&fs, &marketplace_json);
+        let root = fake_marketplace_root(&fs, &marketplace_json);
 
         // Set up per-plugin manifests
         fs.add_file("/repo/plugins/alpha/.claude-plugin/plugin.json", fake_plugin_json("alpha"));
@@ -149,7 +138,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let marketplace_json =
             fake_marketplace_json(&[("alpha", "Alpha plugin", "./plugins/alpha")]);
-        let root = marketplace_root(&fs, &marketplace_json);
+        let root = fake_marketplace_root(&fs, &marketplace_json);
 
         fs.add_file("/repo/plugins/alpha/.claude-plugin/plugin.json", fake_plugin_json("alpha"));
 
@@ -177,7 +166,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let marketplace_json =
             fake_marketplace_json(&[("alpha", "Alpha plugin", "./plugins/alpha")]);
-        let root = marketplace_root(&fs, &marketplace_json);
+        let root = fake_marketplace_root(&fs, &marketplace_json);
 
         let plugin_content = fake_plugin_json("alpha");
         fs.add_file("/repo/plugins/alpha/.claude-plugin/plugin.json", plugin_content.as_str());
@@ -205,7 +194,7 @@ mod tests {
             ("alpha", "Alpha plugin", "./plugins/alpha"),
             ("beta", "Beta plugin", "./plugins/beta"),
         ]);
-        let root = marketplace_root(&fs, &marketplace_json);
+        let root = fake_marketplace_root(&fs, &marketplace_json);
 
         fs.add_file("/repo/plugins/alpha/.claude-plugin/plugin.json", fake_plugin_json("alpha"));
         fs.add_file("/repo/plugins/beta/.claude-plugin/plugin.json", fake_plugin_json("beta"));
@@ -249,7 +238,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let marketplace_json =
             fake_marketplace_json(&[("alpha", "Alpha plugin", "./plugins/alpha")]);
-        let root = marketplace_root(&fs, &marketplace_json);
+        let root = fake_marketplace_root(&fs, &marketplace_json);
 
         fs.add_file("/repo/plugins/alpha/.claude-plugin/plugin.json", fake_plugin_json("alpha"));
 

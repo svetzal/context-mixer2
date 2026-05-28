@@ -218,22 +218,11 @@ pub fn generate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<usiz
 mod tests {
     use super::*;
     use crate::plugin_types::{MarketplaceMetadata, Owner};
-    use crate::repo::RepoKind;
-    use crate::test_support::{fake_marketplace_json, fake_plugin_json};
+    use crate::repo::{RepoKind, RepoRoot};
+    use crate::test_support::{fake_marketplace_json, fake_marketplace_root, fake_plugin_json};
     use crate::validation::IssueLevel;
     use cmx::gateway::fakes::FakeFilesystem;
     use std::path::PathBuf;
-
-    fn marketplace_root(fs: &FakeFilesystem, marketplace_json: &str) -> RepoRoot {
-        fs.add_file("/repo/.claude-plugin/marketplace.json", marketplace_json);
-        fs.add_dir("/repo/plugins");
-        RepoRoot {
-            path: PathBuf::from("/repo"),
-            kind: RepoKind::Marketplace,
-            has_facets: false,
-            has_plugins_dir: true,
-        }
-    }
 
     // -----------------------------------------------------------------------
     // Validation tests
@@ -243,7 +232,7 @@ mod tests {
     fn validate_marketplace_ok() {
         let fs = FakeFilesystem::new();
         let json = fake_marketplace_json(&[("alpha", "Alpha plugin", "./plugins/alpha")]);
-        let root = marketplace_root(&fs, &json);
+        let root = fake_marketplace_root(&fs, &json);
 
         fs.add_dir("/repo/plugins/alpha");
         fs.add_file("/repo/plugins/alpha/.claude-plugin/plugin.json", fake_plugin_json("alpha"));
@@ -256,7 +245,7 @@ mod tests {
     fn validate_marketplace_missing_plugin_dir() {
         let fs = FakeFilesystem::new();
         let json = fake_marketplace_json(&[("ghost", "Ghost plugin", "./plugins/ghost")]);
-        let root = marketplace_root(&fs, &json);
+        let root = fake_marketplace_root(&fs, &json);
         // No directory created for "ghost"
 
         let issues = validate_marketplace(&root, &fs).unwrap();
@@ -273,7 +262,7 @@ mod tests {
     fn validate_marketplace_unlisted_plugin() {
         let fs = FakeFilesystem::new();
         let json = fake_marketplace_json(&[("listed", "Listed plugin", "./plugins/listed")]);
-        let root = marketplace_root(&fs, &json);
+        let root = fake_marketplace_root(&fs, &json);
 
         fs.add_dir("/repo/plugins/listed");
         fs.add_file("/repo/plugins/listed/.claude-plugin/plugin.json", fake_plugin_json("listed"));
@@ -299,7 +288,7 @@ mod tests {
     fn validate_marketplace_name_mismatch() {
         let fs = FakeFilesystem::new();
         let json = fake_marketplace_json(&[("wrong-name", "A plugin", "./plugins/my-plugin")]);
-        let root = marketplace_root(&fs, &json);
+        let root = fake_marketplace_root(&fs, &json);
 
         fs.add_dir("/repo/plugins/my-plugin");
         fs.add_file(

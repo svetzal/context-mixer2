@@ -312,7 +312,9 @@ mod tests {
     use crate::manifest::ManifestSummary;
     use crate::plugin::{PluginInfo, PluginList};
     use crate::repo::{RepoKind, RepoRoot};
-    use crate::test_support::{fake_marketplace_json, fake_plugin_json};
+    use crate::test_support::{
+        fake_marketplace_json, fake_marketplace_root_simple, fake_plugin_json,
+    };
     use crate::validation::{IssueLevel, ValidationIssue, ValidationReport};
 
     use super::{
@@ -324,15 +326,6 @@ mod tests {
         RepoRoot {
             path: PathBuf::from(path),
             kind: RepoKind::Unknown,
-            has_facets: false,
-            has_plugins_dir: false,
-        }
-    }
-
-    fn marketplace_root(path: &str) -> RepoRoot {
-        RepoRoot {
-            path: PathBuf::from(path),
-            kind: RepoKind::Marketplace,
             has_facets: false,
             has_plugins_dir: false,
         }
@@ -516,7 +509,7 @@ mod tests {
             "/repo/.claude-plugin/marketplace.json",
             r#"{"name":"My Marketplace","plugins":[]}"#,
         );
-        let root = marketplace_root("/repo");
+        let root = fake_marketplace_root_simple("/repo");
         let out = repo_identity_str(&root, &fs);
         assert!(out.contains("My Marketplace"));
         assert!(out.contains("marketplace"));
@@ -549,7 +542,7 @@ mod tests {
     fn plugin_summary_str_no_plugins_returns_empty() {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/.claude-plugin/marketplace.json", r#"{"name":"empty","plugins":[]}"#);
-        let root = marketplace_root("/repo");
+        let root = fake_marketplace_root_simple("/repo");
         assert_eq!(plugin_summary_str(&root, &fs), "");
     }
 
@@ -563,7 +556,7 @@ mod tests {
             "/repo/plugins/my-plugin/.claude-plugin/plugin.json",
             fake_plugin_json("my-plugin"),
         );
-        let root = marketplace_root("/repo");
+        let root = fake_marketplace_root_simple("/repo");
         let out = plugin_summary_str(&root, &fs);
         assert!(out.contains("Plugins:"));
         assert!(out.contains('1'));
@@ -603,7 +596,7 @@ mod tests {
     fn validation_summary_str_all_clean() {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/.claude-plugin/marketplace.json", r#"{"name":"clean","plugins":[]}"#);
-        let root = marketplace_root("/repo");
+        let root = fake_marketplace_root_simple("/repo");
         assert_eq!(validation_summary_str(&root, &fs), "Validation: all clean\n");
     }
 
@@ -646,7 +639,7 @@ mod tests {
             "/repo/.claude-plugin/marketplace.json",
             r#"{"name":"My Marketplace","plugins":[]}"#,
         );
-        let root = marketplace_root("/repo");
+        let root = fake_marketplace_root_simple("/repo");
         let out = status_report(&root, &fs);
         assert!(out.contains("My Marketplace"));
         assert!(out.contains("Validation: all clean"));
