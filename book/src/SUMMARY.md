@@ -35,3 +35,7 @@
 - [Frontmatter Reference](./reference/frontmatter.md)
 - [Lock File](./reference/lockfile.md)
 - [Platform Paths](./reference/platforms.md)
+
+# Design
+
+- [Multi-Tool Platform Support](./design/multi-tool-platform-support.md)
