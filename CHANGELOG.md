@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-05-29
+
 ### Added
 
 - `--platform` global flag (and `CMX_PLATFORM` env var) for selecting the target AI coding assistant: `claude` (default), `copilot`, `cursor`, `windsurf`, `gemini`. All install, uninstall, update, list, outdated, info, and search commands respect the platform setting.
