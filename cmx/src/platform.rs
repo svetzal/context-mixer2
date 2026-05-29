@@ -18,6 +18,16 @@ pub enum Platform {
     Codex,
     /// Pi — skills only; no native agent concept.
     Pi,
+    /// Crush — skills only; reads the shared .agents directory.
+    Crush,
+    /// Amp — skills only; reads the shared .agents directory.
+    Amp,
+    /// Zed — skills only; agents are settings-embedded profiles cmx does not manage.
+    Zed,
+    /// openhands — skills only; agents are trigger-activated skills.
+    Openhands,
+    /// Hermes — skills only; global-centric (~/.hermes/skills); no agent files.
+    Hermes,
 }
 
 impl fmt::Display for Platform {
@@ -31,6 +41,11 @@ impl fmt::Display for Platform {
             Self::Opencode => "opencode",
             Self::Codex => "codex",
             Self::Pi => "pi",
+            Self::Crush => "crush",
+            Self::Amp => "amp",
+            Self::Zed => "zed",
+            Self::Openhands => "openhands",
+            Self::Hermes => "hermes",
         };
         f.write_str(name)
     }
@@ -86,24 +101,51 @@ impl Platform {
             // codex: TOML agents in `.codex/agents` (both scopes).
             (Self::Codex, Agent) => dir(".codex", "agents"),
 
-            // Pi has no native agent concept — fallback never written to.
+            // Skills-only tools have no native agent concept — these agent
+            // fallbacks are never written to (gated by `supports`).
             (Self::Pi, Agent) => dir(".pi", "agents"),
+            (Self::Crush, Agent) => dir(".crush", "agents"),
+            (Self::Amp, Agent) => dir(".amp", "agents"),
+            (Self::Zed, Agent) => dir(".zed", "agents"),
+            (Self::Openhands, Agent) => dir(".openhands", "agents"),
+            (Self::Hermes, Agent) => dir(".hermes", "agents"),
 
-            // Skills for the `.agents`-standard tools resolve to the shared
-            // cross-tool `.agents/skills` location (read by opencode, codex,
-            // and pi), for both local and global scopes.
-            (Self::Opencode | Self::Codex | Self::Pi, Skill) => {
-                PathBuf::from(".agents").join("skills")
-            }
+            // Amp and Hermes diverge only at *global* scope: Amp resolves
+            // user-scoped skills under XDG (`~/.config/agents/skills`); Hermes
+            // uses its own home (`~/.hermes/skills`, its auto-read source of
+            // truth). At project scope both fall through to `.agents/skills`.
+            (Self::Amp, Skill) if !local => PathBuf::from(".config").join("agents").join("skills"),
+            (Self::Hermes, Skill) if !local => dir(".hermes", "skills"),
+
+            // All `.agents`-standard tools (plus Amp/Hermes at project scope)
+            // resolve skills to the shared cross-tool `.agents/skills` location.
+            (
+                Self::Opencode
+                | Self::Codex
+                | Self::Pi
+                | Self::Crush
+                | Self::Zed
+                | Self::Openhands
+                | Self::Amp
+                | Self::Hermes,
+                Skill,
+            ) => PathBuf::from(".agents").join("skills"),
         }
     }
 
     /// Whether this platform supports installing the given artifact kind.
     ///
-    /// Pi has no native agent concept, so `(Pi, Agent)` is unsupported. Every
-    /// other `(platform, kind)` combination is supported.
+    /// The skills-only tools (Pi, Crush, Amp, Zed, `OpenHands`, Hermes) have no
+    /// file-droppable agent concept, so `(platform, Agent)` is unsupported for
+    /// them. Every other `(platform, kind)` combination is supported.
     pub fn supports(self, kind: ArtifactKind) -> bool {
-        !matches!((self, kind), (Self::Pi, ArtifactKind::Agent))
+        !matches!(
+            (self, kind),
+            (
+                Self::Pi | Self::Crush | Self::Amp | Self::Zed | Self::Openhands | Self::Hermes,
+                ArtifactKind::Agent
+            )
+        )
     }
 
     /// The file extension for an installed agent on this platform.
@@ -137,14 +179,20 @@ impl Platform {
             Self::Opencode => "opencode",
             Self::Codex => "codex",
             Self::Pi => "pi",
+            Self::Crush => "crush",
+            Self::Amp => "amp",
+            Self::Zed => "zed",
+            Self::Openhands => "openhands",
+            Self::Hermes => "hermes",
         }
     }
 
     /// The directory name for this platform's plugin manifest (used by cmf).
     ///
     /// Only the platforms returned by [`targets`] consume this; the
-    /// `.agents`-standard tools (opencode, codex, pi) have no Claude-style
-    /// plugin manifest, so their value here is unused.
+    /// `.agents`-standard tools (opencode, codex, pi, Crush, Amp, Zed,
+    /// `OpenHands`) have no Claude-style plugin manifest, so their value here is
+    /// unused.
     ///
     /// [`targets`]: Platform::targets
     pub fn manifest_dir(self) -> &'static str {
@@ -157,12 +205,18 @@ impl Platform {
             Self::Opencode => ".opencode-plugin",
             Self::Codex => ".codex-plugin",
             Self::Pi => ".pi-plugin",
+            Self::Crush => ".crush-plugin",
+            Self::Amp => ".amp-plugin",
+            Self::Zed => ".zed-plugin",
+            Self::Openhands => ".openhands-plugin",
+            Self::Hermes => ".hermes-plugin",
         }
     }
 
     /// All non-Claude platforms that receive generated plugin manifests.
     ///
-    /// opencode, codex, and pi are intentionally excluded: none of them define a
+    /// The `.agents`-standard tools (opencode, codex, pi, Crush, Amp, Zed,
+    /// `OpenHands`) are intentionally excluded: none of them define a
     /// plugin/marketplace manifest format, so generating one would produce dead
     /// files no tool reads.
     pub fn targets() -> &'static [Platform] {
@@ -189,6 +243,11 @@ mod tests {
         assert_eq!(Platform::Opencode.to_string(), "opencode");
         assert_eq!(Platform::Codex.to_string(), "codex");
         assert_eq!(Platform::Pi.to_string(), "pi");
+        assert_eq!(Platform::Crush.to_string(), "crush");
+        assert_eq!(Platform::Amp.to_string(), "amp");
+        assert_eq!(Platform::Zed.to_string(), "zed");
+        assert_eq!(Platform::Openhands.to_string(), "openhands");
+        assert_eq!(Platform::Hermes.to_string(), "hermes");
     }
 
     #[test]
@@ -218,7 +277,16 @@ mod tests {
 
     #[test]
     fn targets_excludes_agents_standard_tools() {
-        for p in [Platform::Opencode, Platform::Codex, Platform::Pi] {
+        for p in [
+            Platform::Opencode,
+            Platform::Codex,
+            Platform::Pi,
+            Platform::Crush,
+            Platform::Amp,
+            Platform::Zed,
+            Platform::Openhands,
+            Platform::Hermes,
+        ] {
             assert!(
                 !Platform::targets().contains(&p),
                 "{p} has no manifest format and must not be a manifest target"
@@ -292,7 +360,15 @@ mod tests {
 
     #[test]
     fn install_subpath_new_tools_share_dot_agents_skills() {
-        for p in [Platform::Opencode, Platform::Codex, Platform::Pi] {
+        // Tools that read `.agents/skills` for both project and user scope.
+        for p in [
+            Platform::Opencode,
+            Platform::Codex,
+            Platform::Pi,
+            Platform::Crush,
+            Platform::Zed,
+            Platform::Openhands,
+        ] {
             for scope in InstallScope::ALL {
                 assert_eq!(
                     p.install_subpath(ArtifactKind::Skill, scope),
@@ -303,12 +379,49 @@ mod tests {
         }
     }
 
+    #[test]
+    fn install_subpath_amp_skill_diverges_at_global_scope() {
+        // Amp reads project skills from `.agents/skills` but user-scoped skills
+        // from XDG `~/.config/agents/skills`.
+        assert_eq!(
+            Platform::Amp.install_subpath(ArtifactKind::Skill, InstallScope::Local),
+            PathBuf::from(".agents").join("skills")
+        );
+        assert_eq!(
+            Platform::Amp.install_subpath(ArtifactKind::Skill, InstallScope::Global),
+            PathBuf::from(".config").join("agents").join("skills")
+        );
+    }
+
+    #[test]
+    fn install_subpath_hermes_skill_diverges_at_global_scope() {
+        // Hermes is global-centric: user skills live in `~/.hermes/skills`,
+        // while project skills use the shared `.agents/skills`.
+        assert_eq!(
+            Platform::Hermes.install_subpath(ArtifactKind::Skill, InstallScope::Local),
+            PathBuf::from(".agents").join("skills")
+        );
+        assert_eq!(
+            Platform::Hermes.install_subpath(ArtifactKind::Skill, InstallScope::Global),
+            PathBuf::from(".hermes").join("skills")
+        );
+    }
+
     // --- supports ---
 
     #[test]
-    fn supports_pi_skills_but_not_agents() {
-        assert!(Platform::Pi.supports(ArtifactKind::Skill));
-        assert!(!Platform::Pi.supports(ArtifactKind::Agent));
+    fn supports_skills_only_tools_reject_agents() {
+        for p in [
+            Platform::Pi,
+            Platform::Crush,
+            Platform::Amp,
+            Platform::Zed,
+            Platform::Openhands,
+            Platform::Hermes,
+        ] {
+            assert!(p.supports(ArtifactKind::Skill), "{p} should support skills");
+            assert!(!p.supports(ArtifactKind::Agent), "{p} should not support agents");
+        }
     }
 
     #[test]
@@ -356,6 +469,11 @@ mod tests {
         assert_eq!(Platform::Opencode.slug(), "opencode");
         assert_eq!(Platform::Codex.slug(), "codex");
         assert_eq!(Platform::Pi.slug(), "pi");
+        assert_eq!(Platform::Crush.slug(), "crush");
+        assert_eq!(Platform::Amp.slug(), "amp");
+        assert_eq!(Platform::Zed.slug(), "zed");
+        assert_eq!(Platform::Openhands.slug(), "openhands");
+        assert_eq!(Platform::Hermes.slug(), "hermes");
     }
 
     #[test]
@@ -369,5 +487,10 @@ mod tests {
         assert_eq!(Platform::from_str("opencode", true).unwrap(), Platform::Opencode);
         assert_eq!(Platform::from_str("codex", true).unwrap(), Platform::Codex);
         assert_eq!(Platform::from_str("pi", true).unwrap(), Platform::Pi);
+        assert_eq!(Platform::from_str("crush", true).unwrap(), Platform::Crush);
+        assert_eq!(Platform::from_str("amp", true).unwrap(), Platform::Amp);
+        assert_eq!(Platform::from_str("zed", true).unwrap(), Platform::Zed);
+        assert_eq!(Platform::from_str("openhands", true).unwrap(), Platform::Openhands);
+        assert_eq!(Platform::from_str("hermes", true).unwrap(), Platform::Hermes);
     }
 }

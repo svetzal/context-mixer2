@@ -6,7 +6,7 @@ cmx is a package manager for curated agentic context (agents and skills) across 
 
 ## Goals
 
-- Provide a single CLI to install, update, and track agents and skills across Claude Code, GitHub Copilot, Cursor, Windsurf, Gemini CLI, opencode, Codex CLI, and Pi
+- Provide a single CLI to install, update, and track agents and skills across Claude Code, GitHub Copilot, Cursor, Windsurf, Gemini CLI, opencode, Codex CLI, Pi, Crush, Amp, Zed, OpenHands, and Hermes
 - Support both global (user-wide) and local (project-scoped) installation with lock file tracking
 - Enable plugin marketplaces as git repositories with a standard manifest format
 - Track artifact integrity via SHA-256 checksums and optional semver versioning

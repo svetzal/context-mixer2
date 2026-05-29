@@ -1080,6 +1080,57 @@ mod tests {
     }
 
     #[test]
+    fn install_skills_only_cohort_installs_skill_and_rejects_agent() {
+        // Crush, Amp, Zed, OpenHands are all skills-only: a skill install must
+        // succeed (to the shared .agents/skills location), and an agent install
+        // must be rejected with a clear error.
+        for platform in [
+            Platform::Crush,
+            Platform::Amp,
+            Platform::Zed,
+            Platform::Openhands,
+            Platform::Hermes,
+        ] {
+            let fs = FakeFilesystem::new();
+            let git = FakeGitClient::new();
+            let clock = FakeClock::at(Utc::now());
+            let paths = test_paths_for(platform);
+
+            setup_source_with_skill(
+                &fs,
+                &paths,
+                "my-source",
+                "/sources/my-source",
+                "my-skill",
+                "1.0.0",
+            );
+
+            let ctx = make_ctx(&fs, &git, &clock, &paths);
+
+            // Skill install lands in the platform's resolved skills dir.
+            install("my-skill", ArtifactKind::Skill, InstallScope::Local, false, &ctx)
+                .unwrap_or_else(|e| panic!("{platform} skill install should succeed: {e}"));
+            let skill_md = paths
+                .install_dir(ArtifactKind::Skill, InstallScope::Local)
+                .join("my-skill")
+                .join("SKILL.md");
+            assert!(
+                fs.file_exists(&skill_md),
+                "{platform}: skill should be at {}",
+                skill_md.display()
+            );
+
+            // Agent install is rejected.
+            let agent = install("anything", ArtifactKind::Agent, InstallScope::Local, false, &ctx);
+            assert!(agent.is_err(), "{platform}: agent install must be rejected");
+            assert!(
+                agent.unwrap_err().to_string().contains(&platform.to_string()),
+                "{platform}: error should name the platform"
+            );
+        }
+    }
+
+    #[test]
     fn install_opencode_skill_lands_in_shared_dot_agents() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();

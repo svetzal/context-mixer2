@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - opencode agents install as markdown to `.opencode/agent/` (project) and `~/.config/opencode/agent/` (user).
 - Codex agents are transformed from cmx markdown into Codex subagent TOML (`<name>.toml`) on install, mapping `name`, `description`, the markdown body (`developer_instructions`), and an optional `model` field. Installed to `.codex/agents/` / `~/.codex/agents/`.
 - Per-platform support gating: platforms declare which artifact kinds they support. Pi supports skills only, so `cmx agent install --platform pi` (and uninstall/update) fails with a clear, actionable error rather than installing into a directory Pi never reads.
+- Five additional skills-only `--platform` targets: `crush`, `amp`, `zed`, `openhands`, and `hermes`. All consume the cross-tool `.agents/skills/` standard, so a single skill install serves the whole cohort (plus opencode/codex/pi) at once. None has a file-droppable agent concept, so `cmx agent install` for these fails with a clear error. Two have user-scope path nuances: Amp resolves user skills under `~/.config/agents/skills/` (XDG), and Hermes under `~/.hermes/skills/` (its global source of truth).
 
 ### Notes
 

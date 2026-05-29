@@ -32,6 +32,11 @@ The `--platform` flag is global — it applies to all subcommands.
 | opencode | `opencode` | `.opencode/agent/` | `~/.config/opencode/agent/` | `.agents/skills/` | `~/.agents/skills/` |
 | Codex CLI | `codex` | `.codex/agents/` ¹ | `~/.codex/agents/` ¹ | `.agents/skills/` | `~/.agents/skills/` |
 | Pi | `pi` | *(not supported)* ² | *(not supported)* ² | `.agents/skills/` | `~/.agents/skills/` |
+| Crush | `crush` | *(not supported)* ² | *(not supported)* ² | `.agents/skills/` | `~/.agents/skills/` |
+| Amp | `amp` | *(not supported)* ² | *(not supported)* ² | `.agents/skills/` | `~/.config/agents/skills/` ³ |
+| Zed | `zed` | *(not supported)* ² | *(not supported)* ² | `.agents/skills/` | `~/.agents/skills/` |
+| OpenHands | `openhands` | *(not supported)* ² | *(not supported)* ² | `.agents/skills/` | `~/.agents/skills/` |
+| Hermes | `hermes` | *(not supported)* ² | *(not supported)* ² | `.agents/skills/` ⁴ | `~/.hermes/skills/` ⁴ |
 
 ¹ **Codex agents are TOML, not markdown.** cmx agents are markdown files with
 YAML frontmatter; the Codex CLI defines subagents as standalone TOML files. When
@@ -39,14 +44,28 @@ you install an agent with `--platform codex`, cmx transforms the source markdown
 into a Codex subagent document (`<name>.toml`) with `name`, `description`,
 `developer_instructions` (the markdown body), and an optional `model` field.
 
-² **Pi has no native agent concept.** `cmx agent install --platform pi` fails
-with a clear error. Pi supports skills only.
+² **Skills-only platforms.** Pi, Crush, Amp, Zed, OpenHands, and Hermes have no
+file-droppable agent concept (their "agents" are tool-gating profiles, runtime
+delegations, executable plugins, or trigger-activated skills), so
+`cmx agent install --platform <tool>` fails with a clear error. They support
+skills only.
+
+³ **Amp resolves user-scoped skills under XDG** (`~/.config/agents/skills/`)
+rather than `~/.agents/skills/`. Project skills still use `.agents/skills/`.
+
+⁴ **Hermes is global-centric.** Its auto-read source of truth is
+`~/.hermes/skills/`, so cmx installs user-scoped skills there. Project skills use
+the shared `.agents/skills/`, which Hermes reads only if you add it to
+`skills.external_dirs` in `~/.hermes/config.yaml`.
 
 ## The shared `.agents` skills convention
 
-opencode, Codex, and Pi all read skills from the cross-tool `.agents/skills/`
-location (project) and `~/.agents/skills/` (user), so cmx installs skills there
-for all three. This is a **shared directory**: a skill installed under one of
+The `.agents/skills/` directory (project) and `~/.agents/skills/` (user) is an
+emerging cross-tool standard — the [agentskills.io](https://agentskills.io)
+`SKILL.md` format. opencode, Codex, Pi, Crush, Zed, and OpenHands all read it
+natively, so cmx installs skills there for the whole cohort. (Amp and Hermes read
+the project `.agents/skills/` too but resolve user-scoped skills elsewhere — see
+notes ³ and ⁴.) This is a **shared directory**: a skill installed under one of
 these platforms is visible to the others.
 
 A practical consequence: because each platform keeps its own lock file (below),
@@ -69,6 +88,11 @@ do not interfere with each other.
 | opencode | `~/.config/context-mixer/cmx-lock-opencode.json` | `.context-mixer/cmx-lock-opencode.json` |
 | Codex CLI | `~/.config/context-mixer/cmx-lock-codex.json` | `.context-mixer/cmx-lock-codex.json` |
 | Pi | `~/.config/context-mixer/cmx-lock-pi.json` | `.context-mixer/cmx-lock-pi.json` |
+| Crush | `~/.config/context-mixer/cmx-lock-crush.json` | `.context-mixer/cmx-lock-crush.json` |
+| Amp | `~/.config/context-mixer/cmx-lock-amp.json` | `.context-mixer/cmx-lock-amp.json` |
+| Zed | `~/.config/context-mixer/cmx-lock-zed.json` | `.context-mixer/cmx-lock-zed.json` |
+| OpenHands | `~/.config/context-mixer/cmx-lock-openhands.json` | `.context-mixer/cmx-lock-openhands.json` |
+| Hermes | `~/.config/context-mixer/cmx-lock-hermes.json` | `.context-mixer/cmx-lock-hermes.json` |
 
 Claude Code keeps `cmx-lock.json` (no suffix) for backward compatibility with
 installations made before platform selection was introduced.
