@@ -146,12 +146,31 @@ fn parse_deprecation(fm_text: &str) -> Option<Deprecation> {
     })
 }
 
-/// Split YAML frontmatter from content. Returns the text between `---` delimiters,
-/// or `None` if delimiters are missing.
-fn split_frontmatter_str(content: &str) -> Option<&str> {
-    let rest = content.strip_prefix("---")?;
-    let end = rest.find("---")?;
-    Some(&rest[..end])
+/// Split YAML frontmatter from content. Returns `(Some(frontmatter), body)` when
+/// `---` fences are found at line boundaries, or `(None, full_content)` otherwise.
+/// Handles both LF and CRLF line endings. Unterminated blocks return `(None, full_content)`.
+pub(crate) fn split_frontmatter_and_body(content: &str) -> (Option<String>, &str) {
+    let Some(rest) = content.strip_prefix("---\n").or_else(|| content.strip_prefix("---\r\n"))
+    else {
+        return (None, content);
+    };
+
+    let mut search_start = 0;
+    while let Some(idx) = rest[search_start..].find("---") {
+        let abs = search_start + idx;
+        let at_line_start = abs == 0 || rest.as_bytes()[abs - 1] == b'\n';
+        let after = &rest[abs + 3..];
+        let ends_line = after.is_empty() || after.starts_with('\n') || after.starts_with('\r');
+        if at_line_start && ends_line {
+            let frontmatter = rest[..abs].to_string();
+            let body =
+                after.strip_prefix("\r\n").or_else(|| after.strip_prefix('\n')).unwrap_or(after);
+            return (Some(frontmatter), body);
+        }
+        search_start = abs + 3;
+    }
+
+    (None, content)
 }
 
 pub(crate) fn parse_frontmatter_str(content: &str) -> Option<Frontmatter> {
@@ -163,7 +182,8 @@ pub(crate) fn parse_agent_frontmatter_str(content: &str) -> Option<Frontmatter> 
 }
 
 fn parse_frontmatter_impl(content: &str, required_fields: &[&str]) -> Option<Frontmatter> {
-    let fm_text = split_frontmatter_str(content)?;
+    let (fm_opt, _) = split_frontmatter_and_body(content);
+    let fm_text = fm_opt.as_deref()?;
     for field in required_fields {
         if !fm_text.lines().any(|l| l.starts_with(&format!("{field}:"))) {
             return None;
@@ -220,8 +240,8 @@ pub fn extract_version(frontmatter: &str) -> Option<String> {
 /// Extract the version from an installed artifact's file content.
 /// For agents, pass the .md file content. For skills, pass the SKILL.md content.
 pub fn extract_version_from_content(content: &str) -> Option<String> {
-    let fm_text = split_frontmatter_str(content)?;
-    extract_version(fm_text)
+    let (fm_opt, _) = split_frontmatter_and_body(content);
+    extract_version(fm_opt.as_deref()?)
 }
 
 #[cfg(test)]
@@ -379,32 +399,45 @@ mod tests {
         assert!(parse_deprecation(text).is_none());
     }
 
-    // --- split_frontmatter_str ---
+    // --- split_frontmatter_and_body ---
 
     #[test]
-    fn split_frontmatter_str_valid_content() {
-        let content = "---\nkey: value\n---\n# body";
-        let fm = split_frontmatter_str(content);
-        assert_eq!(fm, Some("\nkey: value\n"));
+    fn split_frontmatter_and_body_extracts_frontmatter_and_body() {
+        let (fm, body) = split_frontmatter_and_body("---\nkey: value\n---\n# body");
+        assert_eq!(fm.as_deref(), Some("key: value\n"));
+        assert_eq!(body, "# body");
     }
 
     #[test]
-    fn split_frontmatter_str_no_opening_delimiter_returns_none() {
+    fn split_frontmatter_and_body_no_opening_delimiter_returns_none() {
         let content = "key: value\n---\n# body";
-        assert!(split_frontmatter_str(content).is_none());
+        let (fm, body) = split_frontmatter_and_body(content);
+        assert!(fm.is_none());
+        assert_eq!(body, content);
     }
 
     #[test]
-    fn split_frontmatter_str_no_closing_delimiter_returns_none() {
+    fn split_frontmatter_and_body_unterminated_returns_none() {
         let content = "---\nkey: value\n# body";
-        assert!(split_frontmatter_str(content).is_none());
+        let (fm, body) = split_frontmatter_and_body(content);
+        assert!(fm.is_none());
+        assert_eq!(body, content);
     }
 
     #[test]
-    fn split_frontmatter_str_empty_frontmatter_block() {
+    fn split_frontmatter_and_body_handles_crlf() {
+        let (fm, body) = split_frontmatter_and_body("---\r\nkey: value\r\n---\r\nBody\r\n");
+        assert_eq!(fm.as_deref(), Some("key: value\r\n"));
+        assert_eq!(body, "Body\r\n");
+    }
+
+    #[test]
+    fn split_frontmatter_and_body_dashes_not_at_line_boundary_are_ignored() {
+        // "------" is not a valid opener — requires exactly ---\n or ---\r\n
         let content = "------\n# body";
-        let fm = split_frontmatter_str(content);
-        assert_eq!(fm, Some(""));
+        let (fm, body) = split_frontmatter_and_body(content);
+        assert!(fm.is_none());
+        assert_eq!(body, content);
     }
 
     // --- parse_frontmatter_str ---

@@ -20,7 +20,7 @@
 //! arbitrary markdown bodies (including `"""`, quotes, and backslashes) round
 //! trip without relying on multi-line string edge cases.
 
-use crate::scan::extract_field;
+use crate::scan::{extract_field, split_frontmatter_and_body};
 
 /// Convert a cmx markdown agent document into codex subagent TOML.
 ///
@@ -49,36 +49,6 @@ pub fn markdown_to_codex_toml(markdown: &str, fallback_name: &str) -> String {
     }
     out.push_str(&toml_kv("developer_instructions", body.trim_end_matches('\n')));
     out
-}
-
-/// Split markdown into its YAML frontmatter (without the `---` fences) and the
-/// remaining body. Returns `(None, full_content)` when there is no frontmatter.
-fn split_frontmatter_and_body(content: &str) -> (Option<String>, &str) {
-    // Frontmatter must start at the very beginning of the file.
-    let Some(rest) = content.strip_prefix("---\n").or_else(|| content.strip_prefix("---\r\n"))
-    else {
-        return (None, content);
-    };
-
-    // Find the closing fence: a line containing only `---`.
-    let mut search_start = 0;
-    while let Some(idx) = rest[search_start..].find("---") {
-        let abs = search_start + idx;
-        let at_line_start = abs == 0 || rest.as_bytes()[abs - 1] == b'\n';
-        let after = &rest[abs + 3..];
-        let ends_line = after.is_empty() || after.starts_with('\n') || after.starts_with('\r');
-        if at_line_start && ends_line {
-            let frontmatter = rest[..abs].to_string();
-            // Body is everything after the closing fence's line break.
-            let body =
-                after.strip_prefix("\r\n").or_else(|| after.strip_prefix('\n')).unwrap_or(after);
-            return (Some(frontmatter), body);
-        }
-        search_start = abs + 3;
-    }
-
-    // Unterminated frontmatter — treat the whole thing as body.
-    (None, content)
 }
 
 /// Render a single `key = "value"` TOML line with a fully escaped basic string.
@@ -142,37 +112,6 @@ mod tests {
     fn triple_quotes_in_body_are_escaped_not_treated_as_multiline() {
         let out = toml_basic_string(r#"use """ here"#);
         assert_eq!(out, r#""use \"\"\" here""#);
-    }
-
-    // --- split_frontmatter_and_body ---
-
-    #[test]
-    fn split_extracts_frontmatter_and_body() {
-        let (fm, body) = split_frontmatter_and_body("---\nname: a\n---\nHello body\n");
-        assert_eq!(fm.as_deref(), Some("name: a\n"));
-        assert_eq!(body, "Hello body\n");
-    }
-
-    #[test]
-    fn split_no_frontmatter_returns_full_body() {
-        let (fm, body) = split_frontmatter_and_body("Just a body\n");
-        assert!(fm.is_none());
-        assert_eq!(body, "Just a body\n");
-    }
-
-    #[test]
-    fn split_unterminated_frontmatter_is_treated_as_body() {
-        let content = "---\nname: a\nno closing fence";
-        let (fm, body) = split_frontmatter_and_body(content);
-        assert!(fm.is_none());
-        assert_eq!(body, content);
-    }
-
-    #[test]
-    fn split_handles_crlf_line_endings() {
-        let (fm, body) = split_frontmatter_and_body("---\r\nname: a\r\n---\r\nBody\r\n");
-        assert_eq!(fm.as_deref(), Some("name: a\r\n"));
-        assert_eq!(body, "Body\r\n");
     }
 
     // --- markdown_to_codex_toml ---
