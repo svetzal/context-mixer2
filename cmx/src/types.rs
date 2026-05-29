@@ -207,15 +207,23 @@ impl ArtifactKind {
 
     /// Determine whether a directory entry represents a valid installed artifact
     /// for this kind, returning the artifact name if it matches.
+    ///
+    /// `agent_ext` is the platform's agent file extension (e.g. `md`, or `toml`
+    /// for codex), so that codex's TOML agents are recognized as well as
+    /// markdown ones.
     pub fn artifact_name_from_entry(
         &self,
         entry: &crate::gateway::filesystem::DirEntry,
+        agent_ext: &str,
     ) -> Option<String> {
         match self {
-            ArtifactKind::Agent => Path::new(&entry.file_name)
-                .extension()
-                .filter(|ext| ext.eq_ignore_ascii_case("md"))
-                .map(|_| entry.file_name.trim_end_matches(".md").to_string()),
+            ArtifactKind::Agent => {
+                let path = Path::new(&entry.file_name);
+                path.extension()
+                    .filter(|ext| ext.eq_ignore_ascii_case(agent_ext))
+                    .and_then(|_| path.file_stem())
+                    .map(|stem| stem.to_string_lossy().to_string())
+            }
             ArtifactKind::Skill => entry.is_dir.then(|| entry.file_name.clone()),
         }
     }

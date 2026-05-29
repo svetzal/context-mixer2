@@ -234,8 +234,8 @@ fn read_installed_version(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Option<String> {
-    let dir = ctx.paths.install_dir(kind, scope);
-    let file_path = kind.content_path(&kind.installed_path(name, &dir));
+    let installed = ctx.paths.installed_artifact_path(kind, name, scope);
+    let file_path = kind.content_path(&installed);
     let content = ctx.fs.read_to_string(&file_path).ok()?;
     scan::extract_version_from_content(&content)
 }

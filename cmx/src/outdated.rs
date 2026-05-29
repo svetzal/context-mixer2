@@ -101,7 +101,7 @@ fn check_locally_modified(
     let Some(entry) = lock_entry else {
         return Ok(false);
     };
-    let install_path = kind.installed_path(name, &ctx.paths.install_dir(kind, scope));
+    let install_path = ctx.paths.installed_artifact_path(kind, name, scope);
     if !ctx.fs.exists(&install_path) {
         return Ok(false);
     }

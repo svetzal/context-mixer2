@@ -61,7 +61,8 @@ pub fn installed_names(
             continue;
         }
 
-        if let Some(name) = kind.artifact_name_from_entry(&entry) {
+        if let Some(name) = kind.artifact_name_from_entry(&entry, paths.platform.agent_extension())
+        {
             names.push(name);
         }
     }
@@ -149,8 +150,7 @@ pub fn find_installed_path(
     paths: &ConfigPaths,
 ) -> Option<(PathBuf, InstallScope)> {
     for scope in InstallScope::ALL {
-        let dir = paths.install_dir(kind, scope);
-        let path = kind.installed_path(name, &dir);
+        let path = paths.installed_artifact_path(kind, name, scope);
         if fs.exists(&path) {
             return Some((path, scope));
         }

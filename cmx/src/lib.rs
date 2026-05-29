@@ -1,6 +1,7 @@
 pub mod checksum;
 pub mod cli;
 pub mod cmx_config;
+pub(crate) mod codex_agent;
 pub mod config;
 pub mod context;
 pub(crate) mod copy;

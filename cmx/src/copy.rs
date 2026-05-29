@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::{Context as _, Result, bail};
 use std::path::{Path, PathBuf};
 
 use crate::context::AppContext;
@@ -6,6 +6,10 @@ use crate::gateway::Filesystem;
 use crate::types::ArtifactKind;
 
 /// Copy an artifact from source to destination, returning the destination path.
+///
+/// Most artifacts are copied verbatim. Codex agents are the exception: the
+/// source markdown is transformed into a codex subagent TOML document (see
+/// [`crate::codex_agent`]) and written as `<name>.toml`.
 pub(crate) fn copy_artifact(
     artifact_path: &Path,
     dest_dir: &Path,
@@ -13,6 +17,10 @@ pub(crate) fn copy_artifact(
     artifact_name: &str,
     ctx: &AppContext<'_>,
 ) -> Result<PathBuf> {
+    if kind == ArtifactKind::Agent && ctx.paths.platform.transforms_agent_to_toml() {
+        return transform_agent_to_codex_toml(artifact_path, dest_dir, artifact_name, ctx);
+    }
+
     let dest_path = kind.copy_to(artifact_path, dest_dir, ctx.fs)?;
 
     if matches!(kind, ArtifactKind::Skill) {
@@ -24,6 +32,28 @@ pub(crate) fn copy_artifact(
     }
 
     Ok(dest_path)
+}
+
+/// Read a markdown agent, transform it into codex subagent TOML, and write it to
+/// `<dest_dir>/<name>.toml`. Returns the written path.
+fn transform_agent_to_codex_toml(
+    source: &Path,
+    dest_dir: &Path,
+    name: &str,
+    ctx: &AppContext<'_>,
+) -> Result<PathBuf> {
+    let markdown = ctx
+        .fs
+        .read_to_string(source)
+        .with_context(|| format!("Failed to read agent source {}", source.display()))?;
+    let toml = crate::codex_agent::markdown_to_codex_toml(&markdown, name);
+
+    ctx.fs.create_dir_all(dest_dir)?;
+    let dest = dest_dir.join(format!("{name}.toml"));
+    ctx.fs
+        .write(&dest, &toml)
+        .with_context(|| format!("Failed to write codex agent {}", dest.display()))?;
+    Ok(dest)
 }
 
 pub(crate) fn copy_dir_recursive_with(src: &Path, dest: &Path, fs: &dyn Filesystem) -> Result<()> {

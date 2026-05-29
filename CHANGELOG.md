@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-platform lock files: non-Claude platforms use `cmx-lock-<platform>.json` so installations for different tools remain independent. Claude keeps `cmx-lock.json` for backward compatibility.
 - `cmx::platform::Platform` is now a public type in the `cmx` crate; `cmf` imports it from there rather than defining its own copy.
 - `cmf manifest generate` now emits `.windsurf-plugin/` manifests, so marketplaces built with cmf no longer silently exclude Windsurf users.
+- Three additional `--platform` targets: `opencode`, `codex`, and `pi`. Skills for all three install to the shared cross-tool `.agents/skills/` (project) and `~/.agents/skills/` (user) convention that opencode, Codex, and Pi all read.
+- opencode agents install as markdown to `.opencode/agent/` (project) and `~/.config/opencode/agent/` (user).
+- Codex agents are transformed from cmx markdown into Codex subagent TOML (`<name>.toml`) on install, mapping `name`, `description`, the markdown body (`developer_instructions`), and an optional `model` field. Installed to `.codex/agents/` / `~/.codex/agents/`.
+- Per-platform support gating: platforms declare which artifact kinds they support. Pi supports skills only, so `cmx agent install --platform pi` (and uninstall/update) fails with a clear, actionable error rather than installing into a directory Pi never reads.
+
+### Notes
+
+- opencode, Codex, and Pi have no Claude-style plugin/marketplace manifest format, so `cmf manifest generate` intentionally does not emit manifest directories for them.
+- Because opencode/Codex/Pi share the `.agents/skills/` directory, uninstalling a skill under one of these platforms removes it for all tools that read `.agents/`.
 
 ### Changed
 

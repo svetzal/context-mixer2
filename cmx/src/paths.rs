@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use std::path::PathBuf;
 
 use crate::platform::Platform;
@@ -80,12 +80,51 @@ impl ConfigPaths {
     }
 
     /// Directory where artifacts of the given kind and scope are installed.
+    ///
+    /// Resolution is delegated to [`Platform::install_subpath`], which encodes
+    /// each platform's layout (including per-kind divergence such as codex/pi
+    /// skills living under the shared `.agents/skills`). Local installs are
+    /// relative to the project root; global installs are anchored at `$HOME`.
     pub fn install_dir(&self, kind: ArtifactKind, scope: InstallScope) -> PathBuf {
-        let subdir = kind.subdir_name();
+        let subpath = self.platform.install_subpath(kind, scope);
         if scope.is_local() {
-            self.platform.project_base().join(subdir)
+            subpath
         } else {
-            self.home_dir.join(self.platform.user_base()).join(subdir)
+            self.home_dir.join(subpath)
+        }
+    }
+
+    /// Full path to where an artifact of `kind` named `name` is (or would be)
+    /// installed under `scope`, accounting for the platform's agent file format.
+    ///
+    /// Agents use the platform's [`agent_extension`](Platform::agent_extension)
+    /// (e.g. `.md`, or `.toml` for codex); skills resolve to a directory named
+    /// after the artifact.
+    pub fn installed_artifact_path(
+        &self,
+        kind: ArtifactKind,
+        name: &str,
+        scope: InstallScope,
+    ) -> PathBuf {
+        let dir = self.install_dir(kind, scope);
+        match kind {
+            ArtifactKind::Agent => dir.join(format!("{name}.{}", self.platform.agent_extension())),
+            ArtifactKind::Skill => kind.installed_path(name, &dir),
+        }
+    }
+
+    /// Verify the active platform supports the given artifact kind, returning a
+    /// user-facing error otherwise (e.g. pi has no agent concept).
+    pub fn ensure_supports(&self, kind: ArtifactKind) -> Result<()> {
+        if self.platform.supports(kind) {
+            Ok(())
+        } else {
+            bail!(
+                "The {platform} platform does not support {kind}s. \
+                 {platform} has no native {kind} concept.",
+                platform = self.platform,
+                kind = kind,
+            );
         }
     }
 }
@@ -325,5 +364,130 @@ mod tests {
             paths.lock_path(InstallScope::Global),
             PathBuf::from("/home/testuser/.config/context-mixer/cmx-lock-gemini.json")
         );
+    }
+
+    // --- opencode ---
+
+    #[test]
+    fn install_dir_opencode_agent_local_uses_singular_leaf() {
+        let paths = test_paths_for(Platform::Opencode);
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            PathBuf::from(".opencode/agent")
+        );
+    }
+
+    #[test]
+    fn install_dir_opencode_agent_global_uses_xdg_config() {
+        let paths = test_paths_for(Platform::Opencode);
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            PathBuf::from("/home/testuser/.config/opencode/agent")
+        );
+    }
+
+    #[test]
+    fn install_dir_opencode_skill_uses_shared_dot_agents() {
+        let paths = test_paths_for(Platform::Opencode);
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Local),
+            PathBuf::from(".agents/skills")
+        );
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
+            PathBuf::from("/home/testuser/.agents/skills")
+        );
+    }
+
+    #[test]
+    fn lock_path_opencode_uses_opencode_slug() {
+        let paths = test_paths_for(Platform::Opencode);
+        assert_eq!(
+            paths.lock_path(InstallScope::Global),
+            PathBuf::from("/home/testuser/.config/context-mixer/cmx-lock-opencode.json")
+        );
+    }
+
+    // --- codex ---
+
+    #[test]
+    fn install_dir_codex_agent_uses_dot_codex_agents() {
+        let paths = test_paths_for(Platform::Codex);
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            PathBuf::from(".codex/agents")
+        );
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            PathBuf::from("/home/testuser/.codex/agents")
+        );
+    }
+
+    #[test]
+    fn install_dir_codex_skill_uses_shared_dot_agents() {
+        let paths = test_paths_for(Platform::Codex);
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
+            PathBuf::from("/home/testuser/.agents/skills")
+        );
+    }
+
+    #[test]
+    fn installed_artifact_path_codex_agent_is_toml() {
+        let paths = test_paths_for(Platform::Codex);
+        assert_eq!(
+            paths.installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Global),
+            PathBuf::from("/home/testuser/.codex/agents/my-agent.toml")
+        );
+    }
+
+    #[test]
+    fn installed_artifact_path_default_agent_is_md() {
+        let paths = test_paths();
+        assert_eq!(
+            paths.installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Local),
+            PathBuf::from(".claude/agents/my-agent.md")
+        );
+    }
+
+    #[test]
+    fn installed_artifact_path_skill_is_directory() {
+        let paths = test_paths_for(Platform::Codex);
+        assert_eq!(
+            paths.installed_artifact_path(ArtifactKind::Skill, "my-skill", InstallScope::Local),
+            PathBuf::from(".agents/skills/my-skill")
+        );
+    }
+
+    // --- pi ---
+
+    #[test]
+    fn install_dir_pi_skill_uses_shared_dot_agents() {
+        let paths = test_paths_for(Platform::Pi);
+        assert_eq!(
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Local),
+            PathBuf::from(".agents/skills")
+        );
+    }
+
+    #[test]
+    fn ensure_supports_pi_rejects_agents() {
+        let paths = test_paths_for(Platform::Pi);
+        let err = paths.ensure_supports(ArtifactKind::Agent).unwrap_err().to_string();
+        assert!(err.contains("pi"), "error should name the platform: {err}");
+        assert!(err.contains("agent"), "error should name the kind: {err}");
+    }
+
+    #[test]
+    fn ensure_supports_pi_allows_skills() {
+        let paths = test_paths_for(Platform::Pi);
+        assert!(paths.ensure_supports(ArtifactKind::Skill).is_ok());
+    }
+
+    #[test]
+    fn ensure_supports_codex_allows_both() {
+        let paths = test_paths_for(Platform::Codex);
+        assert!(paths.ensure_supports(ArtifactKind::Agent).is_ok());
+        assert!(paths.ensure_supports(ArtifactKind::Skill).is_ok());
     }
 }

@@ -15,7 +15,7 @@ cmx manages the lifecycle of **agents** and **skills** for AI coding assistants 
 - **Install & update** — install agents and skills globally or per-project, track versions and checksums
 - **Status tracking** — see what's installed, what's outdated, what's deprecated
 - **LLM-powered diff** — use AI to analyze differences between installed and source versions
-- **Cross-platform** — works with Claude Code, GitHub Copilot, Cursor, Windsurf, and Gemini CLI
+- **Cross-platform** — works with Claude Code, GitHub Copilot, Cursor, Windsurf, Gemini CLI, opencode, Codex CLI, and Pi
 
 ## Quick example
 

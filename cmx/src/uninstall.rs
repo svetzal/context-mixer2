@@ -8,6 +8,7 @@ use crate::types::{ArtifactKind, InstallScope};
 // Result types
 // ---------------------------------------------------------------------------
 
+#[derive(Debug)]
 pub struct UninstallResult {
     pub name: String,
     pub kind: ArtifactKind,
@@ -25,8 +26,9 @@ pub fn uninstall(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<UninstallResult> {
-    let dir = ctx.paths.install_dir(kind, scope);
-    let target = kind.installed_path(name, &dir);
+    ctx.paths.ensure_supports(kind)?;
+
+    let target = ctx.paths.installed_artifact_path(kind, name, scope);
 
     if !ctx.fs.exists(&target) {
         bail!("No {kind} named '{name}' found in {} scope.", scope.label());
@@ -243,5 +245,41 @@ mod tests {
             !updated_lock.packages.contains_key("my-agent"),
             "lock entry should be removed from cursor lock"
         );
+    }
+
+    #[test]
+    fn uninstall_codex_agent_removes_toml_file() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(chrono::Utc::now());
+        let paths = test_paths_for(Platform::Codex);
+
+        let toml_path =
+            paths.installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Global);
+        assert_eq!(
+            toml_path,
+            std::path::PathBuf::from("/home/testuser/.codex/agents/my-agent.toml")
+        );
+        fs.add_file(toml_path.clone(), "name = \"my-agent\"\n");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result =
+            uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
+
+        assert_eq!(result.name, "my-agent");
+        assert!(!fs.file_exists(&toml_path), "codex agent TOML should be removed");
+    }
+
+    #[test]
+    fn uninstall_pi_agent_is_rejected() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(chrono::Utc::now());
+        let paths = test_paths_for(Platform::Pi);
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = uninstall("whatever", ArtifactKind::Agent, InstallScope::Global, &ctx);
+        assert!(result.is_err(), "pi must reject agent uninstall");
+        assert!(result.unwrap_err().to_string().contains("pi"));
     }
 }

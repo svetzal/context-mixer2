@@ -49,6 +49,8 @@ pub fn install(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<InstallResult> {
+    ctx.paths.ensure_supports(kind)?;
+
     let (source_name, artifact_name) = parse_name(name);
 
     source_update::ensure_fresh(ctx)?;
@@ -67,7 +69,7 @@ pub fn install(
         check_local_modifications(
             artifact_name,
             kind,
-            &plan.dest_dir,
+            scope,
             lock.packages.get(artifact_name),
             ctx,
         )?;
@@ -75,7 +77,8 @@ pub fn install(
 
     // Record whether this is a fresh install (vs. an update/reinstall) so that
     // we can roll back if the lockfile write fails.
-    let already_installed = ctx.fs.exists(&kind.installed_path(artifact_name, &plan.dest_dir));
+    let already_installed =
+        ctx.fs.exists(&ctx.paths.installed_artifact_path(kind, artifact_name, scope));
 
     let dest_path =
         copy::copy_artifact(&found.artifact.path, &plan.dest_dir, kind, artifact_name, ctx)?;
@@ -142,6 +145,8 @@ pub fn install_all(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<BatchInstallResult> {
+    ctx.paths.ensure_supports(kind)?;
+
     source_update::ensure_fresh(ctx)?;
 
     let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
@@ -177,6 +182,8 @@ pub fn update_all(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<BatchInstallResult> {
+    ctx.paths.ensure_supports(kind)?;
+
     source_update::ensure_fresh(ctx)?;
 
     let all_source_info = source_iter::all_with_checksums(ctx)?;
@@ -239,11 +246,11 @@ fn plan_install(
 fn check_local_modifications(
     artifact_name: &str,
     kind: ArtifactKind,
-    dest_dir: &std::path::Path,
+    scope: InstallScope,
     lock_entry: Option<&LockEntry>,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
-    let dest_check = kind.installed_path(artifact_name, dest_dir);
+    let dest_check = ctx.paths.installed_artifact_path(kind, artifact_name, scope);
     if ctx.fs.exists(&dest_check) {
         if let Some(entry) = lock_entry {
             if checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs)? {
@@ -371,7 +378,8 @@ mod tests {
     use crate::source_iter::SourceArtifact;
     use crate::test_support::{
         TestContext, agent_content, make_ctx, setup_empty_sources, setup_source,
-        setup_source_with_agent, setup_sources, test_paths, test_paths_for,
+        setup_source_with_agent, setup_source_with_skill, setup_sources, test_paths,
+        test_paths_for,
     };
     use crate::types::{Artifact, ArtifactKind, Deprecation, InstallScope, LockFile};
     use chrono::Utc;
@@ -974,5 +982,123 @@ mod tests {
             t.fs.file_exists(&expected_dest),
             "existing agent should be kept when lock save fails on reinstall (already_installed=true)"
         );
+    }
+
+    // --- New platform installs ---
+
+    #[test]
+    fn install_codex_agent_transforms_markdown_to_toml() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths_for(Platform::Codex);
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+
+        let dest = PathBuf::from("/home/testuser/.codex/agents/my-agent.toml");
+        assert!(
+            fs.file_exists(&dest),
+            "codex agent should be written as TOML at {}",
+            dest.display()
+        );
+
+        let content = fs.read_to_string(&dest).unwrap();
+        assert!(content.contains("name = \"my-agent\""), "got: {content}");
+        assert!(content.contains("description = \"A test agent\""), "got: {content}");
+        assert!(content.contains("developer_instructions = \"# my-agent\""), "got: {content}");
+
+        // No stray markdown file should exist alongside the TOML.
+        assert!(!fs.file_exists(&PathBuf::from("/home/testuser/.codex/agents/my-agent.md")));
+    }
+
+    #[test]
+    fn install_codex_agent_is_idempotent_without_force() {
+        // The transform is deterministic, so a second install with no source
+        // change must not trip the local-modification guard.
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths_for(Platform::Codex);
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        let again = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+        assert!(
+            again.is_ok(),
+            "reinstalling unchanged codex agent should succeed: {:?}",
+            again.err()
+        );
+    }
+
+    #[test]
+    fn install_pi_agent_is_rejected_with_clear_error() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths_for(Platform::Pi);
+
+        setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+        assert!(result.is_err(), "pi must reject agent installs");
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("pi"), "error should name the platform: {msg}");
+        assert!(msg.contains("agent"), "error should name the kind: {msg}");
+    }
+
+    #[test]
+    fn install_pi_skill_is_allowed_and_lands_in_dot_agents() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths_for(Platform::Pi);
+
+        setup_source_with_skill(
+            &fs,
+            &paths,
+            "my-source",
+            "/sources/my-source",
+            "my-skill",
+            "1.0.0",
+        );
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx).unwrap();
+
+        let dest = PathBuf::from("/home/testuser/.agents/skills/my-skill/SKILL.md");
+        assert!(
+            fs.file_exists(&dest),
+            "pi skill should land in shared .agents/skills at {}",
+            dest.display()
+        );
+    }
+
+    #[test]
+    fn install_opencode_skill_lands_in_shared_dot_agents() {
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths_for(Platform::Opencode);
+
+        setup_source_with_skill(
+            &fs,
+            &paths,
+            "my-source",
+            "/sources/my-source",
+            "my-skill",
+            "1.0.0",
+        );
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        install("my-skill", ArtifactKind::Skill, InstallScope::Local, false, &ctx).unwrap();
+
+        let dest = PathBuf::from(".agents/skills/my-skill/SKILL.md");
+        assert!(fs.file_exists(&dest), "opencode skill should land in shared .agents/skills");
     }
 }
