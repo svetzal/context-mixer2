@@ -17,6 +17,41 @@ This note records that research (so we don't re-derive it), the structural
 patterns it revealed, the abstraction options we weighed, and the scope
 decisions that produced the shipped design.
 
+## Design principles
+
+These are the durable commitments behind the decisions on this page. We publish
+them so you can judge whether cmx's *direction* fits your values — not just
+whether it works today.
+
+- **Honesty over the appearance of coverage.** If a tool can't consume an
+  artifact kind, cmx fails with a clear error rather than writing files the tool
+  will never read. (→ `supports()` / skip-unsupported.)
+- **Favor open, cross-tool standards.** We invest first in the shared
+  `.agents/skills/` standard because it serves many tools at once; per-tool
+  quirks are the long tail. (→ the skills cohort.)
+- **Layer on top; don't replace.** cmx adds version-tracking and cross-tool
+  management *over* each tool's native system. It won't try to become a tool's
+  plugin system, manage its secrets, or own its config. (→ file-drop-only;
+  config-merge/MCP deferred; charter non-goals.)
+- **Lean by default.** The default build carries no needless dependencies or
+  advisory surface; we'll hand-roll a small, well-tested thing before pulling in
+  a crate for it. (→ the hand-rolled Codex TOML emitter.)
+- **Provenance and integrity are first-class.** Every install records source,
+  version, and checksum in a per-platform lockfile, so you can always see what's
+  installed, from where, and whether it has drifted.
+- **One curated set, projected outward.** You manage a single curated set of
+  artifacts; cmx projects it into many tools' native locations and formats. You
+  curate once, not once per tool.
+
+## Direction
+
+The [phasing](#phasing) below is the roadmap, and the
+[scope decisions](#scope-decisions) mark the current boundaries —
+deliberately, not permanently. The deferred items (a `Command` artifact kind, a
+config-merge/MCP engine, more tools) are open questions where those boundaries
+may be revisited. If your needs press on one of them, that signal is welcome —
+it's part of how the direction gets set.
+
 ## TL;DR — the three findings that matter
 
 1. **`.agents/skills/` is a real cross-tool standard.** The
