@@ -95,9 +95,17 @@ named `home`.
 |---------|-------------|
 | `cmx home init` | Create the home directory and register it as the `home` source |
 | `cmx home path` | Print the resolved home directory |
-| `cmx skill adopt <name>` | Copy an orphaned skill into the home and mark it tracked |
-| `cmx agent adopt <name>` | Copy an orphaned agent into the home and mark it tracked |
-| `cmx doctor --adopt-all` | Adopt every orphan the survey finds, in one pass |
+| `cmx skill adopt <name>...` | Adopt one or more named orphaned skills into the home |
+| `cmx agent adopt <name>...` | Adopt one or more named orphaned agents into the home |
+| `cmx skill adopt --all [--from <dir>]` | Adopt all orphaned skills, optionally only those under `<dir>` |
+| `cmx doctor --adopt-all [--from <dir>]` | Adopt every orphan the survey finds (both kinds), optionally scoped to `<dir>` |
+
+Adoption acts **only on orphaned** artifacts. Naming an untracked
+(source-available) artifact steers you to `install`; an already-tracked or
+drifted one is rejected. Named adoption is all-or-nothing — if any name is
+invalid, nothing is adopted. The `--from <dir>` filter restricts a bulk adopt to
+a single install location (e.g. `--from ~/.claude/skills` to adopt your own
+skills while leaving another tool's bundled-skill directory untouched).
 
 **Adoption copies, never moves.** It places a verbatim copy of the orphan in the
 home, registers the home as a source, and records provenance (`source: home`,

@@ -150,46 +150,66 @@ fn adopt_rows(
     })
 }
 
-/// Adopt every orphan the survey finds. Backs `cmx doctor --adopt-all`.
-pub fn adopt_all(include_local: bool, ctx: &AppContext<'_>) -> Result<AdoptOutcome> {
-    let report = doctor::survey(include_local, ctx)?;
-    adopt_rows(&report.rows, include_local, ctx)
-}
-
-/// Adopt the orphan(s) of the given kind matching `name`. Backs
-/// `cmx {skill,agent} adopt <name>`.
-pub fn adopt_named(
-    kind: ArtifactKind,
-    name: &str,
+/// Adopt every orphan the survey finds, optionally narrowed by artifact `kind`
+/// and install `location` (a directory prefix). Backs `cmx doctor --adopt-all`
+/// and `cmx <kind> adopt --all [--from <dir>]`.
+///
+/// Only *orphaned* artifacts are adopted — untracked (source-available) ones are
+/// left for `install`. The `from` filter is how you exclude, say, a vendor
+/// tool's bundled-skill directory while adopting your own.
+pub fn adopt_all(
+    kind: Option<ArtifactKind>,
+    from: Option<&Path>,
     include_local: bool,
     ctx: &AppContext<'_>,
 ) -> Result<AdoptOutcome> {
     let report = doctor::survey(include_local, ctx)?;
-
-    // If it's untracked (a registered source provides it), adopting it as
-    // private would be wrong — steer to `install`, which records provenance.
-    if report
-        .rows
-        .iter()
-        .any(|r| r.kind == kind && r.name == name && r.state == ArtifactState::Untracked)
-    {
-        anyhow::bail!(
-            "'{name}' is available in a registered source — run `cmx {kind} install {name}` to track it. \
-             (adopt is for hand-authored artifacts that no source provides.)"
-        );
-    }
-
-    let matching: Vec<DoctorRow> = report
+    let rows: Vec<DoctorRow> = report
         .rows
         .into_iter()
-        .filter(|r| r.kind == kind && r.name == name && r.state == ArtifactState::Orphaned)
+        .filter(|r| r.state == ArtifactState::Orphaned)
+        .filter(|r| kind.is_none_or(|k| r.kind == k))
+        .filter(|r| from.is_none_or(|d| r.location.starts_with(d)))
         .collect();
-    if matching.is_empty() {
-        anyhow::bail!(
-            "No orphaned {kind} named '{name}' found. Run `cmx doctor` to see what is adoptable."
-        );
+    adopt_rows(&rows, include_local, ctx)
+}
+
+/// Adopt the named orphan artifacts of the given kind. Backs
+/// `cmx {skill,agent} adopt <name>...`.
+///
+/// Each name is validated against the survey: a source-available (untracked)
+/// artifact is steered to `install`; an already-tracked or drifted one is
+/// rejected with an explanation; an unknown name errors. All-or-nothing — if any
+/// name is invalid, nothing is adopted.
+pub fn adopt_named(
+    kind: ArtifactKind,
+    names: &[String],
+    include_local: bool,
+    ctx: &AppContext<'_>,
+) -> Result<AdoptOutcome> {
+    let report = doctor::survey(include_local, ctx)?;
+    let mut chosen = Vec::new();
+    for name in names {
+        let row = report.rows.iter().find(|r| r.kind == kind && &r.name == name);
+        match row.map(|r| r.state) {
+            Some(ArtifactState::Orphaned) => chosen.push(row.unwrap().clone()),
+            Some(ArtifactState::Untracked) => anyhow::bail!(
+                "'{name}' is available in a registered source — run `cmx {kind} install {name}` to track it. \
+                 (adopt is for hand-authored artifacts that no source provides.)"
+            ),
+            Some(ArtifactState::Tracked) => {
+                anyhow::bail!("'{name}' is already tracked — nothing to adopt.")
+            }
+            Some(ArtifactState::Drifted) => anyhow::bail!(
+                "'{name}' is tracked but locally modified (drifted), not orphaned — adopt does not yet \
+                 re-home drifted artifacts. Inspect with `cmx info {name}`."
+            ),
+            None => anyhow::bail!(
+                "No {kind} named '{name}' found on disk. Run `cmx doctor` to see what is adoptable."
+            ),
+        }
     }
-    adopt_rows(&matching, include_local, ctx)
+    adopt_rows(&chosen, include_local, ctx)
 }
 
 /// Set up the canonical home without adopting anything: create the directory and
@@ -255,7 +275,7 @@ mod tests {
         let row = before.rows.iter().find(|r| r.name == "my-skill").unwrap();
         assert_eq!(row.state, ArtifactState::Orphaned);
 
-        let outcome = adopt_all(false, &t.ctx()).unwrap();
+        let outcome = adopt_all(None, None, false, &t.ctx()).unwrap();
         assert_eq!(outcome.adopted.len(), 1);
         let adopted = &outcome.adopted[0];
         assert_eq!(adopted.name, "my-skill");
@@ -275,7 +295,7 @@ mod tests {
     fn adopt_records_home_provenance_in_lockfile() {
         let t = TestContext::new();
         place_orphan_skill(&t, Platform::Claude, "my-skill", "2.3.4");
-        adopt_all(false, &t.ctx()).unwrap();
+        adopt_all(None, None, false, &t.ctx()).unwrap();
 
         let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
         let entry = lock.packages.get("my-skill").expect("lock entry written");
@@ -294,7 +314,7 @@ mod tests {
             .install_dir(ArtifactKind::Skill, InstallScope::Global)
             .join("my-skill")
             .join("SKILL.md");
-        adopt_all(false, &t.ctx()).unwrap();
+        adopt_all(None, None, false, &t.ctx()).unwrap();
         assert!(t.fs.exists(&original), "original copy is left in place, not moved");
     }
 
@@ -304,7 +324,8 @@ mod tests {
         place_orphan_skill(&t, Platform::Claude, "keep", "1.0.0");
         place_orphan_skill(&t, Platform::Claude, "other", "1.0.0");
 
-        let outcome = adopt_named(ArtifactKind::Skill, "keep", false, &t.ctx()).unwrap();
+        let outcome =
+            adopt_named(ArtifactKind::Skill, &["keep".to_string()], false, &t.ctx()).unwrap();
         assert_eq!(outcome.adopted.len(), 1);
         assert_eq!(outcome.adopted[0].name, "keep");
 
@@ -330,7 +351,7 @@ mod tests {
         // A genuine orphan alongside it.
         place_orphan_skill(&t, Platform::Claude, "my-private", "1.0.0");
 
-        let outcome = adopt_all(false, &t.ctx()).unwrap();
+        let outcome = adopt_all(None, None, false, &t.ctx()).unwrap();
         let names: Vec<&str> = outcome.adopted.iter().map(|a| a.name.as_str()).collect();
         assert!(names.contains(&"my-private"), "the true orphan is adopted");
         assert!(
@@ -352,27 +373,90 @@ mod tests {
         );
         place_orphan_skill(&t, Platform::Claude, "vis-theory", "1.0.0");
 
-        let err = adopt_named(ArtifactKind::Skill, "vis-theory", false, &t.ctx()).unwrap_err();
+        let err = adopt_named(ArtifactKind::Skill, &["vis-theory".to_string()], false, &t.ctx())
+            .unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("available in a registered source"), "got: {msg}");
         assert!(msg.contains("cmx skill install vis-theory"), "steers to install: {msg}");
     }
 
     #[test]
+    fn adopt_all_from_filters_by_install_location() {
+        let t = TestContext::new();
+        // "mine" in ~/.claude/skills; "theirs" in the shared ~/.agents/skills.
+        place_orphan_skill(&t, Platform::Claude, "mine", "1.0.0");
+        place_orphan_skill(&t, Platform::Pi, "theirs", "1.0.0");
+
+        let claude_skills = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global);
+        let outcome =
+            adopt_all(Some(ArtifactKind::Skill), Some(&claude_skills), false, &t.ctx()).unwrap();
+        let names: Vec<&str> = outcome.adopted.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["mine"], "only the orphan under the --from location is adopted");
+    }
+
+    #[test]
+    fn adopt_named_adopts_multiple_in_one_call() {
+        let t = TestContext::new();
+        place_orphan_skill(&t, Platform::Claude, "alpha", "1.0.0");
+        place_orphan_skill(&t, Platform::Claude, "beta", "1.0.0");
+        place_orphan_skill(&t, Platform::Claude, "gamma", "1.0.0");
+
+        let outcome = adopt_named(
+            ArtifactKind::Skill,
+            &["alpha".to_string(), "gamma".to_string()],
+            false,
+            &t.ctx(),
+        )
+        .unwrap();
+        let mut names: Vec<&str> = outcome.adopted.iter().map(|a| a.name.as_str()).collect();
+        names.sort_unstable();
+        assert_eq!(names, ["alpha", "gamma"], "exactly the two named orphans");
+
+        // beta remains orphaned.
+        let report = doctor::survey(false, &t.ctx()).unwrap();
+        assert_eq!(
+            report.rows.iter().find(|r| r.name == "beta").unwrap().state,
+            ArtifactState::Orphaned
+        );
+    }
+
+    #[test]
+    fn adopt_named_is_all_or_nothing_on_invalid_name() {
+        let t = TestContext::new();
+        place_orphan_skill(&t, Platform::Claude, "good", "1.0.0");
+
+        // One valid orphan, one nonexistent → whole call fails, nothing adopted.
+        let result = adopt_named(
+            ArtifactKind::Skill,
+            &["good".to_string(), "nope".to_string()],
+            false,
+            &t.ctx(),
+        );
+        assert!(result.is_err(), "invalid name should abort the batch");
+
+        let report = doctor::survey(false, &t.ctx()).unwrap();
+        assert_eq!(
+            report.rows.iter().find(|r| r.name == "good").unwrap().state,
+            ArtifactState::Orphaned,
+            "the valid orphan must NOT have been adopted when the batch aborted"
+        );
+    }
+
+    #[test]
     fn adopt_named_errors_when_no_matching_orphan() {
         let t = TestContext::new();
-        let result = adopt_named(ArtifactKind::Skill, "ghost", false, &t.ctx());
+        let result = adopt_named(ArtifactKind::Skill, &["ghost".to_string()], false, &t.ctx());
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("No orphaned skill named 'ghost'"));
+        assert!(result.unwrap_err().to_string().contains("No skill named 'ghost' found on disk"));
     }
 
     #[test]
     fn adopt_is_idempotent() {
         let t = TestContext::new();
         place_orphan_skill(&t, Platform::Claude, "my-skill", "1.0.0");
-        adopt_all(false, &t.ctx()).unwrap();
+        adopt_all(None, None, false, &t.ctx()).unwrap();
         // Second run finds no orphans (the original is now tracked).
-        let second = adopt_all(false, &t.ctx()).unwrap();
+        let second = adopt_all(None, None, false, &t.ctx()).unwrap();
         assert!(second.adopted.is_empty(), "nothing left to adopt on the second run");
     }
 }

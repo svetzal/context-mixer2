@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `cmx doctor` now distinguishes two kinds of no-lock-entry artifact: **`untracked`** (a registered source provides it — installed out-of-band, fix by `install`) versus **`orphaned`** (no source provides it — hand-authored, the `adopt` candidate). Previously both were lumped as "orphaned".
+- `cmx {skill,agent} adopt <name>...` now accepts **multiple names** in one call (all-or-nothing: an invalid name aborts the batch before anything is adopted).
+- `cmx {skill,agent} adopt --all [--from <dir>]` and `cmx doctor --adopt-all [--from <dir>]` — bulk-adopt orphans, optionally restricted to a single install location. `--from ~/.claude/skills`, for example, adopts your own skills while leaving another tool's bundled-skill directory untouched.
 
 ### Changed
 

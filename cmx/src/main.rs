@@ -28,11 +28,17 @@ fn main() -> Result<()> {
             print!("{output}");
             Ok(())
         }
-        Commands::Doctor { local, adopt_all } => {
+        Commands::Doctor {
+            local,
+            adopt_all,
+            from,
+        } => {
             if adopt_all {
-                let outcome = cmx::adopt::adopt_all(local, &ctx)?;
+                let outcome = cmx::adopt::adopt_all(None, from.as_deref(), local, &ctx)?;
                 print!("{outcome}");
                 Ok(())
+            } else if from.is_some() {
+                bail!("--from only applies together with --adopt-all")
             } else {
                 let report = cmx::doctor::survey(local, &ctx)?;
                 print!("{report}");
@@ -202,8 +208,19 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
             print!("{result}");
             Ok(())
         }
-        ArtifactAction::Adopt { name, local } => {
-            let outcome = cmx::adopt::adopt_named(kind, &name, local, ctx)?;
+        ArtifactAction::Adopt {
+            names,
+            all,
+            from,
+            local,
+        } => {
+            let outcome = if all {
+                cmx::adopt::adopt_all(Some(kind), from.as_deref(), local, ctx)?
+            } else if names.is_empty() {
+                bail!("Provide artifact name(s) to adopt, or use --all")
+            } else {
+                cmx::adopt::adopt_named(kind, &names, local, ctx)?
+            };
             print!("{outcome}");
             Ok(())
         }

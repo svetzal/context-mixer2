@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 use crate::platform::Platform;
@@ -44,6 +46,9 @@ pub enum Commands {
         /// Adopt every orphaned artifact into the canonical home (mutating)
         #[arg(long = "adopt-all")]
         adopt_all: bool,
+        /// With --adopt-all, only adopt orphans under this install directory
+        #[arg(long)]
+        from: Option<PathBuf>,
     },
     /// Manage the canonical home for hand-authored artifacts
     Home {
@@ -140,11 +145,17 @@ pub enum ArtifactAction {
         #[arg(long)]
         local: bool,
     },
-    /// Adopt an orphaned, hand-authored artifact into the canonical home
+    /// Adopt orphaned, hand-authored artifacts into the canonical home
     Adopt {
-        /// Artifact name (must be an orphan reported by `cmx doctor`)
-        name: String,
-        /// Search project (local) scope as well as global for the orphan
+        /// Artifact name(s) to adopt (each must be an orphan reported by `cmx doctor`)
+        names: Vec<String>,
+        /// Adopt all orphans of this kind instead of named ones
+        #[arg(long, conflicts_with = "names")]
+        all: bool,
+        /// With --all, only adopt orphans under this install directory
+        #[arg(long)]
+        from: Option<PathBuf>,
+        /// Search project (local) scope as well as global for orphans
         #[arg(long)]
         local: bool,
     },
