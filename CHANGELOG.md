@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `cmx {agent,skill} uninstall <name>` now reconciles a tracked-but-absent artifact instead of bailing. Previously it errored `No <kind> named '<name>' found` whenever the file was already gone — which is exactly the "missing" state `cmx doctor` reports and tells you to fix, so the stale lock entry could not be cleared through the CLI. It now removes the stale lock entry and reports that the file was already absent. The `doctor` footer hint for missing entries is corrected accordingly (uninstall clears the entry; reinstall only works if the source still has it).
+
 ## [2.7.0] - 2026-05-30
 
 ### Added

@@ -14,6 +14,10 @@ pub struct UninstallResult {
     pub kind: ArtifactKind,
     pub scope: &'static str,
     pub was_tracked: bool,
+    /// Whether the artifact was present on disk. `false` means we only
+    /// reconciled a stale lock entry (the file was already gone) — the case
+    /// `cmx doctor` reports as "missing".
+    pub was_on_disk: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -29,23 +33,37 @@ pub fn uninstall(
     ctx.paths.ensure_supports(kind)?;
 
     let target = ctx.paths.installed_artifact_path(kind, name, scope);
+    let on_disk = ctx.fs.exists(&target);
+    let tracked = lockfile::load(scope, ctx.fs, ctx.paths)?.packages.contains_key(name);
 
-    if !ctx.fs.exists(&target) {
-        bail!("No {kind} named '{name}' found in {} scope.", scope.label());
+    // Nothing to do only when the artifact is neither on disk nor in the lock
+    // file. A tracked-but-absent artifact (what `cmx doctor` reports as
+    // "missing") is still reconcilable: we drop the stale lock entry below.
+    if !on_disk && !tracked {
+        bail!(
+            "No {kind} named '{name}' found in {} scope (not on disk, no lock entry).",
+            scope.label()
+        );
     }
 
-    // Remove from disk
-    kind.remove_installed(&target, ctx.fs)?;
+    // Remove from disk if present (absent is fine — we're reconciling).
+    if on_disk {
+        kind.remove_installed(&target, ctx.fs)?;
+    }
 
-    // Remove from lock file
-    let was_tracked =
-        lockfile::mutate(scope, ctx.fs, ctx.paths, |lock| lock.packages.remove(name).is_some())?;
+    // Remove the lock entry if there is one.
+    let was_tracked = if tracked {
+        lockfile::mutate(scope, ctx.fs, ctx.paths, |lock| lock.packages.remove(name).is_some())?
+    } else {
+        false
+    };
 
     Ok(UninstallResult {
         name: name.to_string(),
         kind,
         scope: scope.label(),
         was_tracked,
+        was_on_disk: on_disk,
     })
 }
 
@@ -71,6 +89,7 @@ mod tests {
             kind: ArtifactKind::Agent,
             scope: "global",
             was_tracked: true,
+            was_on_disk: true,
         };
         let out = result.to_string();
         assert!(out.contains("Uninstalled my-agent"));
@@ -84,6 +103,7 @@ mod tests {
             kind: ArtifactKind::Agent,
             scope: "global",
             was_tracked: false,
+            was_on_disk: true,
         };
         let out = result.to_string();
         assert!(out.contains("untracked"));
@@ -98,6 +118,44 @@ mod tests {
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("nonexistent"), "unexpected: {msg}");
+    }
+
+    #[test]
+    fn uninstall_reconciles_tracked_but_absent_artifact() {
+        // The "missing" case `cmx doctor` reports: a lock entry whose file is
+        // already gone. uninstall must clear the stale entry, not bail.
+        let t = TestContext::new();
+
+        let mut packages = BTreeMap::new();
+        packages.insert("skill-writing".to_string(), sample_lock_entry());
+        let lock = LockFile {
+            version: 1,
+            packages,
+        };
+        lockfile::save(&lock, InstallScope::Global, &t.fs, &t.paths).unwrap();
+        // Note: no file on disk for skill-writing.
+
+        let ctx = t.ctx();
+        let result =
+            uninstall("skill-writing", ArtifactKind::Skill, InstallScope::Global, &ctx).unwrap();
+
+        assert!(result.was_tracked, "the stale lock entry was tracked");
+        assert!(!result.was_on_disk, "the file was already gone");
+
+        let updated = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
+        assert!(
+            !updated.packages.contains_key("skill-writing"),
+            "stale lock entry should be removed"
+        );
+    }
+
+    #[test]
+    fn uninstall_bails_when_neither_on_disk_nor_tracked() {
+        let t = TestContext::new();
+        let ctx = t.ctx();
+        let result = uninstall("ghost", ArtifactKind::Skill, InstallScope::Global, &ctx);
+        assert!(result.is_err(), "nothing on disk and no lock entry → bail");
+        assert!(result.unwrap_err().to_string().contains("ghost"));
     }
 
     #[test]

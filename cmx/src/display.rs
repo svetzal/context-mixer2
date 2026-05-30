@@ -320,9 +320,18 @@ impl fmt::Display for DiffOutput {
 
 impl fmt::Display for UninstallResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Uninstalled {} ({}) from {} scope.", self.name, self.kind, self.scope)?;
-        if !self.was_tracked {
-            writeln!(f, "  (no lock file entry found — artifact was untracked)")?;
+        if self.was_on_disk {
+            writeln!(f, "Uninstalled {} ({}) from {} scope.", self.name, self.kind, self.scope)?;
+            if !self.was_tracked {
+                writeln!(f, "  (no lock file entry found — artifact was untracked)")?;
+            }
+        } else {
+            // File was already gone — we only reconciled the stale lock entry.
+            writeln!(
+                f,
+                "Cleared stale lock entry for {} ({}) in {} scope — the artifact was already absent from disk.",
+                self.name, self.kind, self.scope
+            )?;
         }
         Ok(())
     }
@@ -392,7 +401,7 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
     }
     if c.missing > 0 {
         lines.push(format!(
-            "  • {} missing artifact(s) are recorded in a lock file but gone from disk — reinstall or uninstall to reconcile.",
+            "  • {} missing artifact(s) are recorded in a lock file but gone from disk — `cmx <kind> uninstall <name>` clears the stale entry (or reinstall if the source still has it).",
             c.missing
         ));
     }
@@ -746,6 +755,7 @@ mod tests {
             kind: ArtifactKind::Agent,
             scope: "global",
             was_tracked: true,
+            was_on_disk: true,
         };
         let out = r.to_string();
         assert!(out.contains("Uninstalled my-agent"));
@@ -759,8 +769,25 @@ mod tests {
             kind: ArtifactKind::Agent,
             scope: "global",
             was_tracked: false,
+            was_on_disk: true,
         };
         assert!(r.to_string().contains("untracked"));
+    }
+
+    #[test]
+    fn uninstall_result_reconciled_missing_entry() {
+        // File already gone, only the stale lock entry was cleared.
+        let r = UninstallResult {
+            name: "skill-writing".to_string(),
+            kind: ArtifactKind::Skill,
+            scope: "global",
+            was_tracked: true,
+            was_on_disk: false,
+        };
+        let out = r.to_string();
+        assert!(out.contains("Cleared stale lock entry for skill-writing"), "got: {out}");
+        assert!(out.contains("already absent from disk"));
+        assert!(!out.contains("Uninstalled"), "should not claim a real uninstall");
     }
 
     // --- Step 7: ListKindOutput and ListOutput ---
