@@ -54,8 +54,11 @@ A **first-class local directory** that holds your hand-authored private agents
 and skills. It is the authoritative source of truth for artifacts you wrote
 yourself (as opposed to artifacts you pulled from a remote marketplace).
 
-- **Location:** `~/.cmx/home` by default; overridable via config
-  (`home` field in `config.json`).
+- **Location:** `~/.config/context-mixer/home` by default — inside cmx's
+  existing config root, alongside `sources.json` and the lockfiles — overridable
+  via the `home` field in `config.json`. (We deliberately reuse the established
+  config directory rather than invent a new `~/.cmx/` tree; cmx already owns
+  `~/.config/context-mixer/`.)
 - **Structure:** a plain artifact tree — `agents/*.md` and `skills/<name>/SKILL.md`
   — with **no `marketplace.json` required**. cmx's existing fallback
   tree-walking scanner already reads un-manifested repositories, so the home
@@ -145,7 +148,7 @@ surveyed.
 | `doctor` mutation | **Read-only by contract** | Diagnose before you mutate. The only writing path is the explicit `adopt` / `--adopt-all` flag. |
 | Adoption of originals | **Copy, never move** | Safe to run on a messy system; reclassifies originals to *tracked* without risking data loss. Deleting/migrating originals stays an explicit, separate user action. |
 | Home structure | **Plain tree, no manifest** | The fallback scanner already reads un-manifested repos; requiring `marketplace.json` for purely-local private artifacts would be friction with no benefit. |
-| Home location | **`~/.cmx/home`, config-overridable** | A tool-neutral default outside any single assistant's directory, so it outlives tool changes. |
+| Home location | **`~/.config/context-mixer/home`, config-overridable** | Reuses cmx's existing config root (next to `sources.json` and the lockfiles) rather than inventing a new `~/.cmx/` tree. Still tool-neutral — it lives under cmx's own directory, not any single assistant's — so it outlives tool changes. |
 | Home as a source | **Implicit, always-present, unremovable** | This is what makes it first-class; every source-iterating command sees it for free, and it can't be accidentally `source remove`d. |
 | `~/.claude/skills` | **Demoted to an install target** | Decouples the source of truth from the tool being abandoned — the motivating requirement. |
 
@@ -166,8 +169,10 @@ surveyed.
 
 - `cmx/src/platform.rs` — add `Platform::ALL` (exhaustive variant slice) so the
   survey is automatically complete.
-- `cmx/src/paths.rs` — add a per-platform `ConfigPaths` view and `home_dir()`
-  resolution for the canonical home.
+- `cmx/src/paths.rs` — add a per-platform `ConfigPaths` view (done in Phase 1)
+  and `artifact_home_dir()` resolving the canonical home under `config_dir`
+  (`config_dir.join("home")` by default — *not* the existing `home_dir` field,
+  which is the OS home).
 - `cmx/src/types.rs` — add the `home` field to `CmxConfig`; add the artifact
   classification enum used by `doctor`.
 - `cmx/src/doctor.rs` (new) — the read-only cross-platform survey + classification
