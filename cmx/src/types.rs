@@ -143,7 +143,7 @@ pub struct LockSource {
     pub path: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum InstallScope {
     Global,
     Local,
@@ -164,7 +164,7 @@ impl InstallScope {
     pub const ALL: [InstallScope; 2] = [InstallScope::Global, InstallScope::Local];
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ArtifactKind {
     Agent,

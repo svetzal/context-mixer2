@@ -28,6 +28,14 @@ fn main() -> Result<()> {
             print!("{output}");
             Ok(())
         }
+        Commands::Doctor { local } => {
+            let report = cmx::doctor::survey(local, &ctx)?;
+            print!("{report}");
+            if report.has_issues() {
+                std::process::exit(2);
+            }
+            Ok(())
+        }
         Commands::Info { name } => {
             let info = cmx::info::info(&name, &ctx)?;
             print!("{info}");

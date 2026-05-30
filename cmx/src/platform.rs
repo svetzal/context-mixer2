@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::types::{ArtifactKind, InstallScope};
 
 /// The target AI coding assistant platform for artifact installation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, clap::ValueEnum)]
 pub enum Platform {
     #[default]
     Claude,
@@ -212,6 +212,27 @@ impl Platform {
             Self::Hermes => ".hermes-plugin",
         }
     }
+
+    /// Every platform variant, for exhaustive cross-platform operations such as
+    /// the system survey (`cmx doctor`).
+    ///
+    /// Keep this in sync with the enum; the `all_contains_every_variant` test
+    /// guards against a variant being added without being listed here.
+    pub const ALL: [Platform; 13] = [
+        Self::Claude,
+        Self::Copilot,
+        Self::Cursor,
+        Self::Windsurf,
+        Self::Gemini,
+        Self::Opencode,
+        Self::Codex,
+        Self::Pi,
+        Self::Crush,
+        Self::Amp,
+        Self::Zed,
+        Self::Openhands,
+        Self::Hermes,
+    ];
 
     /// All non-Claude platforms that receive generated plugin manifests.
     ///
@@ -474,6 +495,44 @@ mod tests {
         assert_eq!(Platform::Zed.slug(), "zed");
         assert_eq!(Platform::Openhands.slug(), "openhands");
         assert_eq!(Platform::Hermes.slug(), "hermes");
+    }
+
+    // --- ALL ---
+
+    #[test]
+    fn all_contains_every_variant() {
+        // Every variant the enum can produce must appear in ALL, so the
+        // cross-platform survey never silently skips a platform. Enumerating
+        // the variants explicitly here means adding a 14th without updating
+        // ALL fails this assertion.
+        let every = [
+            Platform::Claude,
+            Platform::Copilot,
+            Platform::Cursor,
+            Platform::Windsurf,
+            Platform::Gemini,
+            Platform::Opencode,
+            Platform::Codex,
+            Platform::Pi,
+            Platform::Crush,
+            Platform::Amp,
+            Platform::Zed,
+            Platform::Openhands,
+            Platform::Hermes,
+        ];
+        assert_eq!(Platform::ALL.len(), every.len(), "ALL must list every variant");
+        for p in every {
+            assert!(Platform::ALL.contains(&p), "{p} missing from Platform::ALL");
+        }
+    }
+
+    #[test]
+    fn all_slugs_are_unique() {
+        let mut slugs: Vec<&str> = Platform::ALL.iter().map(|p| p.slug()).collect();
+        let count = slugs.len();
+        slugs.sort_unstable();
+        slugs.dedup();
+        assert_eq!(slugs.len(), count, "platform slugs must be unique across ALL");
     }
 
     #[test]

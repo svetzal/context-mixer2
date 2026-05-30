@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `cmx doctor` — a read-only survey of the whole system installation across every supported platform. It cross-references each platform's install directories and per-platform lock files and classifies every artifact as `tracked`, `drifted` (locally edited after install), `orphaned` (on disk but untracked — e.g. hand-authored skills), or `missing` (in a lock file but gone from disk), and flags artifacts duplicated across distinct install locations. Skills in the shared `.agents/skills` directory are reported once for the whole cohort rather than once per tool. `cmx doctor --local` also includes project scope. Exits non-zero (`2`) when drift, orphans, or missing entries are found, so it can gate a hook or CI check.
+- `cmx::platform::Platform::ALL` — the exhaustive slice of platform variants, so cross-platform operations (like the survey) automatically cover every platform.
+- `ConfigPaths::with_platform` — derive a path view bound to a different platform from a single base, reusing all platform-aware path resolution.
+
 ## [2.6.0] - 2026-05-29
 
 ### Added

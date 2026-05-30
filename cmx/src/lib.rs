@@ -8,6 +8,7 @@ pub(crate) mod copy;
 #[cfg(feature = "llm")]
 pub mod diff;
 pub mod display;
+pub mod doctor;
 pub(crate) mod fs_util;
 pub mod gateway;
 pub mod info;

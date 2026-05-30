@@ -36,6 +36,12 @@ pub enum Commands {
     },
     /// List all installed agents and skills
     List,
+    /// Survey the whole system installation across every platform (read-only)
+    Doctor {
+        /// Also survey project (local) scope, not just global
+        #[arg(long)]
+        local: bool,
+    },
     /// Show installed artifacts that have updates available
     Outdated,
     /// Search all sources for agents and skills by keyword

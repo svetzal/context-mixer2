@@ -3,6 +3,7 @@ use std::fmt;
 use crate::cmx_config::{ConfigSetResult, ConfigShowResult};
 #[cfg(feature = "llm")]
 use crate::diff::DiffOutput;
+use crate::doctor::DoctorReport;
 use crate::info::ArtifactInfo;
 use crate::install::{BatchInstallResult, InstallResult};
 use crate::list::{ListKindOutput, ListOutput, section_str, table_str};
@@ -323,6 +324,121 @@ impl fmt::Display for UninstallResult {
             writeln!(f, "  (no lock file entry found — artifact was untracked)")?;
         }
         Ok(())
+    }
+}
+
+/// Build the "Installed artifacts" table from the survey rows.
+fn doctor_installed_table(report: &DoctorReport) -> Table {
+    Table {
+        headers: vec!["Type", "Name", "Scope", "State", "Version", "Location"],
+        padded_cols: 5,
+        rows: report
+            .rows
+            .iter()
+            .map(|r| {
+                let mut cells = vec![
+                    r.kind.to_string(),
+                    r.name.clone(),
+                    r.scope.label().to_string(),
+                    r.state.label().to_string(),
+                    r.version.clone().unwrap_or_else(|| "-".to_string()),
+                    r.location.display().to_string(),
+                ];
+                if r.duplicated {
+                    cells.push("(dup)".to_string());
+                }
+                cells
+            })
+            .collect(),
+    }
+}
+
+/// Build the "Missing" table from lock entries with no file on disk.
+fn doctor_missing_table(report: &DoctorReport) -> Table {
+    Table {
+        headers: vec!["Type", "Name", "Scope", "Platform"],
+        padded_cols: 4,
+        rows: report
+            .missing
+            .iter()
+            .map(|m| {
+                vec![
+                    m.kind.to_string(),
+                    m.name.clone(),
+                    m.scope.label().to_string(),
+                    m.platform.to_string(),
+                ]
+            })
+            .collect(),
+    }
+}
+
+/// Honest next-step hints — one line per state that actually occurs, referring
+/// only to capabilities that exist today.
+fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
+    let mut lines = Vec::new();
+    if c.orphaned > 0 {
+        lines.push(format!(
+            "  • {} orphaned artifact(s) are not tracked by cmx (no source, no lock entry).",
+            c.orphaned
+        ));
+    }
+    if c.drifted > 0 {
+        lines.push(format!(
+            "  • {} drifted artifact(s) differ from their lock file — inspect with `cmx info <name>`.",
+            c.drifted
+        ));
+    }
+    if c.missing > 0 {
+        lines.push(format!(
+            "  • {} missing artifact(s) are recorded in a lock file but gone from disk — reinstall or uninstall to reconcile.",
+            c.missing
+        ));
+    }
+    if lines.is_empty() {
+        String::new()
+    } else {
+        format!("\n{}\n", lines.join("\n"))
+    }
+}
+
+impl fmt::Display for DoctorReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let scope_desc = if self.included_local {
+            "global + project scope"
+        } else {
+            "global scope"
+        };
+        writeln!(
+            f,
+            "cmx doctor — {scope_desc}, {} platforms surveyed.\n",
+            crate::platform::Platform::ALL.len()
+        )?;
+
+        if self.rows.is_empty() && self.missing.is_empty() {
+            return writeln!(f, "Nothing installed — your system is clean.");
+        }
+
+        if !self.rows.is_empty() {
+            writeln!(f, "Installed artifacts:")?;
+            write!(f, "{}", doctor_installed_table(self).render())?;
+        }
+
+        if !self.missing.is_empty() {
+            if !self.rows.is_empty() {
+                writeln!(f)?;
+            }
+            writeln!(f, "Missing (in a lock file, absent on disk):")?;
+            write!(f, "{}", doctor_missing_table(self).render())?;
+        }
+
+        let c = self.counts();
+        writeln!(
+            f,
+            "\nSummary: {} tracked, {} drifted, {} orphaned, {} missing · {} duplicated across locations.",
+            c.tracked, c.drifted, c.orphaned, c.missing, c.duplicated
+        )?;
+        write!(f, "{}", doctor_hints(&c))
     }
 }
 
@@ -865,6 +981,78 @@ mod tests {
         let out = r.to_string();
         assert!(out.contains("model"));
         assert!(out.contains("gpt-4"));
+    }
+
+    // --- DoctorReport ---
+
+    fn orphan_row(name: &str) -> crate::doctor::DoctorRow {
+        crate::doctor::DoctorRow {
+            kind: ArtifactKind::Skill,
+            name: name.to_string(),
+            scope: InstallScope::Global,
+            location: PathBuf::from("/home/u/.claude/skills"),
+            platforms: vec![crate::platform::Platform::Claude],
+            state: crate::doctor::ArtifactState::Orphaned,
+            version: Some("1.0.0".to_string()),
+            duplicated: false,
+        }
+    }
+
+    #[test]
+    fn doctor_report_clean_system_message() {
+        let r = crate::doctor::DoctorReport::default();
+        let out = r.to_string();
+        assert!(out.contains("Nothing installed"), "clean message: {out}");
+        assert!(out.contains("global scope"), "default scope description");
+    }
+
+    #[test]
+    fn doctor_report_lists_rows_and_summary() {
+        let r = crate::doctor::DoctorReport {
+            rows: vec![orphan_row("my-skill")],
+            missing: vec![],
+            included_local: false,
+        };
+        let out = r.to_string();
+        assert!(out.contains("Installed artifacts:"));
+        assert!(out.contains("my-skill"));
+        assert!(out.contains("orphaned"));
+        assert!(out.contains("1 orphaned"), "summary tallies orphans: {out}");
+        assert!(out.contains("not tracked by cmx"), "orphan hint present");
+    }
+
+    #[test]
+    fn doctor_report_missing_section_and_scope_label() {
+        let r = crate::doctor::DoctorReport {
+            rows: vec![],
+            missing: vec![crate::doctor::MissingRow {
+                kind: ArtifactKind::Skill,
+                name: "ghost".to_string(),
+                scope: InstallScope::Global,
+                platform: crate::platform::Platform::Pi,
+            }],
+            included_local: true,
+        };
+        let out = r.to_string();
+        assert!(out.contains("global + project scope"), "local-included scope label");
+        assert!(out.contains("Missing (in a lock file"));
+        assert!(out.contains("ghost"));
+        assert!(out.contains("pi"));
+        assert!(out.contains("1 missing"));
+    }
+
+    #[test]
+    fn doctor_report_marks_duplicated_rows() {
+        let mut row = orphan_row("dup");
+        row.duplicated = true;
+        let r = crate::doctor::DoctorReport {
+            rows: vec![row],
+            missing: vec![],
+            included_local: false,
+        };
+        let out = r.to_string();
+        assert!(out.contains("(dup)"), "duplicated marker rendered: {out}");
+        assert!(out.contains("1 duplicated across locations"));
     }
 
     // --- Step 13: SourceUpdateOutput ---

@@ -46,6 +46,21 @@ impl ConfigPaths {
         }
     }
 
+    /// Return a view of these paths bound to a different platform.
+    ///
+    /// `home_dir` and `config_dir` are platform-independent — only the active
+    /// platform changes. `cmx doctor` uses this to survey every platform's
+    /// install directories and lock files from a single base, reusing all the
+    /// platform-aware path resolution without rebuilding it per platform.
+    #[must_use]
+    pub fn with_platform(&self, platform: Platform) -> ConfigPaths {
+        ConfigPaths {
+            config_dir: self.config_dir.clone(),
+            home_dir: self.home_dir.clone(),
+            platform,
+        }
+    }
+
     /// Path to `sources.json`.
     pub fn sources_path(&self) -> PathBuf {
         self.config_dir.join("sources.json")
@@ -147,6 +162,27 @@ mod tests {
             PathBuf::from("/home/testuser/.config/context-mixer"),
             platform,
         )
+    }
+
+    // --- with_platform ---
+
+    #[test]
+    fn with_platform_rebinds_platform_keeping_dirs() {
+        let base = test_paths(); // Claude
+        let codex = base.with_platform(Platform::Codex);
+        assert_eq!(codex.platform, Platform::Codex);
+        // home_dir and config_dir are carried over unchanged.
+        assert_eq!(codex.config_dir, base.config_dir);
+        assert_eq!(codex.home_dir, base.home_dir);
+        // Path resolution now reflects the new platform.
+        assert_eq!(
+            codex.lock_path(InstallScope::Global),
+            PathBuf::from("/home/testuser/.config/context-mixer/cmx-lock-codex.json")
+        );
+        assert_eq!(
+            codex.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            PathBuf::from("/home/testuser/.codex/agents")
+        );
     }
 
     // --- Claude (default) ---
