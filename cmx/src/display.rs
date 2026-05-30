@@ -347,7 +347,11 @@ fn doctor_installed_table(report: &DoctorReport) -> Table {
             .artifacts
             .iter()
             .map(|a| {
-                let tools = a.tools.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+                let tools = if a.tools.is_empty() {
+                    "-".to_string()
+                } else {
+                    a.tools.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
+                };
                 let mut cells = vec![
                     a.kind.to_string(),
                     a.name.clone(),

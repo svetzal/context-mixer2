@@ -74,8 +74,12 @@ pub struct DoctorRow {
     /// The resolved install directory the artifact was found in.
     pub location: PathBuf,
     /// Every platform that reads this location (more than one for the shared
-    /// `.agents/skills` cohort).
+    /// `.agents/skills` cohort). Used by adopt to record provenance.
     pub platforms: Vec<Platform>,
+    /// The platforms whose lock file actually records this artifact — i.e. the
+    /// tools cmx *manages* it for, a subset of `platforms`. Empty for artifacts
+    /// with no lock entry (orphaned/untracked/external).
+    pub tracked_for: Vec<Platform>,
     pub state: ArtifactState,
     pub version: Option<String>,
 }
@@ -93,7 +97,9 @@ pub struct DoctorArtifact {
     pub state: ArtifactState,
     /// The version, when all copies agree; `None` if they differ or carry none.
     pub version: Option<String>,
-    /// Every platform this artifact is installed for, across all its locations.
+    /// The platforms cmx *manages* this artifact for (has a lock entry), unioned
+    /// across its locations. Not every tool that merely reads a shared directory
+    /// — only those cmx tracks it for. Empty when nothing tracks it.
     pub tools: Vec<Platform>,
     /// The distinct install locations it occupies.
     pub locations: Vec<PathBuf>,
@@ -327,8 +333,11 @@ fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
         .map(|members| {
             let first = members[0];
 
+            // Tools cmx manages this for: the union of each location's
+            // tracked-for platforms (lockfile-backed), not every tool that reads
+            // a shared directory.
             let mut tools: Vec<Platform> =
-                members.iter().flat_map(|r| r.platforms.iter().copied()).collect();
+                members.iter().flat_map(|r| r.tracked_for.iter().copied()).collect();
             tools.sort_by_key(|p| p.slug());
             tools.dedup();
 
@@ -400,12 +409,23 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
                 state = ArtifactState::External;
             }
             let version = read_installed_version(agg.kind, &path, ctx);
+            // The platforms cmx actually tracks this for: those whose lock file
+            // records it (a subset of the location's readers).
+            let tracked_for: Vec<Platform> = agg
+                .platforms
+                .iter()
+                .copied()
+                .filter(|p| {
+                    locks.get(&(*p, agg.scope)).is_some_and(|l| l.packages.contains_key(&name))
+                })
+                .collect();
             rows.push(DoctorRow {
                 kind: agg.kind,
                 name,
                 scope: agg.scope,
                 location: dir.clone(),
                 platforms: agg.platforms.clone(),
+                tracked_for,
                 state,
                 version,
             });
@@ -487,6 +507,20 @@ mod tests {
 
     fn skill_checksum(t: &TestContext, skill_dir: &std::path::Path) -> String {
         crate::checksum::checksum_dir(skill_dir, &t.fs).unwrap()
+    }
+
+    /// Install a skill for `platform` and record a matching lock entry in that
+    /// platform's lock file, so the survey classifies it `tracked` for that tool.
+    fn track_skill(t: &TestContext, platform: Platform, skill: &str, version: &str) {
+        let dir = install_skill(t, platform, skill, version, InstallScope::Global);
+        let cs = skill_checksum(t, &dir);
+        let entry =
+            make_lock_entry_with_checksum(ArtifactKind::Skill, Some(version), "home", skill, &cs);
+        let pv = t.paths.with_platform(platform);
+        crate::lockfile::mutate(InstallScope::Global, &t.fs, &pv, |l| {
+            l.packages.insert(skill.to_string(), entry);
+        })
+        .unwrap();
     }
 
     // --- ArtifactState::label ---
@@ -744,17 +778,25 @@ mod tests {
     #[test]
     fn same_skill_in_two_tools_is_one_artifact_not_duplicated() {
         let t = TestContext::new();
-        // Same skill, same version, in ~/.claude/skills and the shared
-        // ~/.agents/skills — one logical artifact installed for both tools.
-        install_skill(&t, Platform::Claude, "multi", "1.0.0", InstallScope::Global);
-        install_skill(&t, Platform::Pi, "multi", "1.0.0", InstallScope::Global);
+        // Same skill, same version, tracked for claude (~/.claude/skills) and pi
+        // (~/.agents/skills) — one logical artifact managed for both tools.
+        track_skill(&t, Platform::Claude, "multi", "1.0.0");
+        track_skill(&t, Platform::Pi, "multi", "1.0.0");
 
         let report = survey(false, &t.ctx()).unwrap();
         let arts: Vec<&DoctorArtifact> =
             report.artifacts.iter().filter(|a| a.name == "multi").collect();
         assert_eq!(arts.len(), 1, "one logical artifact, not two duplicates");
+        assert_eq!(arts[0].state, ArtifactState::Tracked);
         assert!(!arts[0].diverged, "identical copies do not diverge");
-        assert!(arts[0].tools.len() > 1, "lists both tools");
+        // Tools = the platforms cmx tracks it for (lockfile-backed), not every
+        // cohort tool that merely reads .agents/skills.
+        assert!(arts[0].tools.contains(&Platform::Claude));
+        assert!(arts[0].tools.contains(&Platform::Pi));
+        assert!(
+            !arts[0].tools.contains(&Platform::Crush),
+            "crush reads .agents/skills but isn't tracked for it — must not be listed"
+        );
         // The raw per-location rows still exist (two locations) for adopt/detail.
         assert_eq!(report.rows.iter().filter(|r| r.name == "multi").count(), 2);
     }
@@ -774,18 +816,25 @@ mod tests {
     }
 
     #[test]
-    fn shared_cohort_skill_is_one_artifact() {
+    fn shared_cohort_skill_lists_only_tools_it_is_tracked_for() {
         let t = TestContext::new();
-        // A single skill in the shared ~/.agents/skills dir, read by the whole
-        // cohort, is one artifact attributed to multiple tools — not duplicated.
-        install_skill(&t, Platform::Pi, "shared", "1.0.0", InstallScope::Global);
+        // One skill in the shared ~/.agents/skills dir, tracked for pi and codex
+        // (both wrote lock entries). It's one artifact whose Tools lists exactly
+        // those two — not the other cohort tools that merely read the directory.
+        track_skill(&t, Platform::Pi, "shared", "1.0.0");
+        track_skill(&t, Platform::Codex, "shared", "1.0.0");
 
         let report = survey(false, &t.ctx()).unwrap();
         let arts: Vec<&DoctorArtifact> =
             report.artifacts.iter().filter(|a| a.name == "shared").collect();
         assert_eq!(arts.len(), 1, "shared dir reported once");
-        assert!(!arts[0].diverged, "one location is not divergence");
-        assert!(arts[0].tools.len() > 1, "attributed to multiple cohort tools");
+        assert!(!arts[0].diverged, "consistent copies don't diverge");
+        assert!(arts[0].tools.contains(&Platform::Pi));
+        assert!(arts[0].tools.contains(&Platform::Codex));
+        assert!(
+            !arts[0].tools.contains(&Platform::Crush) && !arts[0].tools.contains(&Platform::Zed),
+            "cohort readers without a lock entry are not listed as tracked-for tools"
+        );
     }
 
     #[test]
