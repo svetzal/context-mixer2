@@ -21,6 +21,13 @@ pub struct CmxConfig {
     /// [`ConfigPaths::default_artifact_home`]: crate::paths::ConfigPaths::default_artifact_home
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub home: Option<PathBuf>,
+    /// Artifacts managed by another tool, which `cmx doctor` should report as
+    /// `external` rather than flagging as orphaned/untracked. Each entry is
+    /// either a **directory** (an install location, e.g. `~/.hermes/skills` —
+    /// `~` expands to the OS home) or a bare **artifact name**. See
+    /// [`config::matches_external`](crate::config::matches_external).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub external: Vec<String>,
 }
 
 impl Default for CmxConfig {
@@ -29,6 +36,7 @@ impl Default for CmxConfig {
             version: 1,
             llm: LlmConfig::default(),
             home: None,
+            external: Vec::new(),
         }
     }
 }

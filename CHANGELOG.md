@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **External artifacts.** Declare artifacts that another tool manages — e.g. a tool's bundled/stock skills in its own directory — so `cmx doctor` reports them as `external` (informational, never an issue) instead of flagging them as orphaned, and so `adopt`/`--adopt-all` never sweep them into your home. Manage the list with `cmx config external add|remove|list`; `cmx config show` displays it. Each rule is either a **directory** (an install location, `~` expands to home — covers everything under it) or a bare **artifact name**. A directory rule like `~/.hermes/skills` lets `doctor` reach a clean (zero-exit) resting point while a tool's stock bundle stays acknowledged but unflagged.
+
 ## [2.8.0] - 2026-05-30
 
 ### Added

@@ -1,7 +1,9 @@
 use anyhow::{Result, bail};
 use clap::Parser;
 
-use cmx::cli::{ArtifactAction, Cli, Commands, ConfigAction, HomeAction, SourceAction};
+use cmx::cli::{
+    ArtifactAction, Cli, Commands, ConfigAction, ExternalAction, HomeAction, SourceAction,
+};
 use cmx::context::AppContext;
 use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use cmx::paths::ConfigPaths;
@@ -132,6 +134,15 @@ fn handle_config(action: ConfigAction, ctx: &AppContext<'_>) -> Result<()> {
         }
         ConfigAction::Model { value } => {
             let result = cmx::cmx_config::set_model(&value, ctx)?;
+            print!("{result}");
+            Ok(())
+        }
+        ConfigAction::External { action } => {
+            let result = match action {
+                ExternalAction::List => cmx::cmx_config::external_list(ctx)?,
+                ExternalAction::Add { entry } => cmx::cmx_config::external_add(&entry, ctx)?,
+                ExternalAction::Remove { entry } => cmx::cmx_config::external_remove(&entry, ctx)?,
+            };
             print!("{result}");
             Ok(())
         }

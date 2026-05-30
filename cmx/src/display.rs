@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::adopt::AdoptOutcome;
-use crate::cmx_config::{ConfigSetResult, ConfigShowResult};
+use crate::cmx_config::{ConfigSetResult, ConfigShowResult, ExternalResult};
 #[cfg(feature = "llm")]
 use crate::diff::DiffOutput;
 use crate::doctor::DoctorReport;
@@ -477,8 +477,8 @@ impl fmt::Display for DoctorReport {
         let c = self.counts();
         writeln!(
             f,
-            "\nSummary: {} tracked, {} drifted, {} untracked, {} orphaned, {} missing · {} duplicated across locations.",
-            c.tracked, c.drifted, c.untracked, c.orphaned, c.missing, c.duplicated
+            "\nSummary: {} tracked, {} drifted, {} untracked, {} orphaned, {} external, {} missing · {} duplicated across locations.",
+            c.tracked, c.drifted, c.untracked, c.orphaned, c.external, c.missing, c.duplicated
         )?;
         write!(f, "{}", doctor_hints(&c))
     }
@@ -486,7 +486,29 @@ impl fmt::Display for DoctorReport {
 
 impl fmt::Display for ConfigShowResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "LLM gateway: {}\nLLM model:   {}\n", self.gateway, self.model)
+        write!(f, "LLM gateway: {}\nLLM model:   {}\n", self.gateway, self.model)?;
+        if self.external.is_empty() {
+            writeln!(f, "External:    (none)")
+        } else {
+            writeln!(f, "External:    {}", self.external.join(", "))
+        }
+    }
+}
+
+impl fmt::Display for ExternalResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(entry) = &self.entry {
+            writeln!(f, "{} external rule: {entry}", self.action)?;
+        }
+        if self.external.is_empty() {
+            writeln!(f, "External rules: (none)")
+        } else {
+            writeln!(f, "External rules:")?;
+            for e in &self.external {
+                writeln!(f, "  {e}")?;
+            }
+            Ok(())
+        }
     }
 }
 
@@ -521,7 +543,7 @@ impl fmt::Display for SourceUpdateOutput {
 
 #[cfg(test)]
 mod tests {
-    use crate::cmx_config::{ConfigSetResult, ConfigShowResult};
+    use crate::cmx_config::{ConfigSetResult, ConfigShowResult, ExternalResult};
     use crate::info::{ArtifactInfo, SkillFileEntry};
     use crate::install::{BatchInstallResult, InstallResult};
     use crate::list::{ListKindOutput, ListOutput, Row};
@@ -1026,10 +1048,38 @@ mod tests {
         let r = ConfigShowResult {
             gateway: "ollama".to_string(),
             model: "llama3".to_string(),
+            external: vec!["~/.hermes/skills".to_string()],
         };
         let out = r.to_string();
         assert!(out.contains("LLM gateway:"));
         assert!(out.contains("LLM model:"));
+        assert!(out.contains("External:    ~/.hermes/skills"));
+    }
+
+    #[test]
+    fn external_result_list_and_mutation_render() {
+        let list = ExternalResult {
+            action: "External rules",
+            entry: None,
+            external: vec!["~/.hermes/skills".to_string()],
+        };
+        let out = list.to_string();
+        assert!(out.contains("External rules:"));
+        assert!(out.contains("~/.hermes/skills"));
+
+        let added = ExternalResult {
+            action: "Added",
+            entry: Some("apple".to_string()),
+            external: vec!["apple".to_string()],
+        };
+        assert!(added.to_string().contains("Added external rule: apple"));
+
+        let empty = ExternalResult {
+            action: "External rules",
+            entry: None,
+            external: vec![],
+        };
+        assert!(empty.to_string().contains("(none)"));
     }
 
     #[test]

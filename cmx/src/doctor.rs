@@ -45,6 +45,9 @@ pub enum ArtifactState {
     /// Present on disk with no lock entry and **no** registered source provides
     /// it — a genuinely hand-authored artifact. The adopt candidate.
     Orphaned,
+    /// Present on disk but declared external in config — managed by another tool,
+    /// not cmx. Reported for visibility but never an issue.
+    External,
 }
 
 impl ArtifactState {
@@ -54,6 +57,7 @@ impl ArtifactState {
             ArtifactState::Drifted => "drifted",
             ArtifactState::Untracked => "untracked",
             ArtifactState::Orphaned => "orphaned",
+            ArtifactState::External => "external",
         }
     }
 }
@@ -101,6 +105,7 @@ pub struct StateCounts {
     pub drifted: usize,
     pub untracked: usize,
     pub orphaned: usize,
+    pub external: usize,
     pub missing: usize,
     pub duplicated: usize,
 }
@@ -118,6 +123,7 @@ impl DoctorReport {
                 ArtifactState::Drifted => c.drifted += 1,
                 ArtifactState::Untracked => c.untracked += 1,
                 ArtifactState::Orphaned => c.orphaned += 1,
+                ArtifactState::External => c.external += 1,
             }
             if row.duplicated {
                 c.duplicated += 1;
@@ -129,11 +135,15 @@ impl DoctorReport {
     /// Whether the survey found anything that needs attention.
     ///
     /// Drift, untracked, orphaned, and missing entries are all issues.
-    /// Cross-location duplication is reported but is *not* an issue on its own —
-    /// projecting one curated set into many tools legitimately produces copies;
-    /// only the states above represent unmanaged or broken state.
+    /// `tracked` and `external` (managed by another tool) are not issues, nor is
+    /// cross-location duplication on its own — projecting one curated set into
+    /// many tools legitimately produces copies.
     pub fn has_issues(&self) -> bool {
-        !self.missing.is_empty() || self.rows.iter().any(|r| r.state != ArtifactState::Tracked)
+        !self.missing.is_empty()
+            || self
+                .rows
+                .iter()
+                .any(|r| !matches!(r.state, ArtifactState::Tracked | ArtifactState::External))
     }
 }
 
@@ -284,6 +294,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
     let locations = build_locations(ctx, &scopes);
     let locks = load_all_locks(ctx, &scopes)?;
     let available = available_in_sources(ctx)?;
+    let external = config::load_config(ctx.fs, ctx.paths)?.external;
 
     let mut rows = Vec::new();
     for (dir, agg) in &locations {
@@ -296,7 +307,15 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
         let names = config::installed_names(agg.kind, agg.scope, ctx.fs, &pv)?;
         for name in names {
             let path = pv.installed_artifact_path(agg.kind, &name, agg.scope);
-            let state = classify_installed(&name, agg, &path, &locks, &available, ctx)?;
+            let mut state = classify_installed(&name, agg, &path, &locks, &available, ctx)?;
+            // An artifact cmx doesn't manage (orphaned/untracked) but that the
+            // user has declared external is reclassified — managed by another
+            // tool, not a cmx issue.
+            if matches!(state, ArtifactState::Orphaned | ArtifactState::Untracked)
+                && config::matches_external(&external, &name, dir, &ctx.paths.home_dir)
+            {
+                state = ArtifactState::External;
+            }
             let version = read_installed_version(agg.kind, &path, ctx);
             rows.push(DoctorRow {
                 kind: agg.kind,
@@ -514,6 +533,51 @@ mod tests {
         assert_eq!(report.counts().untracked, 1);
         assert_eq!(report.counts().orphaned, 0);
         assert!(report.has_issues());
+    }
+
+    #[test]
+    fn external_reclassifies_orphan_by_directory_rule() {
+        let t = TestContext::new();
+        crate::test_support::setup_empty_sources(&t.fs, &t.paths);
+        // A stock skill from another tool, in the Claude skills dir.
+        install_skill(&t, Platform::Claude, "stock-skill", "1.0.0", InstallScope::Global);
+        // Declare that whole directory external (home_dir is /home/testuser).
+        let cfg = crate::types::CmxConfig {
+            external: vec!["~/.claude/skills".to_string()],
+            ..Default::default()
+        };
+        crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
+
+        let report = survey(false, &t.ctx()).unwrap();
+        let row = report.rows.iter().find(|r| r.name == "stock-skill").expect("surveyed");
+        assert_eq!(row.state, ArtifactState::External);
+        assert_eq!(report.counts().external, 1);
+        assert_eq!(report.counts().orphaned, 0);
+        assert!(!report.has_issues(), "external artifacts are not issues");
+    }
+
+    #[test]
+    fn external_reclassifies_orphan_by_name_rule() {
+        let t = TestContext::new();
+        crate::test_support::setup_empty_sources(&t.fs, &t.paths);
+        install_skill(&t, Platform::Claude, "apple", "1.0.0", InstallScope::Global);
+        install_skill(&t, Platform::Claude, "mine", "1.0.0", InstallScope::Global);
+        let cfg = crate::types::CmxConfig {
+            external: vec!["apple".to_string()], // bare name
+            ..Default::default()
+        };
+        crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
+
+        let report = survey(false, &t.ctx()).unwrap();
+        assert_eq!(
+            report.rows.iter().find(|r| r.name == "apple").unwrap().state,
+            ArtifactState::External
+        );
+        assert_eq!(
+            report.rows.iter().find(|r| r.name == "mine").unwrap().state,
+            ArtifactState::Orphaned,
+            "a non-matching orphan stays orphaned"
+        );
     }
 
     #[test]

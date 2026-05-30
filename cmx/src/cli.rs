@@ -183,4 +183,26 @@ pub enum ConfigAction {
         /// Model name (e.g. gpt-5.4, qwen3.5:27b)
         value: String,
     },
+    /// Manage `external` rules — artifacts another tool manages, which `doctor`
+    /// reports as external instead of flagging
+    External {
+        #[command(subcommand)]
+        action: ExternalAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ExternalAction {
+    /// List the configured external rules
+    List,
+    /// Add an external rule: a directory (e.g. ~/.hermes/skills) or an artifact name
+    Add {
+        /// Directory path or bare artifact name to mark external
+        entry: String,
+    },
+    /// Remove an external rule
+    Remove {
+        /// The directory path or name to remove
+        entry: String,
+    },
 }

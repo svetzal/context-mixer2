@@ -7,6 +7,7 @@ use crate::types::LlmGatewayType;
 pub struct ConfigShowResult {
     pub gateway: String,
     pub model: String,
+    pub external: Vec<String>,
 }
 
 pub struct ConfigSetResult {
@@ -14,11 +15,68 @@ pub struct ConfigSetResult {
     pub value: String,
 }
 
+/// Result of listing or mutating the `external` rules.
+pub struct ExternalResult {
+    /// Human-facing verb: "Added", "Removed", "Already present", "Not present",
+    /// or "External rules" for a plain listing.
+    pub action: &'static str,
+    pub entry: Option<String>,
+    /// The resulting (or current) external list.
+    pub external: Vec<String>,
+}
+
 pub fn show(ctx: &AppContext<'_>) -> Result<ConfigShowResult> {
     let cfg = config::load_config(ctx.fs, ctx.paths)?;
     Ok(ConfigShowResult {
         gateway: cfg.llm.gateway.to_string(),
         model: cfg.llm.model.clone(),
+        external: cfg.external.clone(),
+    })
+}
+
+/// List the configured external rules.
+pub fn external_list(ctx: &AppContext<'_>) -> Result<ExternalResult> {
+    let cfg = config::load_config(ctx.fs, ctx.paths)?;
+    Ok(ExternalResult {
+        action: "External rules",
+        entry: None,
+        external: cfg.external,
+    })
+}
+
+/// Add an external rule (a directory path or a bare artifact name). Idempotent.
+pub fn external_add(entry: &str, ctx: &AppContext<'_>) -> Result<ExternalResult> {
+    let mut cfg = config::load_config(ctx.fs, ctx.paths)?;
+    let action = if cfg.external.iter().any(|e| e == entry) {
+        "Already present"
+    } else {
+        cfg.external.push(entry.to_string());
+        cfg.external.sort();
+        config::save_config(&cfg, ctx.fs, ctx.paths)?;
+        "Added"
+    };
+    Ok(ExternalResult {
+        action,
+        entry: Some(entry.to_string()),
+        external: cfg.external,
+    })
+}
+
+/// Remove an external rule. Reports "Not present" without error if absent.
+pub fn external_remove(entry: &str, ctx: &AppContext<'_>) -> Result<ExternalResult> {
+    let mut cfg = config::load_config(ctx.fs, ctx.paths)?;
+    let before = cfg.external.len();
+    cfg.external.retain(|e| e != entry);
+    let action = if cfg.external.len() == before {
+        "Not present"
+    } else {
+        config::save_config(&cfg, ctx.fs, ctx.paths)?;
+        "Removed"
+    };
+    Ok(ExternalResult {
+        action,
+        entry: Some(entry.to_string()),
+        external: cfg.external,
     })
 }
 
@@ -58,10 +116,12 @@ mod tests {
         let result = ConfigShowResult {
             gateway: "ollama".to_string(),
             model: "llama3".to_string(),
+            external: vec![],
         };
         let out = result.to_string();
         assert!(out.contains("LLM gateway: ollama"));
         assert!(out.contains("LLM model:   llama3"));
+        assert!(out.contains("External:    (none)"));
     }
 
     // --- Display for ConfigSetResult ---
@@ -130,6 +190,44 @@ mod tests {
             ),
             Ok(_) => panic!("expected an error for unknown gateway"),
         }
+    }
+
+    #[test]
+    fn external_add_list_remove_round_trip() {
+        let t = TestContext::new();
+        let ctx = t.ctx();
+
+        // Empty to start.
+        assert!(external_list(&ctx).unwrap().external.is_empty());
+
+        // Add two rules.
+        let added = external_add("~/.hermes/skills", &ctx).unwrap();
+        assert_eq!(added.action, "Added");
+        external_add("apple", &ctx).unwrap();
+
+        let listed = external_list(&ctx).unwrap();
+        assert!(listed.external.contains(&"~/.hermes/skills".to_string()));
+        assert!(listed.external.contains(&"apple".to_string()));
+
+        // Adding a duplicate is idempotent.
+        assert_eq!(external_add("apple", &ctx).unwrap().action, "Already present");
+
+        // Remove one; the other remains.
+        assert_eq!(external_remove("apple", &ctx).unwrap().action, "Removed");
+        let after = external_list(&ctx).unwrap();
+        assert!(!after.external.contains(&"apple".to_string()));
+        assert!(after.external.contains(&"~/.hermes/skills".to_string()));
+
+        // Removing an absent rule reports Not present without error.
+        assert_eq!(external_remove("apple", &ctx).unwrap().action, "Not present");
+    }
+
+    #[test]
+    fn external_rules_surface_in_show() {
+        let t = TestContext::new();
+        let ctx = t.ctx();
+        external_add("~/.hermes/skills", &ctx).unwrap();
+        assert!(show(&ctx).unwrap().external.contains(&"~/.hermes/skills".to_string()));
     }
 
     #[test]

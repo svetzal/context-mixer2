@@ -204,6 +204,10 @@ pub fn adopt_named(
                 "'{name}' is tracked but locally modified (drifted), not orphaned — adopt does not yet \
                  re-home drifted artifacts. Inspect with `cmx info {name}`."
             ),
+            Some(ArtifactState::External) => anyhow::bail!(
+                "'{name}' is marked external (managed by another tool) — remove it from the external \
+                 list (`cmx config external remove ...`) before adopting it with cmx."
+            ),
             None => anyhow::bail!(
                 "No {kind} named '{name}' found on disk. Run `cmx doctor` to see what is adoptable."
             ),

@@ -50,6 +50,40 @@ pub fn resolve_artifact_home(config: &CmxConfig, paths: &ConfigPaths) -> PathBuf
     config.home.clone().unwrap_or_else(|| paths.default_artifact_home())
 }
 
+/// Expand a leading `~` in a config path entry against the OS home directory.
+fn expand_tilde(entry: &str, home_dir: &std::path::Path) -> PathBuf {
+    if let Some(rest) = entry.strip_prefix("~/") {
+        home_dir.join(rest)
+    } else if entry == "~" {
+        home_dir.to_path_buf()
+    } else {
+        PathBuf::from(entry)
+    }
+}
+
+/// Whether an artifact at `location` named `name` matches one of the `external`
+/// rules (artifacts another tool manages — see [`CmxConfig::external`]).
+///
+/// Each rule is either a **directory** (contains a path separator or starts with
+/// `~` — matches when `location` is at or below it) or a bare **name** (matches
+/// when it equals `name`). `home_dir` expands a leading `~` in directory rules.
+///
+/// [`CmxConfig::external`]: crate::types::CmxConfig::external
+pub fn matches_external(
+    external: &[String],
+    name: &str,
+    location: &std::path::Path,
+    home_dir: &std::path::Path,
+) -> bool {
+    external.iter().any(|rule| {
+        if rule.contains('/') || rule.starts_with('~') {
+            location.starts_with(expand_tilde(rule, home_dir))
+        } else {
+            rule == name
+        }
+    })
+}
+
 pub fn installed_names(
     kind: ArtifactKind,
     scope: InstallScope,
@@ -585,6 +619,47 @@ mod tests {
 
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("Failed to write"), "expected 'Failed to write' in error: {msg}");
+    }
+
+    // --- matches_external ---
+
+    #[test]
+    fn matches_external_by_directory_with_tilde() {
+        let home = std::path::Path::new("/home/u");
+        let rules = vec!["~/.hermes/skills".to_string()];
+        // An artifact under the declared dir matches; one elsewhere does not.
+        assert!(matches_external(
+            &rules,
+            "apple",
+            std::path::Path::new("/home/u/.hermes/skills"),
+            home
+        ));
+        assert!(!matches_external(
+            &rules,
+            "mine",
+            std::path::Path::new("/home/u/.claude/skills"),
+            home
+        ));
+    }
+
+    #[test]
+    fn matches_external_by_bare_name() {
+        let home = std::path::Path::new("/home/u");
+        let rules = vec!["apple".to_string()];
+        // Name rule matches regardless of location.
+        assert!(matches_external(&rules, "apple", std::path::Path::new("/anywhere"), home));
+        assert!(!matches_external(&rules, "banana", std::path::Path::new("/anywhere"), home));
+    }
+
+    #[test]
+    fn matches_external_empty_rules_never_match() {
+        let home = std::path::Path::new("/home/u");
+        assert!(!matches_external(
+            &[],
+            "apple",
+            std::path::Path::new("/home/u/.hermes/skills"),
+            home
+        ));
     }
 
     // --- resolve_local_path ---

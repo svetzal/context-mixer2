@@ -155,6 +155,30 @@ cmx skill adopt clipboard gilt foundry whatsapp
 Named adoption is all-or-nothing — if any name isn't an adoptable orphan, the
 batch aborts with the reason, and nothing is copied.
 
+## `external` — artifacts another tool manages
+
+Some orphans aren't yours and never will be: a tool's bundled/stock skills,
+sitting in its own directory. You don't want to adopt them, but you also don't
+want `doctor` nagging about them forever. Declare them **external** — cmx then
+reports them as `external` (informational, never an issue) and adoption skips
+them entirely:
+
+```bash
+cmx config external add ~/.hermes/skills    # the whole stock directory
+cmx config external add some-vendored-skill # or a single artifact by name
+cmx config external list                    # review the rules
+```
+
+A directory rule (with `~` expanding to your home) covers everything under it,
+including skills the tool adds later; a bare name matches that artifact
+anywhere. External artifacts still appear in `doctor` for visibility — they just
+no longer count toward the non-zero exit, and `cmx <kind> adopt` refuses them
+(pointing you to remove the rule first if you ever do want to manage one).
+
+This is the difference between *orphaned* (yours, hand-authored → adopt) and
+*external* (another tool's → leave it): both have no cmx lock entry, but only
+the first is your responsibility.
+
 ## Projecting outward (the payoff)
 
 Once your artifacts are in the home, it's a normal registered source. Migrating
@@ -171,13 +195,14 @@ library outlives any single tool.
 ## Converging
 
 Re-run `cmx doctor` after each step. `doctor` exits non-zero while any drift,
-untracked, orphaned, or missing artifact remains, so you can drive it to a known
-resting point — and even wire it into a hook or CI check once you're there. A
-healthy end state for a curated system looks like:
+untracked, orphaned, or missing artifact remains (`external` and `tracked` don't
+count), so you can drive it to a *clean* resting point — and even wire it into a
+hook or CI check once you're there. A fully-curated system looks like:
 
 ```text
-Summary: 40 tracked, 0 drifted, 0 untracked, N orphaned, 0 missing · 0 duplicated across locations.
+Summary: 40 tracked, 0 drifted, 0 untracked, 0 orphaned, 24 external, 0 missing · 0 duplicated across locations.
 ```
 
-…where the only residue (`N orphaned`) is a tool's stock bundle you've
-deliberately chosen not to adopt.
+…where the `external` count is a tool's stock bundle you've deliberately marked
+(see above), so `doctor` exits zero — everything that's *yours* is tracked, and
+everything that isn't is acknowledged but unflagged.

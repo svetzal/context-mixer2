@@ -64,6 +64,7 @@ artifact it reports one of:
 | `drifted` | tracked, but the on-disk copy was edited after install | `cmx info <name>` to inspect |
 | `untracked` | on disk, no lock entry, **but a registered source provides it** (installed out-of-band) | `cmx <kind> install <name>` to track it |
 | `orphaned` | on disk, no lock entry, and **no source provides it** (hand-authored) | `cmx <kind> adopt <name>` to canonicalize into the home |
+| `external` | on disk, but declared external in config (managed by another tool) | none — informational, not an issue |
 | `missing` | in a lock file, but the file is gone from disk | `cmx <kind> uninstall <name>` to clear the stale entry |
 
 The `untracked` vs `orphaned` split matters for bringing a system under control:
@@ -128,6 +129,27 @@ just `install --all --platform <tool>`.
 
 | Command | Description |
 |---------|-------------|
-| `cmx config show` | Show current LLM settings |
+| `cmx config show` | Show current LLM settings and external rules |
 | `cmx config gateway <openai\|ollama>` | Set LLM provider |
 | `cmx config model <name>` | Set LLM model |
+| `cmx config external list` | List the configured external rules |
+| `cmx config external add <dir-or-name>` | Mark a directory or artifact name as external |
+| `cmx config external remove <dir-or-name>` | Remove an external rule |
+
+### External artifacts
+
+Artifacts that **another tool manages** — e.g. a tool's bundled/stock skills in
+its own directory — can be declared *external* so `cmx doctor` reports them as
+`external` (informational, never an issue) instead of flagging them as orphaned,
+and so `adopt`/`--adopt-all` never sweep them into your home.
+
+Each rule is either a **directory** (an install location — `~` expands to your
+home) or a bare **artifact name**:
+
+```bash
+cmx config external add ~/.hermes/skills   # a whole tool's skill directory
+cmx config external add some-skill         # a single artifact by name
+```
+
+A directory rule covers everything under it (including artifacts added later); a
+name rule matches that artifact wherever it lives.
