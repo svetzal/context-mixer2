@@ -11,6 +11,7 @@ cmx is a package manager for curated agentic context (agents and skills) across 
 - Enable plugin marketplaces as git repositories with a standard manifest format
 - Track artifact integrity via SHA-256 checksums and optional semver versioning
 - Surface outdated, untracked, and deprecated artifacts clearly
+- Provide a tool-neutral canonical home for hand-authored private artifacts, and a system-wide survey (`doctor`) that diagnoses a disorganized installation and brings it under management — so a curated set survives migrating between coding assistants
 - Offer LLM-powered diff analysis for understanding changes between installed and source versions
 
 ## Non-Goals

@@ -39,3 +39,4 @@
 # Design
 
 - [Multi-Tool Platform Support](./design/multi-tool-platform-support.md)
+- [Canonical Home & Doctor](./design/canonical-home-and-doctor.md)
