@@ -44,7 +44,11 @@ three targets (macOS arm64/x64, Linux x64), creates a GitHub Release with the
 archives, and **overwrites the Homebrew tap formula** (`svetzal/homebrew-tap`,
 `Formula/cmx.rb`) with the tag's version. There is no crates.io publish.
 
-Releasing is two distinct steps:
+Homebrew is the **distribution** channel for end users. This **development
+machine installs locally via `cargo install`**, not Homebrew — so after a
+release, refresh the local install as an explicit extra step (see step 3).
+
+Releasing is three distinct steps:
 
 1. **Prep** (a normal commit on `main`): bump `version` in the root
    `Cargo.toml` (workspace version; `cmx`/`cmf` inherit it via
@@ -55,6 +59,19 @@ Releasing is two distinct steps:
 2. **Tag** (the publish trigger): create a **lightweight** tag `vX.Y.Z` (match
    existing tag style — `git tag vX.Y.Z`, not `-a`) and push it. The push fires
    `release.yml`.
+3. **Local install** (this machine): once the release is published, install the
+   same version locally via `cargo install`. Both binaries are installed
+   **lean** (default features, no `llm`), release profile, from the workspace
+   member paths:
+
+   ```bash
+   cargo install --path cmx --force
+   cargo install --path cmf --force
+   ```
+
+   Run from a checkout at the released version (the tagged commit, or `main` at
+   the same `version`). `--force` overwrites the previously installed binaries.
+   Verify with `cmx --version` / `cmf --version`.
 
 Conventions and gotchas:
 
