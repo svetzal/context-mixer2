@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Skill checksums and copies now ignore transient/generated content: `node_modules/`, `__pycache__/`, `*.pyc`, `.git/`, and `.DS_Store`. Previously a skill carrying runnable scripts would show as `drifted` the moment its dependencies or bytecode appeared (e.g. after `npm install` or running a Python script), because the directory checksum hashed every file. Ignoring these regenerable paths keeps the drift signal honest and keeps the canonical home and projected installs lean (no vendored `node_modules` dragged along on adopt/install). Authored content — including `package.json`/`package-lock.json` — is still tracked and copied.
+
 ### Fixed
 
 - `cmx {agent,skill} uninstall <name>` now reconciles a tracked-but-absent artifact instead of bailing. Previously it errored `No <kind> named '<name>' found` whenever the file was already gone — which is exactly the "missing" state `cmx doctor` reports and tells you to fix, so the stale lock entry could not be cleared through the CLI. It now removes the stale lock entry and reports that the file was already absent. The `doctor` footer hint for missing entries is corrected accordingly (uninstall clears the entry; reinstall only works if the source still has it).

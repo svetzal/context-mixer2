@@ -60,6 +60,14 @@ pub(crate) fn copy_dir_recursive_with(src: &Path, dest: &Path, fs: &dyn Filesyst
     fs.create_dir_all(dest)?;
 
     for entry in fs.read_dir(src)? {
+        // Skip transient/generated content (node_modules, __pycache__, …) so the
+        // canonical home and projected installs don't accumulate vendored deps or
+        // build artifacts. Mirrors the checksum collector's ignore set, keeping a
+        // copied skill identical to its checksummed identity.
+        if crate::fs_util::is_transient(&entry.file_name) {
+            continue;
+        }
+
         let dest_path = dest.join(&entry.file_name);
 
         if entry.is_dir {
@@ -100,6 +108,32 @@ mod tests {
 
         assert!(fs.file_exists(Path::new("/dest/SKILL.md")));
         assert!(fs.file_exists(Path::new("/dest/subdir/tool.py")));
+    }
+
+    #[test]
+    fn copy_dir_recursive_with_skips_transient_content() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/src/SKILL.md", "# skill");
+        fs.add_file("/src/scripts/tool.mjs", "code");
+        fs.add_file("/src/scripts/package.json", "{}");
+        fs.add_file("/src/scripts/node_modules/dep/index.js", "vendored");
+        fs.add_file("/src/scripts/__pycache__/tool.cpython-312.pyc", "bytecode");
+
+        copy_dir_recursive_with(Path::new("/src"), Path::new("/dest"), &fs).unwrap();
+
+        // Authored content is copied.
+        assert!(fs.file_exists(Path::new("/dest/SKILL.md")));
+        assert!(fs.file_exists(Path::new("/dest/scripts/tool.mjs")));
+        assert!(fs.file_exists(Path::new("/dest/scripts/package.json")));
+        // Transient content is not.
+        assert!(
+            !fs.file_exists(Path::new("/dest/scripts/node_modules/dep/index.js")),
+            "node_modules must not be copied"
+        );
+        assert!(
+            !fs.file_exists(Path::new("/dest/scripts/__pycache__/tool.cpython-312.pyc")),
+            "__pycache__ must not be copied"
+        );
     }
 
     #[test]
