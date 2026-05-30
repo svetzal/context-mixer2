@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-05-30
+
 ### Added
 
 - `cmx doctor` — a read-only survey of the whole system installation across every supported platform. It cross-references each platform's install directories and per-platform lock files and classifies every artifact as `tracked`, `drifted` (locally edited after install), `orphaned` (on disk but untracked — e.g. hand-authored skills), or `missing` (in a lock file but gone from disk), and flags artifacts duplicated across distinct install locations. Skills in the shared `.agents/skills` directory are reported once for the whole cohort rather than once per tool. `cmx doctor --local` also includes project scope. Exits non-zero (`2`) when drift, orphans, or missing entries are found, so it can gate a hook or CI check.
