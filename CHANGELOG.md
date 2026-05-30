@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-05-30
+
 ### Added
 
 - `cmx doctor` now distinguishes two kinds of no-lock-entry artifact: **`untracked`** (a registered source provides it — installed out-of-band, fix by `install`) versus **`orphaned`** (no source provides it — hand-authored, the `adopt` candidate). Previously both were lumped as "orphaned".
