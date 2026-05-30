@@ -14,6 +14,7 @@
 - [Installing Artifacts](./guide/installing.md)
 - [Listing & Status](./guide/listing.md)
 - [Updating Artifacts](./guide/updating.md)
+- [Bringing a System Under Control](./guide/under-control.md)
 - [Diffing with LLM Analysis](./guide/diffing.md)
 - [Configuration](./guide/configuration.md)
 
