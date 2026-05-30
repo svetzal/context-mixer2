@@ -91,7 +91,12 @@ canonical home. For each artifact it reports one classification:
 | **untracked** | on disk, no lock entry, **but a registered source provides it** | installed out-of-band → track via `install` |
 | **orphaned** | on disk, no lock entry, **no source provides it** | hand-authored artifacts (the `~/.claude/skills` pile) → adopt |
 | **missing** | in a lock file, but gone from disk | deleted out-of-band → `uninstall` clears it |
-| **duplicated** | the same artifact lives in N install locations | manual copying between tools |
+| **diverged** | the *same* logical artifact's copies disagree across locations (version/state) | edited in one tool but not another |
+
+A skill installed for several tools is **one** logical artifact listing those
+tools — not N duplicates. The survey keeps raw per-location rows internally (adopt
+needs them), but the user-facing view groups them by `(kind, name, scope)`.
+`diverged` is the only multi-location situation worth flagging.
 
 The **untracked vs orphaned** split is what makes adoption safe: `adopt` and
 `--adopt-all` act only on *orphaned* artifacts. An *untracked* artifact has a

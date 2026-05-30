@@ -62,7 +62,10 @@ impl ArtifactState {
     }
 }
 
-/// One installed artifact discovered on disk during the survey.
+/// One installed artifact discovered on disk during the survey, at a single
+/// install location. This is the raw per-location unit; for the user-facing view
+/// these are grouped into [`DoctorArtifact`] (one logical artifact across all the
+/// tools it's installed for).
 #[derive(Debug, Clone)]
 pub struct DoctorRow {
     pub kind: ArtifactKind,
@@ -75,9 +78,29 @@ pub struct DoctorRow {
     pub platforms: Vec<Platform>,
     pub state: ArtifactState,
     pub version: Option<String>,
-    /// True when the same `(kind, name)` also appears in a *different* install
-    /// location — genuine duplication, not the shared-directory cohort.
-    pub duplicated: bool,
+}
+
+/// One *logical* artifact — a `(kind, name, scope)` grouped across every install
+/// location cmx found it in. A skill projected to several tools is **one**
+/// `DoctorArtifact` listing all those tools, not N "duplicates".
+#[derive(Debug, Clone)]
+pub struct DoctorArtifact {
+    pub kind: ArtifactKind,
+    pub name: String,
+    pub scope: InstallScope,
+    /// Consolidated state. When the copies disagree this is the most actionable
+    /// one (see [`diverged`](Self::diverged)).
+    pub state: ArtifactState,
+    /// The version, when all copies agree; `None` if they differ or carry none.
+    pub version: Option<String>,
+    /// Every platform this artifact is installed for, across all its locations.
+    pub tools: Vec<Platform>,
+    /// The distinct install locations it occupies.
+    pub locations: Vec<PathBuf>,
+    /// True when the copies **disagree** — different state or different version
+    /// across locations. This is the only multi-location situation worth
+    /// flagging; consistent copies are just one skill installed to many tools.
+    pub diverged: bool,
 }
 
 /// A lock entry whose artifact is no longer present on disk.
@@ -90,15 +113,20 @@ pub struct MissingRow {
 }
 
 /// The full read-only survey result.
+///
+/// `rows` is the raw per-location view (used by adopt and for detail);
+/// `artifacts` is the grouped logical view (one entry per skill, listing the
+/// tools it's installed for) used for display and counts.
 #[derive(Debug, Default)]
 pub struct DoctorReport {
     pub rows: Vec<DoctorRow>,
+    pub artifacts: Vec<DoctorArtifact>,
     pub missing: Vec<MissingRow>,
     /// Whether project (local) scope was included in the survey.
     pub included_local: bool,
 }
 
-/// Per-state tallies for the summary line.
+/// Per-state tallies for the summary line. Counts are over *logical* artifacts.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct StateCounts {
     pub tracked: usize,
@@ -107,26 +135,27 @@ pub struct StateCounts {
     pub orphaned: usize,
     pub external: usize,
     pub missing: usize,
-    pub duplicated: usize,
+    /// Logical artifacts whose copies disagree across locations.
+    pub diverged: usize,
 }
 
 impl DoctorReport {
-    /// Tally rows by state for the summary line.
+    /// Tally logical artifacts by state for the summary line.
     pub fn counts(&self) -> StateCounts {
         let mut c = StateCounts {
             missing: self.missing.len(),
             ..StateCounts::default()
         };
-        for row in &self.rows {
-            match row.state {
+        for a in &self.artifacts {
+            match a.state {
                 ArtifactState::Tracked => c.tracked += 1,
                 ArtifactState::Drifted => c.drifted += 1,
                 ArtifactState::Untracked => c.untracked += 1,
                 ArtifactState::Orphaned => c.orphaned += 1,
                 ArtifactState::External => c.external += 1,
             }
-            if row.duplicated {
-                c.duplicated += 1;
+            if a.diverged {
+                c.diverged += 1;
             }
         }
         c
@@ -134,16 +163,15 @@ impl DoctorReport {
 
     /// Whether the survey found anything that needs attention.
     ///
-    /// Drift, untracked, orphaned, and missing entries are all issues.
-    /// `tracked` and `external` (managed by another tool) are not issues, nor is
-    /// cross-location duplication on its own — projecting one curated set into
-    /// many tools legitimately produces copies.
+    /// Drift, untracked, orphaned, missing, and *diverged* (copies that
+    /// disagree across locations) are issues. `tracked` and `external` (managed
+    /// by another tool) are not — and a skill consistently installed to many
+    /// tools is just that, not a problem.
     pub fn has_issues(&self) -> bool {
         !self.missing.is_empty()
-            || self
-                .rows
-                .iter()
-                .any(|r| !matches!(r.state, ArtifactState::Tracked | ArtifactState::External))
+            || self.artifacts.iter().any(|a| {
+                a.diverged || !matches!(a.state, ArtifactState::Tracked | ArtifactState::External)
+            })
     }
 }
 
@@ -267,22 +295,77 @@ fn read_installed_version(
     scan::extract_version_from_content(&content)
 }
 
-/// Mark every row whose `(kind, name)` appears in more than one distinct install
-/// location as duplicated.
-fn mark_duplicates(rows: &mut [DoctorRow]) {
-    let mut locations_by_artifact: HashMap<(ArtifactKind, String), BTreeSet<PathBuf>> =
-        HashMap::new();
-    for row in rows.iter() {
-        locations_by_artifact
-            .entry((row.kind, row.name.clone()))
+/// Severity ordering used to pick a logical artifact's consolidated state when
+/// its copies disagree — the most actionable state wins.
+fn state_severity(state: ArtifactState) -> u8 {
+    match state {
+        ArtifactState::Drifted => 4,
+        ArtifactState::Orphaned => 3,
+        ArtifactState::Untracked => 2,
+        ArtifactState::External => 1,
+        ArtifactState::Tracked => 0,
+    }
+}
+
+/// Group per-location rows into logical artifacts — one per `(kind, name,
+/// scope)`, listing every tool it's installed for. A skill installed to several
+/// tools collapses to one artifact; it's flagged `diverged` only when its copies
+/// actually disagree (different state or version), not merely for existing in
+/// more than one place.
+fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
+    // Key by stringified kind so the map key is Ord without needing Ord on ArtifactKind.
+    let mut groups: BTreeMap<(String, String, InstallScope), Vec<&DoctorRow>> = BTreeMap::new();
+    for row in rows {
+        groups
+            .entry((row.kind.to_string(), row.name.clone(), row.scope))
             .or_default()
-            .insert(row.location.clone());
+            .push(row);
     }
-    for row in rows.iter_mut() {
-        if let Some(locs) = locations_by_artifact.get(&(row.kind, row.name.clone())) {
-            row.duplicated = locs.len() > 1;
-        }
-    }
+
+    groups
+        .into_values()
+        .map(|members| {
+            let first = members[0];
+
+            let mut tools: Vec<Platform> =
+                members.iter().flat_map(|r| r.platforms.iter().copied()).collect();
+            tools.sort_by_key(|p| p.slug());
+            tools.dedup();
+
+            let mut locations: Vec<PathBuf> = members.iter().map(|r| r.location.clone()).collect();
+            locations.sort();
+            locations.dedup();
+
+            let states: BTreeSet<&'static str> = members.iter().map(|r| r.state.label()).collect();
+            let versions: BTreeSet<Option<&str>> =
+                members.iter().map(|r| r.version.as_deref()).collect();
+            let diverged = states.len() > 1 || versions.len() > 1;
+
+            // Consolidated state: the most actionable across copies.
+            let state = members
+                .iter()
+                .map(|r| r.state)
+                .max_by_key(|s| state_severity(*s))
+                .unwrap_or(first.state);
+            // Version only when all copies agree.
+            let version = if versions.len() == 1 {
+                first.version.clone()
+            } else {
+                None
+            };
+
+            DoctorArtifact {
+                kind: first.kind,
+                name: first.name.clone(),
+                scope: first.scope,
+                state,
+                version,
+                tools,
+                locations,
+                diverged,
+            }
+        })
+        .collect()
 }
 
 /// Survey the whole system installation and classify every artifact.
@@ -325,7 +408,6 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
                 platforms: agg.platforms.clone(),
                 state,
                 version,
-                duplicated: false,
             });
         }
     }
@@ -348,8 +430,6 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
         }
     }
 
-    mark_duplicates(&mut rows);
-
     rows.sort_by(|a, b| {
         a.kind
             .to_string()
@@ -367,8 +447,11 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
             .then(a.platform.slug().cmp(b.platform.slug()))
     });
 
+    let artifacts = group_rows(&rows);
+
     Ok(DoctorReport {
         rows,
+        artifacts,
         missing,
         included_local: include_local,
     })
@@ -659,31 +742,50 @@ mod tests {
     }
 
     #[test]
-    fn same_skill_in_two_locations_is_marked_duplicated() {
+    fn same_skill_in_two_tools_is_one_artifact_not_duplicated() {
         let t = TestContext::new();
-        // Same skill name in ~/.claude/skills and the shared ~/.agents/skills.
-        install_skill(&t, Platform::Claude, "dup", "1.0.0", InstallScope::Global);
-        install_skill(&t, Platform::Pi, "dup", "2.0.0", InstallScope::Global);
+        // Same skill, same version, in ~/.claude/skills and the shared
+        // ~/.agents/skills — one logical artifact installed for both tools.
+        install_skill(&t, Platform::Claude, "multi", "1.0.0", InstallScope::Global);
+        install_skill(&t, Platform::Pi, "multi", "1.0.0", InstallScope::Global);
 
         let report = survey(false, &t.ctx()).unwrap();
-        let dup_rows: Vec<&DoctorRow> = report.rows.iter().filter(|r| r.name == "dup").collect();
-        assert_eq!(dup_rows.len(), 2, "one row per distinct location");
-        assert!(dup_rows.iter().all(|r| r.duplicated), "both rows flagged duplicated");
-        assert_eq!(report.counts().duplicated, 2);
+        let arts: Vec<&DoctorArtifact> =
+            report.artifacts.iter().filter(|a| a.name == "multi").collect();
+        assert_eq!(arts.len(), 1, "one logical artifact, not two duplicates");
+        assert!(!arts[0].diverged, "identical copies do not diverge");
+        assert!(arts[0].tools.len() > 1, "lists both tools");
+        // The raw per-location rows still exist (two locations) for adopt/detail.
+        assert_eq!(report.rows.iter().filter(|r| r.name == "multi").count(), 2);
     }
 
     #[test]
-    fn shared_cohort_skill_is_one_row_not_many() {
+    fn same_skill_at_different_versions_is_diverged() {
+        let t = TestContext::new();
+        install_skill(&t, Platform::Claude, "skew", "1.0.0", InstallScope::Global);
+        install_skill(&t, Platform::Pi, "skew", "2.0.0", InstallScope::Global);
+
+        let report = survey(false, &t.ctx()).unwrap();
+        let art = report.artifacts.iter().find(|a| a.name == "skew").expect("grouped");
+        assert!(art.diverged, "different versions across locations should diverge");
+        assert!(art.version.is_none(), "no single agreed version");
+        assert_eq!(report.counts().diverged, 1);
+        assert!(report.has_issues(), "divergence is an issue");
+    }
+
+    #[test]
+    fn shared_cohort_skill_is_one_artifact() {
         let t = TestContext::new();
         // A single skill in the shared ~/.agents/skills dir, read by the whole
-        // cohort, must be reported once — not once per platform.
+        // cohort, is one artifact attributed to multiple tools — not duplicated.
         install_skill(&t, Platform::Pi, "shared", "1.0.0", InstallScope::Global);
 
         let report = survey(false, &t.ctx()).unwrap();
-        let rows: Vec<&DoctorRow> = report.rows.iter().filter(|r| r.name == "shared").collect();
-        assert_eq!(rows.len(), 1, "shared dir reported once");
-        assert!(!rows[0].duplicated, "the cohort sharing one dir is not duplication");
-        assert!(rows[0].platforms.len() > 1, "attributed to multiple cohort platforms");
+        let arts: Vec<&DoctorArtifact> =
+            report.artifacts.iter().filter(|a| a.name == "shared").collect();
+        assert_eq!(arts.len(), 1, "shared dir reported once");
+        assert!(!arts[0].diverged, "one location is not divergence");
+        assert!(arts[0].tools.len() > 1, "attributed to multiple cohort tools");
     }
 
     #[test]

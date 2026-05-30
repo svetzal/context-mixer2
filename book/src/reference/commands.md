@@ -74,15 +74,17 @@ canonical home (`adopt`). `cmx doctor --adopt-all` and `cmx <kind> adopt <name>`
 therefore act **only on orphaned** artifacts — an untracked artifact is steered
 to `install` instead of being adopted as if it were private.
 
-It also flags artifacts of the same name appearing in more than one distinct
-install location (`(dup)`). Skills in the shared `.agents/skills` directory that
-many tools read are reported **once**, attributed to the whole cohort — not as
-duplicates.
+A skill installed for several tools is reported as **one logical artifact**
+whose `Tools` column lists every tool it's installed for — not as N duplicates.
+That's the intended "curate once, project to many" outcome. The only
+multi-location situation `doctor` flags is `(diverged)`: copies that actually
+**disagree** — a different version or state across locations — which
+`cmx <kind> update <name> --force` resolves by re-syncing every copy from one
+source.
 
-`doctor` exits non-zero (`2`) when it finds drift, orphans, or missing entries,
-so it is usable in a pre-commit hook or CI check. Cross-location duplication
-alone does not fail it — projecting one curated set into many tools legitimately
-produces copies.
+`doctor` exits non-zero (`2`) when it finds drift, untracked, orphaned, missing,
+or diverged artifacts, so it is usable in a pre-commit hook or CI check.
+Consistent multi-tool installs and `external` artifacts never fail it.
 
 ## Canonical home & adoption
 

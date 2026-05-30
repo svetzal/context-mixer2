@@ -18,7 +18,7 @@ and classifies each artifact. It changes nothing — it just tells you the truth
 A typical first run on a lived-in system:
 
 ```text
-Summary: 18 tracked, 3 drifted, 43 orphaned, 1 missing · 0 duplicated across locations.
+Summary: 18 tracked, 3 drifted, 0 untracked, 43 orphaned, 0 external, 1 missing · 0 diverged.
 ```
 
 Work through it one state at a time. Each section below is a state `doctor`
@@ -200,9 +200,16 @@ count), so you can drive it to a *clean* resting point — and even wire it into
 hook or CI check once you're there. A fully-curated system looks like:
 
 ```text
-Summary: 40 tracked, 0 drifted, 0 untracked, 0 orphaned, 24 external, 0 missing · 0 duplicated across locations.
+Summary: 40 tracked, 0 drifted, 0 untracked, 0 orphaned, 24 external, 0 missing · 0 diverged.
 ```
 
 …where the `external` count is a tool's stock bundle you've deliberately marked
 (see above), so `doctor` exits zero — everything that's *yours* is tracked, and
 everything that isn't is acknowledged but unflagged.
+
+> **One skill, many tools.** A skill you've projected to several assistants is
+> reported as a *single* tracked artifact whose `Tools` column lists every tool
+> it's installed for — not as "duplicates." `diverged` is reserved for the rare
+> case where copies actually disagree (different version or state across
+> locations); fix those with `cmx <kind> update <name> --force` to re-sync every
+> copy from one source.

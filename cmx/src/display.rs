@@ -337,25 +337,27 @@ impl fmt::Display for UninstallResult {
     }
 }
 
-/// Build the "Installed artifacts" table from the survey rows.
+/// Build the "Installed artifacts" table from the grouped logical artifacts —
+/// one row per skill, the Tools column listing every tool it's installed for.
 fn doctor_installed_table(report: &DoctorReport) -> Table {
     Table {
-        headers: vec!["Type", "Name", "Scope", "State", "Version", "Location"],
+        headers: vec!["Type", "Name", "Scope", "State", "Version", "Tools"],
         padded_cols: 5,
         rows: report
-            .rows
+            .artifacts
             .iter()
-            .map(|r| {
+            .map(|a| {
+                let tools = a.tools.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
                 let mut cells = vec![
-                    r.kind.to_string(),
-                    r.name.clone(),
-                    r.scope.label().to_string(),
-                    r.state.label().to_string(),
-                    r.version.clone().unwrap_or_else(|| "-".to_string()),
-                    r.location.display().to_string(),
+                    a.kind.to_string(),
+                    a.name.clone(),
+                    a.scope.label().to_string(),
+                    a.state.label().to_string(),
+                    a.version.clone().unwrap_or_else(|| "-".to_string()),
+                    tools,
                 ];
-                if r.duplicated {
-                    cells.push("(dup)".to_string());
+                if a.diverged {
+                    cells.push("(diverged)".to_string());
                 }
                 cells
             })
@@ -411,6 +413,12 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
             c.missing
         ));
     }
+    if c.diverged > 0 {
+        lines.push(format!(
+            "  • {} artifact(s) diverge across their install locations (different version or state) — `cmx <kind> update <name> --force` re-syncs every copy from one source.",
+            c.diverged
+        ));
+    }
     if lines.is_empty() {
         String::new()
     } else {
@@ -457,17 +465,17 @@ impl fmt::Display for DoctorReport {
             crate::platform::Platform::ALL.len()
         )?;
 
-        if self.rows.is_empty() && self.missing.is_empty() {
+        if self.artifacts.is_empty() && self.missing.is_empty() {
             return writeln!(f, "Nothing installed — your system is clean.");
         }
 
-        if !self.rows.is_empty() {
+        if !self.artifacts.is_empty() {
             writeln!(f, "Installed artifacts:")?;
             write!(f, "{}", doctor_installed_table(self).render())?;
         }
 
         if !self.missing.is_empty() {
-            if !self.rows.is_empty() {
+            if !self.artifacts.is_empty() {
                 writeln!(f)?;
             }
             writeln!(f, "Missing (in a lock file, absent on disk):")?;
@@ -477,8 +485,8 @@ impl fmt::Display for DoctorReport {
         let c = self.counts();
         writeln!(
             f,
-            "\nSummary: {} tracked, {} drifted, {} untracked, {} orphaned, {} external, {} missing · {} duplicated across locations.",
-            c.tracked, c.drifted, c.untracked, c.orphaned, c.external, c.missing, c.duplicated
+            "\nSummary: {} tracked, {} drifted, {} untracked, {} orphaned, {} external, {} missing · {} diverged.",
+            c.tracked, c.drifted, c.untracked, c.orphaned, c.external, c.missing, c.diverged
         )?;
         write!(f, "{}", doctor_hints(&c))
     }
@@ -1126,16 +1134,16 @@ mod tests {
 
     // --- DoctorReport ---
 
-    fn orphan_row(name: &str) -> crate::doctor::DoctorRow {
-        crate::doctor::DoctorRow {
+    fn orphan_artifact(name: &str) -> crate::doctor::DoctorArtifact {
+        crate::doctor::DoctorArtifact {
             kind: ArtifactKind::Skill,
             name: name.to_string(),
             scope: InstallScope::Global,
-            location: PathBuf::from("/home/u/.claude/skills"),
-            platforms: vec![crate::platform::Platform::Claude],
             state: crate::doctor::ArtifactState::Orphaned,
             version: Some("1.0.0".to_string()),
-            duplicated: false,
+            tools: vec![crate::platform::Platform::Claude],
+            locations: vec![PathBuf::from("/home/u/.claude/skills")],
+            diverged: false,
         }
     }
 
@@ -1148,9 +1156,10 @@ mod tests {
     }
 
     #[test]
-    fn doctor_report_lists_rows_and_summary() {
+    fn doctor_report_lists_artifacts_and_summary() {
         let r = crate::doctor::DoctorReport {
-            rows: vec![orphan_row("my-skill")],
+            rows: vec![],
+            artifacts: vec![orphan_artifact("my-skill")],
             missing: vec![],
             included_local: false,
         };
@@ -1164,9 +1173,38 @@ mod tests {
     }
 
     #[test]
+    fn doctor_report_lists_tools_for_multi_tool_artifact() {
+        // One skill installed for two tools is ONE row listing both — not "dup".
+        let r = crate::doctor::DoctorReport {
+            rows: vec![],
+            artifacts: vec![crate::doctor::DoctorArtifact {
+                kind: ArtifactKind::Skill,
+                name: "clipboard".to_string(),
+                scope: InstallScope::Global,
+                state: crate::doctor::ArtifactState::Tracked,
+                version: Some("1.0.0".to_string()),
+                tools: vec![
+                    crate::platform::Platform::Claude,
+                    crate::platform::Platform::Codex,
+                ],
+                locations: vec![PathBuf::from("/a"), PathBuf::from("/b")],
+                diverged: false,
+            }],
+            missing: vec![],
+            included_local: false,
+        };
+        let out = r.to_string();
+        assert!(out.contains("clipboard"));
+        assert!(out.contains("claude, codex"), "tools listed in one row: {out}");
+        assert!(!out.contains("(diverged)"), "consistent copies carry no diverged marker");
+        assert!(out.contains("1 tracked"), "counted once, not per-location");
+    }
+
+    #[test]
     fn doctor_report_missing_section_and_scope_label() {
         let r = crate::doctor::DoctorReport {
             rows: vec![],
+            artifacts: vec![],
             missing: vec![crate::doctor::MissingRow {
                 kind: ArtifactKind::Skill,
                 name: "ghost".to_string(),
@@ -1184,17 +1222,19 @@ mod tests {
     }
 
     #[test]
-    fn doctor_report_marks_duplicated_rows() {
-        let mut row = orphan_row("dup");
-        row.duplicated = true;
+    fn doctor_report_flags_diverged_artifact() {
+        let mut a = orphan_artifact("skew");
+        a.diverged = true;
         let r = crate::doctor::DoctorReport {
-            rows: vec![row],
+            rows: vec![],
+            artifacts: vec![a],
             missing: vec![],
             included_local: false,
         };
         let out = r.to_string();
-        assert!(out.contains("(dup)"), "duplicated marker rendered: {out}");
-        assert!(out.contains("1 duplicated across locations"));
+        assert!(out.contains("(diverged)"), "diverged marker rendered: {out}");
+        assert!(out.contains("1 diverged"));
+        assert!(out.contains("diverge across their install locations"), "diverged hint present");
     }
 
     // --- Step 13: SourceUpdateOutput ---

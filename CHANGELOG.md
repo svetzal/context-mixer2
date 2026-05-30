@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `cmx doctor` now presents **one logical artifact per skill**, with a `Tools` column listing every tool it's installed for, instead of one row per install location. A skill projected to several tools is no longer reported as N "duplicates" — that's the intended "curate once, project to many" outcome. The old `duplicated` flag is replaced by `diverged`, which fires only when a skill's copies actually **disagree** across locations (different version or state); `cmx <kind> update <name> --force` re-syncs them. Counts in the summary are now per logical artifact.
+
 ### Added
 
 - **External artifacts.** Declare artifacts that another tool manages — e.g. a tool's bundled/stock skills in its own directory — so `cmx doctor` reports them as `external` (informational, never an issue) instead of flagging them as orphaned, and so `adopt`/`--adopt-all` never sweep them into your home. Manage the list with `cmx config external add|remove|list`; `cmx config show` displays it. Each rule is either a **directory** (an install location, `~` expands to home — covers everything under it) or a bare **artifact name**. A directory rule like `~/.hermes/skills` lets `doctor` reach a clean (zero-exit) resting point while a tool's stock bundle stays acknowledged but unflagged.
