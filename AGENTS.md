@@ -36,6 +36,39 @@ cargo tarpaulin      # code coverage (target >80%)
 
 Trunk-based development: `main` is the only long-lived branch. All work lands on `main` via direct commit. Feature branches are not pushed to `origin`. Pull requests are not used. Short-lived local working branches (e.g. hopper worktrees) are merged to `main` and deleted locally before work is considered complete.
 
+## CI / Release
+
+Two GitHub Actions workflows: `ci.yml` (on push/PR) and `release.yml` (on
+pushing a `v*` tag). `release.yml` runs the quality gate, builds binaries for
+three targets (macOS arm64/x64, Linux x64), creates a GitHub Release with the
+archives, and **overwrites the Homebrew tap formula** (`svetzal/homebrew-tap`,
+`Formula/cmx.rb`) with the tag's version. There is no crates.io publish.
+
+Releasing is two distinct steps:
+
+1. **Prep** (a normal commit on `main`): bump `version` in the root
+   `Cargo.toml` (workspace version; `cmx`/`cmf` inherit it via
+   `version.workspace = true`), run a build so `Cargo.lock` picks up the new
+   `cmx`/`cmf` versions, finalize `CHANGELOG.md` (date the new section, open a
+   fresh `## [Unreleased]`), and commit as `chore(release): prepare X.Y.Z`.
+   This does **not** tag — nothing publishes yet.
+2. **Tag** (the publish trigger): create a **lightweight** tag `vX.Y.Z` (match
+   existing tag style — `git tag vX.Y.Z`, not `-a`) and push it. The push fires
+   `release.yml`.
+
+Conventions and gotchas:
+
+- **Sequence releases — never push two `v*` tags concurrently.** The Homebrew
+  job overwrites the single tap formula with whichever run finishes last, so two
+  in-flight releases can leave the tap pinned to the wrong (older) version. Push
+  one tag, wait for its run to complete (`gh run watch <id> --exit-status`,
+  including the Homebrew job), then push the next.
+- The tag's commit must pass the quality gate independently (the workflow re-runs
+  fmt/clippy/test/deny on the tagged tree).
+- `--generate-notes` builds the GitHub Release body from commits; no manual
+  release notes needed.
+- Semver: new backward-compatible commands/features → minor bump; fixes → patch.
+
 ## Reference repositories
 
 - **guidelines**: `~/Work/Projects/Personal/guidelines` — the reference source repository used for local testing of cmx features (artifact scanning, install, versioning, upgrades).
