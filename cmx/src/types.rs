@@ -14,6 +14,13 @@ pub struct CmxConfig {
     pub version: u32,
     #[serde(default)]
     pub llm: LlmConfig,
+    /// Optional override for the canonical home directory that holds
+    /// hand-authored artifacts. When absent, the home defaults to
+    /// `<config_dir>/home` (see [`ConfigPaths::default_artifact_home`]).
+    ///
+    /// [`ConfigPaths::default_artifact_home`]: crate::paths::ConfigPaths::default_artifact_home
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home: Option<PathBuf>,
 }
 
 impl Default for CmxConfig {
@@ -21,6 +28,7 @@ impl Default for CmxConfig {
         Self {
             version: 1,
             llm: LlmConfig::default(),
+            home: None,
         }
     }
 }

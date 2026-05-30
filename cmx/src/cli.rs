@@ -41,6 +41,14 @@ pub enum Commands {
         /// Also survey project (local) scope, not just global
         #[arg(long)]
         local: bool,
+        /// Adopt every orphaned artifact into the canonical home (mutating)
+        #[arg(long = "adopt-all")]
+        adopt_all: bool,
+    },
+    /// Manage the canonical home for hand-authored artifacts
+    Home {
+        #[command(subcommand)]
+        action: HomeAction,
     },
     /// Show installed artifacts that have updates available
     Outdated,
@@ -132,6 +140,22 @@ pub enum ArtifactAction {
         #[arg(long)]
         local: bool,
     },
+    /// Adopt an orphaned, hand-authored artifact into the canonical home
+    Adopt {
+        /// Artifact name (must be an orphan reported by `cmx doctor`)
+        name: String,
+        /// Search project (local) scope as well as global for the orphan
+        #[arg(long)]
+        local: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum HomeAction {
+    /// Create the canonical home directory and register it as the `home` source
+    Init,
+    /// Print the resolved canonical home directory
+    Path,
 }
 
 #[derive(Subcommand)]

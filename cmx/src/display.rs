@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::adopt::AdoptOutcome;
 use crate::cmx_config::{ConfigSetResult, ConfigShowResult};
 #[cfg(feature = "llm")]
 use crate::diff::DiffOutput;
@@ -399,6 +400,32 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
         String::new()
     } else {
         format!("\n{}\n", lines.join("\n"))
+    }
+}
+
+impl fmt::Display for AdoptOutcome {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.adopted.is_empty() {
+            return writeln!(
+                f,
+                "Nothing to adopt — no orphaned artifacts found{}.",
+                if self.included_local {
+                    " (global + project scope)"
+                } else {
+                    ""
+                }
+            );
+        }
+        writeln!(f, "Adopted {} artifact(s) into {}:", self.adopted.len(), self.home.display())?;
+        for a in &self.adopted {
+            let tools: Vec<String> = a.platforms.iter().map(ToString::to_string).collect();
+            writeln!(f, "  {} {} — now tracked for: {}", a.kind, a.name, tools.join(", "))?;
+        }
+        writeln!(f)?;
+        writeln!(
+            f,
+            "Project them to another tool with: cmx skill install --all --platform <tool>"
+        )
     }
 }
 
@@ -981,6 +1008,37 @@ mod tests {
         let out = r.to_string();
         assert!(out.contains("model"));
         assert!(out.contains("gpt-4"));
+    }
+
+    // --- AdoptOutcome ---
+
+    #[test]
+    fn adopt_outcome_empty_message() {
+        let o = crate::adopt::AdoptOutcome {
+            adopted: vec![],
+            home: PathBuf::from("/home/u/.config/context-mixer/home"),
+            included_local: false,
+        };
+        assert!(o.to_string().contains("Nothing to adopt"));
+    }
+
+    #[test]
+    fn adopt_outcome_lists_adopted_and_projection_hint() {
+        let o = crate::adopt::AdoptOutcome {
+            adopted: vec![crate::adopt::AdoptResult {
+                kind: ArtifactKind::Skill,
+                name: "my-skill".to_string(),
+                home_path: PathBuf::from("/home/u/.config/context-mixer/home/skills/my-skill"),
+                platforms: vec![crate::platform::Platform::Claude],
+            }],
+            home: PathBuf::from("/home/u/.config/context-mixer/home"),
+            included_local: false,
+        };
+        let out = o.to_string();
+        assert!(out.contains("Adopted 1 artifact(s)"));
+        assert!(out.contains("my-skill"));
+        assert!(out.contains("now tracked for: claude"));
+        assert!(out.contains("install --all --platform"), "projection hint present");
     }
 
     // --- DoctorReport ---

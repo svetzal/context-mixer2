@@ -31,6 +31,7 @@ It can also be set via the `CMX_PLATFORM` environment variable.
 | `cmx agent update <name>` | Update an agent from its source |
 | `cmx agent update --all` | Update all tracked agents |
 | `cmx agent uninstall <name>` | Uninstall an agent |
+| `cmx agent adopt <name>` | Adopt an orphaned, hand-authored agent into the canonical home |
 | `cmx agent list` | List installed agents |
 | `cmx agent diff <name>` | LLM-powered diff analysis (requires `llm` feature) |
 
@@ -48,6 +49,7 @@ Same commands as agent, using `cmx skill` instead of `cmx agent`.
 | `cmx info <name>` | Show detailed metadata for an installed artifact |
 | `cmx doctor` | Survey the whole system installation across every platform (read-only) |
 | `cmx doctor --local` | Also include project (local) scope in the survey |
+| `cmx doctor --adopt-all` | Adopt every orphaned artifact into the canonical home |
 
 ### `cmx doctor`
 
@@ -72,6 +74,39 @@ duplicates.
 so it is usable in a pre-commit hook or CI check. Cross-location duplication
 alone does not fail it — projecting one curated set into many tools legitimately
 produces copies.
+
+## Canonical home & adoption
+
+The **canonical home** is a tool-neutral directory that holds your hand-authored
+private agents and skills — the source of truth that survives switching coding
+assistants. It defaults to `~/.config/context-mixer/home` (override with the
+`home` field in `config.json`) and is auto-registered as a visible local source
+named `home`.
+
+| Command | Description |
+|---------|-------------|
+| `cmx home init` | Create the home directory and register it as the `home` source |
+| `cmx home path` | Print the resolved home directory |
+| `cmx skill adopt <name>` | Copy an orphaned skill into the home and mark it tracked |
+| `cmx agent adopt <name>` | Copy an orphaned agent into the home and mark it tracked |
+| `cmx doctor --adopt-all` | Adopt every orphan the survey finds, in one pass |
+
+**Adoption copies, never moves.** It places a verbatim copy of the orphan in the
+home, registers the home as a source, and records provenance (`source: home`,
+with the artifact's checksum) in the lock file of every platform that reads the
+orphan's location — so the original reclassifies from *orphaned* to *tracked*.
+The original file is left exactly where it was.
+
+### Migrating a private skill set between tools
+
+```text
+cmx doctor                 # see what's orphaned
+cmx doctor --adopt-all     # canonicalize the orphaned private artifacts
+cmx skill install --all --platform opencode   # project the home to a new tool
+```
+
+After adoption the home is a normal source, so projecting it to any platform is
+just `install --all --platform <tool>`.
 
 ## Configuration
 

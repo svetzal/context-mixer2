@@ -64,11 +64,15 @@ yourself (as opposed to artifacts you pulled from a remote marketplace).
   tree-walking scanner already reads un-manifested repositories, so the home
   works with `list`, `install`, `search`, and `browse` unchanged. `cmf validate`
   / `cmf status` can lint and author it without new code.
-- **First-class status:** the home is injected as an implicit, always-present
-  source named `home`. It sorts first, cannot be removed via `source remove`,
-  and is created on first use. Every existing command that iterates sources sees
-  it for free — that is what makes it *first-class* rather than "just another
-  `source add`."
+- **First-class status:** the home is **auto-registered as a visible local
+  source** named `home` (created, and written into `sources.json`, on first use
+  — e.g. the first `adopt`). It then behaves like any registered source:
+  `list`, `install --all`, `search`, and `browse` see it, and it shows in
+  `cmx source list`. We deliberately chose a *visible, explicit* source over an
+  invisible injected one: cmx's whole model is that sources are explicit, and
+  keeping the home in `sources.json` avoids special-casing the shared config-load
+  path that every command runs through. (Trade-off: like any source, it can be
+  `source remove`d — re-running `adopt` or `cmx home init` re-registers it.)
 - **`~/.claude/skills` is demoted.** It stops being special. It becomes one
   install *target* among the thirteen platforms, on equal footing with opencode,
   codex, and hermes. The source of truth now survives dropping any single tool —
@@ -149,35 +153,46 @@ surveyed.
 | Adoption of originals | **Copy, never move** | Safe to run on a messy system; reclassifies originals to *tracked* without risking data loss. Deleting/migrating originals stays an explicit, separate user action. |
 | Home structure | **Plain tree, no manifest** | The fallback scanner already reads un-manifested repos; requiring `marketplace.json` for purely-local private artifacts would be friction with no benefit. |
 | Home location | **`~/.config/context-mixer/home`, config-overridable** | Reuses cmx's existing config root (next to `sources.json` and the lockfiles) rather than inventing a new `~/.cmx/` tree. Still tool-neutral — it lives under cmx's own directory, not any single assistant's — so it outlives tool changes. |
-| Home as a source | **Implicit, always-present, unremovable** | This is what makes it first-class; every source-iterating command sees it for free, and it can't be accidentally `source remove`d. |
+| Home as a source | **Visible, auto-registered local source** | Consistent with cmx's explicit-source model; the home lives in `sources.json` and shows in `source list`, rather than being injected into the shared config-load path. Auto-registered on first `adopt` (or `cmx home init`); re-registers if removed. |
 | `~/.claude/skills` | **Demoted to an install target** | Decouples the source of truth from the tool being abandoned — the motivating requirement. |
 
 ## Phasing
 
-- **Phase 1 — `doctor` (read-only):** the cross-platform survey and
-  classification. Ship first so the system state is visible before any model
-  decision about the home is finalized.
-- **Phase 2 — canonical home + `adopt`:** the implicit `home` source, the
-  `config.json` `home` field, `cmx {skill,agent} adopt`, and
-  `cmx doctor --adopt-all`.
-- **Phase 3 — projection ergonomics (optional):** a `cmx sync` convenience that
-  fans the home out to a configured set of platforms in one command. Not needed
-  for the cutover — `install --all --platform X` already covers it — so this is a
-  fast-follow only if the per-platform invocation proves tedious.
+- **Phase 1 — `doctor` (read-only) — done.** The cross-platform survey and
+  classification, shipped first so the system state is visible before any model
+  decision about the home was finalized.
+- **Phase 2 — canonical home + `adopt` — done.** The `config.json` `home` field,
+  the auto-registered visible `home` source, `cmx home init` / `cmx home path`,
+  `cmx {skill,agent} adopt <name>`, and `cmx doctor --adopt-all`. Adoption copies
+  verbatim into the home and records `home` provenance so orphans reclassify as
+  tracked. Projection reuses the existing `install --all --platform <tool>` (the
+  home is just a registered source) — no new code.
+- **Phase 3 — projection ergonomics (optional, not started):** a `cmx sync`
+  convenience that fans the home out to a configured set of platforms in one
+  command. Not needed for the cutover — `install --all --platform X` already
+  covers it — so this is a fast-follow only if the per-platform invocation proves
+  tedious.
 
-## Source code map (planned)
+> **Note on frontmatter normalization.** An earlier sketch had `adopt` default a
+> missing `version` to `0.1.0`. We deliberately *don't*: normalizing the home
+> copy would make it differ from the verbatim original, so the original would
+> show as *drifted* rather than *tracked*. Adoption copies byte-for-byte;
+> version curation is a separate, explicit step.
 
-- `cmx/src/platform.rs` — add `Platform::ALL` (exhaustive variant slice) so the
+## Source code map
+
+- `cmx/src/platform.rs` — `Platform::ALL` (exhaustive variant slice) so the
   survey is automatically complete.
-- `cmx/src/paths.rs` — add a per-platform `ConfigPaths` view (done in Phase 1)
-  and `artifact_home_dir()` resolving the canonical home under `config_dir`
-  (`config_dir.join("home")` by default — *not* the existing `home_dir` field,
-  which is the OS home).
-- `cmx/src/types.rs` — add the `home` field to `CmxConfig`; add the artifact
-  classification enum used by `doctor`.
-- `cmx/src/doctor.rs` (new) — the read-only cross-platform survey + classification
-  (pure functional core over injected `Filesystem`).
-- `cmx/src/adopt.rs` (new) — copy-into-home + frontmatter normalization +
-  lockfile/registration.
-- `cmx/src/source_iter.rs` — inject the implicit `home` source into iteration.
-- `book/src/reference/commands.md` — document `doctor` and `adopt`.
+- `cmx/src/paths.rs` — `ConfigPaths::with_platform` (per-platform view) and
+  `default_artifact_home()` (`config_dir.join("home")` — *not* the existing
+  `home_dir` field, which is the OS home).
+- `cmx/src/types.rs` — the `home` field on `CmxConfig`.
+- `cmx/src/config.rs` — `resolve_artifact_home(config, paths)` (override or
+  default).
+- `cmx/src/doctor.rs` — the read-only cross-platform survey + classification
+  (`ArtifactState`, `DoctorRow`, `survey`).
+- `cmx/src/adopt.rs` — copy-into-home + per-platform lock registration +
+  `ensure_home_source` (registers the `home` source so projection via
+  `install --all` works with no further setup). Backs `adopt`, `doctor
+  --adopt-all`, and `home init` / `home path`.
+- `book/src/reference/commands.md` — documents `doctor`, `adopt`, and the home.

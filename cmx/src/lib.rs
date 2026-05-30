@@ -1,3 +1,4 @@
+pub mod adopt;
 pub mod checksum;
 pub mod cli;
 pub mod cmx_config;

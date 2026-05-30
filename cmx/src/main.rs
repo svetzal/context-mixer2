@@ -1,7 +1,7 @@
 use anyhow::{Result, bail};
 use clap::Parser;
 
-use cmx::cli::{ArtifactAction, Cli, Commands, ConfigAction, SourceAction};
+use cmx::cli::{ArtifactAction, Cli, Commands, ConfigAction, HomeAction, SourceAction};
 use cmx::context::AppContext;
 use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use cmx::paths::ConfigPaths;
@@ -28,14 +28,21 @@ fn main() -> Result<()> {
             print!("{output}");
             Ok(())
         }
-        Commands::Doctor { local } => {
-            let report = cmx::doctor::survey(local, &ctx)?;
-            print!("{report}");
-            if report.has_issues() {
-                std::process::exit(2);
+        Commands::Doctor { local, adopt_all } => {
+            if adopt_all {
+                let outcome = cmx::adopt::adopt_all(local, &ctx)?;
+                print!("{outcome}");
+                Ok(())
+            } else {
+                let report = cmx::doctor::survey(local, &ctx)?;
+                print!("{report}");
+                if report.has_issues() {
+                    std::process::exit(2);
+                }
+                Ok(())
             }
-            Ok(())
         }
+        Commands::Home { action } => handle_home(&action, &ctx),
         Commands::Info { name } => {
             let info = cmx::info::info(&name, &ctx)?;
             print!("{info}");
@@ -84,6 +91,22 @@ fn handle_source(action: SourceAction, paths: &ConfigPaths, ctx: &AppContext<'_>
         SourceAction::Remove { name } => {
             let result = cmx::source::remove(&name, ctx)?;
             print!("{result}");
+            Ok(())
+        }
+    }
+}
+
+fn handle_home(action: &HomeAction, ctx: &AppContext<'_>) -> Result<()> {
+    match action {
+        HomeAction::Init => {
+            let home = cmx::adopt::home_init(ctx)?;
+            println!("Canonical home ready at {}", home.display());
+            println!("Registered as source '{}'.", cmx::adopt::HOME_SOURCE);
+            Ok(())
+        }
+        HomeAction::Path => {
+            let home = cmx::adopt::home_path(ctx)?;
+            println!("{}", home.display());
             Ok(())
         }
     }
@@ -177,6 +200,11 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
             };
             let result = cmx::uninstall::uninstall(&name, kind, scope, ctx)?;
             print!("{result}");
+            Ok(())
+        }
+        ArtifactAction::Adopt { name, local } => {
+            let outcome = cmx::adopt::adopt_named(kind, &name, local, ctx)?;
+            print!("{outcome}");
             Ok(())
         }
     }

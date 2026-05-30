@@ -44,6 +44,12 @@ pub fn save_config(config: &CmxConfig, fs: &dyn Filesystem, paths: &ConfigPaths)
     crate::json_file::save_json(config, &paths.config_path(), fs)
 }
 
+/// Resolve the effective canonical artifact home: the `home` override in the
+/// config if set, otherwise the default under the config root.
+pub fn resolve_artifact_home(config: &CmxConfig, paths: &ConfigPaths) -> PathBuf {
+    config.home.clone().unwrap_or_else(|| paths.default_artifact_home())
+}
+
 pub fn installed_names(
     kind: ArtifactKind,
     scope: InstallScope,

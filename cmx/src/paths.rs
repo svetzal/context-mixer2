@@ -76,6 +76,17 @@ impl ConfigPaths {
         self.config_dir.join("config.json")
     }
 
+    /// Default location of the canonical artifact home — under cmx's existing
+    /// config root, alongside `sources.json` and the lockfiles.
+    ///
+    /// This is the *default*; the `home` field in `config.json` can override it.
+    /// Use [`crate::config::resolve_artifact_home`] to get the effective home,
+    /// which consults the config first. Note this is unrelated to
+    /// [`home_dir`](Self::home_dir), which is the OS home (`$HOME`).
+    pub fn default_artifact_home(&self) -> PathBuf {
+        self.config_dir.join("home")
+    }
+
     /// Path to the lock file for the given scope.
     ///
     /// Claude uses `cmx-lock.json` for backward compatibility. All other
