@@ -389,8 +389,14 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
     let mut lines = Vec::new();
     if c.orphaned > 0 {
         lines.push(format!(
-            "  • {} orphaned artifact(s) are not tracked by cmx (no source, no lock entry).",
+            "  • {} orphaned artifact(s) have no source (hand-authored) — `cmx <kind> adopt <name>` (or `cmx doctor --adopt-all`) canonicalizes them into the home.",
             c.orphaned
+        ));
+    }
+    if c.untracked > 0 {
+        lines.push(format!(
+            "  • {} untracked artifact(s) are installed but a registered source provides them — `cmx <kind> install <name>` records provenance and tracks them.",
+            c.untracked
         ));
     }
     if c.drifted > 0 {
@@ -471,8 +477,8 @@ impl fmt::Display for DoctorReport {
         let c = self.counts();
         writeln!(
             f,
-            "\nSummary: {} tracked, {} drifted, {} orphaned, {} missing · {} duplicated across locations.",
-            c.tracked, c.drifted, c.orphaned, c.missing, c.duplicated
+            "\nSummary: {} tracked, {} drifted, {} untracked, {} orphaned, {} missing · {} duplicated across locations.",
+            c.tracked, c.drifted, c.untracked, c.orphaned, c.missing, c.duplicated
         )?;
         write!(f, "{}", doctor_hints(&c))
     }
@@ -1103,7 +1109,8 @@ mod tests {
         assert!(out.contains("my-skill"));
         assert!(out.contains("orphaned"));
         assert!(out.contains("1 orphaned"), "summary tallies orphans: {out}");
-        assert!(out.contains("not tracked by cmx"), "orphan hint present");
+        assert!(out.contains("have no source"), "orphan hint present");
+        assert!(out.contains("adopt"), "orphan hint points at adopt");
     }
 
     #[test]

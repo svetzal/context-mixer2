@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `cmx doctor` now distinguishes two kinds of no-lock-entry artifact: **`untracked`** (a registered source provides it — installed out-of-band, fix by `install`) versus **`orphaned`** (no source provides it — hand-authored, the `adopt` candidate). Previously both were lumped as "orphaned".
+
 ### Changed
 
+- `cmx {skill,agent} adopt` and `cmx doctor --adopt-all` now act **only on orphaned** artifacts. An untracked (source-available) artifact is no longer adopted as if it were private — `adopt <name>` steers it to `cmx <kind> install <name>` instead, and `--adopt-all` skips it. This prevents adopting a tool's bundled/stock skills, or any source-backed artifact, into the personal canonical home.
 - Skill checksums and copies now ignore transient/generated content: `node_modules/`, `__pycache__/`, `*.pyc`, `.git/`, and `.DS_Store`. Previously a skill carrying runnable scripts would show as `drifted` the moment its dependencies or bytecode appeared (e.g. after `npm install` or running a Python script), because the directory checksum hashed every file. Ignoring these regenerable paths keeps the drift signal honest and keeps the canonical home and projected installs lean (no vendored `node_modules` dragged along on adopt/install). Authored content — including `package.json`/`package-lock.json` — is still tracked and copied.
 
 ### Fixed

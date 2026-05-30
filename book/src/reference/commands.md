@@ -58,12 +58,20 @@ directories and lock files. It mutates nothing — its job is to make a
 disorganized installation visible before any command changes it. For each
 artifact it reports one of:
 
-| State | Meaning |
-|-------|---------|
-| `tracked` | recorded in a lock file with a matching checksum |
-| `drifted` | tracked, but the on-disk copy was edited after install |
-| `orphaned` | on disk with no lock entry on any platform (e.g. hand-authored) |
-| `missing` | in a lock file, but the file is gone from disk |
+| State | Meaning | Remedy |
+|-------|---------|--------|
+| `tracked` | recorded in a lock file with a matching checksum | — |
+| `drifted` | tracked, but the on-disk copy was edited after install | `cmx info <name>` to inspect |
+| `untracked` | on disk, no lock entry, **but a registered source provides it** (installed out-of-band) | `cmx <kind> install <name>` to track it |
+| `orphaned` | on disk, no lock entry, and **no source provides it** (hand-authored) | `cmx <kind> adopt <name>` to canonicalize into the home |
+| `missing` | in a lock file, but the file is gone from disk | `cmx <kind> uninstall <name>` to clear the stale entry |
+
+The `untracked` vs `orphaned` split matters for bringing a system under control:
+*untracked* artifacts have a real upstream source, so the right move is to track
+them (`install`); *orphaned* artifacts are yours alone, so they belong in the
+canonical home (`adopt`). `cmx doctor --adopt-all` and `cmx <kind> adopt <name>`
+therefore act **only on orphaned** artifacts — an untracked artifact is steered
+to `install` instead of being adopted as if it were private.
 
 It also flags artifacts of the same name appearing in more than one distinct
 install location (`(dup)`). Skills in the shared `.agents/skills` directory that

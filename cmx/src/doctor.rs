@@ -15,7 +15,7 @@
 //! An artifact is *tracked* if any attributed platform's lock file records it
 //! with a matching checksum.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -26,6 +26,7 @@ use crate::context::AppContext;
 use crate::lockfile;
 use crate::platform::Platform;
 use crate::scan;
+use crate::source_iter;
 use crate::types::{ArtifactKind, InstallScope, LockFile};
 
 /// Classification of an installed artifact relative to the lock files that
@@ -37,8 +38,12 @@ pub enum ArtifactState {
     /// Present on disk and in a lock file, but the on-disk copy was edited after
     /// install (checksum mismatch).
     Drifted,
-    /// Present on disk with no lock entry on any platform that reads this
-    /// location — e.g. a hand-authored artifact never installed via cmx.
+    /// Present on disk with no lock entry, but a registered source provides an
+    /// artifact of the same kind and name. Installed out-of-band — the fix is to
+    /// track it via `install`, *not* adopt it as private.
+    Untracked,
+    /// Present on disk with no lock entry and **no** registered source provides
+    /// it — a genuinely hand-authored artifact. The adopt candidate.
     Orphaned,
 }
 
@@ -47,6 +52,7 @@ impl ArtifactState {
         match self {
             ArtifactState::Tracked => "tracked",
             ArtifactState::Drifted => "drifted",
+            ArtifactState::Untracked => "untracked",
             ArtifactState::Orphaned => "orphaned",
         }
     }
@@ -93,6 +99,7 @@ pub struct DoctorReport {
 pub struct StateCounts {
     pub tracked: usize,
     pub drifted: usize,
+    pub untracked: usize,
     pub orphaned: usize,
     pub missing: usize,
     pub duplicated: usize,
@@ -109,6 +116,7 @@ impl DoctorReport {
             match row.state {
                 ArtifactState::Tracked => c.tracked += 1,
                 ArtifactState::Drifted => c.drifted += 1,
+                ArtifactState::Untracked => c.untracked += 1,
                 ArtifactState::Orphaned => c.orphaned += 1,
             }
             if row.duplicated {
@@ -120,10 +128,10 @@ impl DoctorReport {
 
     /// Whether the survey found anything that needs attention.
     ///
-    /// Drift, orphans, and missing entries are issues. Cross-location
-    /// duplication is reported but is *not* an issue on its own — projecting one
-    /// curated set into many tools legitimately produces copies; only the states
-    /// above represent unmanaged or broken state.
+    /// Drift, untracked, orphaned, and missing entries are all issues.
+    /// Cross-location duplication is reported but is *not* an issue on its own —
+    /// projecting one curated set into many tools legitimately produces copies;
+    /// only the states above represent unmanaged or broken state.
     pub fn has_issues(&self) -> bool {
         !self.missing.is_empty() || self.rows.iter().any(|r| r.state != ArtifactState::Tracked)
     }
@@ -196,34 +204,46 @@ fn load_all_locks(
 /// reads its location.
 ///
 /// Tracked wins as soon as any platform's lock records the artifact with a
-/// matching checksum; drifted means a lock entry exists but none matched;
-/// orphaned means no platform's lock knows about it.
+/// matching checksum; drifted means a lock entry exists but none matched. With
+/// no lock entry, the artifact is *untracked* if a registered source provides it
+/// (installed out-of-band → track via `install`) or *orphaned* if no source does
+/// (hand-authored → adopt candidate).
 fn classify_installed(
     name: &str,
-    kind: ArtifactKind,
-    scope: InstallScope,
-    platforms: &[Platform],
+    agg: &LocationAgg,
     path: &std::path::Path,
     locks: &HashMap<(Platform, InstallScope), LockFile>,
+    available_in_source: &HashSet<(ArtifactKind, String)>,
     ctx: &AppContext<'_>,
 ) -> Result<ArtifactState> {
     let mut found_entry = false;
-    for &platform in platforms {
-        let Some(lock) = locks.get(&(platform, scope)) else {
+    for &platform in &agg.platforms {
+        let Some(lock) = locks.get(&(platform, agg.scope)) else {
             continue;
         };
         if let Some(entry) = lock.packages.get(name) {
             found_entry = true;
-            if !checksum::is_locally_modified(path, kind, entry, ctx.fs)? {
+            if !checksum::is_locally_modified(path, agg.kind, entry, ctx.fs)? {
                 return Ok(ArtifactState::Tracked);
             }
         }
     }
-    Ok(if found_entry {
-        ArtifactState::Drifted
+    if found_entry {
+        Ok(ArtifactState::Drifted)
+    } else if available_in_source.contains(&(agg.kind, name.to_string())) {
+        Ok(ArtifactState::Untracked)
     } else {
-        ArtifactState::Orphaned
-    })
+        Ok(ArtifactState::Orphaned)
+    }
+}
+
+/// Build the set of `(kind, name)` artifacts available across every registered
+/// source. Read-only — scans local source clones, never pulls.
+fn available_in_sources(ctx: &AppContext<'_>) -> Result<HashSet<(ArtifactKind, String)>> {
+    Ok(source_iter::all_artifacts(ctx)?
+        .into_iter()
+        .map(|sa| (sa.artifact.kind, sa.artifact.name))
+        .collect())
 }
 
 /// Read an installed artifact's declared version from its content file.
@@ -263,6 +283,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
     let scopes = survey_scopes(include_local);
     let locations = build_locations(ctx, &scopes);
     let locks = load_all_locks(ctx, &scopes)?;
+    let available = available_in_sources(ctx)?;
 
     let mut rows = Vec::new();
     for (dir, agg) in &locations {
@@ -275,8 +296,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
         let names = config::installed_names(agg.kind, agg.scope, ctx.fs, &pv)?;
         for name in names {
             let path = pv.installed_artifact_path(agg.kind, &name, agg.scope);
-            let state =
-                classify_installed(&name, agg.kind, agg.scope, &agg.platforms, &path, &locks, ctx)?;
+            let state = classify_installed(&name, agg, &path, &locks, &available, ctx)?;
             let version = read_installed_version(agg.kind, &path, ctx);
             rows.push(DoctorRow {
                 kind: agg.kind,
@@ -467,6 +487,47 @@ mod tests {
         assert_eq!(row.state, ArtifactState::Orphaned);
         assert_eq!(row.version.as_deref(), Some("1.0.0"));
         assert!(report.has_issues(), "an orphan is an issue");
+    }
+
+    #[test]
+    fn untracked_when_on_disk_no_lock_but_source_provides_it() {
+        let t = TestContext::new();
+        // A registered source provides "vis-theory"...
+        crate::test_support::setup_source_with_skill(
+            &t.fs,
+            &t.paths,
+            "guidelines",
+            "/sources/guidelines",
+            "vis-theory",
+            "1.0.0",
+        );
+        // ...and it's on disk with no lock entry (installed out-of-band).
+        install_skill(&t, Platform::Claude, "vis-theory", "1.0.0", InstallScope::Global);
+
+        let report = survey(false, &t.ctx()).unwrap();
+        let row = report.rows.iter().find(|r| r.name == "vis-theory").expect("surveyed");
+        assert_eq!(
+            row.state,
+            ArtifactState::Untracked,
+            "source-available + no lock → untracked, not orphaned"
+        );
+        assert_eq!(report.counts().untracked, 1);
+        assert_eq!(report.counts().orphaned, 0);
+        assert!(report.has_issues());
+    }
+
+    #[test]
+    fn orphaned_only_when_no_source_provides_it() {
+        let t = TestContext::new();
+        // No source registered; a hand-authored skill on disk with no lock.
+        crate::test_support::setup_empty_sources(&t.fs, &t.paths);
+        install_skill(&t, Platform::Claude, "my-private", "1.0.0", InstallScope::Global);
+
+        let report = survey(false, &t.ctx()).unwrap();
+        let row = report.rows.iter().find(|r| r.name == "my-private").expect("surveyed");
+        assert_eq!(row.state, ArtifactState::Orphaned);
+        assert_eq!(report.counts().untracked, 0);
+        assert_eq!(report.counts().orphaned, 1);
     }
 
     #[test]

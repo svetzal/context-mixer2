@@ -165,6 +165,20 @@ pub fn adopt_named(
     ctx: &AppContext<'_>,
 ) -> Result<AdoptOutcome> {
     let report = doctor::survey(include_local, ctx)?;
+
+    // If it's untracked (a registered source provides it), adopting it as
+    // private would be wrong — steer to `install`, which records provenance.
+    if report
+        .rows
+        .iter()
+        .any(|r| r.kind == kind && r.name == name && r.state == ArtifactState::Untracked)
+    {
+        anyhow::bail!(
+            "'{name}' is available in a registered source — run `cmx {kind} install {name}` to track it. \
+             (adopt is for hand-authored artifacts that no source provides.)"
+        );
+    }
+
     let matching: Vec<DoctorRow> = report
         .rows
         .into_iter()
@@ -298,6 +312,50 @@ mod tests {
         let report = doctor::survey(false, &t.ctx()).unwrap();
         let other = report.rows.iter().find(|r| r.name == "other").unwrap();
         assert_eq!(other.state, ArtifactState::Orphaned);
+    }
+
+    #[test]
+    fn adopt_all_skips_source_available_untracked_artifacts() {
+        let t = TestContext::new();
+        // Source provides "vis-theory"; it's on disk with no lock (untracked).
+        crate::test_support::setup_source_with_skill(
+            &t.fs,
+            &t.paths,
+            "guidelines",
+            "/sources/guidelines",
+            "vis-theory",
+            "1.0.0",
+        );
+        place_orphan_skill(&t, Platform::Claude, "vis-theory", "1.0.0");
+        // A genuine orphan alongside it.
+        place_orphan_skill(&t, Platform::Claude, "my-private", "1.0.0");
+
+        let outcome = adopt_all(false, &t.ctx()).unwrap();
+        let names: Vec<&str> = outcome.adopted.iter().map(|a| a.name.as_str()).collect();
+        assert!(names.contains(&"my-private"), "the true orphan is adopted");
+        assert!(
+            !names.contains(&"vis-theory"),
+            "a source-available (untracked) artifact must NOT be adopted as private"
+        );
+    }
+
+    #[test]
+    fn adopt_named_steers_untracked_to_install() {
+        let t = TestContext::new();
+        crate::test_support::setup_source_with_skill(
+            &t.fs,
+            &t.paths,
+            "guidelines",
+            "/sources/guidelines",
+            "vis-theory",
+            "1.0.0",
+        );
+        place_orphan_skill(&t, Platform::Claude, "vis-theory", "1.0.0");
+
+        let err = adopt_named(ArtifactKind::Skill, "vis-theory", false, &t.ctx()).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("available in a registered source"), "got: {msg}");
+        assert!(msg.contains("cmx skill install vis-theory"), "steers to install: {msg}");
     }
 
     #[test]

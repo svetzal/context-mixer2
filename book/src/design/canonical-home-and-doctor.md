@@ -86,11 +86,20 @@ canonical home. For each artifact it reports one classification:
 
 | State | Meaning | Typical cause |
 |---|---|---|
-| **tracked** | in a lock file, installed checksum matches the home | a normal cmx install |
+| **tracked** | in a lock file, installed checksum matches | a normal cmx install |
 | **drifted** | tracked, but the installed copy was edited after install | hand-tweaked in place |
-| **orphaned** | present on disk, no lock entry, not in the home | hand-authored artifacts (the `~/.claude/skills` pile) |
-| **missing** | in a lock file, but gone from disk | deleted out-of-band |
-| **duplicated** | the same artifact lives in N platforms, possibly at different versions | manual copying between tools |
+| **untracked** | on disk, no lock entry, **but a registered source provides it** | installed out-of-band → track via `install` |
+| **orphaned** | on disk, no lock entry, **no source provides it** | hand-authored artifacts (the `~/.claude/skills` pile) → adopt |
+| **missing** | in a lock file, but gone from disk | deleted out-of-band → `uninstall` clears it |
+| **duplicated** | the same artifact lives in N install locations | manual copying between tools |
+
+The **untracked vs orphaned** split is what makes adoption safe: `adopt` and
+`--adopt-all` act only on *orphaned* artifacts. An *untracked* artifact has a
+real upstream source, so adopting it as private would duplicate source content
+and lose provenance — it's steered to `install` instead. (Discovered the hard
+way: a real system had a vendor tool's entire bundled-skill collection sitting
+untracked on disk; a blanket adopt-all would have swept those defaults into the
+personal home.)
 
 `doctor` mutates nothing. It exits non-zero when anything is off (so it is
 usable in a hook or CI later) and prints a grouped, human-readable report plus a
