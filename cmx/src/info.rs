@@ -5,6 +5,7 @@ use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
 use crate::lockfile;
+use crate::platform::Platform;
 use crate::source_iter;
 use crate::source_update;
 use crate::types::{ArtifactKind, Deprecation, InstallScope};
@@ -51,10 +52,10 @@ pub struct SkillFileEntry {
 // ---------------------------------------------------------------------------
 
 pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
-    // Search both kinds, global then local for each
+    // Search both kinds across every platform.
     for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-        if let Some((path, scope)) = config::find_installed_path(name, kind, ctx.fs, ctx.paths) {
-            return gather_info(name, kind, scope, &path, ctx);
+        if let Some(info) = find_and_gather(name, kind, ctx)? {
+            return Ok(info);
         }
     }
 
@@ -64,10 +65,42 @@ pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
 /// Like [`info`], but scoped to a single kind — backs `cmx skill info` /
 /// `cmx agent info`, which know which kind the user meant.
 pub fn info_for_kind(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
-    match config::find_installed_path(name, kind, ctx.fs, ctx.paths) {
-        Some((path, scope)) => gather_info(name, kind, scope, &path, ctx),
+    match find_and_gather(name, kind, ctx)? {
+        Some(info) => Ok(info),
         None => bail!("No installed {kind} named '{name}' found."),
     }
+}
+
+/// Locate an installed artifact across **every** platform (active platform
+/// first, then the rest), returning its gathered info. This mirrors `cmx doctor`,
+/// which surveys all platforms — without it, `info` only sees the active
+/// `--platform` (Claude by default) and can't describe a skill that lives in,
+/// say, another tool's directory (e.g. an `external` skill under `~/.hermes`).
+fn find_and_gather(
+    name: &str,
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<Option<ArtifactInfo>> {
+    let active = ctx.paths.platform;
+    let platforms =
+        std::iter::once(active).chain(Platform::ALL.iter().copied().filter(|&p| p != active));
+
+    for platform in platforms {
+        let pv = ctx.paths.with_platform(platform);
+        if let Some((path, scope)) = config::find_installed_path(name, kind, ctx.fs, &pv) {
+            // Gather against the platform the artifact actually lives in, so its
+            // (per-platform) lock file is the one consulted.
+            let pv_ctx = AppContext {
+                fs: ctx.fs,
+                git: ctx.git,
+                clock: ctx.clock,
+                paths: &pv,
+                llm: ctx.llm,
+            };
+            return Ok(Some(gather_info(name, kind, scope, &path, &pv_ctx)?));
+        }
+    }
+    Ok(None)
 }
 
 // ---------------------------------------------------------------------------
@@ -759,6 +792,24 @@ mod tests {
         assert!(info_for_kind("my-skill", ArtifactKind::Skill, &ctx).is_ok());
         let err = info_for_kind("my-skill", ArtifactKind::Agent, &ctx).unwrap_err().to_string();
         assert!(err.contains("agent") && err.contains("my-skill"), "kind-scoped error: {err}");
+    }
+
+    #[test]
+    fn info_finds_skill_installed_under_another_platform() {
+        // The skill lives only under a non-active platform (as an external skill
+        // under ~/.hermes does). `info` must survey every platform like `doctor`,
+        // not just the active one (Claude in tests) — else it can't describe it.
+        let t = TestContext::new();
+        let pv = t.paths.with_platform(Platform::Hermes);
+        let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).join("productivity");
+        t.fs.add_file(dir.join("SKILL.md"), crate::test_support::skill_content("Use when busy"));
+        setup_empty_sources(&t.fs, &t.paths);
+
+        let scoped = info_for_kind("productivity", ArtifactKind::Skill, &t.ctx()).unwrap();
+        assert_eq!(scoped.name, "productivity");
+        assert_eq!(scoped.activates_when.as_deref(), Some("Use when busy"));
+        // Found via the both-kinds entry point too.
+        assert_eq!(info("productivity", &t.ctx()).unwrap().name, "productivity");
     }
 
     // --- summarize (LLM-backed) ---
