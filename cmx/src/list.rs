@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::collections::BTreeMap;
 
 use crate::context::AppContext;
-use crate::doctor;
+use crate::doctor::{self, ArtifactState};
 use crate::source_iter::{self, SourceArtifactInfo};
 use crate::table::Table;
 use crate::types::{ArtifactKind, InstallScope, display_version};
@@ -104,8 +104,14 @@ fn rows_by_scope(
     let report = doctor::survey(true, ctx)?;
     let source_versions = source_iter::all_with_checksums(ctx)?;
 
+    // `list` is the cmx-managed inventory: skip artifacts declared external
+    // (another tool owns them). They remain visible in `cmx doctor`'s full audit.
     let mut by_scope: BTreeMap<InstallScope, Vec<Row>> = BTreeMap::new();
-    for a in report.artifacts.iter().filter(|a| a.kind == kind) {
+    for a in report
+        .artifacts
+        .iter()
+        .filter(|a| a.kind == kind && a.state != ArtifactState::External)
+    {
         let infos = source_versions.get(&a.name);
         let available = available_version(infos, a.source.as_deref());
         let deprecated = infos.is_some_and(|v| v.iter().any(|i| i.deprecated));
@@ -256,5 +262,30 @@ mod tests {
         );
         assert_eq!(row.installed, "1.0.0");
         assert_eq!(row.available, "1.0.0");
+    }
+
+    #[test]
+    fn list_excludes_external_artifacts() {
+        use crate::platform::Platform;
+
+        let t = TestContext::new();
+        crate::test_support::setup_empty_sources(&t.fs, &t.paths);
+        // A hand-authored skill (mine) and a vendor skill in ~/.hermes/skills.
+        let mine = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).join("mine");
+        t.fs.add_file(mine.join("SKILL.md"), versioned_skill_content("m", "1.0.0"));
+        let hermes = t.paths.with_platform(Platform::Hermes);
+        let vendored = hermes.install_dir(ArtifactKind::Skill, InstallScope::Global).join("apple");
+        t.fs.add_file(vendored.join("SKILL.md"), versioned_skill_content("a", "1.0.0"));
+        // Declare the Hermes directory external.
+        let cfg = crate::types::CmxConfig {
+            external: vec!["~/.hermes/skills".to_string()],
+            ..Default::default()
+        };
+        crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
+
+        let out = list_kind(ArtifactKind::Skill, &t.ctx()).unwrap();
+        let names: Vec<&str> = out.rows.values().flatten().map(|r| r.name.as_str()).collect();
+        assert!(names.contains(&"mine"), "your skill is listed");
+        assert!(!names.contains(&"apple"), "external (Hermes) skill is excluded from list");
     }
 }
