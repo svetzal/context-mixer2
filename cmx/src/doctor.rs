@@ -15,7 +15,7 @@
 //! An artifact is *tracked* if any attributed platform's lock file records it
 //! with a matching checksum.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -82,6 +82,9 @@ pub struct DoctorRow {
     pub tracked_for: Vec<Platform>,
     pub state: ArtifactState,
     pub version: Option<String>,
+    /// The source this came from: the lock entry's repo when tracked/drifted, or
+    /// the providing source when untracked. `None` for orphaned/external.
+    pub source: Option<String>,
 }
 
 /// One *logical* artifact — a `(kind, name, scope)` grouped across every install
@@ -101,6 +104,8 @@ pub struct DoctorArtifact {
     /// across its locations. Not every tool that merely reads a shared directory
     /// — only those cmx tracks it for. Empty when nothing tracks it.
     pub tools: Vec<Platform>,
+    /// The source it came from (lock provenance), when all copies agree.
+    pub source: Option<String>,
     /// The distinct install locations it occupies.
     pub locations: Vec<PathBuf>,
     /// True when the copies **disagree** — different state or different version
@@ -257,7 +262,7 @@ fn classify_installed(
     agg: &LocationAgg,
     path: &std::path::Path,
     locks: &HashMap<(Platform, InstallScope), LockFile>,
-    available_in_source: &HashSet<(ArtifactKind, String)>,
+    available_in_source: &HashMap<(ArtifactKind, String), Vec<String>>,
     ctx: &AppContext<'_>,
 ) -> Result<ArtifactState> {
     let mut found_entry = false;
@@ -274,20 +279,49 @@ fn classify_installed(
     }
     if found_entry {
         Ok(ArtifactState::Drifted)
-    } else if available_in_source.contains(&(agg.kind, name.to_string())) {
+    } else if available_in_source.contains_key(&(agg.kind, name.to_string())) {
         Ok(ArtifactState::Untracked)
     } else {
         Ok(ArtifactState::Orphaned)
     }
 }
 
-/// Build the set of `(kind, name)` artifacts available across every registered
-/// source. Read-only — scans local source clones, never pulls.
-fn available_in_sources(ctx: &AppContext<'_>) -> Result<HashSet<(ArtifactKind, String)>> {
-    Ok(source_iter::all_artifacts(ctx)?
-        .into_iter()
-        .map(|sa| (sa.artifact.kind, sa.artifact.name))
-        .collect())
+/// Map every `(kind, name)` available across registered sources to the source(s)
+/// that provide it. Read-only — scans local source clones, never pulls.
+fn available_in_sources(
+    ctx: &AppContext<'_>,
+) -> Result<HashMap<(ArtifactKind, String), Vec<String>>> {
+    let mut map: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+    for sa in source_iter::all_artifacts(ctx)? {
+        map.entry((sa.artifact.kind, sa.artifact.name))
+            .or_default()
+            .push(sa.source_name);
+    }
+    Ok(map)
+}
+
+/// The source an installed artifact came from, for the doctor `Source` column:
+/// the lock entry's source repo when tracked/drifted, or the providing
+/// source(s) when untracked (installed out-of-band).
+fn source_of(
+    name: &str,
+    agg: &LocationAgg,
+    state: ArtifactState,
+    locks: &HashMap<(Platform, InstallScope), LockFile>,
+    available_in_source: &HashMap<(ArtifactKind, String), Vec<String>>,
+) -> Option<String> {
+    match state {
+        ArtifactState::Tracked | ArtifactState::Drifted => agg.platforms.iter().find_map(|p| {
+            locks
+                .get(&(*p, agg.scope))
+                .and_then(|l| l.packages.get(name))
+                .map(|e| e.source.repo.clone())
+        }),
+        ArtifactState::Untracked => available_in_source
+            .get(&(agg.kind, name.to_string()))
+            .and_then(|sources| sources.first().cloned()),
+        ArtifactState::Orphaned | ArtifactState::External => None,
+    }
 }
 
 /// Read an installed artifact's declared version from its content file.
@@ -363,6 +397,18 @@ fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
                 None
             };
 
+            // Source: the distinct provenance(s) across copies, joined when they
+            // differ (rare — copies normally share a source).
+            let mut sources: Vec<String> =
+                members.iter().filter_map(|r| r.source.clone()).collect();
+            sources.sort();
+            sources.dedup();
+            let source = if sources.is_empty() {
+                None
+            } else {
+                Some(sources.join(", "))
+            };
+
             DoctorArtifact {
                 kind: first.kind,
                 name: first.name.clone(),
@@ -370,6 +416,7 @@ fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
                 state,
                 version,
                 tools,
+                source,
                 locations,
                 diverged,
             }
@@ -419,6 +466,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
                     locks.get(&(*p, agg.scope)).is_some_and(|l| l.packages.contains_key(&name))
                 })
                 .collect();
+            let source = source_of(&name, agg, state, &locks, &available);
             rows.push(DoctorRow {
                 kind: agg.kind,
                 name,
@@ -428,6 +476,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
                 tracked_for,
                 state,
                 version,
+                source,
             });
         }
     }
@@ -709,6 +758,28 @@ mod tests {
         assert_eq!(row.state, ArtifactState::Orphaned);
         assert_eq!(report.counts().untracked, 0);
         assert_eq!(report.counts().orphaned, 1);
+    }
+
+    #[test]
+    fn tracked_artifact_reports_its_lock_source() {
+        let t = TestContext::new();
+        // track_skill records provenance repo "home" in the lock entry.
+        track_skill(&t, Platform::Claude, "mine", "1.0.0");
+
+        let report = survey(false, &t.ctx()).unwrap();
+        let art = report.artifacts.iter().find(|a| a.name == "mine").expect("grouped");
+        assert_eq!(art.source.as_deref(), Some("home"), "source from the lock entry");
+    }
+
+    #[test]
+    fn orphan_has_no_source() {
+        let t = TestContext::new();
+        crate::test_support::setup_empty_sources(&t.fs, &t.paths);
+        install_skill(&t, Platform::Claude, "loose", "1.0.0", InstallScope::Global);
+
+        let report = survey(false, &t.ctx()).unwrap();
+        let art = report.artifacts.iter().find(|a| a.name == "loose").expect("grouped");
+        assert!(art.source.is_none(), "an orphan has no source");
     }
 
     #[test]

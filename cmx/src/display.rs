@@ -341,8 +341,10 @@ impl fmt::Display for UninstallResult {
 /// one row per skill, the Tools column listing every tool it's installed for.
 fn doctor_installed_table(report: &DoctorReport) -> Table {
     Table {
-        headers: vec!["Type", "Name", "Scope", "State", "Version", "Tools"],
-        padded_cols: 5,
+        headers: vec![
+            "Type", "Name", "Scope", "State", "Version", "Source", "Tools",
+        ],
+        padded_cols: 6,
         rows: report
             .artifacts
             .iter()
@@ -358,6 +360,7 @@ fn doctor_installed_table(report: &DoctorReport) -> Table {
                     a.scope.label().to_string(),
                     a.state.label().to_string(),
                     a.version.clone().unwrap_or_else(|| "-".to_string()),
+                    a.source.clone().unwrap_or_else(|| "-".to_string()),
                     tools,
                 ];
                 if a.diverged {
@@ -1146,6 +1149,7 @@ mod tests {
             state: crate::doctor::ArtifactState::Orphaned,
             version: Some("1.0.0".to_string()),
             tools: vec![crate::platform::Platform::Claude],
+            source: None,
             locations: vec![PathBuf::from("/home/u/.claude/skills")],
             diverged: false,
         }
@@ -1191,6 +1195,7 @@ mod tests {
                     crate::platform::Platform::Claude,
                     crate::platform::Platform::Codex,
                 ],
+                source: Some("home".to_string()),
                 locations: vec![PathBuf::from("/a"), PathBuf::from("/b")],
                 diverged: false,
             }],
@@ -1200,6 +1205,7 @@ mod tests {
         let out = r.to_string();
         assert!(out.contains("clipboard"));
         assert!(out.contains("claude, codex"), "tools listed in one row: {out}");
+        assert!(out.contains("home"), "source provenance shown: {out}");
         assert!(!out.contains("(diverged)"), "consistent copies carry no diverged marker");
         assert!(out.contains("1 tracked"), "counted once, not per-location");
     }
