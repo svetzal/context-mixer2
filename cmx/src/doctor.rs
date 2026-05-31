@@ -146,13 +146,17 @@ pub struct DoctorReport {
 
 impl DoctorReport {
     /// Whether a logical artifact needs attention — drifted/untracked/orphaned,
-    /// or a tracked artifact that diverged across locations. **External artifacts
-    /// are never a problem** (another tool manages them — divergence among their
-    /// copies isn't cmx's concern), and a clean tracked artifact is fine.
+    /// or *any* artifact whose copies diverge across locations.
+    ///
+    /// A clean external or tracked artifact is fine: another tool managing it, or
+    /// cmx managing it consistently, is the steady state. But a **divergence** —
+    /// two copies at different versions or states — is a real anomaly worth
+    /// surfacing whoever owns it; cmx just can't be the one to re-sync an external
+    /// one (its owning tool must). So divergence is always a problem; only a
+    /// *consistent* external/tracked artifact is healthy.
     pub fn is_problem(a: &DoctorArtifact) -> bool {
         match a.state {
-            ArtifactState::External => false,
-            ArtifactState::Tracked => a.diverged,
+            ArtifactState::External | ArtifactState::Tracked => a.diverged,
             _ => true,
         }
     }
@@ -186,9 +190,9 @@ impl DoctorReport {
                 ArtifactState::Orphaned => c.orphaned += 1,
                 ArtifactState::External => c.external += 1,
             }
-            // Divergence among external copies isn't cmx's concern, so it doesn't
-            // count toward the diverged tally (consistent with `is_problem`).
-            if a.diverged && a.state != ArtifactState::External {
+            // Every divergence counts — including external ones, which are a real
+            // anomaly even if their owning tool (not cmx) must re-sync them.
+            if a.diverged {
                 c.diverged += 1;
             }
         }
@@ -635,11 +639,15 @@ mod tests {
             DoctorReport::is_problem(&art(ArtifactState::Drifted, false)),
             "drifted: problem"
         );
-        // External is never a problem — even if its copies diverge.
-        assert!(!DoctorReport::is_problem(&art(ArtifactState::External, false)), "external: ok");
+        // A consistent external artifact is fine; a diverged one is an anomaly
+        // worth surfacing even though its owning tool (not cmx) must re-sync it.
         assert!(
-            !DoctorReport::is_problem(&art(ArtifactState::External, true)),
-            "external+diverged: still not cmx's concern"
+            !DoctorReport::is_problem(&art(ArtifactState::External, false)),
+            "consistent external: ok"
+        );
+        assert!(
+            DoctorReport::is_problem(&art(ArtifactState::External, true)),
+            "external+diverged: surfaced as a problem"
         );
     }
 

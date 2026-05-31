@@ -448,7 +448,7 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
     }
     if c.diverged > 0 {
         lines.push(format!(
-            "  • {} artifact(s) diverge across their install locations (different version or state) — `cmx <kind> update <name> --force` re-syncs every copy from one source.",
+            "  • {} artifact(s) diverge across their install locations (different version or state). Re-sync a cmx-managed one with `cmx <kind> update <name> --force`; an external one is the owning tool's to re-sync.",
             c.diverged
         ));
     }
@@ -1445,6 +1445,33 @@ mod tests {
         assert!(out.contains("hopper-coordinator diverges:"), "detail line present: {out}");
         assert!(out.contains("/u/.claude/skills @ 3.3.0"), "claude copy version: {out}");
         assert!(out.contains("/u/.agents/skills @ 3.2.0"), "agents copy version: {out}");
+    }
+
+    #[test]
+    fn doctor_default_view_surfaces_external_divergence() {
+        // A diverged external artifact is an anomaly: the default (problems-only)
+        // view must surface it rather than claim everything is healthy.
+        let mut a = orphan_artifact("hopper-coordinator");
+        a.state = crate::doctor::ArtifactState::External;
+        a.diverged = true;
+        a.version = None;
+        a.versions = vec!["3.2.0".to_string(), "3.3.0".to_string()];
+        let r = crate::doctor::DoctorReport {
+            rows: vec![],
+            artifacts: vec![a],
+            missing: vec![],
+            included_local: false,
+            show_all: false,
+        };
+        assert!(r.has_issues(), "a diverged external artifact is an issue");
+        let out = r.to_string();
+        assert!(out.contains("Needs attention:"), "surfaced in default view: {out}");
+        assert!(out.contains("hopper-coordinator"), "the diverged artifact is shown: {out}");
+        assert!(
+            !out.contains("everything cmx manages is healthy"),
+            "must not claim healthy while diverged: {out}"
+        );
+        assert!(out.contains("1 diverged"), "tally counts it: {out}");
     }
 
     #[test]
