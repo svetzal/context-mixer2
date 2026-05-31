@@ -142,6 +142,22 @@ impl Table {
     }
 }
 
+/// Convenience wrapper: constructs and renders a [`Table`] in one step.
+///
+/// Equivalent to `Table { headers, padded_cols, rows }.render()`.
+pub fn render_table(
+    headers: Vec<&'static str>,
+    padded_cols: usize,
+    rows: Vec<Vec<String>>,
+) -> String {
+    Table {
+        headers,
+        padded_cols,
+        rows,
+    }
+    .render()
+}
+
 // ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
@@ -262,6 +278,22 @@ mod tests {
         let widths = t.column_widths();
         // widths[0] = max(4, 5, 13) = 13; widths[1] = max(7, 3, 6) = 7
         assert_eq!(widths, vec![13, 7]);
+    }
+
+    // --- render_table ---
+
+    #[test]
+    fn render_table_produces_same_output_as_table_render() {
+        let headers = vec!["Name", "Version"];
+        let rows = vec![vec!["my-agent".to_string(), "1.0.0".to_string()]];
+        let via_struct = Table {
+            headers: headers.clone(),
+            padded_cols: 2,
+            rows: rows.clone(),
+        }
+        .render();
+        let via_helper = render_table(headers, 2, rows);
+        assert_eq!(via_struct, via_helper);
     }
 
     // --- render ---

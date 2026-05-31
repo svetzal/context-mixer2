@@ -12,7 +12,7 @@ use crate::outdated::OutdatedReport;
 use crate::search::SearchOutput;
 use crate::source::{SourceBrowseResult, SourceListResult, SourceRemoveResult, SourceScanResult};
 use crate::source_update::SourceUpdateOutput;
-use crate::table::Table;
+use crate::table::{Table, render_table};
 use crate::types::{InstallScope, format_version_prefix};
 use crate::uninstall::{BatchUninstallResult, UninstallResult};
 
@@ -192,11 +192,10 @@ impl fmt::Display for OutdatedReport {
         write!(
             f,
             "{}",
-            Table {
-                headers: vec!["Name", "Type", "Installed", "Available", "Source", "Status"],
-                padded_cols: 6,
-                rows: rows
-                    .iter()
+            render_table(
+                vec!["Name", "Type", "Installed", "Available", "Source", "Status"],
+                6,
+                rows.iter()
                     .map(|r| {
                         vec![
                             r.name.clone(),
@@ -208,8 +207,7 @@ impl fmt::Display for OutdatedReport {
                         ]
                     })
                     .collect(),
-            }
-            .render()
+            )
         )
     }
 }
@@ -223,10 +221,10 @@ impl fmt::Display for SearchOutput {
             return writeln!(f, "No results for '{query}'.");
         }
 
-        let table = Table {
-            headers: vec!["Name", "Type", "Version", "Source", "Description"],
-            padded_cols: 4,
-            rows: results
+        let table = render_table(
+            vec!["Name", "Type", "Version", "Source", "Description"],
+            4,
+            results
                 .iter()
                 .map(|r| {
                     vec![
@@ -238,8 +236,7 @@ impl fmt::Display for SearchOutput {
                     ]
                 })
                 .collect(),
-        }
-        .render();
+        );
 
         write!(f, "{table}\n{} result(s) found.\n", results.len())
     }

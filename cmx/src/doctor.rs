@@ -517,8 +517,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
         let pv = ctx.paths.with_platform(*platform);
         for (name, entry) in &lock.packages {
             let kind = entry.artifact_type;
-            let path = pv.installed_artifact_path(kind, name, *scope);
-            if !ctx.fs.exists(&path) {
+            if !pv.is_installed(kind, name, *scope, ctx.fs) {
                 missing.push(MissingRow {
                     kind,
                     name: name.clone(),

@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, bail};
 use std::path::PathBuf;
 
+use crate::gateway::Filesystem;
 use crate::platform::Platform;
 use crate::types::{ArtifactKind, InstallScope};
 
@@ -139,6 +140,17 @@ impl ConfigPaths {
         }
     }
 
+    /// Returns `true` if an artifact of `kind` named `name` exists on disk under `scope`.
+    pub fn is_installed(
+        &self,
+        kind: ArtifactKind,
+        name: &str,
+        scope: InstallScope,
+        fs: &dyn Filesystem,
+    ) -> bool {
+        fs.exists(&self.installed_artifact_path(kind, name, scope))
+    }
+
     /// Verify the active platform supports the given artifact kind, returning a
     /// user-facing error otherwise (e.g. pi has no agent concept).
     pub fn ensure_supports(&self, kind: ArtifactKind) -> Result<()> {
@@ -158,6 +170,7 @@ impl ConfigPaths {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gateway::fakes::FakeFilesystem;
     use crate::types::InstallScope;
 
     fn test_paths() -> ConfigPaths {
@@ -173,6 +186,25 @@ mod tests {
             PathBuf::from("/home/testuser/.config/context-mixer"),
             platform,
         )
+    }
+
+    // --- is_installed ---
+
+    #[test]
+    fn is_installed_returns_false_for_absent_artifact() {
+        let paths = test_paths();
+        let fs = FakeFilesystem::new();
+        assert!(!paths.is_installed(ArtifactKind::Agent, "my-agent", InstallScope::Global, &fs));
+    }
+
+    #[test]
+    fn is_installed_returns_true_when_file_present() {
+        let paths = test_paths();
+        let fs = FakeFilesystem::new();
+        let path =
+            paths.installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Global);
+        fs.add_file(path, "# agent");
+        assert!(paths.is_installed(ArtifactKind::Agent, "my-agent", InstallScope::Global, &fs));
     }
 
     // --- with_platform ---
