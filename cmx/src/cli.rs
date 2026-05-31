@@ -104,12 +104,12 @@ pub enum SourceAction {
 
 #[derive(Subcommand)]
 pub enum ArtifactAction {
-    /// Install an artifact from a source
+    /// Install artifact(s) from a source
     Install {
-        /// Artifact name, or source:name to pin to a specific source
-        name: Option<String>,
+        /// Artifact name(s); each may be `source:name` to pin to a specific source
+        names: Vec<String>,
         /// Install all available artifacts from sources
-        #[arg(long, conflicts_with = "name")]
+        #[arg(long, conflicts_with = "names")]
         all: bool,
         /// Install into the current project instead of globally
         #[arg(long)]

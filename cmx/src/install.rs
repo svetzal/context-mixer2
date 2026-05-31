@@ -30,6 +30,16 @@ pub struct BatchInstallResult {
     pub is_update: bool,
 }
 
+/// Outcome of installing several named artifacts in one pass.
+#[derive(Debug)]
+pub struct InstallManyResult {
+    pub kind: ArtifactKind,
+    pub installed: Vec<InstallResult>,
+    /// `(name, reason)` for names that failed (not found, ambiguous, locally
+    /// modified without `--force`, …).
+    pub failed: Vec<(String, String)>,
+}
+
 /// Pure description of an intended installation — computed from source metadata
 /// and path configuration, with no filesystem access.
 #[derive(Debug)]
@@ -121,6 +131,32 @@ pub fn install(
         kind,
         source_name: plan.source_name,
         dest_dir: plan.dest_dir,
+    })
+}
+
+/// Install several named artifacts in one pass. Best-effort: each name is
+/// installed independently; failures (not found, ambiguous, locally modified
+/// without `--force`) are collected with their reason rather than aborting the
+/// batch. Backs `cmx {skill,agent} install <name>...`.
+pub fn install_many(
+    names: &[String],
+    kind: ArtifactKind,
+    scope: InstallScope,
+    force: bool,
+    ctx: &AppContext<'_>,
+) -> Result<InstallManyResult> {
+    let mut installed = Vec::new();
+    let mut failed = Vec::new();
+    for name in names {
+        match install(name, kind, scope, force, ctx) {
+            Ok(r) => installed.push(r),
+            Err(e) => failed.push((name.clone(), e.to_string())),
+        }
+    }
+    Ok(InstallManyResult {
+        kind,
+        installed,
+        failed,
     })
 }
 
@@ -451,6 +487,39 @@ mod tests {
             plan_install("legacy", ArtifactKind::Agent, InstallScope::Global, &found, &paths);
         assert_eq!(plan.version, Some("0.1.0".to_string()));
         assert_eq!(plan.source_name, "guidelines");
+    }
+
+    // --- install_many ---
+
+    #[test]
+    fn install_many_installs_each_and_collects_failures() {
+        let t = TestContext::new();
+        setup_source(&t.fs, &t.paths, "src", "/src");
+        t.fs.add_file("/src/alpha/SKILL.md", "---\ndescription: a\n---\n");
+        t.fs.add_file("/src/beta/SKILL.md", "---\ndescription: b\n---\n");
+
+        let ctx = t.ctx();
+        let result = install_many(
+            &[
+                "alpha".to_string(),
+                "beta".to_string(),
+                "missing".to_string(),
+            ],
+            ArtifactKind::Skill,
+            InstallScope::Global,
+            false,
+            &ctx,
+        )
+        .unwrap();
+
+        let names: Vec<&str> = result.installed.iter().map(|r| r.artifact_name.as_str()).collect();
+        assert!(
+            names.contains(&"alpha") && names.contains(&"beta"),
+            "both real skills installed"
+        );
+        assert_eq!(result.failed.len(), 1, "the missing one is collected, not fatal");
+        assert_eq!(result.failed[0].0, "missing");
+        assert!(result.failed[0].1.contains("missing"), "reason mentions the name");
     }
 
     // --- parse_name ---

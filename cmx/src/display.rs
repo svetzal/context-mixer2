@@ -6,7 +6,7 @@ use crate::cmx_config::{ConfigSetResult, ConfigShowResult, ExternalResult};
 use crate::diff::DiffOutput;
 use crate::doctor::DoctorReport;
 use crate::info::ArtifactInfo;
-use crate::install::{BatchInstallResult, InstallResult};
+use crate::install::{BatchInstallResult, InstallManyResult, InstallResult};
 use crate::list::{ListKindOutput, ListOutput, section_str, table_str};
 use crate::outdated::OutdatedReport;
 use crate::search::SearchOutput;
@@ -113,6 +113,21 @@ impl fmt::Display for BatchInstallResult {
             }
             Ok(())
         }
+    }
+}
+
+impl fmt::Display for InstallManyResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for r in &self.installed {
+            write!(f, "{r}")?;
+        }
+        for (name, reason) in &self.failed {
+            writeln!(f, "Failed: {name} — {reason}")?;
+        }
+        if self.installed.is_empty() && self.failed.is_empty() {
+            writeln!(f, "No {}s given to install.", self.kind)?;
+        }
+        Ok(())
     }
 }
 

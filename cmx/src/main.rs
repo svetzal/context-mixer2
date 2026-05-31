@@ -152,7 +152,7 @@ fn handle_config(action: ConfigAction, ctx: &AppContext<'_>) -> Result<()> {
 fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {
     match action {
         ArtifactAction::Install {
-            name,
+            names,
             all,
             local,
             force,
@@ -166,12 +166,16 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
                 let result = cmx::install::install_all(kind, scope, force, ctx)?;
                 print!("{result}");
                 Ok(())
-            } else if let Some(name) = name {
-                let result = cmx::install::install(&name, kind, scope, force, ctx)?;
-                print!("{result}");
-                Ok(())
+            } else if names.is_empty() {
+                bail!("Provide artifact name(s) or use --all")
             } else {
-                bail!("Provide an artifact name or use --all")
+                let result = cmx::install::install_many(&names, kind, scope, force, ctx)?;
+                let any_failed = !result.failed.is_empty();
+                print!("{result}");
+                if any_failed {
+                    std::process::exit(1);
+                }
+                Ok(())
             }
         }
         ArtifactAction::List => {
