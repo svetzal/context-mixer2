@@ -1,7 +1,11 @@
+use std::collections::BTreeSet;
+use std::path::PathBuf;
+
 use anyhow::{Result, bail};
 
 use crate::context::AppContext;
 use crate::lockfile;
+use crate::platform::Platform;
 use crate::types::{ArtifactKind, InstallScope};
 
 // ---------------------------------------------------------------------------
@@ -13,57 +17,73 @@ pub struct UninstallResult {
     pub name: String,
     pub kind: ArtifactKind,
     pub scope: &'static str,
+    /// Whether any lock entry was removed (the artifact was tracked somewhere).
     pub was_tracked: bool,
-    /// Whether the artifact was present on disk. `false` means we only
-    /// reconciled a stale lock entry (the file was already gone) — the case
-    /// `cmx doctor` reports as "missing".
+    /// Whether any physical copy was removed. `false` with `was_tracked` means we
+    /// only reconciled stale lock entries (the files were already gone).
     pub was_on_disk: bool,
+    /// The platforms whose lock entry was cleared.
+    pub platforms: Vec<Platform>,
 }
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
+/// Uninstall an artifact **everywhere cmx tracks it** at the given scope —
+/// across every platform — not just the active one.
+///
+/// `cmx doctor` presents a cross-platform, grouped view, so its inverse should
+/// too: removing a skill deletes every physical copy and clears every platform's
+/// lock entry for it. Because skills-only tools share one `.agents/skills`
+/// directory, a single physical copy may be read by several tools; it is deleted
+/// once, and each platform that *tracked* it has its lock entry cleared.
 pub fn uninstall(
     name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<UninstallResult> {
-    ctx.paths.ensure_supports(kind)?;
+    // Distinct physical locations to delete (the shared `.agents/skills` dir
+    // resolves to the same path for several platforms — dedup so we delete once).
+    let mut paths_to_delete: BTreeSet<PathBuf> = BTreeSet::new();
+    let mut removed_from: Vec<Platform> = Vec::new();
 
-    let target = ctx.paths.installed_artifact_path(kind, name, scope);
-    let on_disk = ctx.fs.exists(&target);
-    let tracked = lockfile::load(scope, ctx.fs, ctx.paths)?.packages.contains_key(name);
-
-    // Nothing to do only when the artifact is neither on disk nor in the lock
-    // file. A tracked-but-absent artifact (what `cmx doctor` reports as
-    // "missing") is still reconcilable: we drop the stale lock entry below.
-    if !on_disk && !tracked {
-        bail!(
-            "No {kind} named '{name}' found in {} scope (not on disk, no lock entry).",
-            scope.label()
-        );
+    for platform in Platform::ALL {
+        if !platform.supports(kind) {
+            continue;
+        }
+        let pv = ctx.paths.with_platform(platform);
+        let path = pv.installed_artifact_path(kind, name, scope);
+        if ctx.fs.exists(&path) {
+            paths_to_delete.insert(path);
+        }
+        if lockfile::load(scope, ctx.fs, &pv)?.packages.contains_key(name) {
+            lockfile::mutate(scope, ctx.fs, &pv, |lock| {
+                lock.packages.remove(name);
+            })?;
+            removed_from.push(platform);
+        }
     }
 
-    // Remove from disk if present (absent is fine — we're reconciling).
-    if on_disk {
-        kind.remove_installed(&target, ctx.fs)?;
+    if paths_to_delete.is_empty() && removed_from.is_empty() {
+        bail!("No {kind} named '{name}' found in {} scope on any platform.", scope.label());
     }
 
-    // Remove the lock entry if there is one.
-    let was_tracked = if tracked {
-        lockfile::mutate(scope, ctx.fs, ctx.paths, |lock| lock.packages.remove(name).is_some())?
-    } else {
-        false
-    };
+    let was_on_disk = !paths_to_delete.is_empty();
+    for path in &paths_to_delete {
+        kind.remove_installed(path, ctx.fs)?;
+    }
 
+    removed_from.sort_by_key(|p| p.slug());
+    removed_from.dedup();
     Ok(UninstallResult {
         name: name.to_string(),
         kind,
         scope: scope.label(),
-        was_tracked,
-        was_on_disk: on_disk,
+        was_tracked: !removed_from.is_empty(),
+        was_on_disk,
+        platforms: removed_from,
     })
 }
 
@@ -90,6 +110,7 @@ mod tests {
             scope: "global",
             was_tracked: true,
             was_on_disk: true,
+            platforms: vec![Platform::Claude],
         };
         let out = result.to_string();
         assert!(out.contains("Uninstalled my-agent"));
@@ -104,6 +125,7 @@ mod tests {
             scope: "global",
             was_tracked: false,
             was_on_disk: true,
+            platforms: vec![],
         };
         let out = result.to_string();
         assert!(out.contains("untracked"));
@@ -329,15 +351,36 @@ mod tests {
     }
 
     #[test]
-    fn uninstall_pi_agent_is_rejected() {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(chrono::Utc::now());
-        let paths = test_paths_for(Platform::Pi);
+    fn uninstall_removes_skill_tracked_for_another_platform() {
+        // The slack-gif-creator case: a skill in the shared .agents/skills dir,
+        // tracked for codex, must be removable with the DEFAULT (claude) context
+        // — uninstall is cross-platform, not bound to the active platform.
+        let t = TestContext::new(); // active platform = claude
+        let codex = t.paths.with_platform(Platform::Codex);
+        let skill_dir =
+            codex.install_dir(ArtifactKind::Skill, InstallScope::Global).join("slack-gif");
+        t.fs.add_file(skill_dir.join("SKILL.md"), "---\n---\n");
+        let mut packages = BTreeMap::new();
+        packages.insert("slack-gif".to_string(), sample_lock_entry());
+        lockfile::save(
+            &LockFile {
+                version: 1,
+                packages,
+            },
+            InstallScope::Global,
+            &t.fs,
+            &codex,
+        )
+        .unwrap();
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
-        let result = uninstall("whatever", ArtifactKind::Agent, InstallScope::Global, &ctx);
-        assert!(result.is_err(), "pi must reject agent uninstall");
-        assert!(result.unwrap_err().to_string().contains("pi"));
+        let ctx = t.ctx();
+        let result =
+            uninstall("slack-gif", ArtifactKind::Skill, InstallScope::Global, &ctx).unwrap();
+
+        assert!(result.was_on_disk, "the shared .agents/skills copy was removed");
+        assert!(result.platforms.contains(&Platform::Codex), "codex lock entry cleared");
+        assert!(!t.fs.file_exists(&skill_dir.join("SKILL.md")), "physical copy gone");
+        let codex_lock = lockfile::load(InstallScope::Global, &t.fs, &codex).unwrap();
+        assert!(!codex_lock.packages.contains_key("slack-gif"), "codex lock entry removed");
     }
 }

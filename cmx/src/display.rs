@@ -320,16 +320,19 @@ impl fmt::Display for DiffOutput {
 
 impl fmt::Display for UninstallResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let tools = self.platforms.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
         if self.was_on_disk {
             writeln!(f, "Uninstalled {} ({}) from {} scope.", self.name, self.kind, self.scope)?;
-            if !self.was_tracked {
+            if self.was_tracked {
+                writeln!(f, "  Cleared lock entries for: {tools}")?;
+            } else {
                 writeln!(f, "  (no lock file entry found — artifact was untracked)")?;
             }
         } else {
-            // File was already gone — we only reconciled the stale lock entry.
+            // Files were already gone — we only reconciled stale lock entries.
             writeln!(
                 f,
-                "Cleared stale lock entry for {} ({}) in {} scope — the artifact was already absent from disk.",
+                "Cleared stale lock entry for {} ({}) in {} scope ({tools}) — the artifact was already absent from disk.",
                 self.name, self.kind, self.scope
             )?;
         }
@@ -799,6 +802,7 @@ mod tests {
             scope: "global",
             was_tracked: true,
             was_on_disk: true,
+            platforms: vec![crate::platform::Platform::Claude],
         };
         let out = r.to_string();
         assert!(out.contains("Uninstalled my-agent"));
@@ -813,6 +817,7 @@ mod tests {
             scope: "global",
             was_tracked: false,
             was_on_disk: true,
+            platforms: vec![],
         };
         assert!(r.to_string().contains("untracked"));
     }
@@ -826,6 +831,7 @@ mod tests {
             scope: "global",
             was_tracked: true,
             was_on_disk: false,
+            platforms: vec![crate::platform::Platform::Claude],
         };
         let out = r.to_string();
         assert!(out.contains("Cleared stale lock entry for skill-writing"), "got: {out}");
