@@ -25,8 +25,8 @@ fn main() -> Result<()> {
         Commands::Source { action } => handle_source(action, &paths, &ctx),
         Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, &ctx),
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, &ctx),
-        Commands::List => {
-            let output = cmx::list::list_all(&ctx)?;
+        Commands::List { all } => {
+            let output = cmx::list::list_all(all, &ctx)?;
             print!("{output}");
             Ok(())
         }
@@ -34,6 +34,7 @@ fn main() -> Result<()> {
             local,
             adopt_all,
             from,
+            all,
         } => {
             if adopt_all {
                 let outcome = cmx::adopt::adopt_all(None, from.as_deref(), local, &ctx)?;
@@ -42,7 +43,8 @@ fn main() -> Result<()> {
             } else if from.is_some() {
                 bail!("--from only applies together with --adopt-all")
             } else {
-                let report = cmx::doctor::survey(local, &ctx)?;
+                let mut report = cmx::doctor::survey(local, &ctx)?;
+                report.show_all = all;
                 print!("{report}");
                 if report.has_issues() {
                     std::process::exit(2);
@@ -178,8 +180,8 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
                 Ok(())
             }
         }
-        ArtifactAction::List => {
-            let output = cmx::list::list_kind(kind, ctx)?;
+        ArtifactAction::List { all } => {
+            let output = cmx::list::list_kind(kind, all, ctx)?;
             print!("{output}");
             Ok(())
         }

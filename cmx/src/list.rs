@@ -80,37 +80,43 @@ fn status_indicator(
     }
 }
 
-pub fn list_kind(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKindOutput> {
+pub fn list_kind(
+    kind: ArtifactKind,
+    include_external: bool,
+    ctx: &AppContext<'_>,
+) -> Result<ListKindOutput> {
     Ok(ListKindOutput {
         kind,
-        rows: rows_by_scope(kind, ctx)?,
+        rows: rows_by_scope(kind, include_external, ctx)?,
     })
 }
 
-pub fn list_all(ctx: &AppContext<'_>) -> Result<ListOutput> {
+pub fn list_all(include_external: bool, ctx: &AppContext<'_>) -> Result<ListOutput> {
     Ok(ListOutput {
-        agents: rows_by_scope(ArtifactKind::Agent, ctx)?,
-        skills: rows_by_scope(ArtifactKind::Skill, ctx)?,
+        agents: rows_by_scope(ArtifactKind::Agent, include_external, ctx)?,
+        skills: rows_by_scope(ArtifactKind::Skill, include_external, ctx)?,
     })
 }
 
 /// Build list rows for `kind` from the cross-platform [`doctor`] survey — one row
 /// per logical artifact, with the tools it's tracked for and an available-version
 /// comparison drawn from the registered sources.
+///
+/// By default `list` is the cmx-managed inventory and omits artifacts declared
+/// external (another tool owns them); pass `include_external` to show them too.
 fn rows_by_scope(
     kind: ArtifactKind,
+    include_external: bool,
     ctx: &AppContext<'_>,
 ) -> Result<BTreeMap<InstallScope, Vec<Row>>> {
     let report = doctor::survey(true, ctx)?;
     let source_versions = source_iter::all_with_checksums(ctx)?;
 
-    // `list` is the cmx-managed inventory: skip artifacts declared external
-    // (another tool owns them). They remain visible in `cmx doctor`'s full audit.
     let mut by_scope: BTreeMap<InstallScope, Vec<Row>> = BTreeMap::new();
     for a in report
         .artifacts
         .iter()
-        .filter(|a| a.kind == kind && a.state != ArtifactState::External)
+        .filter(|a| a.kind == kind && (include_external || a.state != ArtifactState::External))
     {
         let infos = source_versions.get(&a.name);
         let available = available_version(infos, a.source.as_deref());
@@ -251,7 +257,7 @@ mod tests {
             .unwrap();
         }
 
-        let out = list_kind(ArtifactKind::Skill, &t.ctx()).unwrap();
+        let out = list_kind(ArtifactKind::Skill, false, &t.ctx()).unwrap();
         let rows = &out.rows[&InstallScope::Global];
         let row = rows.iter().find(|r| r.name == "shared").expect("listed");
         assert_eq!(row.source, "guidelines", "source is the bare repo name, no path");
@@ -283,9 +289,15 @@ mod tests {
         };
         crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
 
-        let out = list_kind(ArtifactKind::Skill, &t.ctx()).unwrap();
+        let out = list_kind(ArtifactKind::Skill, false, &t.ctx()).unwrap();
         let names: Vec<&str> = out.rows.values().flatten().map(|r| r.name.as_str()).collect();
         assert!(names.contains(&"mine"), "your skill is listed");
-        assert!(!names.contains(&"apple"), "external (Hermes) skill is excluded from list");
+        assert!(!names.contains(&"apple"), "external (Hermes) skill is excluded by default");
+
+        // --all includes external.
+        let out_all = list_kind(ArtifactKind::Skill, true, &t.ctx()).unwrap();
+        let names_all: Vec<&str> =
+            out_all.rows.values().flatten().map(|r| r.name.as_str()).collect();
+        assert!(names_all.contains(&"apple"), "list --all includes external");
     }
 }

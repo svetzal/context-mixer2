@@ -355,16 +355,15 @@ impl fmt::Display for UninstallResult {
     }
 }
 
-/// Build the "Installed artifacts" table from the grouped logical artifacts —
-/// one row per skill, the Tools column listing every tool it's installed for.
-fn doctor_installed_table(report: &DoctorReport) -> Table {
+/// Build the artifact table from the given grouped logical artifacts — one row
+/// per skill, the Tools column listing every tool it's installed for.
+fn doctor_artifact_table(artifacts: &[&crate::doctor::DoctorArtifact]) -> Table {
     Table {
         headers: vec![
             "Type", "Name", "Scope", "State", "Version", "Source", "Tools",
         ],
         padded_cols: 6,
-        rows: report
-            .artifacts
+        rows: artifacts
             .iter()
             .map(|a| {
                 let tools = if a.tools.is_empty() {
@@ -516,21 +515,46 @@ impl fmt::Display for DoctorReport {
             crate::platform::Platform::ALL.len()
         )?;
 
-        if self.artifacts.is_empty() && self.missing.is_empty() {
-            return writeln!(f, "Nothing installed — your system is clean.");
-        }
+        // By default `doctor` shows only what needs attention — it's a doctor.
+        // `--all` shows the full inventory.
+        let shown: Vec<&crate::doctor::DoctorArtifact> = if self.show_all {
+            self.artifacts.iter().collect()
+        } else {
+            self.artifacts.iter().filter(|a| DoctorReport::is_problem(a)).collect()
+        };
 
-        if !self.artifacts.is_empty() {
-            writeln!(f, "Installed artifacts:")?;
-            write!(f, "{}", doctor_installed_table(self).render())?;
+        if !shown.is_empty() {
+            writeln!(
+                f,
+                "{}",
+                if self.show_all {
+                    "Installed artifacts:"
+                } else {
+                    "Needs attention:"
+                }
+            )?;
+            write!(f, "{}", doctor_artifact_table(&shown).render())?;
         }
 
         if !self.missing.is_empty() {
-            if !self.artifacts.is_empty() {
+            if !shown.is_empty() {
                 writeln!(f)?;
             }
             writeln!(f, "Missing (in a lock file, absent on disk):")?;
             write!(f, "{}", doctor_missing_table(self).render())?;
+        }
+
+        if shown.is_empty() && self.missing.is_empty() {
+            if self.artifacts.is_empty() {
+                writeln!(f, "Nothing installed — your system is clean.")?;
+            } else if self.show_all {
+                writeln!(f, "No artifacts found.")?;
+            } else {
+                writeln!(
+                    f,
+                    "No problems — everything cmx manages is healthy. (`--all` shows the full inventory.)"
+                )?;
+            }
         }
 
         let c = self.counts();
@@ -1233,6 +1257,7 @@ mod tests {
             artifacts: vec![orphan_artifact("my-skill")],
             missing: vec![],
             included_local: false,
+            show_all: true,
         };
         let out = r.to_string();
         assert!(out.contains("Installed artifacts:"));
@@ -1264,6 +1289,7 @@ mod tests {
             }],
             missing: vec![],
             included_local: false,
+            show_all: true,
         };
         let out = r.to_string();
         assert!(out.contains("clipboard"));
@@ -1285,6 +1311,7 @@ mod tests {
                 platform: crate::platform::Platform::Pi,
             }],
             included_local: true,
+            show_all: false,
         };
         let out = r.to_string();
         assert!(out.contains("global + project scope"), "local-included scope label");
@@ -1303,11 +1330,39 @@ mod tests {
             artifacts: vec![a],
             missing: vec![],
             included_local: false,
+            show_all: false,
         };
         let out = r.to_string();
         assert!(out.contains("(diverged)"), "diverged marker rendered: {out}");
         assert!(out.contains("1 diverged"));
         assert!(out.contains("diverge across their install locations"), "diverged hint present");
+    }
+
+    #[test]
+    fn doctor_report_problems_only_by_default() {
+        // Default view (show_all=false): a tracked artifact is hidden; only
+        // problems surface. With nothing wrong, a healthy message shows.
+        let healthy = crate::doctor::DoctorReport {
+            rows: vec![],
+            artifacts: vec![crate::doctor::DoctorArtifact {
+                kind: ArtifactKind::Skill,
+                name: "clipboard".to_string(),
+                scope: InstallScope::Global,
+                state: crate::doctor::ArtifactState::Tracked,
+                version: Some("1.0.0".to_string()),
+                tools: vec![crate::platform::Platform::Claude],
+                source: Some("home".to_string()),
+                locations: vec![PathBuf::from("/a")],
+                diverged: false,
+            }],
+            missing: vec![],
+            included_local: false,
+            show_all: false,
+        };
+        let out = healthy.to_string();
+        assert!(!out.contains("clipboard"), "tracked artifact hidden by default: {out}");
+        assert!(out.contains("everything cmx manages is healthy"), "healthy message: {out}");
+        assert!(out.contains("1 tracked"), "summary still tallies it");
     }
 
     // --- Step 13: SourceUpdateOutput ---

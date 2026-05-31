@@ -135,6 +135,17 @@ pub struct DoctorReport {
     pub missing: Vec<MissingRow>,
     /// Whether project (local) scope was included in the survey.
     pub included_local: bool,
+    /// Display hint: when `true`, the full inventory is shown; otherwise only
+    /// artifacts that need attention (the default — `doctor` is for problems).
+    pub show_all: bool,
+}
+
+impl DoctorReport {
+    /// Whether a logical artifact needs attention — drifted/untracked/orphaned,
+    /// or diverged across locations. Tracked and external are healthy.
+    pub fn is_problem(a: &DoctorArtifact) -> bool {
+        a.diverged || !matches!(a.state, ArtifactState::Tracked | ArtifactState::External)
+    }
 }
 
 /// Per-state tallies for the summary line. Counts are over *logical* artifacts.
@@ -179,10 +190,7 @@ impl DoctorReport {
     /// by another tool) are not — and a skill consistently installed to many
     /// tools is just that, not a problem.
     pub fn has_issues(&self) -> bool {
-        !self.missing.is_empty()
-            || self.artifacts.iter().any(|a| {
-                a.diverged || !matches!(a.state, ArtifactState::Tracked | ArtifactState::External)
-            })
+        !self.missing.is_empty() || self.artifacts.iter().any(Self::is_problem)
     }
 }
 
@@ -523,6 +531,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
         artifacts,
         missing,
         included_local: include_local,
+        show_all: false,
     })
 }
 

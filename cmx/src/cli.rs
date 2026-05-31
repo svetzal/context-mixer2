@@ -37,7 +37,11 @@ pub enum Commands {
         action: ArtifactAction,
     },
     /// List all installed agents and skills
-    List,
+    List {
+        /// Include external artifacts (managed by another tool)
+        #[arg(long)]
+        all: bool,
+    },
     /// Survey the whole system installation across every platform (read-only)
     Doctor {
         /// Also survey project (local) scope, not just global
@@ -49,6 +53,9 @@ pub enum Commands {
         /// With --adopt-all, only adopt orphans under this install directory
         #[arg(long)]
         from: Option<PathBuf>,
+        /// Show the full inventory, not just artifacts that need attention
+        #[arg(long)]
+        all: bool,
     },
     /// Manage the canonical home for hand-authored artifacts
     Home {
@@ -119,7 +126,11 @@ pub enum ArtifactAction {
         force: bool,
     },
     /// List installed artifacts
-    List,
+    List {
+        /// Include external artifacts (managed by another tool)
+        #[arg(long)]
+        all: bool,
+    },
     #[cfg(feature = "llm")]
     /// Compare installed artifact with source version using LLM analysis
     Diff {
