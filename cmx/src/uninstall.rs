@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 
 use crate::context::AppContext;
 use crate::lockfile;
@@ -26,24 +26,34 @@ pub struct UninstallResult {
     pub platforms: Vec<Platform>,
 }
 
+/// Result of uninstalling one or more named artifacts.
+#[derive(Debug)]
+pub struct BatchUninstallResult {
+    pub kind: ArtifactKind,
+    pub removed: Vec<UninstallResult>,
+    /// Names that were not installed anywhere (nothing to remove).
+    pub not_found: Vec<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Uninstall an artifact **everywhere cmx tracks it** at the given scope —
-/// across every platform — not just the active one.
+/// Uninstall one artifact **everywhere cmx tracks it** at the given scope, across
+/// every platform — returning `Ok(None)` when it isn't installed anywhere
+/// (rather than erroring), so batch callers can report it without aborting.
 ///
 /// `cmx doctor` presents a cross-platform, grouped view, so its inverse should
 /// too: removing a skill deletes every physical copy and clears every platform's
 /// lock entry for it. Because skills-only tools share one `.agents/skills`
 /// directory, a single physical copy may be read by several tools; it is deleted
 /// once, and each platform that *tracked* it has its lock entry cleared.
-pub fn uninstall(
+fn uninstall_one(
     name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
     ctx: &AppContext<'_>,
-) -> Result<UninstallResult> {
+) -> Result<Option<UninstallResult>> {
     // Distinct physical locations to delete (the shared `.agents/skills` dir
     // resolves to the same path for several platforms — dedup so we delete once).
     let mut paths_to_delete: BTreeSet<PathBuf> = BTreeSet::new();
@@ -67,7 +77,7 @@ pub fn uninstall(
     }
 
     if paths_to_delete.is_empty() && removed_from.is_empty() {
-        bail!("No {kind} named '{name}' found in {} scope on any platform.", scope.label());
+        return Ok(None);
     }
 
     let was_on_disk = !paths_to_delete.is_empty();
@@ -77,13 +87,52 @@ pub fn uninstall(
 
     removed_from.sort_by_key(|p| p.slug());
     removed_from.dedup();
-    Ok(UninstallResult {
+    Ok(Some(UninstallResult {
         name: name.to_string(),
         kind,
         scope: scope.label(),
         was_tracked: !removed_from.is_empty(),
         was_on_disk,
         platforms: removed_from,
+    }))
+}
+
+/// Uninstall a single named artifact, erroring if it isn't installed anywhere.
+pub fn uninstall(
+    name: &str,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    ctx: &AppContext<'_>,
+) -> Result<UninstallResult> {
+    uninstall_one(name, kind, scope, ctx)?.ok_or_else(|| {
+        anyhow::anyhow!(
+            "No {kind} named '{name}' found in {} scope on any platform.",
+            scope.label()
+        )
+    })
+}
+
+/// Uninstall several named artifacts in one pass. Best-effort: each name is
+/// removed everywhere it's tracked; names not installed anywhere are collected
+/// into `not_found` rather than aborting the batch.
+pub fn uninstall_many(
+    names: &[String],
+    kind: ArtifactKind,
+    scope: InstallScope,
+    ctx: &AppContext<'_>,
+) -> Result<BatchUninstallResult> {
+    let mut removed = Vec::new();
+    let mut not_found = Vec::new();
+    for name in names {
+        match uninstall_one(name, kind, scope, ctx)? {
+            Some(r) => removed.push(r),
+            None => not_found.push(name.clone()),
+        }
+    }
+    Ok(BatchUninstallResult {
+        kind,
+        removed,
+        not_found,
     })
 }
 
@@ -348,6 +397,33 @@ mod tests {
 
         assert_eq!(result.name, "my-agent");
         assert!(!fs.file_exists(&toml_path), "codex agent TOML should be removed");
+    }
+
+    #[test]
+    fn uninstall_many_removes_each_and_reports_not_found() {
+        let t = TestContext::new();
+        let skills_dir = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global);
+        for s in ["webapp-testing", "web-artifacts-builder"] {
+            t.fs.add_file(skills_dir.join(s).join("SKILL.md"), "---\n---\n");
+        }
+
+        let ctx = t.ctx();
+        let result = uninstall_many(
+            &[
+                "webapp-testing".to_string(),
+                "web-artifacts-builder".to_string(),
+                "nope".to_string(),
+            ],
+            ArtifactKind::Skill,
+            InstallScope::Global,
+            &ctx,
+        )
+        .unwrap();
+
+        assert_eq!(result.removed.len(), 2, "both installed skills removed");
+        assert_eq!(result.not_found, vec!["nope".to_string()], "missing one reported, not fatal");
+        assert!(!t.fs.file_exists(&skills_dir.join("webapp-testing").join("SKILL.md")));
+        assert!(!t.fs.file_exists(&skills_dir.join("web-artifacts-builder").join("SKILL.md")));
     }
 
     #[test]

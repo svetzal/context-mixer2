@@ -209,14 +209,22 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
                 bail!("Provide an artifact name or use --all")
             }
         }
-        ArtifactAction::Uninstall { name, local } => {
+        ArtifactAction::Uninstall { names, local } => {
+            if names.is_empty() {
+                bail!("Provide artifact name(s) to uninstall")
+            }
             let scope = if local {
                 InstallScope::Local
             } else {
                 InstallScope::Global
             };
-            let result = cmx::uninstall::uninstall(&name, kind, scope, ctx)?;
+            let result = cmx::uninstall::uninstall_many(&names, kind, scope, ctx)?;
+            let none_removed = result.removed.is_empty();
             print!("{result}");
+            // Exit non-zero only if nothing at all was removed (e.g. all typos).
+            if none_removed {
+                std::process::exit(1);
+            }
             Ok(())
         }
         ArtifactAction::Adopt {

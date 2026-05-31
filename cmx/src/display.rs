@@ -14,7 +14,7 @@ use crate::source::{SourceBrowseResult, SourceListResult, SourceRemoveResult, So
 use crate::source_update::SourceUpdateOutput;
 use crate::table::Table;
 use crate::types::{InstallScope, format_version_prefix};
-use crate::uninstall::UninstallResult;
+use crate::uninstall::{BatchUninstallResult, UninstallResult};
 
 impl fmt::Display for SourceListResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -499,6 +499,21 @@ impl fmt::Display for DoctorReport {
             c.tracked, c.drifted, c.untracked, c.orphaned, c.external, c.missing, c.diverged
         )?;
         write!(f, "{}", doctor_hints(&c))
+    }
+}
+
+impl fmt::Display for BatchUninstallResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for r in &self.removed {
+            write!(f, "{r}")?;
+        }
+        if !self.not_found.is_empty() {
+            writeln!(f, "Not found (nothing to uninstall): {}", self.not_found.join(", "))?;
+        }
+        if self.removed.is_empty() && self.not_found.is_empty() {
+            writeln!(f, "No {}s given to uninstall.", self.kind)?;
+        }
+        Ok(())
     }
 }
 

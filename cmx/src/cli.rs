@@ -137,10 +137,10 @@ pub enum ArtifactAction {
         #[arg(long)]
         force: bool,
     },
-    /// Uninstall an installed artifact
+    /// Uninstall installed artifact(s) — removed everywhere cmx tracks them
     Uninstall {
-        /// Artifact name
-        name: String,
+        /// Artifact name(s) to uninstall
+        names: Vec<String>,
         /// Uninstall from project scope instead of global
         #[arg(long)]
         local: bool,
