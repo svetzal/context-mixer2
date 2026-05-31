@@ -182,7 +182,9 @@ impl DoctorReport {
                 ArtifactState::Orphaned => c.orphaned += 1,
                 ArtifactState::External => c.external += 1,
             }
-            if a.diverged {
+            // Divergence among external copies isn't cmx's concern, so it doesn't
+            // count toward the diverged tally (consistent with `is_problem`).
+            if a.diverged && a.state != ArtifactState::External {
                 c.diverged += 1;
             }
         }
