@@ -25,7 +25,9 @@ use crate::context::AppContext;
 use crate::doctor::{self, ArtifactState, DoctorRow};
 use crate::lockfile;
 use crate::platform::Platform;
-use crate::types::{self, ArtifactKind, LockEntry, LockSource, SourceEntry, SourceType};
+use crate::types::{
+    self, ArtifactKind, InstallScope, LockEntry, LockSource, SourceEntry, SourceType,
+};
 
 /// The canonical source name under which the home is registered.
 pub const HOME_SOURCE: &str = "home";
@@ -214,6 +216,100 @@ pub fn adopt_named(
         }
     }
     adopt_rows(&chosen, include_local, ctx)
+}
+
+/// One unadopted artifact.
+#[derive(Debug)]
+pub struct UnadoptResult {
+    pub kind: ArtifactKind,
+    pub name: String,
+    /// Whether the canonical copy was removed from the home.
+    pub home_removed: bool,
+    /// Platforms whose `home`-provenance lock entry was cleared (un-tracked).
+    pub untracked_from: Vec<Platform>,
+}
+
+/// The outcome of an unadopt run.
+#[derive(Debug)]
+pub struct UnadoptOutcome {
+    pub kind: ArtifactKind,
+    pub unadopted: Vec<UnadoptResult>,
+    /// Names that weren't adopted (not in the home, no `home` lock entry).
+    pub not_adopted: Vec<String>,
+}
+
+/// Reverse [`adopt`](adopt_named) for one artifact: delete its canonical copy
+/// from the home and clear every `home`-provenance lock entry for it (across all
+/// platforms and scopes), un-tracking it. The on-disk originals/projections are
+/// **left in place** — they simply revert to orphaned. Returns `Ok(None)` if the
+/// artifact wasn't adopted (nothing in the home, no `home` lock entry).
+fn unadopt_one(
+    name: &str,
+    kind: ArtifactKind,
+    home: &Path,
+    ctx: &AppContext<'_>,
+) -> Result<Option<UnadoptResult>> {
+    let home_path = kind.installed_path(name, &home.join(kind.subdir_name()));
+    let home_present = ctx.fs.exists(&home_path);
+
+    let mut untracked_from: Vec<Platform> = Vec::new();
+    for platform in Platform::ALL {
+        if !platform.supports(kind) {
+            continue;
+        }
+        let pv = ctx.paths.with_platform(platform);
+        for scope in InstallScope::ALL {
+            let tracked_from_home = lockfile::load(scope, ctx.fs, &pv)?
+                .packages
+                .get(name)
+                .is_some_and(|e| e.source.repo == HOME_SOURCE);
+            if tracked_from_home {
+                lockfile::mutate(scope, ctx.fs, &pv, |lock| {
+                    lock.packages.remove(name);
+                })?;
+                untracked_from.push(platform);
+            }
+        }
+    }
+
+    if !home_present && untracked_from.is_empty() {
+        return Ok(None);
+    }
+    if home_present {
+        kind.remove_installed(&home_path, ctx.fs)?;
+    }
+    untracked_from.sort_by_key(|p| p.slug());
+    untracked_from.dedup();
+    Ok(Some(UnadoptResult {
+        kind,
+        name: name.to_string(),
+        home_removed: home_present,
+        untracked_from,
+    }))
+}
+
+/// Unadopt several named artifacts. Best-effort: names that weren't adopted are
+/// collected into `not_adopted` rather than aborting the batch. Backs
+/// `cmx {skill,agent} unadopt <name>...`.
+pub fn unadopt_many(
+    names: &[String],
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<UnadoptOutcome> {
+    let home = resolve_home(ctx)?;
+    let mut unadopted = Vec::new();
+    let mut not_adopted = Vec::new();
+    for name in names {
+        match unadopt_one(name, kind, &home, ctx)? {
+            Some(r) => unadopted.push(r),
+            None => not_adopted.push(name.clone()),
+        }
+    }
+    Ok(UnadoptOutcome {
+        kind,
+        unadopted,
+        not_adopted,
+    })
 }
 
 /// Set up the canonical home without adopting anything: create the directory and
@@ -452,6 +548,49 @@ mod tests {
         let result = adopt_named(ArtifactKind::Skill, &["ghost".to_string()], false, &t.ctx());
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("No skill named 'ghost' found on disk"));
+    }
+
+    #[test]
+    fn unadopt_reverses_adoption() {
+        let t = TestContext::new();
+        place_orphan_skill(&t, Platform::Claude, "tool-skill", "1.0.0");
+        adopt_all(None, None, false, &t.ctx()).unwrap();
+
+        // After adopt: in the home, and the original is tracked.
+        let home = home_path(&t.ctx()).unwrap();
+        assert!(t.fs.exists(&home.join("skills").join("tool-skill")), "adopted into home");
+
+        let outcome =
+            unadopt_many(&["tool-skill".to_string()], ArtifactKind::Skill, &t.ctx()).unwrap();
+        assert_eq!(outcome.unadopted.len(), 1);
+        assert!(outcome.unadopted[0].home_removed, "home copy removed");
+        assert!(
+            outcome.unadopted[0].untracked_from.contains(&Platform::Claude),
+            "home-provenance lock entry cleared"
+        );
+
+        // Home copy gone; original on disk remains and is orphaned again.
+        assert!(!t.fs.exists(&home.join("skills").join("tool-skill")), "removed from home");
+        let original = t
+            .paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .join("tool-skill")
+            .join("SKILL.md");
+        assert!(t.fs.exists(&original), "tool-created original is left in place");
+        let report = doctor::survey(false, &t.ctx()).unwrap();
+        assert_eq!(
+            report.rows.iter().find(|r| r.name == "tool-skill").unwrap().state,
+            ArtifactState::Orphaned,
+            "reverts to orphaned"
+        );
+    }
+
+    #[test]
+    fn unadopt_reports_not_adopted() {
+        let t = TestContext::new();
+        let outcome = unadopt_many(&["never".to_string()], ArtifactKind::Skill, &t.ctx()).unwrap();
+        assert!(outcome.unadopted.is_empty());
+        assert_eq!(outcome.not_adopted, vec!["never".to_string()]);
     }
 
     #[test]

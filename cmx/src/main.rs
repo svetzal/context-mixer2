@@ -227,21 +227,51 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
             }
             Ok(())
         }
+        ArtifactAction::Unadopt { names, external } => handle_unadopt(&names, kind, external, ctx),
         ArtifactAction::Adopt {
             names,
             all,
             from,
             local,
-        } => {
-            let outcome = if all {
-                cmx::adopt::adopt_all(Some(kind), from.as_deref(), local, ctx)?
-            } else if names.is_empty() {
-                bail!("Provide artifact name(s) to adopt, or use --all")
-            } else {
-                cmx::adopt::adopt_named(kind, &names, local, ctx)?
-            };
-            print!("{outcome}");
-            Ok(())
+        } => handle_adopt(&names, kind, all, from.as_deref(), local, ctx),
+    }
+}
+
+fn handle_unadopt(
+    names: &[String],
+    kind: ArtifactKind,
+    external: bool,
+    ctx: &AppContext<'_>,
+) -> Result<()> {
+    if names.is_empty() {
+        bail!("Provide artifact name(s) to unadopt")
+    }
+    let outcome = cmx::adopt::unadopt_many(names, kind, ctx)?;
+    print!("{outcome}");
+    if external {
+        for name in names {
+            let r = cmx::cmx_config::external_add(name, ctx)?;
+            print!("{r}");
         }
     }
+    Ok(())
+}
+
+fn handle_adopt(
+    names: &[String],
+    kind: ArtifactKind,
+    all: bool,
+    from: Option<&std::path::Path>,
+    local: bool,
+    ctx: &AppContext<'_>,
+) -> Result<()> {
+    let outcome = if all {
+        cmx::adopt::adopt_all(Some(kind), from, local, ctx)?
+    } else if names.is_empty() {
+        bail!("Provide artifact name(s) to adopt, or use --all")
+    } else {
+        cmx::adopt::adopt_named(kind, names, local, ctx)?
+    };
+    print!("{outcome}");
+    Ok(())
 }

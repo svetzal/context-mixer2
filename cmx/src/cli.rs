@@ -145,6 +145,14 @@ pub enum ArtifactAction {
         #[arg(long)]
         local: bool,
     },
+    /// Unadopt artifact(s): remove them from the canonical home and un-track them
+    Unadopt {
+        /// Artifact name(s) to unadopt
+        names: Vec<String>,
+        /// Also mark each as external (managed by another tool) after unadopting
+        #[arg(long)]
+        external: bool,
+    },
     /// Adopt orphaned, hand-authored artifacts into the canonical home
     Adopt {
         /// Artifact name(s) to adopt (each must be an orphan reported by `cmx doctor`)
