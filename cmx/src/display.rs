@@ -298,6 +298,30 @@ impl fmt::Display for ArtifactInfo {
             }
         }
 
+        if let Some(desc) = &self.activates_when {
+            // For a skill the description *is* the activation trigger; for an
+            // agent it's a role description.
+            let header = match self.kind {
+                crate::types::ArtifactKind::Skill => "Activates when:",
+                crate::types::ArtifactKind::Agent => "Description:",
+            };
+            writeln!(f, "\n{header}")?;
+            writeln!(f, "  {desc}")?;
+        }
+
+        match &self.summary {
+            Some(summary) => {
+                writeln!(f, "\nWhat it does:")?;
+                writeln!(f, "  {summary}")?;
+            }
+            None => {
+                writeln!(
+                    f,
+                    "\nWhat it does:\n  (build cmx with `--features llm` for an LLM-generated summary)"
+                )?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -733,6 +757,8 @@ mod tests {
             deprecation: None,
             available_version: None,
             skill_files: vec![],
+            activates_when: None,
+            summary: None,
         }
     }
 

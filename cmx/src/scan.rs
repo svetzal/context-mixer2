@@ -198,11 +198,48 @@ fn parse_frontmatter_impl(content: &str, required_fields: &[&str]) -> Option<Fro
 
 pub fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
     let prefix = format!("{key}:");
-    frontmatter
-        .lines()
-        .find(|l| l.starts_with(&prefix))
-        .map(|l| l[prefix.len()..].trim().trim_matches('"').to_string())
-        .filter(|v| !v.is_empty())
+    let mut lines = frontmatter.lines();
+    let header = lines.find(|l| l.starts_with(&prefix))?;
+    let inline = header[prefix.len()..].trim();
+
+    // YAML block scalar: `description: >` (folded) or `description: |` (literal),
+    // optionally with chomping/indent indicators (`>-`, `|+`, …). The value is the
+    // indented lines that follow, joined per the style. Without this, a multi-line
+    // description collapses to just the `>`/`|` indicator.
+    if let Some(folded) = block_scalar_style(inline) {
+        let body: Vec<&str> = lines
+            .take_while(|l| l.trim().is_empty() || l.starts_with([' ', '\t']))
+            .map(str::trim)
+            .collect();
+        let joined = if folded {
+            body.join(" ")
+        } else {
+            body.join("\n")
+        };
+        let joined = joined.trim().to_string();
+        return (!joined.is_empty()).then_some(joined);
+    }
+
+    let value = inline.trim_matches('"').to_string();
+    (!value.is_empty()).then_some(value)
+}
+
+/// If `inline` is a YAML block-scalar indicator (`>` folded or `|` literal, with
+/// optional chomping/indent indicators), return `true` for folded, `false` for
+/// literal. Returns `None` when it's an ordinary inline value.
+fn block_scalar_style(inline: &str) -> Option<bool> {
+    let mut chars = inline.chars();
+    let style = chars.next()?;
+    if style != '>' && style != '|' {
+        return None;
+    }
+    // Everything after the indicator must be chomping/indent indicators (or a
+    // comment) — otherwise it's an inline value that merely starts with `>`/`|`.
+    let rest = inline[1..].trim();
+    let indicators_only = rest.is_empty()
+        || rest.starts_with('#')
+        || rest.chars().all(|c| matches!(c, '-' | '+' | '0'..='9'));
+    indicators_only.then_some(style == '>')
 }
 
 /// Extract a field nested under `metadata:` in YAML frontmatter.
@@ -301,6 +338,37 @@ mod tests {
         // key "name" must not match line "namespace: foo"
         let text = "namespace: foo";
         assert_eq!(extract_field(text, "name"), None);
+    }
+
+    #[test]
+    fn extract_field_folded_block_scalar_joins_with_spaces() {
+        let text = "name: lint\ndescription: >\n  Run markdownlint to fix files.\n  Use it whenever a .md file changes.\nversion: 1.0.0";
+        assert_eq!(
+            extract_field(text, "description"),
+            Some("Run markdownlint to fix files. Use it whenever a .md file changes.".to_string())
+        );
+        // The following key is unaffected.
+        assert_eq!(extract_field(text, "version"), Some("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn extract_field_literal_block_scalar_keeps_newlines() {
+        let text = "description: |\n  line one\n  line two\n";
+        assert_eq!(extract_field(text, "description"), Some("line one\nline two".to_string()));
+    }
+
+    #[test]
+    fn extract_field_folded_block_scalar_with_chomping_indicator() {
+        let text = "description: >-\n  folded text here\n";
+        assert_eq!(extract_field(text, "description"), Some("folded text here".to_string()));
+    }
+
+    #[test]
+    fn extract_field_inline_value_starting_with_gt_is_not_a_block_scalar() {
+        // A genuine inline value that happens to start with `>` (not a bare
+        // indicator) is taken verbatim, not treated as a block scalar.
+        let text = "description: >= 2.0 required";
+        assert_eq!(extract_field(text, "description"), Some(">= 2.0 required".to_string()));
     }
 
     // --- extract_metadata_field ---

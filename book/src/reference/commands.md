@@ -34,6 +34,7 @@ It can also be set via the `CMX_PLATFORM` environment variable.
 | `cmx agent adopt <name>...` | Adopt one or more orphaned, hand-authored agents into the canonical home |
 | `cmx agent unadopt <name>...` | Remove agents from the home (originals stay); `--external` also marks them external |
 | `cmx agent list` | List installed agents (cmx-managed); `--all` includes external |
+| `cmx agent info <name>` | Show source, version, activation trigger, and (in an `llm` build) a summary |
 | `cmx agent diff <name>` | LLM-powered diff analysis (requires `llm` feature) |
 
 `install` and `uninstall` accept **multiple names** in one command (e.g.
@@ -56,11 +57,31 @@ Same commands as agent, using `cmx skill` instead of `cmx agent`.
 | `cmx list --all` | Include external (tool-managed) artifacts in the listing |
 | `cmx outdated` | Show artifacts needing attention |
 | `cmx search <keyword>` | Search all sources by name and description |
-| `cmx info <name>` | Show detailed metadata for an installed artifact |
+| `cmx info <name>` | Show detailed metadata for an installed artifact (searches both kinds) |
 | `cmx doctor` | Survey every platform; show only what needs attention (read-only) |
 | `cmx doctor --all` | Show the full inventory, not just problems |
 | `cmx doctor --local` | Also include project (local) scope in the survey |
 | `cmx doctor --adopt-all` | Adopt every orphaned artifact into the canonical home |
+
+### `cmx info`
+
+`cmx info <name>` shows the key details of an installed artifact: its scope and
+path, version (and any available update), source provenance and checksums, and —
+for a skill — its file tree. Two fields are worth calling out:
+
+- **Activates when** (skills) / **Description** (agents) — the artifact's
+  `description` frontmatter. For a skill this is precisely its *activation
+  trigger*: the "use this when…" text the assistant reads to decide whether to
+  load the skill. Multi-line YAML (`description: >` folded or `|` literal) is
+  rendered in full.
+- **What it does** — a short LLM-generated paragraph summarizing the artifact,
+  produced via the configured LLM gateway (`cmx config gateway`/`model`). This
+  requires a build with the **`llm` feature**; a lean build prints a one-line
+  hint in its place. Summary generation is best-effort — if the provider is
+  unreachable, `info` still prints everything else.
+
+The top-level `cmx info <name>` searches both kinds; the kind-scoped
+`cmx skill info <name>` and `cmx agent info <name>` look only at that kind.
 
 ### `cmx doctor`
 

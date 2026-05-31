@@ -30,6 +30,13 @@ pub struct ArtifactInfo {
     pub deprecation: Option<Deprecation>,
     pub available_version: Option<String>,
     pub skill_files: Vec<SkillFileEntry>,
+    /// The artifact's `description` frontmatter — for a skill this is its
+    /// **activation trigger** (the "use this when…" the assistant reads to decide
+    /// whether to load it); for an agent, its role description.
+    pub activates_when: Option<String>,
+    /// An LLM-generated paragraph describing what the artifact does. Populated
+    /// only by an `llm`-feature build (see [`summarize`]); `None` otherwise.
+    pub summary: Option<String>,
 }
 
 #[derive(Debug)]
@@ -52,6 +59,15 @@ pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
     }
 
     bail!("No installed artifact named '{name}' found.");
+}
+
+/// Like [`info`], but scoped to a single kind — backs `cmx skill info` /
+/// `cmx agent info`, which know which kind the user meant.
+pub fn info_for_kind(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
+    match config::find_installed_path(name, kind, ctx.fs, ctx.paths) {
+        Some((path, scope)) => gather_info(name, kind, scope, &path, ctx),
+        None => bail!("No installed {kind} named '{name}' found."),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +135,8 @@ pub(crate) fn gather_info(
         Vec::new()
     };
 
+    let activates_when = read_description(kind, path, ctx);
+
     Ok(ArtifactInfo {
         name: name.to_string(),
         kind,
@@ -135,7 +153,44 @@ pub(crate) fn gather_info(
         deprecation,
         available_version,
         skill_files,
+        activates_when,
+        summary: None,
     })
+}
+
+/// Read the artifact's `description` frontmatter from its content file — the
+/// skill's activation trigger or the agent's role description. Returns `None`
+/// when the file is unreadable or has no `description`.
+fn read_description(kind: ArtifactKind, path: &Path, ctx: &AppContext<'_>) -> Option<String> {
+    let content = ctx.fs.read_to_string(&kind.content_path(path)).ok()?;
+    let (frontmatter, _) = crate::scan::split_frontmatter_and_body(&content);
+    crate::scan::extract_field(&frontmatter?, "description")
+}
+
+/// Generate a short prose paragraph describing what the artifact does, using the
+/// configured LLM provider. Backs the "What it does" line of `cmx skill info`.
+///
+/// Read-only and best-effort: callers treat a failure as "no summary" rather
+/// than a hard error, so `info` still prints everything else. Requires
+/// `ctx.llm` to be set (an `llm`-feature build with a configured gateway).
+pub async fn summarize(info: &ArtifactInfo, ctx: &AppContext<'_>) -> Result<String> {
+    let Some(llm) = ctx.llm else {
+        bail!("LLM client not configured");
+    };
+
+    let content = ctx.fs.read_to_string(&info.kind.content_path(&info.path))?;
+    // Cap the context we send — the frontmatter and opening prose carry the
+    // intent; the long tail rarely changes a one-paragraph summary.
+    let excerpt: String = content.chars().take(6000).collect();
+
+    let system_prompt = "You are summarizing an AI coding assistant artifact (an agent or skill defined in markdown) \
+        for someone browsing their installed tools. Write ONE plain-prose paragraph of 2-4 sentences describing what it does \
+        and the kind of task it helps with. Be concrete and neutral. Do not use headings, lists, or markdown formatting, \
+        and do not begin by restating the artifact's name as a definition.";
+    let user_prompt = format!("Summarize the {} named '{}':\n\n{excerpt}", info.kind, info.name);
+
+    let summary = llm.analyze(system_prompt, &user_prompt).await?;
+    Ok(summary.trim().to_string())
 }
 
 pub(crate) fn collect_skill_files_with(
@@ -201,6 +256,8 @@ mod tests {
             deprecation: None,
             available_version: None,
             skill_files: vec![],
+            activates_when: None,
+            summary: None,
         }
     }
 
@@ -408,6 +465,9 @@ mod tests {
         assert!(info.installed_at.is_some());
         assert!(info.source_display.is_some());
         assert!(!info.untracked);
+        // The agent's `description` frontmatter is surfaced as activates_when.
+        assert_eq!(info.activates_when.as_deref(), Some("A test agent"));
+        assert!(info.summary.is_none(), "summary is only populated by an llm build");
     }
 
     #[test]
@@ -637,5 +697,108 @@ mod tests {
         };
         assert_eq!(dep.reason.as_deref(), Some("Old"));
         assert_eq!(dep.replacement.as_deref(), Some("new-agent"));
+    }
+
+    // --- activation trigger + kind-scoped lookup ---
+
+    fn install_skill_on_disk(t: &TestContext, name: &str, desc: &str) -> PathBuf {
+        let dir = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).join(name);
+        t.fs.add_file(dir.join("SKILL.md"), crate::test_support::skill_content(desc));
+        dir
+    }
+
+    #[test]
+    fn gather_info_skill_surfaces_activation_trigger() {
+        let t = TestContext::new();
+        let dir = install_skill_on_disk(&t, "my-skill", "Use this skill when you need X");
+        setup_empty_sources(&t.fs, &t.paths);
+
+        let info =
+            gather_info("my-skill", ArtifactKind::Skill, InstallScope::Global, &dir, &t.ctx())
+                .unwrap();
+        assert_eq!(info.activates_when.as_deref(), Some("Use this skill when you need X"));
+        assert!(info.summary.is_none());
+    }
+
+    #[test]
+    fn info_for_kind_finds_skill_and_rejects_wrong_kind() {
+        let t = TestContext::new();
+        install_skill_on_disk(&t, "my-skill", "desc");
+        setup_empty_sources(&t.fs, &t.paths);
+        let ctx = t.ctx();
+
+        assert!(info_for_kind("my-skill", ArtifactKind::Skill, &ctx).is_ok());
+        let err = info_for_kind("my-skill", ArtifactKind::Agent, &ctx).unwrap_err().to_string();
+        assert!(err.contains("agent") && err.contains("my-skill"), "kind-scoped error: {err}");
+    }
+
+    // --- summarize (LLM-backed) ---
+
+    #[tokio::test]
+    async fn summarize_returns_llm_paragraph() {
+        use crate::gateway::fakes::{FakeClock, FakeGitClient, FakeLlmClient};
+        use crate::test_support::test_paths;
+        use chrono::Utc;
+
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+        let llm = FakeLlmClient::new("It packages curated context.");
+
+        let dir = paths.install_dir(ArtifactKind::Skill, InstallScope::Global).join("my-skill");
+        fs.add_file(dir.join("SKILL.md"), crate::test_support::skill_content("Use when X"));
+
+        let mut info = minimal_info("my-skill", ArtifactKind::Skill);
+        info.path = dir;
+
+        let ctx = AppContext {
+            fs: &fs,
+            git: &git,
+            clock: &clock,
+            paths: &paths,
+            llm: Some(&llm),
+        };
+        let summary = summarize(&info, &ctx).await.unwrap();
+        assert_eq!(summary, "It packages curated context.");
+    }
+
+    #[tokio::test]
+    async fn summarize_errors_without_llm() {
+        let t = TestContext::new();
+        let info = minimal_info("x", ArtifactKind::Skill);
+        // t.ctx() has no llm client — summarize bails before touching the disk.
+        let err = summarize(&info, &t.ctx()).await.unwrap_err().to_string();
+        assert!(err.contains("LLM"), "expected llm-not-configured error: {err}");
+    }
+
+    // --- Display: activation trigger + summary ---
+
+    #[test]
+    fn display_skill_shows_activates_when_and_summary() {
+        let mut info = minimal_info("my-skill", ArtifactKind::Skill);
+        info.activates_when = Some("Use this skill when you need X".to_string());
+        info.summary = Some("It does a thing.".to_string());
+        let out = info.to_string();
+        assert!(out.contains("Activates when:"), "skill activation label: {out}");
+        assert!(out.contains("Use this skill when you need X"));
+        assert!(out.contains("What it does:"));
+        assert!(out.contains("It does a thing."));
+    }
+
+    #[test]
+    fn display_agent_uses_description_label() {
+        let mut info = minimal_info("my-agent", ArtifactKind::Agent);
+        info.activates_when = Some("A helpful agent".to_string());
+        let out = info.to_string();
+        assert!(out.contains("Description:"), "agent uses Description label: {out}");
+        assert!(!out.contains("Activates when:"), "agent does not use the skill label");
+    }
+
+    #[test]
+    fn display_summary_hint_when_absent() {
+        let info = minimal_info("my-skill", ArtifactKind::Skill);
+        let out = info.to_string();
+        assert!(out.contains("--features llm"), "shows build hint when no summary: {out}");
     }
 }

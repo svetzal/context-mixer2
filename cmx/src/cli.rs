@@ -131,6 +131,12 @@ pub enum ArtifactAction {
         #[arg(long)]
         all: bool,
     },
+    /// Show key details for an installed artifact: source, version, when it
+    /// activates, and (in an `llm`-feature build) a summary of what it does
+    Info {
+        /// Artifact name
+        name: String,
+    },
     #[cfg(feature = "llm")]
     /// Compare installed artifact with source version using LLM analysis
     Diff {

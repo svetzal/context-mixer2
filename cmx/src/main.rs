@@ -53,11 +53,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Home { action } => handle_home(&action, &ctx),
-        Commands::Info { name } => {
-            let info = cmx::info::info(&name, &ctx)?;
-            print!("{info}");
-            Ok(())
-        }
+        Commands::Info { name } => handle_info(&name, None, &ctx),
         Commands::Outdated => {
             let report = cmx::outdated::outdated(&ctx)?;
             print!("{report}");
@@ -151,6 +147,40 @@ fn handle_config(action: ConfigAction, ctx: &AppContext<'_>) -> Result<()> {
     }
 }
 
+/// Show details for an installed artifact. `kind` is `Some` for the kind-scoped
+/// `cmx {skill,agent} info`, `None` for the top-level `cmx info` (searches both).
+/// In an `llm`-feature build with a configured gateway it also attaches a
+/// generated "what it does" summary, best-effort — a generation failure leaves
+/// the summary blank rather than failing the command.
+fn handle_info(name: &str, kind: Option<ArtifactKind>, ctx: &AppContext<'_>) -> Result<()> {
+    #[cfg_attr(not(feature = "llm"), allow(unused_mut))]
+    let mut info = match kind {
+        Some(k) => cmx::info::info_for_kind(name, k, ctx)?,
+        None => cmx::info::info(name, ctx)?,
+    };
+
+    #[cfg(feature = "llm")]
+    {
+        use cmx::gateway::real::MojenticLlmClient;
+        let cfg = cmx::config::load_config(ctx.fs, ctx.paths)?;
+        let llm = MojenticLlmClient::new(cfg.llm);
+        let llm_ctx = AppContext {
+            fs: ctx.fs,
+            git: ctx.git,
+            clock: ctx.clock,
+            paths: ctx.paths,
+            llm: Some(&llm),
+        };
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+        if let Ok(summary) = rt.block_on(cmx::info::summarize(&info, &llm_ctx)) {
+            info.summary = Some(summary);
+        }
+    }
+
+    print!("{info}");
+    Ok(())
+}
+
 fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {
     match action {
         ArtifactAction::Install {
@@ -185,6 +215,7 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
             print!("{output}");
             Ok(())
         }
+        ArtifactAction::Info { name } => handle_info(&name, Some(kind), ctx),
         #[cfg(feature = "llm")]
         ArtifactAction::Diff { name } => {
             use cmx::gateway::real::MojenticLlmClient;
