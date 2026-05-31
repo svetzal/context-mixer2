@@ -3,7 +3,9 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::config;
 use crate::config::InstalledWithSources;
-use crate::context::{AppContext, LoadedState};
+use crate::context::AppContext;
+use crate::lockfile;
+use crate::platform::Platform;
 use crate::scan;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
@@ -80,31 +82,65 @@ fn status_indicator(
 }
 
 pub fn list_kind(kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ListKindOutput> {
-    let loaded = LoadedState::load(ctx)?;
-    let source_versions = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
-    let mut rows = BTreeMap::new();
-    for (scope, lock) in loaded.scopes() {
-        rows.insert(scope, build_rows_with(kind, scope, lock, &source_versions, ctx)?);
-    }
+    let source_versions = load_source_versions(ctx)?;
+    let rows = cross_platform_rows(kind, &source_versions, ctx)?;
     Ok(ListKindOutput { kind, rows })
 }
 
 pub fn list_all(ctx: &AppContext<'_>) -> Result<ListOutput> {
-    let loaded = LoadedState::load(ctx)?;
-    let source_versions = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
-    let mut agents = BTreeMap::new();
-    let mut skills = BTreeMap::new();
-    for (scope, lock) in loaded.scopes() {
-        agents.insert(
-            scope,
-            build_rows_with(ArtifactKind::Agent, scope, lock, &source_versions, ctx)?,
-        );
-        skills.insert(
-            scope,
-            build_rows_with(ArtifactKind::Skill, scope, lock, &source_versions, ctx)?,
-        );
+    let source_versions = load_source_versions(ctx)?;
+    Ok(ListOutput {
+        agents: cross_platform_rows(ArtifactKind::Agent, &source_versions, ctx)?,
+        skills: cross_platform_rows(ArtifactKind::Skill, &source_versions, ctx)?,
+    })
+}
+
+/// Scan all registered sources once for available versions (platform-independent
+/// — `sources.json` is the same regardless of the active platform).
+fn load_source_versions(ctx: &AppContext<'_>) -> Result<BTreeMap<String, Vec<SourceArtifactInfo>>> {
+    let sources = config::load_sources(ctx.fs, ctx.paths)?;
+    source_iter::scan_all_with_checksums(&sources.sources, ctx.fs)
+}
+
+/// Build list rows for `kind` across **every** platform, unioned and deduped by
+/// name within each scope — so a skill installed only for (say) codex still
+/// appears. Reuses the per-platform [`build_rows_with`] and the first platform
+/// that has a given artifact wins the row.
+fn cross_platform_rows(
+    kind: ArtifactKind,
+    source_versions: &BTreeMap<String, Vec<SourceArtifactInfo>>,
+    ctx: &AppContext<'_>,
+) -> Result<BTreeMap<InstallScope, Vec<Row>>> {
+    // Dedup by (name, source) so the same skill tracked for several platforms
+    // collapses to one row, while a skill genuinely available from two sources
+    // still shows a row per source.
+    let mut by_scope: BTreeMap<InstallScope, BTreeMap<(String, String), Row>> = BTreeMap::new();
+    for platform in Platform::ALL {
+        if !platform.supports(kind) {
+            continue;
+        }
+        let pv = ctx.paths.with_platform(platform);
+        let pctx = AppContext {
+            fs: ctx.fs,
+            git: ctx.git,
+            clock: ctx.clock,
+            paths: &pv,
+            llm: ctx.llm,
+        };
+        for (scope, lock) in lockfile::load_both(ctx.fs, &pv)? {
+            for row in build_rows_with(kind, scope, &lock, source_versions, &pctx)? {
+                by_scope
+                    .entry(scope)
+                    .or_default()
+                    .entry((row.name.clone(), row.source.clone()))
+                    .or_insert(row);
+            }
+        }
     }
-    Ok(ListOutput { agents, skills })
+    Ok(by_scope
+        .into_iter()
+        .map(|(scope, rows)| (scope, rows.into_values().collect()))
+        .collect())
 }
 
 fn build_rows_with(
