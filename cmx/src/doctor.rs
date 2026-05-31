@@ -100,6 +100,10 @@ pub struct DoctorArtifact {
     pub state: ArtifactState,
     /// The version, when all copies agree; `None` if they differ or carry none.
     pub version: Option<String>,
+    /// The distinct versions present across copies, sorted. One entry (or none)
+    /// when copies agree; several when they diverge — lets the display name the
+    /// skew (e.g. `3.2.0 / 3.3.0`) instead of an opaque `-`.
+    pub versions: Vec<String>,
     /// The platforms cmx *manages* this artifact for (has a lock entry), unioned
     /// across its locations. Not every tool that merely reads a shared directory
     /// — only those cmx tracks it for. Empty when nothing tracks it.
@@ -412,6 +416,11 @@ fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
             } else {
                 None
             };
+            // The distinct versions actually present, sorted — so the display can
+            // name a skew (`3.2.0 / 3.3.0`) rather than collapsing to `-`.
+            let mut distinct_versions: Vec<String> =
+                versions.iter().filter_map(|v| v.map(str::to_string)).collect();
+            distinct_versions.sort();
 
             // Source: the distinct provenance(s) across copies, joined when they
             // differ (rare — copies normally share a source).
@@ -431,6 +440,7 @@ fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
                 scope: first.scope,
                 state,
                 version,
+                versions: distinct_versions,
                 tools,
                 source,
                 locations,
@@ -599,6 +609,7 @@ mod tests {
             scope: InstallScope::Global,
             state,
             version: None,
+            versions: vec![],
             tools: vec![],
             source: None,
             locations: vec![],

@@ -371,12 +371,21 @@ fn doctor_artifact_table(artifacts: &[&crate::doctor::DoctorArtifact]) -> Table 
                 } else {
                     a.tools.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
                 };
+                // When copies agree show the single version; when they diverge
+                // name the skew (`3.2.0 / 3.3.0`) rather than an opaque `-`.
+                let version = a.version.clone().unwrap_or_else(|| {
+                    if a.versions.len() > 1 {
+                        a.versions.join(" / ")
+                    } else {
+                        "-".to_string()
+                    }
+                });
                 let mut cells = vec![
                     a.kind.to_string(),
                     a.name.clone(),
                     a.scope.label().to_string(),
                     a.state.label().to_string(),
-                    a.version.clone().unwrap_or_else(|| "-".to_string()),
+                    version,
                     a.source.clone().unwrap_or_else(|| "-".to_string()),
                     tools,
                 ];
@@ -1235,6 +1244,7 @@ mod tests {
             scope: InstallScope::Global,
             state: crate::doctor::ArtifactState::Orphaned,
             version: Some("1.0.0".to_string()),
+            versions: vec!["1.0.0".to_string()],
             tools: vec![crate::platform::Platform::Claude],
             source: None,
             locations: vec![PathBuf::from("/home/u/.claude/skills")],
@@ -1279,6 +1289,7 @@ mod tests {
                 scope: InstallScope::Global,
                 state: crate::doctor::ArtifactState::Tracked,
                 version: Some("1.0.0".to_string()),
+                versions: vec!["1.0.0".to_string()],
                 tools: vec![
                     crate::platform::Platform::Claude,
                     crate::platform::Platform::Codex,
@@ -1339,6 +1350,26 @@ mod tests {
     }
 
     #[test]
+    fn doctor_report_names_version_skew() {
+        // A version-diverged artifact: no single agreed version, but the distinct
+        // versions are shown (`3.2.0 / 3.3.0`) rather than an opaque `-`.
+        let mut a = orphan_artifact("hopper-coordinator");
+        a.diverged = true;
+        a.version = None;
+        a.versions = vec!["3.2.0".to_string(), "3.3.0".to_string()];
+        let r = crate::doctor::DoctorReport {
+            rows: vec![],
+            artifacts: vec![a],
+            missing: vec![],
+            included_local: false,
+            show_all: true,
+        };
+        let out = r.to_string();
+        assert!(out.contains("3.2.0 / 3.3.0"), "version skew named in the table: {out}");
+        assert!(out.contains("(diverged)"), "still flagged diverged: {out}");
+    }
+
+    #[test]
     fn doctor_report_problems_only_by_default() {
         // Default view (show_all=false): a tracked artifact is hidden; only
         // problems surface. With nothing wrong, a healthy message shows.
@@ -1350,6 +1381,7 @@ mod tests {
                 scope: InstallScope::Global,
                 state: crate::doctor::ArtifactState::Tracked,
                 version: Some("1.0.0".to_string()),
+                versions: vec!["1.0.0".to_string()],
                 tools: vec![crate::platform::Platform::Claude],
                 source: Some("home".to_string()),
                 locations: vec![PathBuf::from("/a")],
