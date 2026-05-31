@@ -459,6 +459,46 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
     }
 }
 
+/// Per-location breakdown for each shown diverged artifact, naming which copy
+/// carries which version (and state, when states differ too). Built from the raw
+/// rows — which pair location↔version — because the grouped table collapses them.
+fn doctor_divergence_details(
+    shown: &[&crate::doctor::DoctorArtifact],
+    rows: &[crate::doctor::DoctorRow],
+) -> String {
+    let mut lines = Vec::new();
+    for a in shown.iter().filter(|a| a.diverged) {
+        let mut members: Vec<&crate::doctor::DoctorRow> = rows
+            .iter()
+            .filter(|r| r.kind == a.kind && r.name == a.name && r.scope == a.scope)
+            .collect();
+        members.sort_by(|x, y| x.location.cmp(&y.location));
+        let states_differ = members
+            .iter()
+            .map(|r| r.state.label())
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            > 1;
+        let parts: Vec<String> = members
+            .iter()
+            .map(|r| {
+                let ver = r.version.as_deref().unwrap_or("unversioned");
+                if states_differ {
+                    format!("{} @ {ver} ({})", r.location.display(), r.state.label())
+                } else {
+                    format!("{} @ {ver}", r.location.display())
+                }
+            })
+            .collect();
+        lines.push(format!("  • {} diverges: {}", a.name, parts.join(", ")));
+    }
+    if lines.is_empty() {
+        String::new()
+    } else {
+        format!("\n{}\n", lines.join("\n"))
+    }
+}
+
 impl fmt::Display for AdoptOutcome {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.adopted.is_empty() {
@@ -572,7 +612,8 @@ impl fmt::Display for DoctorReport {
             "\nSummary: {} tracked, {} drifted, {} untracked, {} orphaned, {} external, {} missing · {} diverged.",
             c.tracked, c.drifted, c.untracked, c.orphaned, c.external, c.missing, c.diverged
         )?;
-        write!(f, "{}", doctor_hints(&c))
+        write!(f, "{}", doctor_hints(&c))?;
+        write!(f, "{}", doctor_divergence_details(&shown, &self.rows))
     }
 }
 
@@ -1367,6 +1408,43 @@ mod tests {
         let out = r.to_string();
         assert!(out.contains("3.2.0 / 3.3.0"), "version skew named in the table: {out}");
         assert!(out.contains("(diverged)"), "still flagged diverged: {out}");
+    }
+
+    #[test]
+    fn doctor_details_name_each_locations_version() {
+        use crate::doctor::{ArtifactState, DoctorRow};
+        use crate::platform::Platform;
+
+        let mk_row = |loc: &str, ver: &str, platform| DoctorRow {
+            kind: ArtifactKind::Skill,
+            name: "hopper-coordinator".to_string(),
+            scope: InstallScope::Global,
+            location: PathBuf::from(loc),
+            platforms: vec![platform],
+            tracked_for: vec![],
+            state: ArtifactState::External,
+            version: Some(ver.to_string()),
+            source: None,
+        };
+        let mut art = orphan_artifact("hopper-coordinator");
+        art.state = ArtifactState::External;
+        art.diverged = true;
+        art.version = None;
+        art.versions = vec!["3.2.0".to_string(), "3.3.0".to_string()];
+        let r = crate::doctor::DoctorReport {
+            rows: vec![
+                mk_row("/u/.claude/skills", "3.3.0", Platform::Claude),
+                mk_row("/u/.agents/skills", "3.2.0", Platform::Codex),
+            ],
+            artifacts: vec![art],
+            missing: vec![],
+            included_local: false,
+            show_all: true,
+        };
+        let out = r.to_string();
+        assert!(out.contains("hopper-coordinator diverges:"), "detail line present: {out}");
+        assert!(out.contains("/u/.claude/skills @ 3.3.0"), "claude copy version: {out}");
+        assert!(out.contains("/u/.agents/skills @ 3.2.0"), "agents copy version: {out}");
     }
 
     #[test]
