@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-05-30
+
 ### Changed
 
 - `cmx doctor` now shows **only artifacts that need attention** by default (drifted, untracked, orphaned, missing, diverged) — it's a doctor, for fixing broken things. Healthy `tracked` and `external` artifacts are tallied in the summary but not listed. Pass `--all` for the full inventory. When nothing's wrong it reports "everything cmx manages is healthy."
@@ -20,7 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `cmx {skill,agent} unadopt <name>...` — the inverse of `adopt`. Removes the artifact's canonical copy from the home and clears every `home`-provenance lock entry for it (un-tracking it across platforms), while **leaving the on-disk originals in place** (they revert to orphaned). Useful when a skill was adopted by mistake — e.g. one a tool creates for itself (`gilt`, `hone`, `mailctl`) that belongs to that tool, not your curated home. Accepts multiple names; a `--external` flag also marks each as external in one step, so `doctor` reports them as managed-by-another-tool rather than orphaned.
-- **External artifacts.** Declare artifacts that another tool manages — e.g. a tool's bundled/stock skills in its own directory — so `cmx doctor` reports them as `external` (informational, never an issue) instead of flagging them as orphaned, and so `adopt`/`--adopt-all` never sweep them into your home. Manage the list with `cmx config external add|remove|list`; `cmx config show` displays it. Each rule is either a **directory** (an install location, `~` expands to home — covers everything under it) or a bare **artifact name**. A directory rule like `~/.hermes/skills` lets `doctor` reach a clean (zero-exit) resting point while a tool's stock bundle stays acknowledged but unflagged.
+- **External artifacts.** Declare artifacts that another tool manages — e.g. a tool's bundled/stock skills in its own directory — so `cmx doctor` reports them as `external` (a steady state, not flagged) instead of flagging them as orphaned, and so `adopt`/`--adopt-all` never sweep them into your home. Manage the list with `cmx config external add|remove|list`; `cmx config show` displays it. Each rule is either a **directory** (an install location, `~` expands to home — covers everything under it) or a bare **artifact name**. A directory rule like `~/.hermes/skills` lets `doctor` reach a clean (zero-exit) resting point while a tool's stock bundle stays acknowledged but unflagged.
+- `cmx doctor` **names a divergence** instead of leaving it opaque. When a diverged artifact's copies are at different versions, the `Version` column shows the skew (e.g. `3.2.0 / 3.3.0`) rather than `-`, and a detail line under the summary names which copy is where: `• hopper-coordinator diverges: ~/.agents/skills @ 3.2.0, ~/.claude/skills @ 3.3.0` (with each location's state appended when copies disagree on state, not just version). So a skew reads at a glance as "this copy is stale."
+
+### Fixed
+
+- `cmx doctor` no longer reports "everything healthy · 0 diverged" while an artifact is visibly diverged. A divergence is a real anomaly worth surfacing *whoever* owns the artifact, so it's now flagged (shown in the default view, counted in the tally, exit code `2`) even for `external` artifacts — cmx just can't be the one to re-sync an external one, so the hint points at the owning tool instead of `cmx update --force`. A *consistent* `external` or `tracked` artifact is still healthy and unflagged; only a genuine divergence surfaces.
 
 ## [2.8.0] - 2026-05-30
 

@@ -23,17 +23,26 @@ It can also be set via the `CMX_PLATFORM` environment variable.
 
 | Command | Description |
 |---------|-------------|
-| `cmx agent install <name>` | Install an agent from sources |
+| `cmx agent install <name>...` | Install one or more agents from sources |
 | `cmx agent install <source>:<name>` | Install from a specific source |
 | `cmx agent install --all` | Install all available agents |
 | `cmx agent install <name> --local` | Install into current project |
 | `cmx agent install <name> --platform cursor` | Install to Cursor |
 | `cmx agent update <name>` | Update an agent from its source |
 | `cmx agent update --all` | Update all tracked agents |
-| `cmx agent uninstall <name>` | Uninstall an agent |
-| `cmx agent adopt <name>` | Adopt an orphaned, hand-authored agent into the canonical home |
-| `cmx agent list` | List installed agents |
+| `cmx agent uninstall <name>...` | Uninstall one or more agents (everywhere cmx tracks them) |
+| `cmx agent adopt <name>...` | Adopt one or more orphaned, hand-authored agents into the canonical home |
+| `cmx agent unadopt <name>...` | Remove agents from the home (originals stay); `--external` also marks them external |
+| `cmx agent list` | List installed agents (cmx-managed); `--all` includes external |
 | `cmx agent diff <name>` | LLM-powered diff analysis (requires `llm` feature) |
+
+`install` and `uninstall` accept **multiple names** in one command (e.g.
+`cmx agent install a b c`). Both are best-effort: each name is processed
+independently and per-name failures are collected and reported rather than
+aborting the batch. `install` exits non-zero if any name failed; `uninstall`
+exits non-zero only when nothing at all was removed. `uninstall` is
+**cross-platform** — it removes every physical copy and clears every platform's
+lock entry, not just the active `--platform`'s.
 
 ## Skill management
 
@@ -43,11 +52,13 @@ Same commands as agent, using `cmx skill` instead of `cmx agent`.
 
 | Command | Description |
 |---------|-------------|
-| `cmx list` | List all installed agents and skills |
+| `cmx list` | List installed agents and skills (cmx-managed inventory) |
+| `cmx list --all` | Include external (tool-managed) artifacts in the listing |
 | `cmx outdated` | Show artifacts needing attention |
 | `cmx search <keyword>` | Search all sources by name and description |
 | `cmx info <name>` | Show detailed metadata for an installed artifact |
-| `cmx doctor` | Survey the whole system installation across every platform (read-only) |
+| `cmx doctor` | Survey every platform; show only what needs attention (read-only) |
+| `cmx doctor --all` | Show the full inventory, not just problems |
 | `cmx doctor --local` | Also include project (local) scope in the survey |
 | `cmx doctor --adopt-all` | Adopt every orphaned artifact into the canonical home |
 
@@ -55,16 +66,22 @@ Same commands as agent, using `cmx skill` instead of `cmx agent`.
 
 `doctor` is a **read-only** survey across *every* supported platform's install
 directories and lock files. It mutates nothing — its job is to make a
-disorganized installation visible before any command changes it. For each
+disorganized installation visible before any command changes it.
+
+By default `doctor` shows **only what needs attention** — drifted, untracked,
+orphaned, missing, or diverged artifacts — because it's a doctor, for fixing
+broken things. Healthy `tracked` and `external` artifacts are counted in the
+summary line but not listed. Pass **`--all`** for the full inventory. When
+nothing's wrong it reports "everything cmx manages is healthy." For each
 artifact it reports one of:
 
 | State | Meaning | Remedy |
 |-------|---------|--------|
-| `tracked` | recorded in a lock file with a matching checksum | — |
+| `tracked` | recorded in a lock file with a matching checksum | — (unless diverged) |
 | `drifted` | tracked, but the on-disk copy was edited after install | `cmx info <name>` to inspect |
 | `untracked` | on disk, no lock entry, **but a registered source provides it** (installed out-of-band) | `cmx <kind> install <name>` to track it |
 | `orphaned` | on disk, no lock entry, and **no source provides it** (hand-authored) | `cmx <kind> adopt <name>` to canonicalize into the home |
-| `external` | on disk, but declared external in config (managed by another tool) | none — informational, not an issue |
+| `external` | on disk, but declared external in config (managed by another tool) | — (unless diverged) |
 | `missing` | in a lock file, but the file is gone from disk | `cmx <kind> uninstall <name>` to clear the stale entry |
 
 The `untracked` vs `orphaned` split matters for bringing a system under control:
@@ -78,13 +95,23 @@ A skill installed for several tools is reported as **one logical artifact**
 whose `Tools` column lists every tool it's installed for — not as N duplicates.
 That's the intended "curate once, project to many" outcome. The only
 multi-location situation `doctor` flags is `(diverged)`: copies that actually
-**disagree** — a different version or state across locations — which
-`cmx <kind> update <name> --force` resolves by re-syncing every copy from one
-source.
+**disagree** — a different version or state across locations. A divergence is an
+anomaly worth surfacing *whoever* owns the artifact, so it's flagged even for
+`external` artifacts; cmx just can't be the one to re-sync an external one (its
+owning tool must). When versions differ the `Version` column names the skew
+(e.g. `3.2.0 / 3.3.0`) instead of collapsing to `-`, and a detail line under the
+summary names which copy is where:
+
+```text
+  • hopper-coordinator diverges: ~/.agents/skills @ 3.2.0, ~/.claude/skills @ 3.3.0
+```
+
+Re-sync a cmx-managed divergence with `cmx <kind> update <name> --force`.
 
 `doctor` exits non-zero (`2`) when it finds drift, untracked, orphaned, missing,
-or diverged artifacts, so it is usable in a pre-commit hook or CI check.
-Consistent multi-tool installs and `external` artifacts never fail it.
+or diverged artifacts, so it is usable in a pre-commit hook or CI check. A
+*consistent* `tracked` or `external` artifact never fails it — only a genuine
+anomaly does.
 
 ## Canonical home & adoption
 
@@ -142,8 +169,11 @@ just `install --all --platform <tool>`.
 
 Artifacts that **another tool manages** — e.g. a tool's bundled/stock skills in
 its own directory — can be declared *external* so `cmx doctor` reports them as
-`external` (informational, never an issue) instead of flagging them as orphaned,
-and so `adopt`/`--adopt-all` never sweep them into your home.
+`external` (a steady state, not flagged) instead of as orphaned, and so
+`adopt`/`--adopt-all` never sweep them into your home. The one exception is a
+**divergence**: if an external artifact's copies disagree across locations,
+`doctor` still surfaces it — that's a real anomaly even though its owning tool,
+not cmx, must re-sync it.
 
 Each rule is either a **directory** (an install location — `~` expands to your
 home) or a bare **artifact name**:

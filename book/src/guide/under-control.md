@@ -160,8 +160,10 @@ batch aborts with the reason, and nothing is copied.
 Some orphans aren't yours and never will be: a tool's bundled/stock skills,
 sitting in its own directory. You don't want to adopt them, but you also don't
 want `doctor` nagging about them forever. Declare them **external** — cmx then
-reports them as `external` (informational, never an issue) and adoption skips
-them entirely:
+reports them as `external` (a steady state, not flagged) and adoption skips them
+entirely. (The one thing `doctor` will still surface is a *divergence* — an
+external artifact whose copies disagree across locations — since that's a real
+anomaly, even though its owning tool, not cmx, is the one to re-sync it.)
 
 ```bash
 cmx config external add ~/.hermes/skills    # the whole stock directory
