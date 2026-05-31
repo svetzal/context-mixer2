@@ -38,6 +38,11 @@ pub struct ArtifactInfo {
     /// An LLM-generated paragraph describing what the artifact does. Populated
     /// only by an `llm`-feature build (see [`summarize`]); `None` otherwise.
     pub summary: Option<String>,
+    /// Why a summary is absent *after an attempt was made* — e.g. the content
+    /// couldn't be read, or the provider failed. `None` in a lean build (no
+    /// attempt) or on success. Lets the display name the real reason instead of
+    /// always blaming the provider.
+    pub summary_error: Option<String>,
 }
 
 #[derive(Debug)]
@@ -188,6 +193,7 @@ pub(crate) fn gather_info(
         skill_files,
         activates_when,
         summary: None,
+        summary_error: None,
     })
 }
 
@@ -211,7 +217,7 @@ pub async fn summarize(info: &ArtifactInfo, ctx: &AppContext<'_>) -> Result<Stri
         bail!("LLM client not configured");
     };
 
-    let content = ctx.fs.read_to_string(&info.kind.content_path(&info.path))?;
+    let content = read_summary_source(info, ctx)?;
     // Cap the context we send — the frontmatter and opening prose carry the
     // intent; the long tail rarely changes a one-paragraph summary.
     let excerpt: String = content.chars().take(6000).collect();
@@ -222,8 +228,44 @@ pub async fn summarize(info: &ArtifactInfo, ctx: &AppContext<'_>) -> Result<Stri
         and do not begin by restating the artifact's name as a definition.";
     let user_prompt = format!("Summarize the {} named '{}':\n\n{excerpt}", info.kind, info.name);
 
-    let summary = llm.analyze(system_prompt, &user_prompt).await?;
-    Ok(summary.trim().to_string())
+    let summary = llm.analyze(system_prompt, &user_prompt).await?.trim().to_string();
+    if summary.is_empty() {
+        bail!("the LLM returned an empty summary");
+    }
+    Ok(summary)
+}
+
+/// The text to feed the summarizer. Prefers the artifact's primary content file
+/// (`SKILL.md` / the agent `.md`), but falls back for skill *bundles* that lack a
+/// top-level `SKILL.md` — `DESCRIPTION.md`, then any top-level markdown — so a
+/// multi-skill directory (e.g. Hermes' `productivity`) still summarizes.
+fn read_summary_source(info: &ArtifactInfo, ctx: &AppContext<'_>) -> Result<String> {
+    if let Ok(content) = ctx.fs.read_to_string(&info.kind.content_path(&info.path)) {
+        return Ok(content);
+    }
+    if info.kind == ArtifactKind::Skill && ctx.fs.is_dir(&info.path) {
+        for candidate in ["DESCRIPTION.md", "README.md"] {
+            if let Ok(content) = ctx.fs.read_to_string(&info.path.join(candidate)) {
+                return Ok(content);
+            }
+        }
+        // Last resort: concatenate the directory's top-level markdown files.
+        let mut entries = ctx.fs.read_dir(&info.path)?;
+        entries.sort_by(|a, b| a.file_name.cmp(&b.file_name));
+        let mut combined = String::new();
+        for entry in entries {
+            if !entry.is_dir && entry.file_name.to_ascii_lowercase().ends_with(".md") {
+                if let Ok(text) = ctx.fs.read_to_string(&entry.path) {
+                    combined.push_str(&text);
+                    combined.push('\n');
+                }
+            }
+        }
+        if !combined.trim().is_empty() {
+            return Ok(combined);
+        }
+    }
+    bail!("no readable content to summarize at {}", info.path.display());
 }
 
 pub(crate) fn collect_skill_files_with(
@@ -294,6 +336,7 @@ mod tests {
             skill_files: vec![],
             activates_when: None,
             summary: None,
+            summary_error: None,
         }
     }
 
@@ -852,6 +895,66 @@ mod tests {
         assert!(err.contains("LLM"), "expected llm-not-configured error: {err}");
     }
 
+    #[tokio::test]
+    async fn summarize_falls_back_to_description_for_bundle_without_skill_md() {
+        use crate::gateway::fakes::{FakeClock, FakeGitClient, FakeLlmClient};
+        use crate::test_support::test_paths;
+        use chrono::Utc;
+
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+        let llm = FakeLlmClient::new("A bundle of productivity tools.");
+
+        // A skill *bundle*: no top-level SKILL.md, just DESCRIPTION.md + sub-skills.
+        let dir = paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .join("productivity");
+        fs.add_file(dir.join("DESCRIPTION.md"), "# Productivity\nAirtable, Notion, and more.");
+        fs.add_file(dir.join("notion").join("SKILL.md"), crate::test_support::skill_content("n"));
+
+        let mut info = minimal_info("productivity", ArtifactKind::Skill);
+        info.path = dir;
+        let ctx = AppContext {
+            fs: &fs,
+            git: &git,
+            clock: &clock,
+            paths: &paths,
+            llm: Some(&llm),
+        };
+        // Falls back to DESCRIPTION.md instead of failing on the missing SKILL.md.
+        assert_eq!(summarize(&info, &ctx).await.unwrap(), "A bundle of productivity tools.");
+    }
+
+    #[tokio::test]
+    async fn summarize_errors_clearly_when_no_readable_content() {
+        use crate::gateway::fakes::{FakeClock, FakeGitClient, FakeLlmClient};
+        use crate::test_support::test_paths;
+        use chrono::Utc;
+
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+        let llm = FakeLlmClient::new("unused");
+
+        let dir = paths.install_dir(ArtifactKind::Skill, InstallScope::Global).join("empty");
+        fs.add_dir(&dir); // exists but has no markdown content
+
+        let mut info = minimal_info("empty", ArtifactKind::Skill);
+        info.path = dir;
+        let ctx = AppContext {
+            fs: &fs,
+            git: &git,
+            clock: &clock,
+            paths: &paths,
+            llm: Some(&llm),
+        };
+        let err = summarize(&info, &ctx).await.unwrap_err().to_string();
+        assert!(err.contains("no readable content"), "clear content error: {err}");
+    }
+
     // --- Display: activation trigger + summary ---
 
     #[test]
@@ -876,14 +979,21 @@ mod tests {
     }
 
     #[test]
-    fn display_summary_hint_when_absent() {
+    fn display_summary_hint_when_no_attempt() {
+        // Neither a summary nor an error: no attempt was made (a lean build).
         let info = minimal_info("my-skill", ArtifactKind::Skill);
         let out = info.to_string();
-        // The hint differs by build: lean points at `--features llm`; an llm
-        // build that produced no summary points at the provider/config.
-        #[cfg(not(feature = "llm"))]
         assert!(out.contains("--features llm"), "lean build hint: {out}");
-        #[cfg(feature = "llm")]
-        assert!(out.contains("LLM provider unavailable"), "llm build hint: {out}");
+    }
+
+    #[test]
+    fn display_summary_reports_attempt_failure_reason() {
+        // A summary was attempted but failed — show the real reason verbatim,
+        // not a generic "provider unavailable".
+        let mut info = minimal_info("productivity", ArtifactKind::Skill);
+        info.summary_error = Some("no readable content to summarize at /x".to_string());
+        let out = info.to_string();
+        assert!(out.contains("no readable content to summarize"), "names real reason: {out}");
+        assert!(!out.contains("--features llm"), "not the lean hint: {out}");
     }
 }

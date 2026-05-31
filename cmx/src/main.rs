@@ -172,13 +172,32 @@ fn handle_info(name: &str, kind: Option<ArtifactKind>, ctx: &AppContext<'_>) -> 
             llm: Some(&llm),
         };
         let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
-        if let Ok(summary) = rt.block_on(cmx::info::summarize(&info, &llm_ctx)) {
-            info.summary = Some(summary);
+        match rt.block_on(cmx::info::summarize(&info, &llm_ctx)) {
+            Ok(summary) => info.summary = Some(summary),
+            // Best-effort: record *why* so the display reports the real reason
+            // rather than always blaming the provider; never fail the command.
+            Err(e) => info.summary_error = Some(condense_error(&e)),
         }
     }
 
     print!("{info}");
     Ok(())
+}
+
+/// Render an error as a single, length-capped line for the one-line "What it
+/// does" reason. `{:#}` gives anyhow's full context chain (so the underlying
+/// provider/credential cause survives), then we flatten whitespace — provider
+/// errors often embed a multi-line JSON body — and truncate.
+#[cfg(feature = "llm")]
+fn condense_error(e: &anyhow::Error) -> String {
+    const MAX: usize = 200;
+    let flattened = format!("{e:#}").split_whitespace().collect::<Vec<_>>().join(" ");
+    if flattened.chars().count() > MAX {
+        let head: String = flattened.chars().take(MAX).collect();
+        format!("{head}…")
+    } else {
+        flattened
+    }
 }
 
 fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {

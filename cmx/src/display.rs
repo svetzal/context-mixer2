@@ -309,18 +309,16 @@ impl fmt::Display for ArtifactInfo {
             writeln!(f, "  {desc}")?;
         }
 
+        writeln!(f, "\nWhat it does:")?;
         if let Some(summary) = &self.summary {
-            writeln!(f, "\nWhat it does:")?;
             writeln!(f, "  {summary}")?;
+        } else if let Some(err) = &self.summary_error {
+            // A summary was attempted (an `llm` build) but failed — name the real
+            // reason (content unreadable, provider error, …), not a guess.
+            writeln!(f, "  (no summary — {err})")?;
         } else {
-            // The reason a summary is absent differs by build: a lean cmx can't
-            // generate one at all, whereas an `llm` build that left it empty hit
-            // a provider/credential problem.
-            #[cfg(not(feature = "llm"))]
-            let hint = "(build cmx with `--features llm` for an LLM-generated summary)";
-            #[cfg(feature = "llm")]
-            let hint = "(no summary — LLM provider unavailable; check `cmx config` and gateway credentials)";
-            writeln!(f, "\nWhat it does:\n  {hint}")?;
+            // No attempt was made — a lean build with no `llm` feature.
+            writeln!(f, "  (build cmx with `--features llm` for an LLM-generated summary)")?;
         }
 
         Ok(())
@@ -760,6 +758,7 @@ mod tests {
             skill_files: vec![],
             activates_when: None,
             summary: None,
+            summary_error: None,
         }
     }
 
