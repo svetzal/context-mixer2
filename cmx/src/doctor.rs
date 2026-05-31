@@ -142,9 +142,15 @@ pub struct DoctorReport {
 
 impl DoctorReport {
     /// Whether a logical artifact needs attention — drifted/untracked/orphaned,
-    /// or diverged across locations. Tracked and external are healthy.
+    /// or a tracked artifact that diverged across locations. **External artifacts
+    /// are never a problem** (another tool manages them — divergence among their
+    /// copies isn't cmx's concern), and a clean tracked artifact is fine.
     pub fn is_problem(a: &DoctorArtifact) -> bool {
-        a.diverged || !matches!(a.state, ArtifactState::Tracked | ArtifactState::External)
+        match a.state {
+            ArtifactState::External => false,
+            ArtifactState::Tracked => a.diverged,
+            _ => true,
+        }
     }
 }
 
@@ -579,6 +585,49 @@ mod tests {
             l.packages.insert(skill.to_string(), entry);
         })
         .unwrap();
+    }
+
+    // --- is_problem ---
+
+    #[test]
+    fn is_problem_matrix() {
+        let art = |state, diverged| DoctorArtifact {
+            kind: ArtifactKind::Skill,
+            name: "x".to_string(),
+            scope: InstallScope::Global,
+            state,
+            version: None,
+            tools: vec![],
+            source: None,
+            locations: vec![],
+            diverged,
+        };
+        assert!(
+            !DoctorReport::is_problem(&art(ArtifactState::Tracked, false)),
+            "clean tracked: ok"
+        );
+        assert!(
+            DoctorReport::is_problem(&art(ArtifactState::Tracked, true)),
+            "tracked+diverged: problem"
+        );
+        assert!(
+            DoctorReport::is_problem(&art(ArtifactState::Orphaned, false)),
+            "orphaned: problem"
+        );
+        assert!(
+            DoctorReport::is_problem(&art(ArtifactState::Untracked, false)),
+            "untracked: problem"
+        );
+        assert!(
+            DoctorReport::is_problem(&art(ArtifactState::Drifted, false)),
+            "drifted: problem"
+        );
+        // External is never a problem — even if its copies diverge.
+        assert!(!DoctorReport::is_problem(&art(ArtifactState::External, false)), "external: ok");
+        assert!(
+            !DoctorReport::is_problem(&art(ArtifactState::External, true)),
+            "external+diverged: still not cmx's concern"
+        );
     }
 
     // --- ArtifactState::label ---
