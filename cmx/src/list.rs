@@ -111,10 +111,10 @@ fn cross_platform_rows(
     source_versions: &BTreeMap<String, Vec<SourceArtifactInfo>>,
     ctx: &AppContext<'_>,
 ) -> Result<BTreeMap<InstallScope, Vec<Row>>> {
-    // Dedup by (name, source) so the same skill tracked for several platforms
-    // collapses to one row, while a skill genuinely available from two sources
-    // still shows a row per source.
-    let mut by_scope: BTreeMap<InstallScope, BTreeMap<(String, String), Row>> = BTreeMap::new();
+    // One row per skill name within a scope — a complete inventory, not a row
+    // per (platform × source). The first platform that has a given artifact
+    // wins the row; its provenance is shown in the Source column.
+    let mut by_scope: BTreeMap<InstallScope, BTreeMap<String, Row>> = BTreeMap::new();
     for platform in Platform::ALL {
         if !platform.supports(kind) {
             continue;
@@ -129,11 +129,7 @@ fn cross_platform_rows(
         };
         for (scope, lock) in lockfile::load_both(ctx.fs, &pv)? {
             for row in build_rows_with(kind, scope, &lock, source_versions, &pctx)? {
-                by_scope
-                    .entry(scope)
-                    .or_default()
-                    .entry((row.name.clone(), row.source.clone()))
-                    .or_insert(row);
+                by_scope.entry(scope).or_default().entry(row.name.clone()).or_insert(row);
             }
         }
     }
