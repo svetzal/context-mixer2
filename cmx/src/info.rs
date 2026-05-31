@@ -204,7 +204,10 @@ pub(crate) fn collect_skill_files_with(
     let mut result = Vec::new();
     for entry in entries {
         let name_str = &entry.file_name;
-        if name_str.starts_with('.') {
+        // Suppress dotfiles and transient dependency/metadata dirs (node_modules,
+        // __pycache__, .venv, …) — the same filter the checksum/copy walkers use,
+        // so `info`'s tree shows the skill's real contents, not vendored noise.
+        if name_str.starts_with('.') || crate::fs_util::is_transient(name_str) {
             continue;
         }
 
@@ -667,6 +670,32 @@ mod tests {
 
         let names: Vec<&str> = result.iter().map(|e| e.name.as_str()).collect();
         assert!(!names.contains(&".hidden"), "dotfiles should be skipped");
+    }
+
+    #[test]
+    fn collect_skill_files_skips_transient_dependency_dirs() {
+        let t = TestContext::new();
+
+        t.fs.add_file("/skills/my-skill/SKILL.md", "---\ndescription: skill\n---\n");
+        t.fs.add_file("/skills/my-skill/scripts/run.py", "code");
+        // Vendored/dependency/metadata noise that must not be expanded.
+        t.fs.add_file("/skills/my-skill/node_modules/dep/index.js", "x");
+        t.fs.add_file("/skills/my-skill/__pycache__/run.cpython-312.pyc", "y");
+        t.fs.add_file("/skills/my-skill/.venv/bin/activate", "z");
+
+        let ctx = t.ctx();
+        let result =
+            collect_skill_files_with(std::path::Path::new("/skills/my-skill"), 0, &ctx).unwrap();
+        let names: Vec<&str> = result.iter().map(|e| e.name.as_str()).collect();
+
+        assert!(names.contains(&"SKILL.md"), "real content kept");
+        assert!(names.contains(&"scripts"), "real subdir kept");
+        assert!(!names.contains(&"node_modules"), "node_modules suppressed");
+        assert!(!names.contains(&"__pycache__"), "__pycache__ suppressed");
+        assert!(!names.contains(&".venv"), ".venv suppressed");
+        // And nothing from inside them leaked via recursion.
+        assert!(!names.contains(&"dep"), "node_modules contents not expanded");
+        assert!(!names.contains(&"index.js"), "node_modules files not expanded");
     }
 
     #[test]
