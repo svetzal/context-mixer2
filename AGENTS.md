@@ -60,14 +60,19 @@ Releasing is three distinct steps:
    existing tag style — `git tag vX.Y.Z`, not `-a`) and push it. The push fires
    `release.yml`.
 3. **Local install** (this machine): once the release is published, install the
-   same version locally via `cargo install`. Both binaries are installed
-   **lean** (default features, no `llm`), release profile, from the workspace
+   same version locally via `cargo install`, release profile, from the workspace
    member paths:
 
    ```bash
-   cargo install --path cmx --force
+   cargo install --path cmx --features llm --force
    cargo install --path cmf --force
    ```
+
+   `cmx` is installed **with the `llm` feature** so the LLM-backed commands
+   (`cmx skill info`'s summary, `cmx diff`) work locally; it pulls tokio +
+   mojentic and needs the configured gateway's credentials (e.g.
+   `OPENAI_API_KEY`) in the environment at runtime. `cmf` stays **lean**
+   (default features, no `llm`). Homebrew distribution remains lean for both.
 
    Run from a checkout at the released version (the tagged commit, or `main` at
    the same `version`). `--force` overwrites the previously installed binaries.

@@ -799,6 +799,11 @@ mod tests {
     fn display_summary_hint_when_absent() {
         let info = minimal_info("my-skill", ArtifactKind::Skill);
         let out = info.to_string();
-        assert!(out.contains("--features llm"), "shows build hint when no summary: {out}");
+        // The hint differs by build: lean points at `--features llm`; an llm
+        // build that produced no summary points at the provider/config.
+        #[cfg(not(feature = "llm"))]
+        assert!(out.contains("--features llm"), "lean build hint: {out}");
+        #[cfg(feature = "llm")]
+        assert!(out.contains("LLM provider unavailable"), "llm build hint: {out}");
     }
 }
