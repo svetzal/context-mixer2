@@ -638,8 +638,9 @@ mod tests {
         Row {
             name: name.to_string(),
             installed: "1.0.0".to_string(),
-            source: "src".to_string(),
             available: "1.0.0".to_string(),
+            source: "src".to_string(),
+            tools: "claude".to_string(),
             status: "✅",
         }
     }
