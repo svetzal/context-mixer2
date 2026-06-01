@@ -28,7 +28,7 @@ pub fn validate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
     let mut issues = Vec::new();
 
     // Check 3: each entry's source resolves to a directory with plugin.json
-    issues.extend(validate_marketplace_entries(&marketplace.plugins, root, fs));
+    issues.extend(validate_marketplace_entries(&marketplace.plugins, root, fs)?);
 
     // Check 4: unlisted plugins — directories in plugins/ with plugin.json not in marketplace
     issues.extend(find_unlisted_plugins(&marketplace, root, fs));
@@ -89,7 +89,7 @@ fn validate_marketplace_entries(
     entries: &[MarketplaceEntry],
     root: &RepoRoot,
     fs: &dyn Filesystem,
-) -> Vec<ValidationIssue> {
+) -> Result<Vec<ValidationIssue>> {
     let mut issues = Vec::new();
 
     for entry in entries {
@@ -115,23 +115,29 @@ fn validate_marketplace_entries(
             continue;
         }
 
-        // Check name match between marketplace entry and plugin.json
-        if let Ok(pj_content) = fs.read_to_string(&plugin_json) {
-            if let Ok(manifest) = serde_json::from_str::<PluginManifest>(&pj_content) {
-                if manifest.name != entry.name {
-                    issues.push(ValidationIssue::warning(
-                        "marketplace",
-                        format!(
-                            "marketplace entry name \"{}\" does not match plugin.json name \"{}\"",
-                            entry.name, manifest.name
-                        ),
-                    ));
-                }
+        // Check name match between marketplace entry and plugin.json; report
+        // unreadable or malformed files as errors instead of silently skipping.
+        let (maybe_manifest, read_issues) = load_and_validate_json::<PluginManifest>(
+            &plugin_json,
+            "marketplace",
+            &format!("plugin \"{}\" plugin.json", entry.name),
+            fs,
+        )?;
+        issues.extend(read_issues);
+        if let Some(manifest) = maybe_manifest {
+            if manifest.name != entry.name {
+                issues.push(ValidationIssue::warning(
+                    "marketplace",
+                    format!(
+                        "marketplace entry name \"{}\" does not match plugin.json name \"{}\"",
+                        entry.name, manifest.name
+                    ),
+                ));
             }
         }
     }
 
-    issues
+    Ok(issues)
 }
 
 /// Scan for plugin directories that have a plugin.json but are not listed in
@@ -148,8 +154,16 @@ fn find_unlisted_plugins(
         return issues;
     }
 
-    let Ok(entries) = fs.read_dir(&plugins_dir) else {
-        return issues;
+    // A read_dir failure after is_dir succeeds is a genuine I/O error worth reporting.
+    let entries = match fs.read_dir(&plugins_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            issues.push(ValidationIssue::error(
+                "marketplace",
+                format!("could not read plugins directory: {e}"),
+            ));
+            return issues;
+        }
     };
 
     let listed_sources: Vec<_> = marketplace
@@ -301,6 +315,41 @@ mod tests {
         assert!(
             warnings.iter().any(|w| w.message.contains("does not match")),
             "expected name mismatch warning, got: {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn validate_marketplace_malformed_plugin_json() {
+        let fs = FakeFilesystem::new();
+        let json = fake_marketplace_json(&[("alpha", "Alpha plugin", "./plugins/alpha")]);
+        let root = fake_marketplace_root(&fs, &json);
+
+        fs.add_dir("/repo/plugins/alpha");
+        fs.add_file("/repo/plugins/alpha/.claude-plugin/plugin.json", "{ not json");
+
+        let issues = validate_marketplace(&root, &fs).unwrap();
+        let errors: Vec<_> = issues.iter().filter(|i| i.level == IssueLevel::Error).collect();
+        assert!(
+            errors.iter().any(|e| e.message.contains("malformed")),
+            "expected malformed error, got: {issues:?}"
+        );
+    }
+
+    #[test]
+    fn validate_marketplace_unreadable_plugin_json() {
+        let fs = FakeFilesystem::new();
+        let json = fake_marketplace_json(&[("alpha", "Alpha plugin", "./plugins/alpha")]);
+        let root = fake_marketplace_root(&fs, &json);
+
+        fs.add_dir("/repo/plugins/alpha");
+        // Invalid UTF-8 bytes cause read_to_string to fail while exists() is true
+        fs.add_file("/repo/plugins/alpha/.claude-plugin/plugin.json", vec![0xff, 0xfe]);
+
+        let issues = validate_marketplace(&root, &fs).unwrap();
+        let errors: Vec<_> = issues.iter().filter(|i| i.level == IssueLevel::Error).collect();
+        assert!(
+            errors.iter().any(|e| e.message.contains("could not be read")),
+            "expected unreadable error, got: {issues:?}"
         );
     }
 

@@ -216,8 +216,15 @@ fn validate_artifact_dir(
     if !fs.is_dir(&artifact_dir) {
         return;
     }
-    let Ok(entries) = fs.read_dir(&artifact_dir) else {
-        return;
+    let entries = match fs.read_dir(&artifact_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            issues.push(ValidationIssue::error(
+                format!("plugin/{dir_name}"),
+                format!("could not read {} directory: {e}", kind.subdir_name()),
+            ));
+            return;
+        }
     };
     for entry in entries {
         match kind {
