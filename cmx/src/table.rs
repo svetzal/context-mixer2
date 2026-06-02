@@ -158,6 +158,24 @@ pub fn render_table(
     .render()
 }
 
+/// Returns a formatted empty-state message terminated with a newline.
+pub fn empty_state(msg: &str) -> String {
+    format!("{msg}\n")
+}
+
+/// Returns a formatted section: title on its own line followed by each item
+/// indented by two spaces. Produces byte-identical output to the inline
+/// `writeln!(f, "Title:")` + `writeln!(f, "  item")` pattern.
+pub fn section(title: &str, indented_lines: &[String]) -> String {
+    let mut out = format!("{title}\n");
+    for line in indented_lines {
+        out.push_str("  ");
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
 // ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
@@ -278,6 +296,36 @@ mod tests {
         let widths = t.column_widths();
         // widths[0] = max(4, 5, 13) = 13; widths[1] = max(7, 3, 6) = 7
         assert_eq!(widths, vec![13, 7]);
+    }
+
+    // --- empty_state ---
+
+    #[test]
+    fn empty_state_appends_newline() {
+        assert_eq!(empty_state("Nothing here."), "Nothing here.\n");
+    }
+
+    #[test]
+    fn empty_state_empty_message() {
+        assert_eq!(empty_state(""), "\n");
+    }
+
+    // --- section ---
+
+    #[test]
+    fn section_zero_lines_produces_title_only() {
+        assert_eq!(section("Items:", &[]), "Items:\n");
+    }
+
+    #[test]
+    fn section_one_line_indented() {
+        assert_eq!(section("Items:", &["first".to_string()]), "Items:\n  first\n");
+    }
+
+    #[test]
+    fn section_multiple_lines_each_indented() {
+        let lines = vec!["alpha".to_string(), "beta".to_string()];
+        assert_eq!(section("Things:", &lines), "Things:\n  alpha\n  beta\n");
     }
 
     // --- render_table ---

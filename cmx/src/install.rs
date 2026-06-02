@@ -5,6 +5,7 @@ use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
 use crate::lockfile;
+use crate::partition::{Partitioned, partition_by};
 use crate::paths::ConfigPaths;
 use crate::source_iter;
 use crate::source_update;
@@ -144,8 +145,12 @@ pub fn install_many(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<InstallManyResult> {
-    let (installed, failed) =
-        partition_results(names, |name| install(name, kind, scope, force, ctx));
+    let (installed, failed) = partition_by(names, |name| {
+        Ok(match install(name, kind, scope, force, ctx) {
+            Ok(r) => Partitioned::Kept(r),
+            Err(e) => Partitioned::Excluded((name.to_string(), e.to_string())),
+        })
+    })?;
     Ok(InstallManyResult {
         kind,
         installed,
@@ -247,23 +252,6 @@ pub fn update_all(
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
-
-/// Run `op` over each name, collecting successes into the first vec and
-/// `(name, reason)` failure pairs into the second. Never returns `Err`.
-fn partition_results<S, F>(names: &[String], mut op: F) -> (Vec<S>, Vec<(String, String)>)
-where
-    F: FnMut(&str) -> Result<S>,
-{
-    let mut ok = Vec::new();
-    let mut err = Vec::new();
-    for name in names {
-        match op(name) {
-            Ok(r) => ok.push(r),
-            Err(e) => err.push((name.clone(), e.to_string())),
-        }
-    }
-    (ok, err)
-}
 
 /// Compute the destination directory and relative source path for an install.
 /// Pure function — no filesystem access.
@@ -497,23 +485,6 @@ mod tests {
             plan_install("legacy", ArtifactKind::Agent, InstallScope::Global, &found, &paths);
         assert_eq!(plan.version, Some("0.1.0".to_string()));
         assert_eq!(plan.source_name, "guidelines");
-    }
-
-    // --- partition_results ---
-
-    #[test]
-    fn partition_results_collects_ok_and_err() {
-        let names: Vec<String> = vec!["ok1".to_string(), "fail".to_string(), "ok2".to_string()];
-        let (ok, err) = partition_results(&names, |name| {
-            if name == "fail" {
-                anyhow::bail!("something went wrong")
-            }
-            Ok(name.to_string())
-        });
-        assert_eq!(ok, vec!["ok1".to_string(), "ok2".to_string()]);
-        assert_eq!(err.len(), 1);
-        assert_eq!(err[0].0, "fail");
-        assert!(err[0].1.contains("something went wrong"));
     }
 
     // --- install_many ---

@@ -18,6 +18,7 @@ pub mod json_file;
 pub mod list;
 pub mod lockfile;
 pub mod outdated;
+pub mod partition;
 pub mod paths;
 pub mod platform;
 pub mod scan;

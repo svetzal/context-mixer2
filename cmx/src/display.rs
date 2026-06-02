@@ -12,7 +12,7 @@ use crate::outdated::OutdatedReport;
 use crate::search::SearchOutput;
 use crate::source::{SourceBrowseResult, SourceListResult, SourceRemoveResult, SourceScanResult};
 use crate::source_update::SourceUpdateOutput;
-use crate::table::{Table, render_table};
+use crate::table::{Table, empty_state, render_table, section};
 use crate::types::{InstallScope, format_version_prefix};
 use crate::uninstall::{BatchUninstallResult, UninstallResult};
 
@@ -38,11 +38,15 @@ impl fmt::Display for SourceBrowseResult {
             return writeln!(f, "No agents or skills found in '{name}'.");
         }
         if !self.agents.is_empty() {
-            writeln!(f, "Agents:")?;
-            for a in &self.agents {
-                let v = format_version_prefix(a.version.as_deref());
-                writeln!(f, "  {}{v}{}", a.name, a.deprecation_display)?;
-            }
+            let lines: Vec<String> = self
+                .agents
+                .iter()
+                .map(|a| {
+                    let v = format_version_prefix(a.version.as_deref());
+                    format!("{}{v}{}", a.name, a.deprecation_display)
+                })
+                .collect();
+            write!(f, "{}", section("Agents:", &lines))?;
         }
         if !self.skills.is_empty() {
             if !self.agents.is_empty() {
@@ -172,7 +176,7 @@ impl fmt::Display for ListOutput {
             && global_skills.is_empty()
             && local_skills.is_empty()
         {
-            return writeln!(f, "Nothing installed.");
+            return write!(f, "{}", empty_state("Nothing installed."));
         }
 
         write!(f, "{}", section_str("Global agents", global_agents))?;

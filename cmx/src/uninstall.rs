@@ -5,6 +5,7 @@ use anyhow::Result;
 
 use crate::context::AppContext;
 use crate::lockfile;
+use crate::partition::{Partitioned, partition_by};
 use crate::platform::Platform;
 use crate::types::{ArtifactKind, InstallScope};
 
@@ -97,23 +98,6 @@ fn uninstall_one(
     }))
 }
 
-/// Run `op` over each name, collecting `Some(r)` into the first vec and the
-/// name of each `None` result into the second. Propagates `Err` with `?`.
-fn partition_options<S, F>(names: &[String], mut op: F) -> Result<(Vec<S>, Vec<String>)>
-where
-    F: FnMut(&str) -> Result<Option<S>>,
-{
-    let mut found = Vec::new();
-    let mut not_found = Vec::new();
-    for name in names {
-        match op(name)? {
-            Some(r) => found.push(r),
-            None => not_found.push(name.clone()),
-        }
-    }
-    Ok((found, not_found))
-}
-
 /// Uninstall a single named artifact, erroring if it isn't installed anywhere.
 pub fn uninstall(
     name: &str,
@@ -138,8 +122,12 @@ pub fn uninstall_many(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<BatchUninstallResult> {
-    let (removed, not_found) =
-        partition_options(names, |name| uninstall_one(name, kind, scope, ctx))?;
+    let (removed, not_found) = partition_by(names, |name| {
+        Ok(match uninstall_one(name, kind, scope, ctx)? {
+            Some(r) => Partitioned::Kept(r),
+            None => Partitioned::Excluded(name.to_string()),
+        })
+    })?;
     Ok(BatchUninstallResult {
         kind,
         removed,
@@ -159,39 +147,6 @@ mod tests {
     use crate::test_support::{TestContext, make_ctx, sample_lock_entry, test_paths_for};
     use crate::types::{ArtifactKind, InstallScope, LockFile};
     use std::collections::BTreeMap;
-
-    // --- partition_options ---
-
-    #[test]
-    fn partition_options_collects_found_and_not_found() {
-        let names: Vec<String> = vec![
-            "found1".to_string(),
-            "missing".to_string(),
-            "found2".to_string(),
-        ];
-        let (found, not_found) = partition_options(&names, |name| {
-            if name == "missing" {
-                return Ok(None);
-            }
-            Ok(Some(name.to_string()))
-        })
-        .unwrap();
-        assert_eq!(found, vec!["found1".to_string(), "found2".to_string()]);
-        assert_eq!(not_found, vec!["missing".to_string()]);
-    }
-
-    #[test]
-    fn partition_options_propagates_err() {
-        let names: Vec<String> = vec!["ok".to_string(), "boom".to_string()];
-        let result: Result<_> = partition_options(&names, |name| {
-            if name == "boom" {
-                anyhow::bail!("hard error")
-            }
-            Ok(Some(name.to_string()))
-        });
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("hard error"));
-    }
 
     // --- Display for UninstallResult ---
 

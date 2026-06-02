@@ -4,6 +4,7 @@ use std::fmt;
 use cmx::gateway::Filesystem;
 use cmx::json_file::load_json;
 use cmx::platform::Platform;
+use cmx::table::{empty_state, render_table, section};
 
 use crate::facet::{scan_facets, scan_recipes};
 use crate::facet_types::{FacetList, RecipeList};
@@ -70,17 +71,15 @@ impl fmt::Display for ValidationReport {
         let warnings: Vec<_> = issues.iter().filter(|i| i.level == IssueLevel::Warning).collect();
 
         if !errors.is_empty() {
-            writeln!(f, "Errors:")?;
-            for issue in &errors {
-                writeln!(f, "  {}: {}", issue.context, issue.message)?;
-            }
+            let lines: Vec<String> =
+                errors.iter().map(|i| format!("{}: {}", i.context, i.message)).collect();
+            write!(f, "{}", section("Errors:", &lines))?;
         }
 
         if !warnings.is_empty() {
-            writeln!(f, "Warnings:")?;
-            for issue in &warnings {
-                writeln!(f, "  {}: {}", issue.context, issue.message)?;
-            }
+            let lines: Vec<String> =
+                warnings.iter().map(|i| format!("{}: {}", i.context, i.message)).collect();
+            write!(f, "{}", section("Warnings:", &lines))?;
         }
 
         Ok(())
@@ -91,7 +90,11 @@ impl fmt::Display for ManifestSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let files = &self.0;
         if files.is_empty() {
-            return writeln!(f, "No .claude-plugin/ sources found — nothing to generate.");
+            return write!(
+                f,
+                "{}",
+                empty_state("No .claude-plugin/ sources found — nothing to generate.")
+            );
         }
 
         writeln!(f, "Generated manifests for {} platforms:", Platform::targets().len())?;
@@ -146,12 +149,11 @@ impl fmt::Display for FacetList {
             groups.push((facet.category.clone(), vec![facet.name.clone()]));
         }
 
-        let max_cat_width = groups.iter().map(|(cat, _)| cat.len() + 1).max().unwrap_or(0);
-
-        for (category, names) in &groups {
-            let label = format!("{category}/");
-            writeln!(f, "  {:<width$} {}", label, names.join(", "), width = max_cat_width)?;
-        }
+        let rows: Vec<Vec<String>> = groups
+            .iter()
+            .map(|(cat, names)| vec![format!("{cat}/"), names.join(", ")])
+            .collect();
+        write!(f, "{}", render_table(vec!["Category", "Facets"], 1, rows))?;
 
         Ok(())
     }
