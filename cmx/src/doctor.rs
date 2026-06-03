@@ -557,6 +557,64 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
 }
 
 // ---------------------------------------------------------------------------
+// Pure divergence-detail types and builder
+// ---------------------------------------------------------------------------
+
+/// Per-location data for one copy of a diverged artifact.
+#[derive(Debug, Clone)]
+pub struct DivergenceMember {
+    pub location: PathBuf,
+    pub version: Option<String>,
+    pub state_label: &'static str,
+}
+
+/// Per-artifact divergence breakdown — the data needed to render the detail
+/// lines under the summary. Pure: no I/O, computed from borrowed report data.
+#[derive(Debug, Clone)]
+pub struct DivergenceDetail {
+    pub name: String,
+    /// True when the copies also differ in *state* (not just version).
+    pub states_differ: bool,
+    pub members: Vec<DivergenceMember>,
+}
+
+/// Build divergence details for every diverged artifact in `shown`.
+///
+/// Pure function — no I/O. The display layer calls this to obtain the
+/// structured data it needs to render the per-location breakdown.
+pub fn divergence_details(shown: &[&DoctorArtifact], rows: &[DoctorRow]) -> Vec<DivergenceDetail> {
+    shown
+        .iter()
+        .filter(|a| a.diverged)
+        .map(|a| {
+            let mut members: Vec<&DoctorRow> = rows
+                .iter()
+                .filter(|r| r.kind == a.kind && r.name == a.name && r.scope == a.scope)
+                .collect();
+            members.sort_by(|x, y| x.location.cmp(&y.location));
+            let states_differ = members
+                .iter()
+                .map(|r| r.state.label())
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                > 1;
+            DivergenceDetail {
+                name: a.name.clone(),
+                states_differ,
+                members: members
+                    .into_iter()
+                    .map(|r| DivergenceMember {
+                        location: r.location.clone(),
+                        version: r.version.clone(),
+                        state_label: r.state.label(),
+                    })
+                    .collect(),
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 
@@ -984,6 +1042,86 @@ mod tests {
             !arts[0].tools.contains(&Platform::Crush) && !arts[0].tools.contains(&Platform::Zed),
             "cohort readers without a lock entry are not listed as tracked-for tools"
         );
+    }
+
+    // --- divergence_details (pure, no gateway fakes needed) ---
+
+    fn make_doctor_artifact(name: &str, diverged: bool) -> DoctorArtifact {
+        DoctorArtifact {
+            kind: ArtifactKind::Skill,
+            name: name.to_string(),
+            scope: InstallScope::Global,
+            state: ArtifactState::External,
+            version: None,
+            versions: vec![],
+            tools: vec![],
+            source: None,
+            locations: vec![],
+            diverged,
+        }
+    }
+
+    fn make_doctor_row(name: &str, loc: &str, ver: &str, state: ArtifactState) -> DoctorRow {
+        DoctorRow {
+            kind: ArtifactKind::Skill,
+            name: name.to_string(),
+            scope: InstallScope::Global,
+            location: std::path::PathBuf::from(loc),
+            platforms: vec![Platform::Claude],
+            tracked_for: vec![],
+            state,
+            version: Some(ver.to_string()),
+            source: None,
+        }
+    }
+
+    #[test]
+    fn divergence_details_empty_when_no_diverged_artifacts() {
+        let art = make_doctor_artifact("clean", false);
+        let shown = vec![&art];
+        let result = divergence_details(&shown, &[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn divergence_details_groups_rows_by_artifact() {
+        let art = make_doctor_artifact("skew", true);
+        let shown = vec![&art];
+        let rows = vec![
+            make_doctor_row("skew", "/a/skills", "1.0.0", ArtifactState::Tracked),
+            make_doctor_row("skew", "/b/skills", "2.0.0", ArtifactState::Tracked),
+        ];
+        let result = divergence_details(&shown, &rows);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "skew");
+        assert_eq!(result[0].members.len(), 2);
+        assert!(!result[0].states_differ);
+    }
+
+    #[test]
+    fn divergence_details_states_differ_flag() {
+        let art = make_doctor_artifact("mixed", true);
+        let shown = vec![&art];
+        let rows = vec![
+            make_doctor_row("mixed", "/a/skills", "1.0.0", ArtifactState::Tracked),
+            make_doctor_row("mixed", "/b/skills", "1.0.0", ArtifactState::Drifted),
+        ];
+        let result = divergence_details(&shown, &rows);
+        assert_eq!(result.len(), 1);
+        assert!(result[0].states_differ, "copies differ in state");
+    }
+
+    #[test]
+    fn divergence_details_members_sorted_by_location() {
+        let art = make_doctor_artifact("sorted", true);
+        let shown = vec![&art];
+        let rows = vec![
+            make_doctor_row("sorted", "/z/skills", "1.0.0", ArtifactState::External),
+            make_doctor_row("sorted", "/a/skills", "2.0.0", ArtifactState::External),
+        ];
+        let result = divergence_details(&shown, &rows);
+        assert_eq!(result[0].members[0].location, std::path::PathBuf::from("/a/skills"));
+        assert_eq!(result[0].members[1].location, std::path::PathBuf::from("/z/skills"));
     }
 
     #[test]

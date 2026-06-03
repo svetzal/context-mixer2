@@ -55,6 +55,45 @@ pub(crate) fn try_parse_artifact(
     Some(artifact_from_frontmatter(kind, name, path.to_path_buf(), fm))
 }
 
+/// Pure classification of a directory entry before any I/O is performed.
+///
+/// `Recurse` is returned for non-hidden directories: the walker will first
+/// attempt to parse the dir as a skill (requires reading `SKILL.md`) and, if
+/// that fails, recurse into it. The pure classifier only sees what the
+/// `DirEntry` metadata can tell it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EntryAction {
+    /// Parse the file as an agent `.md`.
+    ParseAgent,
+    /// Non-hidden directory: walker tries skill parse first, then recurses.
+    Recurse,
+    /// Skip this entry entirely.
+    Skip,
+}
+
+/// Classify a single directory entry without performing any I/O.
+///
+/// Rules encoded here (from `walk_dir_with`):
+/// - Hidden entries (name starts with `.`) → `Skip`
+/// - Directories → `Recurse` (walker tries skill parse first, then recurses)
+/// - `.md` files (not `SKILL.md`) directly inside an `agents/` directory → `ParseAgent`
+/// - Everything else → `Skip`
+pub(crate) fn classify_entry(entry: &crate::gateway::DirEntry, parent_dir: &Path) -> EntryAction {
+    if entry.file_name.starts_with('.') {
+        return EntryAction::Skip;
+    }
+    if entry.is_dir {
+        return EntryAction::Recurse;
+    }
+    if entry.path.extension().is_some_and(|ext| ext == "md")
+        && entry.file_name != "SKILL.md"
+        && parent_dir.file_name().is_some_and(|d| d == "agents")
+    {
+        return EntryAction::ParseAgent;
+    }
+    EntryAction::Skip
+}
+
 pub(crate) fn walk_dir_with(
     dir: &Path,
     artifacts: &mut Vec<Artifact>,
@@ -65,28 +104,22 @@ pub(crate) fn walk_dir_with(
     };
 
     for entry in entries {
-        let name_str = entry.file_name.clone();
-
-        // Skip hidden directories
-        if name_str.starts_with('.') {
-            continue;
-        }
-
-        if entry.is_dir {
-            if let Some(artifact) = try_parse_artifact(ArtifactKind::Skill, &entry.path, fs) {
-                artifacts.push(artifact);
-                // Don't recurse into skill directories — .md files inside
-                // are reference material, not agents
-            } else {
-                walk_dir_with(&entry.path, artifacts, fs)?;
+        match classify_entry(&entry, dir) {
+            EntryAction::Recurse => {
+                if let Some(artifact) = try_parse_artifact(ArtifactKind::Skill, &entry.path, fs) {
+                    artifacts.push(artifact);
+                    // Don't recurse into skill directories — .md files inside
+                    // are reference material, not agents
+                } else {
+                    walk_dir_with(&entry.path, artifacts, fs)?;
+                }
             }
-        } else if entry.path.extension().is_some_and(|ext| ext == "md")
-            && name_str != "SKILL.md"
-            && dir.file_name().is_some_and(|d| d == "agents")
-        {
-            if let Some(artifact) = try_parse_artifact(ArtifactKind::Agent, &entry.path, fs) {
-                artifacts.push(artifact);
+            EntryAction::ParseAgent => {
+                if let Some(artifact) = try_parse_artifact(ArtifactKind::Agent, &entry.path, fs) {
+                    artifacts.push(artifact);
+                }
             }
+            EntryAction::Skip => {}
         }
     }
 
@@ -284,12 +317,59 @@ pub fn extract_version_from_content(content: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gateway::DirEntry;
     use crate::gateway::fakes::FakeFilesystem;
     use crate::test_support::{
         agent_content, metadata_versioned_agent_content, metadata_versioned_skill_content,
         skill_content,
     };
     use std::path::PathBuf;
+
+    fn make_entry(path: &str, file_name: &str, is_dir: bool) -> DirEntry {
+        DirEntry {
+            path: PathBuf::from(path),
+            file_name: file_name.to_string(),
+            is_dir,
+        }
+    }
+
+    // --- classify_entry (pure, no FakeFilesystem) ---
+
+    #[test]
+    fn classify_entry_hidden_dir_is_skip() {
+        let entry = make_entry("/repo/.hidden", ".hidden", true);
+        assert_eq!(classify_entry(&entry, Path::new("/repo")), EntryAction::Skip);
+    }
+
+    #[test]
+    fn classify_entry_plain_subdir_is_recurse() {
+        let entry = make_entry("/repo/subdir", "subdir", true);
+        assert_eq!(classify_entry(&entry, Path::new("/repo")), EntryAction::Recurse);
+    }
+
+    #[test]
+    fn classify_entry_md_in_agents_is_parse_agent() {
+        let entry = make_entry("/repo/agents/my-agent.md", "my-agent.md", false);
+        assert_eq!(classify_entry(&entry, Path::new("/repo/agents")), EntryAction::ParseAgent);
+    }
+
+    #[test]
+    fn classify_entry_skill_md_is_not_parse_agent() {
+        let entry = make_entry("/repo/my-skill/SKILL.md", "SKILL.md", false);
+        assert_eq!(classify_entry(&entry, Path::new("/repo/my-skill")), EntryAction::Skip);
+    }
+
+    #[test]
+    fn classify_entry_md_outside_agents_dir_is_skip() {
+        let entry = make_entry("/repo/docs/readme.md", "readme.md", false);
+        assert_eq!(classify_entry(&entry, Path::new("/repo/docs")), EntryAction::Skip);
+    }
+
+    #[test]
+    fn classify_entry_non_md_file_is_skip() {
+        let entry = make_entry("/repo/agents/script.py", "script.py", false);
+        assert_eq!(classify_entry(&entry, Path::new("/repo/agents")), EntryAction::Skip);
+    }
 
     // ---------------------------------------------------------------------------
     // Pure parsing tests (unchanged)

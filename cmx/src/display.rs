@@ -484,37 +484,29 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
 }
 
 /// Per-location breakdown for each shown diverged artifact, naming which copy
-/// carries which version (and state, when states differ too). Built from the raw
-/// rows — which pair location↔version — because the grouped table collapses them.
+/// carries which version (and state, when states differ too). Delegates all
+/// filtering/grouping to the pure `doctor::divergence_details` core; this
+/// function only renders the returned structs into output lines.
 fn doctor_divergence_details(
     shown: &[&crate::doctor::DoctorArtifact],
     rows: &[crate::doctor::DoctorRow],
 ) -> String {
+    let details = crate::doctor::divergence_details(shown, rows);
     let mut lines = Vec::new();
-    for a in shown.iter().filter(|a| a.diverged) {
-        let mut members: Vec<&crate::doctor::DoctorRow> = rows
+    for d in &details {
+        let parts: Vec<String> = d
+            .members
             .iter()
-            .filter(|r| r.kind == a.kind && r.name == a.name && r.scope == a.scope)
-            .collect();
-        members.sort_by(|x, y| x.location.cmp(&y.location));
-        let states_differ = members
-            .iter()
-            .map(|r| r.state.label())
-            .collect::<std::collections::BTreeSet<_>>()
-            .len()
-            > 1;
-        let parts: Vec<String> = members
-            .iter()
-            .map(|r| {
-                let ver = r.version.as_deref().unwrap_or("unversioned");
-                if states_differ {
-                    format!("{} @ {ver} ({})", r.location.display(), r.state.label())
+            .map(|m| {
+                let ver = m.version.as_deref().unwrap_or("unversioned");
+                if d.states_differ {
+                    format!("{} @ {ver} ({})", m.location.display(), m.state_label)
                 } else {
-                    format!("{} @ {ver}", r.location.display())
+                    format!("{} @ {ver}", m.location.display())
                 }
             })
             .collect();
-        lines.push(format!("  • {} diverges: {}", a.name, parts.join(", ")));
+        lines.push(format!("  • {} diverges: {}", d.name, parts.join(", ")));
     }
     if lines.is_empty() {
         String::new()

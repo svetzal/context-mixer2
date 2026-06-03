@@ -236,26 +236,59 @@ fn validate_artifact_dir(
     }
 }
 
+/// Pure predicate: determine the validation issue message for an agent entry,
+/// if any. Returns `None` when the entry is valid or not an agent file.
+/// The shell computes `discovered_names` from the scan result and passes it in.
+fn agent_entry_issue(
+    entry: &cmx::gateway::DirEntry,
+    discovered_names: &[String],
+) -> Option<String> {
+    let is_md = Path::new(&entry.file_name)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
+    if entry.is_dir || !is_md {
+        return None;
+    }
+    let artifact_name = ArtifactKind::Agent
+        .artifact_name_from_path(Path::new(&entry.file_name))
+        .unwrap_or_default();
+    if discovered_names.contains(&artifact_name) {
+        None
+    } else {
+        Some(format!("agents/{} has no frontmatter name field", entry.file_name))
+    }
+}
+
+/// Pure predicate: determine the validation issue message for a skill entry,
+/// if any. `skill_md_exists` is computed by the shell via `fs.exists`.
+fn skill_entry_issue(
+    entry: &cmx::gateway::DirEntry,
+    skill_md_exists: bool,
+    discovered_names: &[String],
+) -> Option<String> {
+    if !entry.is_dir {
+        return None;
+    }
+    if !skill_md_exists {
+        Some(format!("skills/{} is missing SKILL.md", entry.file_name))
+    } else if !discovered_names.contains(&entry.file_name) {
+        Some(format!(
+            "skills/{}/SKILL.md has no frontmatter description field",
+            entry.file_name
+        ))
+    } else {
+        None
+    }
+}
+
 fn validate_agent_entry(
     entry: &cmx::gateway::DirEntry,
     discovered_names: &[String],
     dir_name: &str,
     issues: &mut Vec<ValidationIssue>,
 ) {
-    let is_md = Path::new(&entry.file_name)
-        .extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
-    if entry.is_dir || !is_md {
-        return;
-    }
-    let artifact_name = ArtifactKind::Agent
-        .artifact_name_from_path(Path::new(&entry.file_name))
-        .unwrap_or_default();
-    if !discovered_names.contains(&artifact_name) {
-        issues.push(ValidationIssue::warning(
-            dir_name,
-            format!("agents/{} has no frontmatter name field", entry.file_name),
-        ));
+    if let Some(msg) = agent_entry_issue(entry, discovered_names) {
+        issues.push(ValidationIssue::warning(dir_name, msg));
     }
 }
 
@@ -266,20 +299,10 @@ fn validate_skill_entry(
     fs: &dyn Filesystem,
     issues: &mut Vec<ValidationIssue>,
 ) {
-    if !entry.is_dir {
-        return;
-    }
     let content_path = ArtifactKind::Skill.content_path(&entry.path);
-    if !fs.exists(&content_path) {
-        issues.push(ValidationIssue::warning(
-            dir_name,
-            format!("skills/{} is missing SKILL.md", entry.file_name),
-        ));
-    } else if !discovered_names.contains(&entry.file_name) {
-        issues.push(ValidationIssue::warning(
-            dir_name,
-            format!("skills/{}/SKILL.md has no frontmatter description field", entry.file_name),
-        ));
+    let skill_md_exists = fs.exists(&content_path);
+    if let Some(msg) = skill_entry_issue(entry, skill_md_exists, discovered_names) {
+        issues.push(ValidationIssue::warning(dir_name, msg));
     }
 }
 
@@ -314,11 +337,88 @@ pub fn validate_all_plugins(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
 mod tests {
     use super::*;
     use crate::validation::IssueLevel;
+    use cmx::gateway::DirEntry;
     use cmx::gateway::fakes::FakeFilesystem;
 
     use crate::test_support::{
         fake_marketplace_json_with_categories, fake_marketplace_root, fake_plugin_json,
     };
+
+    fn file_entry(file_name: &str, path: &str) -> DirEntry {
+        DirEntry {
+            path: PathBuf::from(path),
+            file_name: file_name.to_string(),
+            is_dir: false,
+        }
+    }
+
+    fn dir_entry(file_name: &str, path: &str) -> DirEntry {
+        DirEntry {
+            path: PathBuf::from(path),
+            file_name: file_name.to_string(),
+            is_dir: true,
+        }
+    }
+
+    // --- agent_entry_issue (pure, no FakeFilesystem) ---
+
+    #[test]
+    fn agent_entry_issue_no_issue_for_discovered_agent() {
+        let entry = file_entry("reviewer.md", "/plugin/agents/reviewer.md");
+        let result = agent_entry_issue(&entry, &["reviewer".to_string()]);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn agent_entry_issue_warns_when_missing_frontmatter() {
+        let entry = file_entry("bad-agent.md", "/plugin/agents/bad-agent.md");
+        let result = agent_entry_issue(&entry, &[]);
+        assert!(result.is_some());
+        assert!(result.unwrap().contains("frontmatter"));
+    }
+
+    #[test]
+    fn agent_entry_issue_skips_directories() {
+        let entry = dir_entry("subdir", "/plugin/agents/subdir");
+        assert!(agent_entry_issue(&entry, &[]).is_none());
+    }
+
+    #[test]
+    fn agent_entry_issue_skips_non_md_files() {
+        let entry = file_entry("script.py", "/plugin/agents/script.py");
+        assert!(agent_entry_issue(&entry, &[]).is_none());
+    }
+
+    // --- skill_entry_issue (pure, no FakeFilesystem) ---
+
+    #[test]
+    fn skill_entry_issue_no_issue_for_valid_skill() {
+        let entry = dir_entry("formatter", "/plugin/skills/formatter");
+        let result = skill_entry_issue(&entry, true, &["formatter".to_string()]);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn skill_entry_issue_missing_skill_md() {
+        let entry = dir_entry("broken", "/plugin/skills/broken");
+        let result = skill_entry_issue(&entry, false, &[]);
+        assert!(result.is_some());
+        assert!(result.unwrap().contains("missing SKILL.md"));
+    }
+
+    #[test]
+    fn skill_entry_issue_skill_md_present_but_no_frontmatter() {
+        let entry = dir_entry("badfm", "/plugin/skills/badfm");
+        let result = skill_entry_issue(&entry, true, &[]);
+        assert!(result.is_some());
+        assert!(result.unwrap().contains("frontmatter description"));
+    }
+
+    #[test]
+    fn skill_entry_issue_skips_non_directories() {
+        let entry = file_entry("SKILL.md", "/plugin/skills/SKILL.md");
+        assert!(skill_entry_issue(&entry, false, &[]).is_none());
+    }
 
     fn make_plugin(
         name: &str,

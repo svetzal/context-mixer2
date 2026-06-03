@@ -97,17 +97,13 @@ pub fn install(
     let lock_result = lockfile::mutate(scope, ctx.fs, ctx.paths, |lock| {
         lock.packages.insert(
             artifact_name.to_string(),
-            LockEntry {
-                artifact_type: kind,
-                version: plan.version.clone(),
-                installed_at: ctx.clock.now().to_rfc3339(),
-                source: LockSource {
-                    repo: plan.source_name.clone(),
-                    path: plan.relative_path.clone(),
-                },
+            build_lock_entry(
+                &plan,
+                kind,
                 source_checksum,
                 installed_checksum,
-            },
+                ctx.clock.now().to_rfc3339(),
+            ),
         );
     });
 
@@ -116,7 +112,7 @@ pub fn install(
         // back by removing the artifact we just copied.  This avoids leaving a
         // ghost: an artifact on disk with no lockfile entry.  We ignore any
         // remove error to ensure the original lock error is surfaced.
-        if !already_installed {
+        if should_rollback(already_installed) {
             let _ = match kind {
                 types::ArtifactKind::Agent => ctx.fs.remove_file(&dest_path),
                 types::ArtifactKind::Skill => ctx.fs.remove_dir_all(&dest_path),
@@ -298,6 +294,35 @@ fn check_local_modifications(
     Ok(())
 }
 
+/// Pure builder: construct a `LockEntry` from plan data and pre-computed checksums.
+/// The shell passes `installed_at` (an RFC 3339 timestamp); no I/O inside.
+fn build_lock_entry(
+    plan: &InstallPlan,
+    kind: ArtifactKind,
+    source_checksum: String,
+    installed_checksum: String,
+    installed_at: String,
+) -> LockEntry {
+    LockEntry {
+        artifact_type: kind,
+        version: plan.version.clone(),
+        installed_at,
+        source: LockSource {
+            repo: plan.source_name.clone(),
+            path: plan.relative_path.clone(),
+        },
+        source_checksum,
+        installed_checksum,
+    }
+}
+
+/// Pure predicate: should we roll back the copied artifact when a lock write fails?
+/// Only true for a *fresh* install — rolling back an existing artifact would discard
+/// the user's current copy, which is worse than the ghost we're trying to prevent.
+fn should_rollback(already_installed: bool) -> bool {
+    !already_installed
+}
+
 fn parse_name(name: &str) -> (Option<&str>, &str) {
     if let Some((source, artifact)) = name.split_once(':') {
         (Some(source), artifact)
@@ -417,6 +442,64 @@ mod tests {
     };
     use crate::types::{Artifact, ArtifactKind, Deprecation, InstallScope, LockFile};
     use chrono::Utc;
+
+    // --- should_rollback (pure) ---
+
+    #[test]
+    fn should_rollback_true_when_fresh_install() {
+        assert!(should_rollback(false), "fresh install → rollback on lock failure");
+    }
+
+    #[test]
+    fn should_rollback_false_when_already_installed() {
+        assert!(!should_rollback(true), "reinstall → keep existing copy on lock failure");
+    }
+
+    // --- build_lock_entry (pure, no gateway fakes needed) ---
+
+    fn make_plan(name: &str, version: Option<&str>, source: &str, rel_path: &str) -> InstallPlan {
+        InstallPlan {
+            artifact_name: name.to_string(),
+            version: version.map(str::to_string),
+            source_name: source.to_string(),
+            source_root: PathBuf::from("/sources"),
+            dest_dir: PathBuf::from("/dest"),
+            relative_path: rel_path.to_string(),
+        }
+    }
+
+    #[test]
+    fn build_lock_entry_maps_all_fields() {
+        let plan = make_plan("my-agent", Some("1.2.3"), "guidelines", "agents/my-agent.md");
+        let entry = build_lock_entry(
+            &plan,
+            ArtifactKind::Agent,
+            "sha256:src".to_string(),
+            "sha256:inst".to_string(),
+            "2024-06-01T00:00:00Z".to_string(),
+        );
+        assert_eq!(entry.artifact_type, ArtifactKind::Agent);
+        assert_eq!(entry.version.as_deref(), Some("1.2.3"));
+        assert_eq!(entry.source.repo, "guidelines");
+        assert_eq!(entry.source.path, "agents/my-agent.md");
+        assert_eq!(entry.source_checksum, "sha256:src");
+        assert_eq!(entry.installed_checksum, "sha256:inst");
+        assert_eq!(entry.installed_at, "2024-06-01T00:00:00Z");
+    }
+
+    #[test]
+    fn build_lock_entry_without_version() {
+        let plan = make_plan("my-skill", None, "home", "my-skill");
+        let entry = build_lock_entry(
+            &plan,
+            ArtifactKind::Skill,
+            "sha256:s".to_string(),
+            "sha256:i".to_string(),
+            "2024-01-01T00:00:00Z".to_string(),
+        );
+        assert!(entry.version.is_none());
+        assert_eq!(entry.artifact_type, ArtifactKind::Skill);
+    }
 
     // --- plan_install (pure, no gateway fakes needed) ---
 
