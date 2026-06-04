@@ -4,11 +4,15 @@ use std::path::PathBuf;
 
 use crate::config;
 use crate::context::AppContext;
-use crate::gateway::{DirEntry, Filesystem};
+use crate::gateway::Filesystem;
 use crate::scan;
 use crate::source_iter;
 use crate::source_update;
-use crate::types::{Artifact, ArtifactKind, SourceEntry, SourceType};
+use crate::types::{ArtifactKind, SourceEntry, SourceType};
+
+mod browse;
+pub use browse::{BrowseArtifact, BrowseSkill, SourceBrowseResult};
+pub(crate) use browse::{build_browse_result, count_artifacts, dir_entry_names};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -31,25 +35,6 @@ pub struct SourceListEntry {
 
 pub struct SourceListResult {
     pub entries: Vec<SourceListEntry>,
-}
-
-pub struct BrowseArtifact {
-    pub name: String,
-    pub version: Option<String>,
-    pub deprecation_display: String,
-}
-
-pub struct BrowseSkill {
-    pub name: String,
-    pub version: Option<String>,
-    pub deprecation_display: String,
-    pub files: Vec<String>,
-}
-
-pub struct SourceBrowseResult {
-    pub source_name: String,
-    pub agents: Vec<BrowseArtifact>,
-    pub skills: Vec<BrowseSkill>,
 }
 
 pub struct SourceRemoveResult {
@@ -234,76 +219,6 @@ fn add_git_source_with(name: &str, url: &str, ctx: &AppContext<'_>) -> Result<So
     })
 }
 
-// ---------------------------------------------------------------------------
-// Pure helpers (no I/O)
-// ---------------------------------------------------------------------------
-
-/// Build a `SourceBrowseResult` from pre-loaded data with no filesystem access.
-fn build_browse_result(
-    source_name: &str,
-    artifacts: &[Artifact],
-    skill_dirs: &HashMap<PathBuf, Vec<String>>,
-) -> SourceBrowseResult {
-    let agents = artifacts_of_kind(artifacts, ArtifactKind::Agent)
-        .map(|a| BrowseArtifact {
-            name: a.name.clone(),
-            version: a.version.clone(),
-            deprecation_display: format_deprecation(a),
-        })
-        .collect();
-
-    let skills = artifacts_of_kind(artifacts, ArtifactKind::Skill)
-        .map(|s| {
-            let files = skill_dirs.get(&s.path).cloned().unwrap_or_default();
-            build_browse_skill(s, files)
-        })
-        .collect();
-
-    SourceBrowseResult {
-        source_name: source_name.to_string(),
-        agents,
-        skills,
-    }
-}
-
-fn artifacts_of_kind(
-    artifacts: &[Artifact],
-    kind: crate::types::ArtifactKind,
-) -> impl Iterator<Item = &Artifact> {
-    artifacts.iter().filter(move |a| a.kind == kind)
-}
-
-fn dir_entry_names(entries: &[DirEntry]) -> Vec<String> {
-    let mut names: Vec<String> = entries
-        .iter()
-        .filter(|e| !e.file_name.starts_with('.'))
-        .map(|e| {
-            if e.is_dir {
-                format!("{}/", e.file_name)
-            } else {
-                e.file_name.clone()
-            }
-        })
-        .collect();
-    names.sort();
-    names
-}
-
-fn build_browse_skill(artifact: &Artifact, files: Vec<String>) -> BrowseSkill {
-    BrowseSkill {
-        name: artifact.name.clone(),
-        version: artifact.version.clone(),
-        deprecation_display: format_deprecation(artifact),
-        files,
-    }
-}
-
-fn count_artifacts(artifacts: &[Artifact]) -> (usize, usize) {
-    let agents = artifacts_of_kind(artifacts, crate::types::ArtifactKind::Agent).count();
-    let skills = artifacts_of_kind(artifacts, crate::types::ArtifactKind::Skill).count();
-    (agents, skills)
-}
-
 pub(crate) fn scan_and_count(
     entry: &crate::types::SourceEntry,
     fs: &dyn Filesystem,
@@ -312,24 +227,6 @@ pub(crate) fn scan_and_count(
     let scan_result = scan::scan_source(&local_path, fs)?;
     let (agents_found, skills_found) = count_artifacts(&scan_result.artifacts);
     Ok((agents_found, skills_found, scan_result.warnings))
-}
-
-fn format_deprecation(artifact: &Artifact) -> String {
-    let Some(dep) = &artifact.deprecation else {
-        return String::new();
-    };
-
-    let mut parts = vec!["  ⛔ DEPRECATED".to_string()];
-
-    if let Some(reason) = &dep.reason {
-        parts.push(format!(": {reason}"));
-    }
-
-    if let Some(replacement) = &dep.replacement {
-        parts.push(format!(" (use {replacement} instead)"));
-    }
-
-    parts.join("")
 }
 
 pub fn looks_like_url(s: &str) -> bool {
@@ -346,14 +243,12 @@ pub fn looks_like_url(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gateway::Filesystem;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::scan::ScanWarning;
     use crate::test_support::{
         TestContext, make_ctx, make_git_entry, make_local_entry, setup_empty_sources,
         setup_sources_from_entries, test_paths,
     };
-    use crate::types::{ArtifactKind, Deprecation};
     use chrono::Utc;
     use std::cell::RefCell;
     use std::path::PathBuf;
@@ -381,80 +276,6 @@ mod tests {
         assert!(out.contains("guidelines"));
         assert!(out.contains("local"));
         assert!(out.contains("/home/user/repos/guidelines"));
-    }
-
-    // --- Display for SourceBrowseResult ---
-
-    #[test]
-    fn source_browse_result_display_empty() {
-        let result = SourceBrowseResult {
-            source_name: "my-source".to_string(),
-            agents: vec![],
-            skills: vec![],
-        };
-        let out = result.to_string();
-        assert!(out.contains("No agents or skills found in 'my-source'"));
-    }
-
-    #[test]
-    fn source_browse_result_display_agents_only() {
-        let result = SourceBrowseResult {
-            source_name: "my-source".to_string(),
-            agents: vec![BrowseArtifact {
-                name: "rust-craftsperson".to_string(),
-                version: Some("1.0.0".to_string()),
-                deprecation_display: String::new(),
-            }],
-            skills: vec![],
-        };
-        let out = result.to_string();
-        assert!(out.contains("Agents:"));
-        assert!(out.contains("rust-craftsperson"));
-        assert!(out.contains("v1.0.0"));
-        assert!(!out.contains("Skills:"));
-    }
-
-    #[test]
-    fn source_browse_result_display_skills_only() {
-        let result = SourceBrowseResult {
-            source_name: "my-source".to_string(),
-            agents: vec![],
-            skills: vec![BrowseSkill {
-                name: "my-skill".to_string(),
-                version: None,
-                deprecation_display: String::new(),
-                files: vec!["tool.md".to_string()],
-            }],
-        };
-        let out = result.to_string();
-        assert!(!out.contains("Agents:"));
-        assert!(out.contains("Skills:"));
-        assert!(out.contains("my-skill"));
-        assert!(out.contains("tool.md"));
-    }
-
-    #[test]
-    fn source_browse_result_display_agents_and_skills() {
-        let result = SourceBrowseResult {
-            source_name: "my-source".to_string(),
-            agents: vec![BrowseArtifact {
-                name: "my-agent".to_string(),
-                version: None,
-                deprecation_display: String::new(),
-            }],
-            skills: vec![BrowseSkill {
-                name: "my-skill".to_string(),
-                version: Some("2.0.0".to_string()),
-                deprecation_display: String::new(),
-                files: vec![],
-            }],
-        };
-        let out = result.to_string();
-        assert!(out.contains("Agents:"));
-        assert!(out.contains("my-agent"));
-        assert!(out.contains("Skills:"));
-        assert!(out.contains("my-skill"));
-        assert!(out.contains("v2.0.0"));
     }
 
     // --- Display for SourceScanResult ---
@@ -546,122 +367,6 @@ mod tests {
     #[test]
     fn looks_like_url_plain_name() {
         assert!(!looks_like_url("just-a-name"));
-    }
-
-    // --- count_artifacts ---
-
-    fn make_agent(name: &str) -> Artifact {
-        Artifact {
-            kind: ArtifactKind::Agent,
-            name: name.to_string(),
-            description: String::new(),
-            path: PathBuf::from(format!("{name}.md")),
-            version: None,
-            deprecation: None,
-        }
-    }
-
-    fn make_skill(name: &str) -> Artifact {
-        Artifact {
-            kind: ArtifactKind::Skill,
-            name: name.to_string(),
-            description: String::new(),
-            path: PathBuf::from(name),
-            version: None,
-            deprecation: None,
-        }
-    }
-
-    #[test]
-    fn count_artifacts_empty() {
-        assert_eq!(count_artifacts(&[]), (0, 0));
-    }
-
-    #[test]
-    fn count_artifacts_only_agents() {
-        let arts = vec![make_agent("alpha"), make_agent("beta")];
-        assert_eq!(count_artifacts(&arts), (2, 0));
-    }
-
-    #[test]
-    fn count_artifacts_mixed() {
-        let arts = vec![make_agent("alpha"), make_skill("zap"), make_skill("zip")];
-        assert_eq!(count_artifacts(&arts), (1, 2));
-    }
-
-    // --- format_deprecation ---
-
-    #[test]
-    fn format_deprecation_not_deprecated() {
-        let artifact = make_agent("alpha");
-        assert_eq!(format_deprecation(&artifact), "");
-    }
-
-    #[test]
-    fn format_deprecation_deprecated_no_extras() {
-        let artifact = Artifact {
-            kind: ArtifactKind::Agent,
-            name: "alpha".to_string(),
-            description: String::new(),
-            path: PathBuf::from("alpha.md"),
-            version: None,
-            deprecation: Some(Deprecation {
-                reason: None,
-                replacement: None,
-            }),
-        };
-        assert_eq!(format_deprecation(&artifact), "  ⛔ DEPRECATED");
-    }
-
-    #[test]
-    fn format_deprecation_deprecated_with_reason() {
-        let artifact = Artifact {
-            kind: ArtifactKind::Agent,
-            name: "alpha".to_string(),
-            description: String::new(),
-            path: PathBuf::from("alpha.md"),
-            version: None,
-            deprecation: Some(Deprecation {
-                reason: Some("Too old".to_string()),
-                replacement: None,
-            }),
-        };
-        assert_eq!(format_deprecation(&artifact), "  ⛔ DEPRECATED: Too old");
-    }
-
-    #[test]
-    fn format_deprecation_deprecated_with_reason_and_replacement() {
-        let artifact = Artifact {
-            kind: ArtifactKind::Agent,
-            name: "alpha".to_string(),
-            description: String::new(),
-            path: PathBuf::from("alpha.md"),
-            version: None,
-            deprecation: Some(Deprecation {
-                reason: Some("Too old".to_string()),
-                replacement: Some("new-agent".to_string()),
-            }),
-        };
-        assert_eq!(
-            format_deprecation(&artifact),
-            "  ⛔ DEPRECATED: Too old (use new-agent instead)"
-        );
-    }
-
-    #[test]
-    fn format_deprecation_deprecated_with_replacement_only() {
-        let artifact = Artifact {
-            kind: ArtifactKind::Agent,
-            name: "alpha".to_string(),
-            description: String::new(),
-            path: PathBuf::from("alpha.md"),
-            version: None,
-            deprecation: Some(Deprecation {
-                reason: None,
-                replacement: Some("new-agent".to_string()),
-            }),
-        };
-        assert_eq!(format_deprecation(&artifact), "  ⛔ DEPRECATED (use new-agent instead)");
     }
 
     // --- source management business logic tests ---
@@ -876,104 +581,5 @@ mod tests {
         // Sources file should remain empty — no partial save
         let sources = config::load_sources(&fs, &paths).unwrap();
         assert!(sources.sources.is_empty(), "sources should not be modified after failed clone");
-    }
-
-    // --- dir_entry_names ---
-
-    fn make_dir_entry(file_name: &str, is_dir: bool) -> crate::gateway::DirEntry {
-        crate::gateway::DirEntry {
-            path: PathBuf::from(file_name),
-            file_name: file_name.to_string(),
-            is_dir,
-        }
-    }
-
-    #[test]
-    fn dir_entry_names_filters_dotfiles() {
-        let entries = vec![
-            make_dir_entry(".hidden", false),
-            make_dir_entry("visible.md", false),
-        ];
-        let names = dir_entry_names(&entries);
-        assert_eq!(names, vec!["visible.md"]);
-    }
-
-    #[test]
-    fn dir_entry_names_appends_slash_to_dirs() {
-        let entries = vec![
-            make_dir_entry("subdir", true),
-            make_dir_entry("file.md", false),
-        ];
-        let names = dir_entry_names(&entries);
-        assert!(names.contains(&"subdir/".to_string()));
-        assert!(names.contains(&"file.md".to_string()));
-    }
-
-    #[test]
-    fn dir_entry_names_sorts_results() {
-        let entries = vec![
-            make_dir_entry("z.md", false),
-            make_dir_entry("a.md", false),
-            make_dir_entry("m.md", false),
-        ];
-        let names = dir_entry_names(&entries);
-        assert_eq!(names, vec!["a.md", "m.md", "z.md"]);
-    }
-
-    // --- build_browse_result ---
-
-    #[test]
-    fn build_browse_result_separates_agents_and_skills() {
-        let mut skill_dirs = HashMap::new();
-        let skill_path = PathBuf::from("my-skill");
-        skill_dirs.insert(skill_path.clone(), vec!["tool.md".to_string()]);
-
-        let artifacts = vec![make_agent("alpha"), make_skill("my-skill")];
-        let result = build_browse_result("test-source", &artifacts, &skill_dirs);
-
-        assert_eq!(result.source_name, "test-source");
-        assert_eq!(result.agents.len(), 1);
-        assert_eq!(result.agents[0].name, "alpha");
-        assert_eq!(result.skills.len(), 1);
-        assert_eq!(result.skills[0].name, "my-skill");
-        assert_eq!(result.skills[0].files, vec!["tool.md"]);
-    }
-
-    #[test]
-    fn build_browse_result_empty_skill_dirs_gives_empty_files() {
-        let artifacts = vec![make_skill("lonely-skill")];
-        let result = build_browse_result("src", &artifacts, &HashMap::new());
-        assert_eq!(result.skills[0].files, Vec::<String>::new());
-    }
-
-    // --- build_browse_skill ---
-
-    #[test]
-    fn build_browse_skill_populates_fields() {
-        let artifact = make_skill("my-skill");
-        let files = vec!["a.md".to_string(), "b.md".to_string()];
-        let skill = build_browse_skill(&artifact, files.clone());
-        assert_eq!(skill.name, "my-skill");
-        assert_eq!(skill.version, None);
-        assert_eq!(skill.deprecation_display, "");
-        assert_eq!(skill.files, files);
-    }
-
-    #[test]
-    fn build_browse_skill_includes_version_and_deprecation() {
-        let artifact = Artifact {
-            kind: ArtifactKind::Skill,
-            name: "my-skill".to_string(),
-            description: String::new(),
-            path: PathBuf::from("my-skill"),
-            version: Some("1.2.3".to_string()),
-            deprecation: Some(Deprecation {
-                reason: Some("Old".to_string()),
-                replacement: Some("new-skill".to_string()),
-            }),
-        };
-        let skill = build_browse_skill(&artifact, vec![]);
-        assert_eq!(skill.version, Some("1.2.3".to_string()));
-        assert!(skill.deprecation_display.contains("DEPRECATED"));
     }
 }
