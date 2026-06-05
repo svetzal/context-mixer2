@@ -113,10 +113,7 @@ pub fn install(
         // ghost: an artifact on disk with no lockfile entry.  We ignore any
         // remove error to ensure the original lock error is surfaced.
         if should_rollback(already_installed) {
-            let _ = match kind {
-                types::ArtifactKind::Agent => ctx.fs.remove_file(&dest_path),
-                types::ArtifactKind::Skill => ctx.fs.remove_dir_all(&dest_path),
-            };
+            let _ = kind.remove_installed(&dest_path, ctx.fs);
         }
         return Err(lock_err);
     }
