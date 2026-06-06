@@ -47,3 +47,79 @@ impl LoadedState {
         self.locks.iter().map(|(s, l)| (*s, l))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::lockfile;
+    use crate::test_support::{make_lock_entry_builder, test_paths};
+    use crate::types::{ArtifactKind, InstallScope, LockFile};
+    use chrono::Utc;
+    use std::collections::BTreeMap;
+
+    fn make_ctx<'a>(
+        fs: &'a FakeFilesystem,
+        git: &'a FakeGitClient,
+        clock: &'a FakeClock,
+        paths: &'a ConfigPaths,
+    ) -> AppContext<'a> {
+        AppContext {
+            fs,
+            git,
+            clock,
+            paths,
+            llm: None,
+        }
+    }
+
+    #[test]
+    fn loaded_state_load_empty_fs_returns_defaults() {
+        let paths = test_paths();
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+
+        let state = LoadedState::load(&ctx).unwrap();
+        assert!(state.sources.sources.is_empty());
+        assert!(state.lock(InstallScope::Global).packages.is_empty());
+        assert!(state.lock(InstallScope::Local).packages.is_empty());
+    }
+
+    #[test]
+    fn loaded_state_lock_returns_scope_lockfile() {
+        let paths = test_paths();
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+
+        let entry = make_lock_entry_builder(ArtifactKind::Agent, "myrepo", "agents/my-agent.md");
+        let mut packages = BTreeMap::new();
+        packages.insert("my-agent".to_string(), entry);
+        let lock = LockFile {
+            version: 1,
+            packages,
+        };
+        lockfile::save(&lock, InstallScope::Global, &fs, &paths).unwrap();
+
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let state = LoadedState::load(&ctx).unwrap();
+
+        assert!(state.lock(InstallScope::Global).packages.contains_key("my-agent"));
+        assert!(state.lock(InstallScope::Local).packages.is_empty());
+    }
+
+    #[test]
+    fn loaded_state_scopes_global_first() {
+        let paths = test_paths();
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let ctx = make_ctx(&fs, &git, &clock, &paths);
+
+        let state = LoadedState::load(&ctx).unwrap();
+        let scopes: Vec<InstallScope> = state.scopes().map(|(s, _)| s).collect();
+        assert_eq!(scopes, vec![InstallScope::Global, InstallScope::Local]);
+    }
+}

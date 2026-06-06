@@ -1,5 +1,7 @@
+use cmx::gateway::clock::Clock;
 use cmx::gateway::filesystem::Filesystem;
-use cmx::gateway::real::RealFilesystem;
+use cmx::gateway::git::GitClient;
+use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use std::fs;
 use tempfile::TempDir;
 
@@ -150,4 +152,59 @@ fn rename_moves_file_old_path_gone_new_path_has_content() {
     assert!(fs().exists(&new_path));
     let content = fs().read_to_string(&new_path).unwrap();
     assert_eq!(content, "original content");
+}
+
+#[test]
+fn system_clock_now_is_between_before_and_after() {
+    let before = chrono::Utc::now();
+    let t = SystemClock.now();
+    let after = chrono::Utc::now();
+    assert!(before <= t && t <= after);
+}
+
+#[test]
+fn real_git_client_pull_on_non_git_directory_errors() {
+    let dir = TempDir::new().unwrap();
+    let result = RealGitClient.pull(dir.path());
+    assert!(result.is_err());
+}
+
+#[test]
+fn real_git_client_clone_from_local_bare_repo() {
+    let src = TempDir::new().unwrap();
+    // Init a real git repo with a commit so we can clone it.
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(src.path())
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(src.path())
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(src.path())
+        .output()
+        .unwrap();
+    fs::write(src.path().join("README.md"), b"hello").unwrap();
+    std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(src.path())
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-m", "init"])
+        .current_dir(src.path())
+        .output()
+        .unwrap();
+
+    let dest = TempDir::new().unwrap();
+    let dest_path = dest.path().join("clone");
+    let src_url = src.path().to_str().unwrap().to_string();
+
+    let result = RealGitClient.clone_repo(&src_url, &dest_path);
+    assert!(result.is_ok(), "clone failed: {:?}", result.err());
+    assert!(dest_path.exists());
 }

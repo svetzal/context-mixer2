@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod display;
 pub mod facet;
 pub mod facet_types;

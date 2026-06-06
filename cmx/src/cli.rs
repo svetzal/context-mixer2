@@ -231,3 +231,230 @@ pub enum ExternalAction {
         entry: String,
     },
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn parse_source_add() {
+        let cli = Cli::try_parse_from(["cmx", "source", "add", "myrepo", "/path"]).unwrap();
+        match cli.command {
+            Commands::Source {
+                action: SourceAction::Add { name, path_or_url },
+            } => {
+                assert_eq!(name, "myrepo");
+                assert_eq!(path_or_url, "/path");
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_source_list() {
+        let cli = Cli::try_parse_from(["cmx", "source", "list"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Source {
+                action: SourceAction::List
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_source_update_all() {
+        let cli = Cli::try_parse_from(["cmx", "source", "update"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Source {
+                action: SourceAction::Update { name: None }
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_source_update_named() {
+        let cli = Cli::try_parse_from(["cmx", "source", "update", "myrepo"]).unwrap();
+        match cli.command {
+            Commands::Source {
+                action: SourceAction::Update { name },
+            } => {
+                assert_eq!(name, Some("myrepo".to_string()));
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_source_remove() {
+        let cli = Cli::try_parse_from(["cmx", "source", "remove", "myrepo"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Source {
+                action: SourceAction::Remove { .. }
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_agent_install() {
+        let cli = Cli::try_parse_from(["cmx", "agent", "install", "foo"]).unwrap();
+        match cli.command {
+            Commands::Agent {
+                action: ArtifactAction::Install { names, .. },
+            } => {
+                assert_eq!(names, vec!["foo"]);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_agent_install_all() {
+        let cli = Cli::try_parse_from(["cmx", "agent", "install", "--all"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Agent {
+                action: ArtifactAction::Install { all: true, .. }
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_agent_list() {
+        let cli = Cli::try_parse_from(["cmx", "agent", "list"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Agent {
+                action: ArtifactAction::List { .. }
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_skill_info() {
+        let cli = Cli::try_parse_from(["cmx", "skill", "info", "my-skill"]).unwrap();
+        match cli.command {
+            Commands::Skill {
+                action: ArtifactAction::Info { name },
+            } => {
+                assert_eq!(name, "my-skill");
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_config_show() {
+        let cli = Cli::try_parse_from(["cmx", "config", "show"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Config {
+                action: ConfigAction::Show
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_config_gateway() {
+        let cli = Cli::try_parse_from(["cmx", "config", "gateway", "openai"]).unwrap();
+        match cli.command {
+            Commands::Config {
+                action: ConfigAction::Gateway { value },
+            } => {
+                assert_eq!(value, "openai");
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_config_model() {
+        let cli = Cli::try_parse_from(["cmx", "config", "model", "gpt-4"]).unwrap();
+        match cli.command {
+            Commands::Config {
+                action: ConfigAction::Model { value },
+            } => {
+                assert_eq!(value, "gpt-4");
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_config_external_list() {
+        let cli = Cli::try_parse_from(["cmx", "config", "external", "list"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Config {
+                action: ConfigAction::External {
+                    action: ExternalAction::List
+                }
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_list() {
+        let cli = Cli::try_parse_from(["cmx", "list"]).unwrap();
+        assert!(matches!(cli.command, Commands::List { .. }));
+    }
+
+    #[test]
+    fn parse_outdated() {
+        let cli = Cli::try_parse_from(["cmx", "outdated"]).unwrap();
+        assert!(matches!(cli.command, Commands::Outdated));
+    }
+
+    #[test]
+    fn parse_search() {
+        let cli = Cli::try_parse_from(["cmx", "search", "foo"]).unwrap();
+        match cli.command {
+            Commands::Search { query } => assert_eq!(query, "foo"),
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_info() {
+        let cli = Cli::try_parse_from(["cmx", "info", "myagent"]).unwrap();
+        match cli.command {
+            Commands::Info { name } => assert_eq!(name, "myagent"),
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_home_init() {
+        let cli = Cli::try_parse_from(["cmx", "home", "init"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Home {
+                action: HomeAction::Init
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_home_path() {
+        let cli = Cli::try_parse_from(["cmx", "home", "path"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Home {
+                action: HomeAction::Path
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_doctor() {
+        let cli = Cli::try_parse_from(["cmx", "doctor"]).unwrap();
+        assert!(matches!(cli.command, Commands::Doctor { .. }));
+    }
+
+    #[test]
+    fn parse_invalid_command_errors() {
+        assert!(Cli::try_parse_from(["cmx", "notacommand"]).is_err());
+    }
+}

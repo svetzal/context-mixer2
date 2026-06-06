@@ -15,9 +15,7 @@ use cmf::repo::{RepoRoot, detect_repo};
 use cmf::validate::validate_all;
 use cmf::validation::ValidationReport;
 
-mod cli;
-
-use cli::{
+use cmf::cli::{
     Cli, Commands, FacetAction, ManifestAction, MarketplaceAction, PluginAction, RecipeAction,
 };
 
@@ -27,18 +25,22 @@ fn main() -> Result<()> {
     let cwd = env::current_dir()?;
     let root = detect_repo(&cwd, &fs)?;
 
+    run(cli, &root, &fs)
+}
+
+fn run(cli: Cli, root: &RepoRoot, fs: &dyn Filesystem) -> Result<()> {
     match cli.command {
-        Commands::Facet { action } => handle_facet(&action, &root, &fs)?,
-        Commands::Recipe { action } => handle_recipe(action, &root, &fs)?,
-        Commands::Plugin { action } => handle_plugin(&action, &root, &fs)?,
-        Commands::Manifest { action } => handle_manifest(&action, &root, &fs)?,
-        Commands::Marketplace { action } => handle_marketplace(&action, &root, &fs)?,
+        Commands::Facet { action } => handle_facet(&action, root, fs)?,
+        Commands::Recipe { action } => handle_recipe(action, root, fs)?,
+        Commands::Plugin { action } => handle_plugin(&action, root, fs)?,
+        Commands::Manifest { action } => handle_manifest(&action, root, fs)?,
+        Commands::Marketplace { action } => handle_marketplace(&action, root, fs)?,
         Commands::Validate => {
-            let issues = validate_all(&root, &fs)?;
+            let issues = validate_all(root, fs)?;
             print!("{}", ValidationReport(issues));
         }
         Commands::Status => {
-            print!("{}", status_report(&root, &fs));
+            print!("{}", status_report(root, fs));
         }
     }
 
@@ -153,4 +155,126 @@ fn handle_marketplace(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cmf::repo::{RepoKind, RepoRoot};
+    use cmx::gateway::fakes::FakeFilesystem;
+    use std::path::PathBuf;
+
+    fn unknown_root() -> RepoRoot {
+        RepoRoot {
+            path: PathBuf::from("/repo"),
+            kind: RepoKind::Unknown,
+            has_facets: false,
+            has_plugins_dir: false,
+        }
+    }
+
+    #[test]
+    fn handle_facet_list_empty_returns_ok() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        assert!(handle_facet(&FacetAction::List, &root, &fs).is_ok());
+    }
+
+    #[test]
+    fn handle_facet_validate_empty_returns_ok() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        assert!(handle_facet(&FacetAction::Validate, &root, &fs).is_ok());
+    }
+
+    #[test]
+    fn handle_recipe_list_empty_returns_ok() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        assert!(handle_recipe(RecipeAction::List, &root, &fs).is_ok());
+    }
+
+    #[test]
+    fn handle_recipe_assemble_no_name_no_all_errors() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        let result = handle_recipe(
+            RecipeAction::Assemble {
+                name: None,
+                all: false,
+            },
+            &root,
+            &fs,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn handle_recipe_diff_unknown_name_errors() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        let result = handle_recipe(
+            RecipeAction::Diff {
+                name: "nonexistent".to_string(),
+            },
+            &root,
+            &fs,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn handle_plugin_list_empty_returns_ok() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        assert!(handle_plugin(&PluginAction::List, &root, &fs).is_ok());
+    }
+
+    #[test]
+    fn handle_plugin_validate_empty_returns_ok() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        assert!(handle_plugin(&PluginAction::Validate, &root, &fs).is_ok());
+    }
+
+    #[test]
+    fn handle_manifest_generate_empty_returns_ok() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        assert!(handle_manifest(&ManifestAction::Generate, &root, &fs).is_ok());
+    }
+
+    #[test]
+    fn handle_marketplace_validate_empty_returns_ok() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        assert!(handle_marketplace(&MarketplaceAction::Validate, &root, &fs).is_ok());
+    }
+
+    #[test]
+    fn handle_marketplace_generate_empty_returns_ok() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        assert!(handle_marketplace(&MarketplaceAction::Generate, &root, &fs).is_ok());
+    }
+
+    #[test]
+    fn run_status_returns_ok() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        let cli = Cli {
+            command: Commands::Status,
+        };
+        assert!(run(cli, &root, &fs).is_ok());
+    }
+
+    #[test]
+    fn run_validate_empty_returns_ok() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        let cli = Cli {
+            command: Commands::Validate,
+        };
+        assert!(run(cli, &root, &fs).is_ok());
+    }
 }

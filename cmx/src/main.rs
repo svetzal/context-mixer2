@@ -21,12 +21,16 @@ fn main() -> Result<()> {
         llm: None,
     };
 
+    run(cli, &ctx, &paths)
+}
+
+fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<()> {
     match cli.command {
-        Commands::Source { action } => handle_source(action, &paths, &ctx),
-        Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, &ctx),
-        Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, &ctx),
+        Commands::Source { action } => handle_source(action, paths, ctx),
+        Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, ctx),
+        Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, ctx),
         Commands::List { all } => {
-            let output = cmx::list::list_all(all, &ctx)?;
+            let output = cmx::list::list_all(all, ctx)?;
             print!("{output}");
             Ok(())
         }
@@ -37,13 +41,13 @@ fn main() -> Result<()> {
             all,
         } => {
             if adopt_all {
-                let outcome = cmx::adopt::adopt_all(None, from.as_deref(), local, &ctx)?;
+                let outcome = cmx::adopt::adopt_all(None, from.as_deref(), local, ctx)?;
                 print!("{outcome}");
                 Ok(())
             } else if from.is_some() {
                 bail!("--from only applies together with --adopt-all")
             } else {
-                let mut report = cmx::doctor::survey(local, &ctx)?;
+                let mut report = cmx::doctor::survey(local, ctx)?;
                 report.show_all = all;
                 print!("{report}");
                 if report.has_issues() {
@@ -52,19 +56,19 @@ fn main() -> Result<()> {
                 Ok(())
             }
         }
-        Commands::Home { action } => handle_home(&action, &ctx),
-        Commands::Info { name } => handle_info(&name, None, &ctx),
+        Commands::Home { action } => handle_home(&action, ctx),
+        Commands::Info { name } => handle_info(&name, None, ctx),
         Commands::Outdated => {
-            let report = cmx::outdated::outdated(&ctx)?;
+            let report = cmx::outdated::outdated(ctx)?;
             print!("{report}");
             Ok(())
         }
         Commands::Search { query } => {
-            let output = cmx::search::search(&query, &ctx)?;
+            let output = cmx::search::search(&query, ctx)?;
             print!("{output}");
             Ok(())
         }
-        Commands::Config { action } => handle_config(action, &ctx),
+        Commands::Config { action } => handle_config(action, ctx),
     }
 }
 
@@ -330,4 +334,284 @@ fn handle_adopt(
     };
     print!("{outcome}");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use cmx::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use cmx::platform::Platform;
+    use std::path::PathBuf;
+
+    fn test_paths() -> ConfigPaths {
+        ConfigPaths::for_test(
+            PathBuf::from("/home/testuser"),
+            PathBuf::from("/home/testuser/.config/context-mixer"),
+        )
+    }
+
+    fn make_test_ctx<'a>(
+        fs: &'a FakeFilesystem,
+        git: &'a FakeGitClient,
+        clock: &'a FakeClock,
+        paths: &'a ConfigPaths,
+    ) -> AppContext<'a> {
+        AppContext {
+            fs,
+            git,
+            clock,
+            paths,
+            llm: None,
+        }
+    }
+
+    fn fake_trio() -> (FakeFilesystem, FakeGitClient, FakeClock, ConfigPaths) {
+        let paths = test_paths();
+        (FakeFilesystem::new(), FakeGitClient::new(), FakeClock::at(Utc::now()), paths)
+    }
+
+    #[test]
+    fn handle_artifact_install_empty_names_errors() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let result = handle_artifact(
+            ArtifactAction::Install {
+                names: vec![],
+                all: false,
+                local: false,
+                force: false,
+            },
+            ArtifactKind::Agent,
+            &ctx,
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("all"));
+    }
+
+    #[test]
+    fn handle_artifact_update_no_name_no_all_errors() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let result = handle_artifact(
+            ArtifactAction::Update {
+                name: None,
+                all: false,
+                force: false,
+            },
+            ArtifactKind::Agent,
+            &ctx,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn handle_artifact_uninstall_empty_names_errors() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let result = handle_artifact(
+            ArtifactAction::Uninstall {
+                names: vec![],
+                local: false,
+            },
+            ArtifactKind::Agent,
+            &ctx,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn handle_unadopt_empty_names_errors() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let result = handle_unadopt(&[], ArtifactKind::Agent, false, &ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn handle_adopt_empty_names_no_all_errors() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let result = handle_adopt(&[], ArtifactKind::Agent, false, None, false, &ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn handle_config_show_default_config_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(handle_config(ConfigAction::Show, &ctx).is_ok());
+    }
+
+    #[test]
+    fn handle_config_gateway_openai_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(
+            handle_config(
+                ConfigAction::Gateway {
+                    value: "openai".to_string()
+                },
+                &ctx
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn handle_config_model_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(
+            handle_config(
+                ConfigAction::Model {
+                    value: "gpt-4".to_string()
+                },
+                &ctx
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn handle_config_external_list_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(
+            handle_config(
+                ConfigAction::External {
+                    action: ExternalAction::List
+                },
+                &ctx
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn handle_config_external_add_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(
+            handle_config(
+                ConfigAction::External {
+                    action: ExternalAction::Add {
+                        entry: "my-skill".to_string()
+                    }
+                },
+                &ctx
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn handle_config_external_remove_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(
+            handle_config(
+                ConfigAction::External {
+                    action: ExternalAction::Remove {
+                        entry: "my-skill".to_string()
+                    }
+                },
+                &ctx
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn handle_home_path_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(handle_home(&HomeAction::Path, &ctx).is_ok());
+    }
+
+    #[test]
+    fn handle_home_init_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(handle_home(&HomeAction::Init, &ctx).is_ok());
+    }
+
+    #[test]
+    fn handle_source_list_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(handle_source(SourceAction::List, &paths, &ctx).is_ok());
+    }
+
+    #[test]
+    fn handle_info_unknown_errors() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(handle_info("nonexistent", None, &ctx).is_err());
+    }
+
+    #[test]
+    fn run_list_all_returns_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let cli = Cli {
+            platform: Platform::Claude,
+            command: Commands::List { all: false },
+        };
+        assert!(run(cli, &ctx, &paths).is_ok());
+    }
+
+    #[test]
+    fn run_outdated_returns_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let cli = Cli {
+            platform: Platform::Claude,
+            command: Commands::Outdated,
+        };
+        assert!(run(cli, &ctx, &paths).is_ok());
+    }
+
+    #[test]
+    fn run_search_returns_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let cli = Cli {
+            platform: Platform::Claude,
+            command: Commands::Search {
+                query: "foo".to_string(),
+            },
+        };
+        assert!(run(cli, &ctx, &paths).is_ok());
+    }
+
+    #[test]
+    fn run_doctor_from_without_adopt_all_errors() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let cli = Cli {
+            platform: Platform::Claude,
+            command: Commands::Doctor {
+                local: false,
+                adopt_all: false,
+                from: Some(PathBuf::from("/x")),
+                all: false,
+            },
+        };
+        assert!(run(cli, &ctx, &paths).is_err());
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn condense_error_short_message_unchanged() {
+        assert_eq!(condense_error(&anyhow::anyhow!("short error")), "short error");
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn condense_error_long_message_truncated() {
+        let long_msg: String = "x".repeat(300);
+        let result = condense_error(&anyhow::anyhow!("{long_msg}"));
+        assert!(result.ends_with('…'));
+    }
 }
