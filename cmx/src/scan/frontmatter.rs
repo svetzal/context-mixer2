@@ -38,7 +38,7 @@ fn parse_deprecation(fm_text: &str) -> Option<Deprecation> {
 /// Split YAML frontmatter from content. Returns `(Some(frontmatter), body)` when
 /// `---` fences are found at line boundaries, or `(None, full_content)` otherwise.
 /// Handles both LF and CRLF line endings. Unterminated blocks return `(None, full_content)`.
-pub(crate) fn split_frontmatter_and_body(content: &str) -> (Option<String>, &str) {
+pub fn split_frontmatter_and_body(content: &str) -> (Option<String>, &str) {
     let Some(rest) = content.strip_prefix("---\n").or_else(|| content.strip_prefix("---\r\n"))
     else {
         return (None, content);

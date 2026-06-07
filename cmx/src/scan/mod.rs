@@ -8,10 +8,10 @@ use crate::types::{Artifact, ArtifactKind};
 mod frontmatter;
 pub(crate) use frontmatter::{
     Frontmatter, artifact_from_frontmatter, parse_agent_frontmatter_str, parse_frontmatter_str,
-    split_frontmatter_and_body,
 };
 pub use frontmatter::{
     extract_field, extract_metadata_field, extract_version, extract_version_from_content,
+    split_frontmatter_and_body,
 };
 
 // ---------------------------------------------------------------------------

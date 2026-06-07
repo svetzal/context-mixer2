@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use cmx::scan::{extract_field, extract_version};
+use cmx::scan::{extract_field, extract_version, split_frontmatter_and_body};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -33,12 +33,8 @@ pub struct RecipeList(pub Vec<Recipe>);
 /// Returns `None` if the content doesn't have valid facet frontmatter
 /// (missing `---` delimiters, or missing required `name` / `facet` fields).
 pub fn parse_facet(path: &Path, content: &str) -> Option<Facet> {
-    if !content.starts_with("---") {
-        return None;
-    }
-    let rest = &content[3..];
-    let end = rest.find("---")?;
-    let fm_text = &rest[..end];
+    let (fm_opt, _) = split_frontmatter_and_body(content);
+    let fm_text = fm_opt.as_deref()?;
 
     let name = extract_field(fm_text, "name")?;
     let category = extract_field(fm_text, "facet")?;

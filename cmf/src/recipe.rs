@@ -2,24 +2,10 @@ use std::fmt::Write as _;
 
 use anyhow::Result;
 use cmx::gateway::Filesystem;
+use cmx::scan::split_frontmatter_and_body;
 
 use crate::facet_types::Recipe;
 use crate::repo::RepoRoot;
-
-/// Strip YAML frontmatter delimited by `---\n` from markdown content.
-///
-/// Returns everything after the closing `---\n`. If the content doesn't
-/// start with `---\n` or has no second delimiter, the entire content is
-/// returned unchanged.
-fn strip_frontmatter(content: &str) -> &str {
-    let Some(rest) = content.strip_prefix("---\n") else {
-        return content;
-    };
-    match rest.find("---\n") {
-        Some(end) => &rest[end + 4..],
-        None => content,
-    }
-}
 
 /// Assemble an agent `.md` file from a recipe by concatenating facet contents.
 ///
@@ -46,7 +32,7 @@ pub fn assemble_recipe(recipe: &Recipe, root: &RepoRoot, fs: &dyn Filesystem) ->
                 facet_path.display()
             )
         })?;
-        let body = strip_frontmatter(&content);
+        let (_, body) = split_frontmatter_and_body(&content);
         let trimmed = body.trim_start();
         output.push_str(trimmed);
         // Ensure each facet body ends with a newline
@@ -139,22 +125,6 @@ mod tests {
             facets: facets.iter().map(|s| (*s).to_string()).collect(),
             runtime_skills: Vec::new(),
         }
-    }
-
-    // -- strip_frontmatter ---------------------------------------------------
-
-    #[test]
-    fn strip_frontmatter_removes_yaml() {
-        let content = "---\nname: test\nfacet: rust\n---\n# Heading\n\nBody text.\n";
-        let result = strip_frontmatter(content);
-        assert_eq!(result, "# Heading\n\nBody text.\n");
-    }
-
-    #[test]
-    fn strip_frontmatter_no_frontmatter() {
-        let content = "# Just Markdown\n\nNo frontmatter here.\n";
-        let result = strip_frontmatter(content);
-        assert_eq!(result, content);
     }
 
     // -- assemble_recipe -----------------------------------------------------
