@@ -60,7 +60,9 @@ pub fn generate_manifests(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<Pa
         let content = fs.read_to_string(source_path)?;
         let file_name = source_path
             .file_name()
-            .expect("source path should have a file name")
+            .ok_or_else(|| {
+                anyhow::anyhow!("manifest source path has no file name: {}", source_path.display())
+            })?
             .to_string_lossy();
 
         for platform in Platform::targets() {

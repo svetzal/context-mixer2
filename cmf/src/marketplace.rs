@@ -20,10 +20,9 @@ pub fn validate_marketplace(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
         "marketplace.json",
         fs,
     )?;
-    if !early_issues.is_empty() {
+    let Some(marketplace) = maybe_marketplace else {
         return Ok(early_issues);
-    }
-    let marketplace = maybe_marketplace.unwrap();
+    };
 
     let mut issues = Vec::new();
 

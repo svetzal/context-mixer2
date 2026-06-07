@@ -193,23 +193,25 @@ pub fn adopt_named(
     let mut chosen = Vec::new();
     for name in names {
         let row = report.rows.iter().find(|r| r.kind == kind && &r.name == name);
-        match row.map(|r| r.state) {
-            Some(ArtifactState::Orphaned) => chosen.push(row.unwrap().clone()),
-            Some(ArtifactState::Untracked) => anyhow::bail!(
-                "'{name}' is available in a registered source — run `cmx {kind} install {name}` to track it. \
-                 (adopt is for hand-authored artifacts that no source provides.)"
-            ),
-            Some(ArtifactState::Tracked) => {
-                anyhow::bail!("'{name}' is already tracked — nothing to adopt.")
-            }
-            Some(ArtifactState::Drifted) => anyhow::bail!(
-                "'{name}' is tracked but locally modified (drifted), not orphaned — adopt does not yet \
-                 re-home drifted artifacts. Inspect with `cmx info {name}`."
-            ),
-            Some(ArtifactState::External) => anyhow::bail!(
-                "'{name}' is marked external (managed by another tool) — remove it from the external \
-                 list (`cmx config external remove ...`) before adopting it with cmx."
-            ),
+        match row {
+            Some(r) => match r.state {
+                ArtifactState::Orphaned => chosen.push(r.clone()),
+                ArtifactState::Untracked => anyhow::bail!(
+                    "'{name}' is available in a registered source — run `cmx {kind} install {name}` to track it. \
+                     (adopt is for hand-authored artifacts that no source provides.)"
+                ),
+                ArtifactState::Tracked => {
+                    anyhow::bail!("'{name}' is already tracked — nothing to adopt.")
+                }
+                ArtifactState::Drifted => anyhow::bail!(
+                    "'{name}' is tracked but locally modified (drifted), not orphaned — adopt does not yet \
+                     re-home drifted artifacts. Inspect with `cmx info {name}`."
+                ),
+                ArtifactState::External => anyhow::bail!(
+                    "'{name}' is marked external (managed by another tool) — remove it from the external \
+                     list (`cmx config external remove ...`) before adopting it with cmx."
+                ),
+            },
             None => anyhow::bail!(
                 "No {kind} named '{name}' found on disk. Run `cmx doctor` to see what is adoptable."
             ),

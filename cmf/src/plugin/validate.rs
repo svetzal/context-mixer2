@@ -22,10 +22,9 @@ pub fn validate_plugin(
 
     let (maybe_manifest, early_issues) =
         load_and_validate_json::<PluginManifest>(&manifest_path, dir_name, "plugin.json", fs)?;
-    if !early_issues.is_empty() {
+    let Some(manifest) = maybe_manifest else {
         return Ok(early_issues);
-    }
-    let manifest = maybe_manifest.unwrap();
+    };
 
     let mut issues = Vec::new();
 
