@@ -1,8 +1,9 @@
 use super::*;
+use crate::platform::Platform;
 use crate::test_support::{
     TestContext, make_lock_entry_with_checksum, save_lock_with_entry, versioned_skill_content,
 };
-use crate::types::InstallScope;
+use crate::types::{ArtifactKind, InstallScope};
 
 /// Install a skill directory on disk for the given platform/scope and return
 /// its checksum so a lock entry can be made to match (or deliberately not).
