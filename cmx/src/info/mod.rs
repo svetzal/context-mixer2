@@ -241,6 +241,21 @@ pub(crate) fn collect_skill_files_with(
     Ok(result)
 }
 
+/// Render an error as a single, length-capped line for the `summary_error`
+/// field. `{:#}` gives anyhow's full context chain, then we flatten whitespace
+/// (provider errors often embed a multi-line JSON body) and truncate.
+#[cfg(feature = "llm")]
+pub fn condense_error(e: &anyhow::Error) -> String {
+    const MAX: usize = 200;
+    let flattened = format!("{e:#}").split_whitespace().collect::<Vec<_>>().join(" ");
+    if flattened.chars().count() > MAX {
+        let head: String = flattened.chars().take(MAX).collect();
+        format!("{head}…")
+    } else {
+        flattened
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
@@ -731,6 +746,22 @@ mod tests {
 
         let skill_md = result.iter().find(|e| e.name == "SKILL.md").unwrap();
         assert!(!skill_md.is_dir, "SKILL.md should not be marked as a directory");
+    }
+
+    // --- condense_error ---
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn condense_error_short_message_unchanged() {
+        assert_eq!(condense_error(&anyhow::anyhow!("short error")), "short error");
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn condense_error_long_message_truncated() {
+        let long_msg: String = "x".repeat(300);
+        let result = condense_error(&anyhow::anyhow!("{long_msg}"));
+        assert!(result.ends_with('…'));
     }
 
     // --- Deprecation struct accessible from tests ---

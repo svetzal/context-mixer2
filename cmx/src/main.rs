@@ -1,5 +1,6 @@
 use anyhow::{Result, bail};
 use clap::Parser;
+use std::process::ExitCode;
 
 use cmx::cli::{
     ArtifactAction, Cli, Commands, ConfigAction, ExternalAction, HomeAction, SourceAction,
@@ -9,7 +10,10 @@ use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use cmx::paths::ConfigPaths;
 use cmx::types::{ArtifactKind, InstallScope};
 
-fn main() -> Result<()> {
+#[cfg(feature = "llm")]
+use cmx::gateway::real::MojenticLlmClient;
+
+fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
     let paths = ConfigPaths::from_env(cli.platform)?;
 
@@ -24,15 +28,15 @@ fn main() -> Result<()> {
     run(cli, &ctx, &paths)
 }
 
-fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<()> {
+fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> {
     match cli.command {
-        Commands::Source { action } => handle_source(action, paths, ctx),
+        Commands::Source { action } => handle_source(action, paths, ctx).map(|()| ExitCode::SUCCESS),
         Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, ctx),
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, ctx),
         Commands::List { all } => {
             let output = cmx::list::list_all(all, ctx)?;
             print!("{output}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
         Commands::Doctor {
             local,
@@ -43,7 +47,7 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<()> {
             if adopt_all {
                 let outcome = cmx::adopt::adopt_all(None, from.as_deref(), local, ctx)?;
                 print!("{outcome}");
-                Ok(())
+                Ok(ExitCode::SUCCESS)
             } else if from.is_some() {
                 bail!("--from only applies together with --adopt-all")
             } else {
@@ -51,24 +55,25 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<()> {
                 report.show_all = all;
                 print!("{report}");
                 if report.has_issues() {
-                    std::process::exit(2);
+                    Ok(ExitCode::from(2))
+                } else {
+                    Ok(ExitCode::SUCCESS)
                 }
-                Ok(())
             }
         }
-        Commands::Home { action } => handle_home(&action, ctx),
-        Commands::Info { name } => handle_info(&name, None, ctx),
+        Commands::Home { action } => handle_home(&action, ctx).map(|()| ExitCode::SUCCESS),
+        Commands::Info { name } => handle_info(&name, None, ctx).map(|()| ExitCode::SUCCESS),
         Commands::Outdated => {
             let report = cmx::outdated::outdated(ctx)?;
             print!("{report}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
         Commands::Search { query } => {
             let output = cmx::search::search(&query, ctx)?;
             print!("{output}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
-        Commands::Config { action } => handle_config(action, ctx),
+        Commands::Config { action } => handle_config(action, ctx).map(|()| ExitCode::SUCCESS),
     }
 }
 
@@ -165,22 +170,19 @@ fn handle_info(name: &str, kind: Option<ArtifactKind>, ctx: &AppContext<'_>) -> 
 
     #[cfg(feature = "llm")]
     {
-        use cmx::gateway::real::MojenticLlmClient;
-        let cfg = cmx::config::load_config(ctx.fs, ctx.paths)?;
-        let llm = MojenticLlmClient::new(cfg.llm);
+        let runner = build_llm_runtime(ctx)?;
         let llm_ctx = AppContext {
             fs: ctx.fs,
             git: ctx.git,
             clock: ctx.clock,
             paths: ctx.paths,
-            llm: Some(&llm),
+            llm: Some(&runner.llm),
         };
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
-        match rt.block_on(cmx::info::summarize(&info, &llm_ctx)) {
+        match runner.rt.block_on(cmx::info::summarize(&info, &llm_ctx)) {
             Ok(summary) => info.summary = Some(summary),
             // Best-effort: record *why* so the display reports the real reason
             // rather than always blaming the provider; never fail the command.
-            Err(e) => info.summary_error = Some(condense_error(&e)),
+            Err(e) => info.summary_error = Some(cmx::info::condense_error(&e)),
         }
     }
 
@@ -188,23 +190,29 @@ fn handle_info(name: &str, kind: Option<ArtifactKind>, ctx: &AppContext<'_>) -> 
     Ok(())
 }
 
-/// Render an error as a single, length-capped line for the one-line "What it
-/// does" reason. `{:#}` gives anyhow's full context chain (so the underlying
-/// provider/credential cause survives), then we flatten whitespace — provider
-/// errors often embed a multi-line JSON body — and truncate.
+/// Bundles the LLM client and a current-thread tokio runtime, extracted from
+/// the config at `ctx`. Both sites that need LLM access (`handle_info` and the
+/// `Diff` action) build the same boilerplate; this helper captures it once.
 #[cfg(feature = "llm")]
-fn condense_error(e: &anyhow::Error) -> String {
-    const MAX: usize = 200;
-    let flattened = format!("{e:#}").split_whitespace().collect::<Vec<_>>().join(" ");
-    if flattened.chars().count() > MAX {
-        let head: String = flattened.chars().take(MAX).collect();
-        format!("{head}…")
-    } else {
-        flattened
-    }
+struct LlmRuntime {
+    llm: MojenticLlmClient,
+    rt: tokio::runtime::Runtime,
 }
 
-fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<()> {
+#[cfg(feature = "llm")]
+fn build_llm_runtime(ctx: &AppContext<'_>) -> Result<LlmRuntime> {
+    let cfg = cmx::config::load_config(ctx.fs, ctx.paths)?;
+    Ok(LlmRuntime {
+        llm: MojenticLlmClient::new(cfg.llm),
+        rt: tokio::runtime::Builder::new_current_thread().enable_all().build()?,
+    })
+}
+
+fn handle_artifact(
+    action: ArtifactAction,
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
     match action {
         ArtifactAction::Install {
             names,
@@ -220,51 +228,51 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
             if all {
                 let result = cmx::install::install_all(kind, scope, force, ctx)?;
                 print!("{result}");
-                Ok(())
+                Ok(ExitCode::SUCCESS)
             } else if names.is_empty() {
                 bail!("Provide artifact name(s) or use --all")
             } else {
                 let result = cmx::install::install_many(&names, kind, scope, force, ctx)?;
                 let any_failed = !result.failed.is_empty();
                 print!("{result}");
-                if any_failed {
-                    std::process::exit(1);
-                }
-                Ok(())
+                Ok(if any_failed {
+                    ExitCode::FAILURE
+                } else {
+                    ExitCode::SUCCESS
+                })
             }
         }
         ArtifactAction::List { all } => {
             let output = cmx::list::list_kind(kind, all, ctx)?;
             print!("{output}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
-        ArtifactAction::Info { name } => handle_info(&name, Some(kind), ctx),
+        ArtifactAction::Info { name } => {
+            handle_info(&name, Some(kind), ctx).map(|()| ExitCode::SUCCESS)
+        }
         #[cfg(feature = "llm")]
         ArtifactAction::Diff { name } => {
-            use cmx::gateway::real::MojenticLlmClient;
-            let cfg = cmx::config::load_config(ctx.fs, ctx.paths)?;
-            let llm = MojenticLlmClient::new(cfg.llm);
+            let runner = build_llm_runtime(ctx)?;
             let diff_ctx = AppContext {
                 fs: ctx.fs,
                 git: ctx.git,
                 clock: ctx.clock,
                 paths: ctx.paths,
-                llm: Some(&llm),
+                llm: Some(&runner.llm),
             };
-            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
-            let output = rt.block_on(cmx::diff::diff(&name, kind, &diff_ctx))?;
+            let output = runner.rt.block_on(cmx::diff::diff(&name, kind, &diff_ctx))?;
             print!("{output}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
         ArtifactAction::Update { name, all, force } => {
             if all {
                 let result = cmx::install::update_all(kind, force, ctx)?;
                 print!("{result}");
-                Ok(())
+                Ok(ExitCode::SUCCESS)
             } else if let Some(name) = name {
                 let result = cmx::install::update(&name, kind, force, ctx)?;
                 print!("{result}");
-                Ok(())
+                Ok(ExitCode::SUCCESS)
             } else {
                 bail!("Provide an artifact name or use --all")
             }
@@ -282,18 +290,23 @@ fn handle_artifact(action: ArtifactAction, kind: ArtifactKind, ctx: &AppContext<
             let none_removed = result.removed.is_empty();
             print!("{result}");
             // Exit non-zero only if nothing at all was removed (e.g. all typos).
-            if none_removed {
-                std::process::exit(1);
-            }
-            Ok(())
+            Ok(if none_removed {
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            })
         }
-        ArtifactAction::Unadopt { names, external } => handle_unadopt(&names, kind, external, ctx),
+        ArtifactAction::Unadopt { names, external } => {
+            handle_unadopt(&names, kind, external, ctx).map(|()| ExitCode::SUCCESS)
+        }
         ArtifactAction::Adopt {
             names,
             all,
             from,
             local,
-        } => handle_adopt(&names, kind, all, from.as_deref(), local, ctx),
+        } => {
+            handle_adopt(&names, kind, all, from.as_deref(), local, ctx).map(|()| ExitCode::SUCCESS)
+        }
     }
 }
 
@@ -387,6 +400,26 @@ mod tests {
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("all"));
+    }
+
+    #[test]
+    fn handle_artifact_install_not_found_returns_failure_exit_code() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        // "nonexistent" is not in any source → install_many puts it in `failed`
+        // → previously process::exit(1), now returns Ok(ExitCode::FAILURE)
+        let result = handle_artifact(
+            ArtifactAction::Install {
+                names: vec!["nonexistent".to_string()],
+                all: false,
+                local: false,
+                force: false,
+            },
+            ArtifactKind::Agent,
+            &ctx,
+        );
+        assert!(result.is_ok(), "expected Ok, not Err: {:?}", result.err());
+        assert_eq!(result.unwrap(), ExitCode::FAILURE);
     }
 
     #[test]
@@ -601,17 +634,28 @@ mod tests {
         assert!(run(cli, &ctx, &paths).is_err());
     }
 
-    #[cfg(feature = "llm")]
     #[test]
-    fn condense_error_short_message_unchanged() {
-        assert_eq!(condense_error(&anyhow::anyhow!("short error")), "short error");
-    }
-
-    #[cfg(feature = "llm")]
-    #[test]
-    fn condense_error_long_message_truncated() {
-        let long_msg: String = "x".repeat(300);
-        let result = condense_error(&anyhow::anyhow!("{long_msg}"));
-        assert!(result.ends_with('…'));
+    fn run_doctor_with_orphaned_artifact_returns_exit_code_2() {
+        let (fs, git, clock, paths) = fake_trio();
+        // Place an agent on disk with no lock entry — doctor classifies it as
+        // Orphaned, which triggers has_issues(); previously process::exit(2),
+        // now testable as Ok(ExitCode::from(2)).
+        fs.add_file(
+            "/home/testuser/.claude/agents/stray-agent.md",
+            "---\nname: stray-agent\ndescription: a stray agent\n---\n# stray-agent\n",
+        );
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let cli = Cli {
+            platform: Platform::Claude,
+            command: Commands::Doctor {
+                local: false,
+                adopt_all: false,
+                from: None,
+                all: false,
+            },
+        };
+        let result = run(cli, &ctx, &paths);
+        assert!(result.is_ok(), "expected Ok, not Err: {:?}", result.err());
+        assert_eq!(result.unwrap(), ExitCode::from(2));
     }
 }
