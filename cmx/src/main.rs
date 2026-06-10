@@ -30,7 +30,9 @@ fn main() -> Result<ExitCode> {
 
 fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> {
     match cli.command {
-        Commands::Source { action } => handle_source(action, paths, ctx).map(|()| ExitCode::SUCCESS),
+        Commands::Source { action } => {
+            handle_source(action, paths, ctx).map(|()| ExitCode::SUCCESS)
+        }
         Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, ctx),
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, ctx),
         Commands::List { all } => {
