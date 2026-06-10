@@ -203,7 +203,11 @@ impl Filesystem for FakeFilesystem {
             if let Some(parent) = file_path.parent()
                 && parent == path
             {
-                let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
+                let file_name = file_path
+                    .file_name()
+                    .expect("file path with a matched parent must have a final component")
+                    .to_string_lossy()
+                    .to_string();
                 if seen.insert(file_path.clone()) {
                     entries.push(DirEntry {
                         path: file_path.clone(),
@@ -220,7 +224,11 @@ impl Filesystem for FakeFilesystem {
                 && parent == path
                 && seen.insert(dir_path.clone())
             {
-                let file_name = dir_path.file_name().unwrap().to_string_lossy().to_string();
+                let file_name = dir_path
+                    .file_name()
+                    .expect("dir path with a matched parent must have a final component")
+                    .to_string_lossy()
+                    .to_string();
                 entries.push(DirEntry {
                     path: dir_path,
                     file_name,
