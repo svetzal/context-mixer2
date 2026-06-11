@@ -98,13 +98,7 @@ fn find_and_gather(
         if let Some((path, scope)) = config::find_installed_path(name, kind, ctx.fs, &pv) {
             // Gather against the platform the artifact actually lives in, so its
             // (per-platform) lock file is the one consulted.
-            let pv_ctx = AppContext {
-                fs: ctx.fs,
-                git: ctx.git,
-                clock: ctx.clock,
-                paths: &pv,
-                llm: ctx.llm,
-            };
+            let pv_ctx = ctx.with_paths(&pv);
             return Ok(Some(gather_info(name, kind, scope, &path, &pv_ctx)?));
         }
     }
@@ -114,6 +108,17 @@ fn find_and_gather(
 // ---------------------------------------------------------------------------
 // Gather (pure logic, no println!)
 // ---------------------------------------------------------------------------
+
+struct LockDerived {
+    version: Option<String>,
+    installed_at: Option<String>,
+    source_display: Option<String>,
+    source_checksum: Option<String>,
+    installed_checksum: Option<String>,
+    disk_checksum: Option<String>,
+    locally_modified: bool,
+    untracked: bool,
+}
 
 pub(crate) fn gather_info(
     name: &str,
@@ -126,30 +131,30 @@ pub(crate) fn gather_info(
     let installed = config::installed_single_with_lock_data(name, &lock, kind);
     let lock_entry = installed.as_ref().and_then(|ia| ia.lock_entry);
 
-    let (
-        version,
-        installed_at,
-        source_display,
-        source_checksum,
-        installed_checksum,
-        disk_checksum,
-        locally_modified,
-        untracked,
-    ) = if let Some(entry) = lock_entry {
+    let ld = if let Some(entry) = lock_entry {
         let (locally_modified, disk_checksum) =
             checksum::current_checksum_if_modified(path, kind, entry, ctx.fs)?;
-        (
-            entry.version.clone(),
-            Some(entry.installed_at.clone()),
-            Some(format!("{} ({})", entry.source.repo, entry.source.path)),
-            Some(entry.source_checksum.clone()),
-            Some(entry.installed_checksum.clone()),
+        LockDerived {
+            version: entry.version.clone(),
+            installed_at: Some(entry.installed_at.clone()),
+            source_display: Some(format!("{} ({})", entry.source.repo, entry.source.path)),
+            source_checksum: Some(entry.source_checksum.clone()),
+            installed_checksum: Some(entry.installed_checksum.clone()),
             disk_checksum,
             locally_modified,
-            false,
-        )
+            untracked: false,
+        }
     } else {
-        (None, None, None, None, None, None, false, true)
+        LockDerived {
+            version: None,
+            installed_at: None,
+            source_display: None,
+            source_checksum: None,
+            installed_checksum: None,
+            disk_checksum: None,
+            locally_modified: false,
+            untracked: true,
+        }
     };
 
     // Check source for deprecation and available version
@@ -183,14 +188,14 @@ pub(crate) fn gather_info(
         kind,
         scope: scope.label(),
         path: path.to_path_buf(),
-        version,
-        installed_at,
-        source_display,
-        source_checksum,
-        installed_checksum,
-        disk_checksum,
-        locally_modified,
-        untracked,
+        version: ld.version,
+        installed_at: ld.installed_at,
+        source_display: ld.source_display,
+        source_checksum: ld.source_checksum,
+        installed_checksum: ld.installed_checksum,
+        disk_checksum: ld.disk_checksum,
+        locally_modified: ld.locally_modified,
+        untracked: ld.untracked,
         deprecation,
         available_version,
         skill_files,

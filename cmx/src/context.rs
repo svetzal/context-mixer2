@@ -19,6 +19,37 @@ pub struct AppContext<'a> {
     pub llm: Option<&'a dyn LlmClient>,
 }
 
+impl<'a> AppContext<'a> {
+    /// Return a copy of this context with `paths` replaced.
+    pub fn with_paths<'b>(&self, paths: &'b ConfigPaths) -> AppContext<'b>
+    where
+        'a: 'b,
+    {
+        AppContext {
+            fs: self.fs,
+            git: self.git,
+            clock: self.clock,
+            paths,
+            llm: self.llm,
+        }
+    }
+
+    /// Return a copy of this context with `llm` set to `Some(llm)`.
+    #[cfg(feature = "llm")]
+    pub fn with_llm<'b>(&self, llm: &'b dyn LlmClient) -> AppContext<'b>
+    where
+        'a: 'b,
+    {
+        AppContext {
+            fs: self.fs,
+            git: self.git,
+            clock: self.clock,
+            paths: self.paths,
+            llm: Some(llm),
+        }
+    }
+}
+
 /// Pre-loaded configuration state — sources file plus both lock files.
 ///
 /// Consolidates the repeated pattern of loading sources + both lock files at

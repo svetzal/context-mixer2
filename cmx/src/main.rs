@@ -173,13 +173,7 @@ fn handle_info(name: &str, kind: Option<ArtifactKind>, ctx: &AppContext<'_>) -> 
     #[cfg(feature = "llm")]
     {
         let runner = build_llm_runtime(ctx)?;
-        let llm_ctx = AppContext {
-            fs: ctx.fs,
-            git: ctx.git,
-            clock: ctx.clock,
-            paths: ctx.paths,
-            llm: Some(&runner.llm),
-        };
+        let llm_ctx = ctx.with_llm(&runner.llm);
         match runner.rt.block_on(cmx::info::summarize(&info, &llm_ctx)) {
             Ok(summary) => info.summary = Some(summary),
             // Best-effort: record *why* so the display reports the real reason
@@ -255,13 +249,7 @@ fn handle_artifact(
         #[cfg(feature = "llm")]
         ArtifactAction::Diff { name } => {
             let runner = build_llm_runtime(ctx)?;
-            let diff_ctx = AppContext {
-                fs: ctx.fs,
-                git: ctx.git,
-                clock: ctx.clock,
-                paths: ctx.paths,
-                llm: Some(&runner.llm),
-            };
+            let diff_ctx = ctx.with_llm(&runner.llm);
             let output = runner.rt.block_on(cmx::diff::diff(&name, kind, &diff_ctx))?;
             print!("{output}");
             Ok(ExitCode::SUCCESS)
