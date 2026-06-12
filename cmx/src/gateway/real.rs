@@ -196,6 +196,7 @@ impl LlmClient for MojenticLlmClient {
         system_prompt: &str,
         user_prompt: &str,
     ) -> Pin<Box<dyn Future<Output = Result<String>> + Send + '_>> {
+        // not unit-tested: live network boundary
         let broker = self.make_broker();
         let messages = vec![
             LlmMessage::system(system_prompt),
@@ -207,5 +208,281 @@ impl LlmClient for MojenticLlmClient {
                 .await
                 .context("LLM analysis failed")
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    // -----------------------------------------------------------------------
+    // RealFilesystem
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn real_filesystem_write_read_string_roundtrip() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("hello.txt");
+        let fs = RealFilesystem;
+        fs.write(&path, "hello world").unwrap();
+        assert_eq!(fs.read_to_string(&path).unwrap(), "hello world");
+    }
+
+    #[test]
+    fn real_filesystem_write_bytes_read_roundtrip() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("bytes.bin");
+        let fs = RealFilesystem;
+        let data = vec![0u8, 1, 2, 255];
+        fs.write_bytes(&path, &data).unwrap();
+        assert_eq!(fs.read(&path).unwrap(), data);
+    }
+
+    #[test]
+    fn real_filesystem_create_dir_all_nested() {
+        let dir = TempDir::new().unwrap();
+        let nested = dir.path().join("a").join("b").join("c");
+        let fs = RealFilesystem;
+        fs.create_dir_all(&nested).unwrap();
+        assert!(nested.is_dir());
+    }
+
+    #[test]
+    fn real_filesystem_copy_file() {
+        let dir = TempDir::new().unwrap();
+        let src = dir.path().join("src.txt");
+        let dst = dir.path().join("dst.txt");
+        let fs = RealFilesystem;
+        fs.write(&src, "copy me").unwrap();
+        fs.copy_file(&src, &dst).unwrap();
+        assert_eq!(fs.read_to_string(&dst).unwrap(), "copy me");
+        // source still exists
+        assert!(fs.exists(&src));
+    }
+
+    #[test]
+    fn real_filesystem_rename() {
+        let dir = TempDir::new().unwrap();
+        let from = dir.path().join("from.txt");
+        let to = dir.path().join("to.txt");
+        let fs = RealFilesystem;
+        fs.write(&from, "data").unwrap();
+        fs.rename(&from, &to).unwrap();
+        assert!(!from.exists());
+        assert_eq!(fs.read_to_string(&to).unwrap(), "data");
+    }
+
+    #[test]
+    fn real_filesystem_remove_file() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("tmp.txt");
+        let fs = RealFilesystem;
+        fs.write(&path, "").unwrap();
+        assert!(fs.exists(&path));
+        fs.remove_file(&path).unwrap();
+        assert!(!fs.exists(&path));
+    }
+
+    #[test]
+    fn real_filesystem_remove_dir_all() {
+        let dir = TempDir::new().unwrap();
+        let sub = dir.path().join("sub");
+        let file = sub.join("file.txt");
+        let fs = RealFilesystem;
+        fs.create_dir_all(&sub).unwrap();
+        fs.write(&file, "x").unwrap();
+        fs.remove_dir_all(&sub).unwrap();
+        assert!(!sub.exists());
+    }
+
+    #[test]
+    fn real_filesystem_read_dir_entries() {
+        let dir = TempDir::new().unwrap();
+        let fs = RealFilesystem;
+        fs.write(&dir.path().join("alpha.txt"), "a").unwrap();
+        fs.write(&dir.path().join("beta.txt"), "b").unwrap();
+        let entries = fs.read_dir(dir.path()).unwrap();
+        let names: std::collections::BTreeSet<_> =
+            entries.iter().map(|e| e.file_name.as_str()).collect();
+        assert!(names.contains("alpha.txt"));
+        assert!(names.contains("beta.txt"));
+        // Verify DirEntry fields
+        for entry in &entries {
+            assert!(!entry.is_dir);
+            assert!(entry.path.exists());
+        }
+    }
+
+    #[test]
+    fn real_filesystem_read_dir_contains_subdir_entry() {
+        let dir = TempDir::new().unwrap();
+        let sub = dir.path().join("subdir");
+        let fs = RealFilesystem;
+        fs.create_dir_all(&sub).unwrap();
+        let entries = fs.read_dir(dir.path()).unwrap();
+        let subdir_entry = entries.iter().find(|e| e.file_name == "subdir").unwrap();
+        assert!(subdir_entry.is_dir);
+    }
+
+    #[test]
+    fn real_filesystem_exists_is_dir_is_file() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("f.txt");
+        let fs = RealFilesystem;
+
+        assert!(!fs.exists(&path));
+        assert!(!fs.is_file(&path));
+        assert!(!fs.is_dir(&path));
+
+        fs.write(&path, "").unwrap();
+        assert!(fs.exists(&path));
+        assert!(fs.is_file(&path));
+        assert!(!fs.is_dir(&path));
+
+        assert!(fs.is_dir(dir.path()));
+        assert!(!fs.is_file(dir.path()));
+    }
+
+    #[test]
+    fn real_filesystem_canonicalize() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("c.txt");
+        let fs = RealFilesystem;
+        fs.write(&path, "").unwrap();
+        let canonical = fs.canonicalize(&path).unwrap();
+        assert!(canonical.is_absolute());
+        assert!(canonical.exists());
+    }
+
+    #[test]
+    fn real_filesystem_read_to_string_missing_returns_err() {
+        let dir = TempDir::new().unwrap();
+        let missing = dir.path().join("no_such_file.txt");
+        let fs = RealFilesystem;
+        let err = fs.read_to_string(&missing).unwrap_err();
+        assert!(err.to_string().contains("Failed to read"));
+    }
+
+    // -----------------------------------------------------------------------
+    // SystemClock
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn system_clock_returns_current_wall_time() {
+        let before = Utc::now();
+        let clock = SystemClock;
+        let result = clock.now();
+        let after = Utc::now();
+        assert!(result >= before, "clock result should be >= before");
+        assert!(result <= after, "clock result should be <= after");
+    }
+
+    // -----------------------------------------------------------------------
+    // RealGitClient
+    // -----------------------------------------------------------------------
+
+    fn git_available() -> bool {
+        Command::new("git").arg("--version").output().is_ok()
+    }
+
+    #[test]
+    fn real_git_client_clone_and_pull() {
+        if !git_available() {
+            eprintln!("git not found on PATH — skipping RealGitClient tests");
+            return;
+        }
+
+        let source_dir = TempDir::new().unwrap();
+        // Init a bare-ish source repo with one commit
+        Command::new("git")
+            .args(["init", "-b", "main"])
+            .current_dir(source_dir.path())
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["config", "user.email", "test@example.com"])
+            .current_dir(source_dir.path())
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(source_dir.path())
+            .output()
+            .unwrap();
+        std::fs::write(source_dir.path().join("README.md"), "hello").unwrap();
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(source_dir.path())
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(source_dir.path())
+            .output()
+            .unwrap();
+
+        let clone_dir = TempDir::new().unwrap();
+        let dest = clone_dir.path().join("repo");
+        let client = RealGitClient;
+
+        client.clone_repo(&source_dir.path().display().to_string(), &dest).unwrap();
+        assert!(dest.join("README.md").exists());
+
+        // pull should succeed on an up-to-date clone
+        client.pull(&dest).unwrap();
+    }
+
+    #[test]
+    fn real_git_client_clone_nonexistent_returns_err() {
+        if !git_available() {
+            eprintln!("git not found on PATH — skipping RealGitClient error test");
+            return;
+        }
+        let dest = TempDir::new().unwrap();
+        let client = RealGitClient;
+        let err = client
+            .clone_repo("/nonexistent/path/that/does/not/exist", dest.path())
+            .unwrap_err();
+        assert!(err.to_string().contains("git clone failed"));
+    }
+
+    // -----------------------------------------------------------------------
+    // MojenticLlmClient (hermetic only — no network calls)
+    // -----------------------------------------------------------------------
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn mojentic_llm_client_new_stores_config() {
+        use crate::types::{LlmConfig, LlmGatewayType};
+        let config = LlmConfig {
+            gateway: LlmGatewayType::OpenAI,
+            model: "gpt-4o".to_string(),
+        };
+        let client = MojenticLlmClient::new(config.clone());
+        assert_eq!(client.config.model, "gpt-4o");
+        assert_eq!(client.config.gateway, LlmGatewayType::OpenAI);
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn mojentic_llm_client_make_broker_openai_does_not_panic() {
+        use crate::types::{LlmConfig, LlmGatewayType};
+        let client = MojenticLlmClient::new(LlmConfig {
+            gateway: LlmGatewayType::OpenAI,
+            model: "gpt-4o".to_string(),
+        });
+        let _broker = client.make_broker();
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn mojentic_llm_client_make_broker_ollama_does_not_panic() {
+        use crate::types::{LlmConfig, LlmGatewayType};
+        let client = MojenticLlmClient::new(LlmConfig {
+            gateway: LlmGatewayType::Ollama,
+            model: "llama3".to_string(),
+        });
+        let _broker = client.make_broker();
     }
 }
