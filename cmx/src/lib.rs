@@ -21,6 +21,7 @@ pub mod outdated;
 pub mod partition;
 pub mod paths;
 pub mod platform;
+pub mod plugin_types;
 pub mod scan;
 pub(crate) mod scan_marketplace;
 pub mod search;

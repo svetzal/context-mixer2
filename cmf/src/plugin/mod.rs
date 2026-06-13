@@ -52,12 +52,15 @@ pub fn scan_plugins(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<PluginIn
     let mut plugins = Vec::new();
 
     for entry in &marketplace.plugins {
-        let plugin_path = resolve_source_path(&root.path, &entry.source);
+        let Some(local_source) = entry.source.as_ref().and_then(|s| s.as_local()) else {
+            continue; // remote/missing source — skip
+        };
+        let plugin_path = resolve_source_path(&root.path, local_source);
 
         if !fs.exists(&plugin_path) {
             eprintln!(
                 "warning: plugin '{}' source path '{}' does not exist, skipping",
-                entry.name, entry.source
+                entry.name, local_source
             );
             continue;
         }

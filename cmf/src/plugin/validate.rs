@@ -62,7 +62,10 @@ pub fn validate_all_plugins(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
 
     let mut all_issues = Vec::new();
     for entry in &marketplace.plugins {
-        let plugin_path = resolve_source_path(&root.path, &entry.source);
+        let Some(local_source) = entry.source.as_ref().and_then(|s| s.as_local()) else {
+            continue; // remote/missing source — skip plugin validation
+        };
+        let plugin_path = resolve_source_path(&root.path, local_source);
         let dir_name = plugin_path
             .file_name()
             .map_or_else(|| entry.name.clone(), |n| n.to_string_lossy().to_string());
@@ -70,7 +73,7 @@ pub fn validate_all_plugins(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<
         if !fs.exists(&plugin_path) {
             all_issues.push(ValidationIssue::error(
                 dir_name,
-                format!("source path \"{}\" does not exist", entry.source),
+                format!("source path \"{local_source}\" does not exist"),
             ));
             continue;
         }

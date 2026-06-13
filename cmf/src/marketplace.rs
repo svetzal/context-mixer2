@@ -2,7 +2,7 @@ use anyhow::Result;
 use cmx::gateway::Filesystem;
 use cmx::json_file::{load_json, save_json};
 
-use crate::plugin_types::{Marketplace, MarketplaceEntry, PluginManifest};
+use crate::plugin_types::{Marketplace, MarketplaceEntry, PluginManifest, PluginSource};
 use crate::repo::{RepoRoot, resolve_source_path};
 use crate::validation::{ValidationIssue, load_and_validate_json};
 
@@ -65,7 +65,7 @@ fn discover_plugin_entries(
         }
 
         let manifest: PluginManifest = load_json(&plugin_json, fs)?;
-        let source = format!("./plugins/{}", dir_entry.file_name);
+        let source = PluginSource::Local(format!("./plugins/{}", dir_entry.file_name));
 
         // Preserve category from existing entry if the name matches
         let category =
@@ -74,8 +74,9 @@ fn discover_plugin_entries(
         entries.push(MarketplaceEntry {
             name: manifest.name,
             description: manifest.description.unwrap_or_default(),
-            source,
+            source: Some(source),
             category,
+            ..Default::default()
         });
     }
 
@@ -92,14 +93,27 @@ fn validate_marketplace_entries(
     let mut issues = Vec::new();
 
     for entry in entries {
-        let plugin_path = resolve_source_path(&root.path, &entry.source);
+        let Some(local_source) = entry.source.as_ref().and_then(|s| s.as_local()) else {
+            if let Some(src) = &entry.source {
+                issues.push(ValidationIssue::warning(
+                    "marketplace",
+                    format!(
+                        "plugin \"{}\" uses remote source type '{}' which is not yet supported for local validation",
+                        entry.name,
+                        src.source_type_name()
+                    ),
+                ));
+            }
+            continue;
+        };
+        let plugin_path = resolve_source_path(&root.path, local_source);
 
         if !fs.exists(&plugin_path) || !fs.is_dir(&plugin_path) {
             issues.push(ValidationIssue::error(
                 "marketplace",
                 format!(
                     "plugin \"{}\" source \"{}\" does not resolve to an existing directory",
-                    entry.name, entry.source
+                    entry.name, local_source
                 ),
             ));
             continue;
@@ -168,7 +182,7 @@ fn find_unlisted_plugins(
     let listed_sources: Vec<_> = marketplace
         .plugins
         .iter()
-        .map(|e| resolve_source_path(&root.path, &e.source))
+        .filter_map(|e| e.source.as_ref()?.as_local().map(|s| resolve_source_path(&root.path, s)))
         .collect();
 
     for entry in entries {
@@ -384,9 +398,15 @@ mod tests {
         assert_eq!(mp.plugins.len(), 2);
         // Sorted by name
         assert_eq!(mp.plugins[0].name, "alpha");
-        assert_eq!(mp.plugins[0].source, "./plugins/alpha");
+        assert_eq!(
+            mp.plugins[0].source.as_ref().and_then(|s| s.as_local()),
+            Some("./plugins/alpha")
+        );
         assert_eq!(mp.plugins[1].name, "beta");
-        assert_eq!(mp.plugins[1].source, "./plugins/beta");
+        assert_eq!(
+            mp.plugins[1].source.as_ref().and_then(|s| s.as_local()),
+            Some("./plugins/beta")
+        );
     }
 
     #[test]
@@ -447,8 +467,9 @@ mod tests {
             plugins: vec![MarketplaceEntry {
                 name: "alpha".to_string(),
                 description: "Old description".to_string(),
-                source: "./plugins/alpha".to_string(),
+                source: Some(PluginSource::Local("./plugins/alpha".to_string())),
                 category: Some("ecosystem".to_string()),
+                ..Default::default()
             }],
         };
         let existing_json = serde_json::to_string_pretty(&existing).unwrap();
@@ -487,8 +508,9 @@ mod tests {
             plugins: vec![MarketplaceEntry {
                 name: "existing".to_string(),
                 description: "Already there".to_string(),
-                source: "./plugins/existing".to_string(),
+                source: Some(PluginSource::Local("./plugins/existing".to_string())),
                 category: Some("tools".to_string()),
+                ..Default::default()
             }],
         };
         let existing_json = serde_json::to_string_pretty(&existing).unwrap();
