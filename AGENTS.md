@@ -104,57 +104,74 @@ Conventions and gotchas:
 ## Architecture
 
 Entry points:
-- `src/main.rs` — binary entry point; constructs AppContext with real gateways and dispatches CLI commands
-- `src/lib.rs` — crate root; re-exports all public modules
-- `src/cli.rs` — clap CLI definition
-- `src/context.rs` — AppContext: bundles all I/O gateway dependencies for command invocations
+- `cmx/src/main.rs` — binary entry point; constructs AppContext with real gateways and dispatches CLI commands
+- `cmx/src/lib.rs` — crate root; re-exports all public modules
+- `cmx/src/cli.rs` — clap CLI definition
+- `cmx/src/context.rs` — AppContext: bundles all I/O gateway dependencies for command invocations
 
 Source management:
-- `src/source.rs` — `cmx source` subcommands (add, list, browse, update, remove)
-- `src/source_update.rs` — source update logic (git pull for registered sources)
-- `src/source_iter.rs` — iterator over configured sources
+- `cmx/src/source/mod.rs` — `cmx source` subcommands (add, list, browse, update, remove)
+- `cmx/src/source/browse.rs` — `cmx source browse` interactive browsing
+- `cmx/src/source_update.rs` — source update logic (git pull for registered sources)
+- `cmx/src/source_iter.rs` — iterator over configured sources
 
 Artifact scanning:
-- `src/scan.rs` — artifact detection (walks source repos, matches agents/skills by frontmatter)
-- `src/scan_marketplace.rs` — scans marketplace-structured plugin repos
+- `cmx/src/scan/mod.rs` — artifact detection (walks source repos, matches agents/skills by frontmatter)
+- `cmx/src/scan/frontmatter.rs` — YAML frontmatter parsing for artifact detection
+- `cmx/src/scan_marketplace.rs` — scans marketplace-structured plugin repos
 
 Install/uninstall:
-- `src/install.rs` — `cmx agent install` / `cmx skill install`
-- `src/uninstall.rs` — `cmx agent uninstall` / `cmx skill uninstall`
-- `src/copy.rs` — file copy helpers used by install
+- `cmx/src/install.rs` — `cmx agent install` / `cmx skill install`
+- `cmx/src/uninstall.rs` — `cmx agent uninstall` / `cmx skill uninstall`
+- `cmx/src/copy.rs` — file copy helpers used by install
 
 Query & display:
-- `src/list.rs` — `cmx agent list` / `cmx skill list` / `cmx list`
-- `src/outdated.rs` — `cmx outdated` (compare installed vs source)
-- `src/search.rs` — `cmx search` (full-text search across sources)
-- `src/info.rs` — `cmx info` (artifact detail view)
-- `src/diff.rs` — LLM-powered diff analysis between installed and source versions (feature-gated)
-- `src/display.rs` — output formatting for all commands
-- `src/table.rs` — table rendering helpers
+- `cmx/src/list.rs` — `cmx agent list` / `cmx skill list` / `cmx list`
+- `cmx/src/outdated.rs` — `cmx outdated` (compare installed vs source)
+- `cmx/src/search.rs` — `cmx search` (full-text search across sources)
+- `cmx/src/info/mod.rs` — `cmx info` (artifact detail view)
+- `cmx/src/info/summary.rs` — LLM-backed prose summary for `cmx info` (feature-gated)
+- `cmx/src/diff.rs` — LLM-powered diff analysis between installed and source versions (feature-gated)
+- `cmx/src/display/mod.rs` — output formatting for all commands; one submodule per command:
+  `adopt.rs`, `config.rs`, `diff.rs`, `doctor.rs`, `info.rs`, `install.rs`, `list.rs`,
+  `outdated.rs`, `search.rs`, `source.rs`, `uninstall.rs`
+- `cmx/src/table.rs` — table rendering helpers
+
+System survey / adoption:
+- `cmx/src/doctor.rs` — `cmx doctor`: read-only system-wide survey of installed artifacts across platforms
+- `cmx/src/doctor/survey.rs` — walks platform install dirs and cross-references lock files
+- `cmx/src/doctor/divergence.rs` — detects divergence between installed artifacts and sources
+- `cmx/src/doctor/types.rs` — doctor result/report types
+- `cmx/src/adopt.rs` — `cmx adopt`: brings orphaned hand-authored artifacts under management
+- `cmx/src/partition.rs` — batch classification of artifact names during adoption/partitioning
 
 Config & persistence:
-- `src/config.rs` — config dir paths, sources.json read/write
-- `src/cmx_config.rs` — `cmx config` subcommands (show, set)
-- `src/paths.rs` — ConfigPaths: global/local install dir resolution
-- `src/lockfile.rs` — lock file read/write
-- `src/json_file.rs` — generic JSON file load/save helpers
-- `src/checksum.rs` — SHA-256 checksums for files and directories
-- `src/fs_util.rs` — filesystem utility functions
+- `cmx/src/config/mod.rs` — config dir paths, sources.json read/write
+- `cmx/src/config/installed.rs` — installed-artifact config records
+- `cmx/src/cmx_config.rs` — `cmx config` subcommands (show, set)
+- `cmx/src/paths.rs` — ConfigPaths: global/local install dir resolution
+- `cmx/src/lockfile.rs` — lock file read/write
+- `cmx/src/json_file.rs` — generic JSON file load/save helpers
+- `cmx/src/checksum.rs` — SHA-256 checksums for files and directories
+- `cmx/src/fs_util.rs` — filesystem utility functions
 
 Types:
-- `src/types.rs` — shared types (SourceEntry, Artifact, ArtifactKind, LockFile, etc.)
+- `cmx/src/types.rs` — shared types (SourceEntry, Artifact, ArtifactKind, LockFile, etc.)
+- `cmx/src/plugin_types.rs` — serde types for plugin.json and marketplace.json (single source of truth lifted from cmf)
+- `cmx/src/platform.rs` — target AI-coding-assistant platform enum used for install-directory resolution
+- `cmx/src/codex_agent.rs` — transforms a cmx markdown agent into a Codex CLI subagent TOML document
 
 Gateway (DI for testability):
-- `src/gateway/mod.rs` — gateway module; re-exports traits and real implementations
-- `src/gateway/filesystem.rs` — Filesystem trait for file I/O abstraction
-- `src/gateway/git.rs` — GitClient trait for git operations
-- `src/gateway/clock.rs` — Clock trait for time abstraction
-- `src/gateway/llm.rs` — LlmClient trait for LLM access (feature-gated)
-- `src/gateway/real.rs` — production implementations (RealFilesystem, RealGitClient, SystemClock, MojenticLlmClient)
-- `src/gateway/fakes.rs` — in-memory fakes for tests (FakeFilesystem, FakeGitClient, etc.)
+- `cmx/src/gateway/mod.rs` — gateway module; re-exports traits and real implementations
+- `cmx/src/gateway/filesystem.rs` — Filesystem trait for file I/O abstraction
+- `cmx/src/gateway/git.rs` — GitClient trait for git operations
+- `cmx/src/gateway/clock.rs` — Clock trait for time abstraction
+- `cmx/src/gateway/llm.rs` — LlmClient trait for LLM access (feature-gated)
+- `cmx/src/gateway/real.rs` — production implementations (RealFilesystem, RealGitClient, SystemClock, MojenticLlmClient)
+- `cmx/src/gateway/fakes.rs` — in-memory fakes for tests (FakeFilesystem, FakeGitClient, etc.)
 
 Test support:
-- `src/test_support.rs` — test helpers shared across integration tests
+- `cmx/src/test_support.rs` — test helpers shared across integration tests
 
 ## cmf — Context Mixer Forge
 
