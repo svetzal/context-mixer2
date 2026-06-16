@@ -8,7 +8,6 @@ use crate::lockfile;
 use crate::partition::{Partitioned, partition_by};
 use crate::paths::ConfigPaths;
 use crate::source_iter;
-use crate::source_update;
 use crate::types::{self, ArtifactKind, InstallScope, LockEntry, LockSource};
 
 // ---------------------------------------------------------------------------
@@ -63,8 +62,6 @@ pub fn install(
     ctx.paths.ensure_supports(kind)?;
 
     let (source_name, artifact_name) = parse_name(name);
-
-    source_update::ensure_fresh(ctx)?;
 
     let found = source_iter::find_unique(artifact_name, kind, source_name, ctx)?;
 
@@ -174,8 +171,6 @@ pub fn install_all(
 ) -> Result<BatchInstallResult> {
     ctx.paths.ensure_supports(kind)?;
 
-    source_update::ensure_fresh(ctx)?;
-
     let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
     let mut installed = Vec::new();
 
@@ -210,8 +205,6 @@ pub fn update_all(
     ctx: &AppContext<'_>,
 ) -> Result<BatchInstallResult> {
     ctx.paths.ensure_supports(kind)?;
-
-    source_update::ensure_fresh(ctx)?;
 
     let all_source_info = source_iter::all_with_checksums(ctx)?;
     let mut updated = Vec::new();

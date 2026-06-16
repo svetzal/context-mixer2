@@ -7,7 +7,6 @@ use crate::context::AppContext;
 use crate::lockfile;
 use crate::platform::Platform;
 use crate::source_iter;
-use crate::source_update;
 use crate::types::{ArtifactKind, Deprecation, InstallScope};
 
 mod summary;
@@ -158,7 +157,6 @@ pub(crate) fn gather_info(
     };
 
     // Check source for deprecation and available version
-    source_update::ensure_fresh(ctx)?;
     let mut deprecation: Option<Deprecation> = None;
     let mut available_version: Option<String> = None;
 

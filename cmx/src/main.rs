@@ -66,11 +66,13 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
         Commands::Home { action } => handle_home(&action, ctx).map(|()| ExitCode::SUCCESS),
         Commands::Info { name } => handle_info(&name, None, ctx).map(|()| ExitCode::SUCCESS),
         Commands::Outdated => {
+            cmx::source_update::ensure_fresh(ctx)?;
             let report = cmx::outdated::outdated(ctx)?;
             print!("{report}");
             Ok(ExitCode::SUCCESS)
         }
         Commands::Search { query } => {
+            cmx::source_update::ensure_fresh(ctx)?;
             let output = cmx::search::search(&query, ctx)?;
             print!("{output}");
             Ok(ExitCode::SUCCESS)
@@ -164,6 +166,7 @@ fn handle_config(action: ConfigAction, ctx: &AppContext<'_>) -> Result<()> {
 /// generated "what it does" summary, best-effort — a generation failure leaves
 /// the summary blank rather than failing the command.
 fn handle_info(name: &str, kind: Option<ArtifactKind>, ctx: &AppContext<'_>) -> Result<()> {
+    cmx::source_update::ensure_fresh(ctx)?;
     #[cfg_attr(not(feature = "llm"), allow(unused_mut))]
     let mut info = match kind {
         Some(k) => cmx::info::info_for_kind(name, k, ctx)?,
@@ -221,6 +224,7 @@ fn handle_artifact(
             } else {
                 InstallScope::Global
             };
+            cmx::source_update::ensure_fresh(ctx)?;
             if all {
                 let result = cmx::install::install_all(kind, scope, force, ctx)?;
                 print!("{result}");
@@ -248,6 +252,7 @@ fn handle_artifact(
         }
         #[cfg(feature = "llm")]
         ArtifactAction::Diff { name } => {
+            cmx::source_update::ensure_fresh(ctx)?;
             let runner = build_llm_runtime(ctx)?;
             let diff_ctx = ctx.with_llm(&runner.llm);
             let output = runner.rt.block_on(cmx::diff::diff(&name, kind, &diff_ctx))?;
@@ -255,6 +260,7 @@ fn handle_artifact(
             Ok(ExitCode::SUCCESS)
         }
         ArtifactAction::Update { name, all, force } => {
+            cmx::source_update::ensure_fresh(ctx)?;
             if all {
                 let result = cmx::install::update_all(kind, force, ctx)?;
                 print!("{result}");
@@ -593,6 +599,69 @@ mod tests {
             command: Commands::Outdated,
         };
         assert!(run(cli, &ctx, &paths).is_ok());
+    }
+
+    fn setup_stale_git_source(
+        fs: &cmx::gateway::fakes::FakeFilesystem,
+        paths: &ConfigPaths,
+        clone_path: &std::path::Path,
+    ) {
+        use cmx::types::{SourceEntry, SourceType, SourcesFile};
+        use std::collections::BTreeMap;
+
+        let old_time = (chrono::Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
+        let mut sources = SourcesFile::default();
+        sources.sources.insert(
+            "stale-source".to_string(),
+            SourceEntry {
+                source_type: SourceType::Git,
+                path: None,
+                url: Some("https://github.com/example/repo.git".to_string()),
+                local_clone: Some(clone_path.to_path_buf()),
+                branch: Some("main".to_string()),
+                last_updated: Some(old_time),
+            },
+        );
+        let _ = BTreeMap::<String, SourceEntry>::new(); // unused, just to avoid unused import warning
+        fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
+        fs.add_dir(clone_path);
+    }
+
+    #[test]
+    fn shell_refresh_happens_for_outdated_command() {
+        let (fs, git, clock, paths) = fake_trio();
+        let clone_path = std::path::PathBuf::from("/clones/stale-source");
+        setup_stale_git_source(&fs, &paths, &clone_path);
+
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let cli = Cli {
+            platform: Platform::Claude,
+            command: Commands::Outdated,
+        };
+        run(cli, &ctx, &paths).unwrap();
+
+        // Shell must have triggered exactly one pull for the stale source
+        assert_eq!(
+            git.pulled.borrow().len(),
+            1,
+            "expected shell to refresh stale source before outdated"
+        );
+    }
+
+    #[test]
+    fn outdated_core_does_not_pull_when_called_directly() {
+        let (fs, git, clock, paths) = fake_trio();
+        let clone_path = std::path::PathBuf::from("/clones/stale-source");
+        setup_stale_git_source(&fs, &paths, &clone_path);
+
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        // Call the core directly — no pull should happen
+        cmx::outdated::outdated(&ctx).unwrap();
+
+        assert!(
+            git.pulled.borrow().is_empty(),
+            "outdated core must not pull; refresh belongs to the shell"
+        );
     }
 
     #[test]

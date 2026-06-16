@@ -7,7 +7,6 @@ use crate::config::InstalledWithSources;
 use crate::context::{AppContext, LoadedState};
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
-use crate::source_update;
 use crate::types::{ArtifactKind, InstallScope, LockFile, display_version};
 
 // ---------------------------------------------------------------------------
@@ -30,8 +29,6 @@ pub struct OutdatedReport(pub Vec<OutdatedRow>);
 // ---------------------------------------------------------------------------
 
 pub fn outdated(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
-    source_update::ensure_fresh(ctx)?;
-
     let loaded = LoadedState::load(ctx)?;
     let source_artifacts = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
 

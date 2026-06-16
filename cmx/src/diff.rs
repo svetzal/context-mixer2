@@ -8,7 +8,6 @@ use crate::context::AppContext;
 use crate::fs_util;
 use crate::lockfile;
 use crate::source_iter;
-use crate::source_update;
 use crate::types::{self, ArtifactKind};
 
 // ---------------------------------------------------------------------------
@@ -44,8 +43,6 @@ pub(crate) async fn gather_diff_with(
     kind: ArtifactKind,
     ctx: &AppContext<'_>,
 ) -> Result<DiffOutput> {
-    source_update::ensure_fresh(ctx)?;
-
     // Find the installed file on disk (global then local)
     let (installed_path, local) = config::find_installed_path(name, kind, ctx.fs, ctx.paths)
         .with_context(|| format!("No installed {kind} named '{name}' found on disk."))?;

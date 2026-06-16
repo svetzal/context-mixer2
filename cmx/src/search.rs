@@ -2,7 +2,6 @@ use anyhow::Result;
 
 use crate::context::AppContext;
 use crate::source_iter;
-use crate::source_update;
 use crate::types::display_version;
 
 // ---------------------------------------------------------------------------
@@ -27,8 +26,6 @@ pub struct SearchOutput {
 // ---------------------------------------------------------------------------
 
 pub fn search(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
-    source_update::ensure_fresh(ctx)?;
-
     let query_lower = query.to_lowercase();
     let mut results = Vec::new();
 
