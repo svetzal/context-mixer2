@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use serde_yaml_ng::{Mapping, Value};
+
 use crate::types::{Artifact, ArtifactKind, Deprecation};
 
 pub(crate) struct Frontmatter {
@@ -24,9 +26,116 @@ pub(crate) fn artifact_from_frontmatter(
     }
 }
 
+/// Normalize frontmatter before YAML parsing to handle common non-spec patterns
+/// found in real-world artifact files:
+///
+/// 1. **Tab indentation** — YAML disallows tabs; replace leading tabs with two
+///    spaces so indented blocks (e.g. `metadata:\n\tversion:`) parse correctly.
+///
+/// 2. **Unquoted `>`/`|` inline values** — `description: >= 2.0` is technically
+///    invalid YAML because `>` opens a block-scalar context.  When a key's value
+///    starts with `>` or `|` but the rest of the line isn't a valid block-scalar
+///    header (i.e. it has non-indicator characters after the initial `>`/`|`),
+///    we single-quote the whole value so the YAML library treats it as a plain
+///    string instead of a block-scalar indicator.
+fn normalize_frontmatter(frontmatter: &str) -> String {
+    let mut out = String::with_capacity(frontmatter.len());
+    for line in frontmatter.lines() {
+        // Replace leading tabs with two spaces each.
+        let normalized_indent: String = {
+            let n_tabs = line.chars().take_while(|&c| c == '\t').count();
+            if n_tabs > 0 {
+                " ".repeat(n_tabs * 2) + line[n_tabs..].trim_start_matches('\t')
+            } else {
+                line.to_string()
+            }
+        };
+
+        // Quote inline values that would be misinterpreted as block-scalar indicators.
+        let fixed = fix_unquoted_block_indicator_value(&normalized_indent);
+        out.push_str(&fixed);
+        out.push('\n');
+    }
+    out
+}
+
+/// If `line` is a YAML mapping entry whose value starts with `>` or `|` but is
+/// NOT a valid block-scalar header (i.e. extra non-indicator content follows on
+/// the same line), wrap the value in single quotes so the YAML parser treats it
+/// as a plain scalar.
+fn fix_unquoted_block_indicator_value(line: &str) -> String {
+    // Match a bare key: value line at the start (no leading indent for root keys,
+    // or indented for nested keys).
+    let trimmed = line.trim_start();
+    if trimmed.is_empty() || trimmed.starts_with('#') {
+        return line.to_string();
+    }
+
+    // Find `key:` followed by a space and value.
+    let Some(colon_pos) = trimmed.find(':') else {
+        return line.to_string();
+    };
+    let after_colon = &trimmed[colon_pos + 1..];
+    // Must have a space after colon (not a nested mapping key).
+    let Some(value_str) = after_colon.strip_prefix(' ') else {
+        return line.to_string();
+    };
+
+    // Only act when value starts with `>` or `|`.
+    let Some(first @ ('>' | '|')) = value_str.chars().next() else {
+        return line.to_string();
+    };
+
+    // A real block-scalar header has ONLY optional chomping/indent indicators
+    // after the `>`/`|`, then end-of-line or a comment.  If the rest has
+    // other chars, it's an inline plain scalar starting with `>`/`|`.
+    let rest = value_str[first.len_utf8()..].trim_end();
+    let is_block_scalar_header = rest.is_empty()
+        || rest.starts_with('#')
+        || rest.chars().all(|c| matches!(c, '-' | '+' | '0'..='9'));
+    if is_block_scalar_header {
+        return line.to_string();
+    }
+
+    // It's an inline plain scalar that starts with a block-scalar indicator char.
+    // Re-emit the line with the value single-quoted.
+    let indent = &line[..line.len() - trimmed.len()];
+    let key = &trimmed[..colon_pos];
+    // Escape any single quotes in the value.
+    let escaped = value_str.replace('\'', "''");
+    format!("{indent}{key}: '{escaped}'")
+}
+
+/// Parse a YAML frontmatter string into a `Mapping`. Returns `None` if the
+/// input is not valid YAML or does not deserialize to a mapping.
+fn parse_yaml_mapping(frontmatter: &str) -> Option<Mapping> {
+    let normalized = normalize_frontmatter(frontmatter);
+    match serde_yaml_ng::from_str::<Value>(&normalized) {
+        Ok(Value::Mapping(m)) => Some(m),
+        _ => None,
+    }
+}
+
+/// Convert a `Value` scalar to a non-empty `String`, or `None` for null/empty.
+fn scalar_to_string(value: &Value) -> Option<String> {
+    let s = match value {
+        Value::String(s) => s.clone(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        _ => return None,
+    };
+    let trimmed = s.trim().to_string();
+    (!trimmed.is_empty()).then_some(trimmed)
+}
+
 fn parse_deprecation(fm_text: &str) -> Option<Deprecation> {
-    let deprecated = extract_field(fm_text, "deprecated")?;
-    if deprecated != "true" {
+    let mapping = parse_yaml_mapping(fm_text)?;
+    let deprecated_key = Value::String("deprecated".to_string());
+    let deprecated = mapping.get(&deprecated_key)?;
+    // Accept both `true` (YAML bool) and the string `"true"` for resilience.
+    let is_deprecated = matches!(deprecated, Value::Bool(true))
+        || matches!(deprecated, Value::String(s) if s == "true");
+    if !is_deprecated {
         return None;
     }
     Some(Deprecation {
@@ -73,8 +182,9 @@ pub(crate) fn parse_agent_frontmatter_str(content: &str) -> Option<Frontmatter> 
 fn parse_frontmatter_impl(content: &str, required_fields: &[&str]) -> Option<Frontmatter> {
     let (fm_opt, _) = split_frontmatter_and_body(content);
     let fm_text = fm_opt.as_deref()?;
+    let mapping = parse_yaml_mapping(fm_text)?;
     for field in required_fields {
-        if !fm_text.lines().any(|l| l.starts_with(&format!("{field}:"))) {
+        if !mapping.contains_key(Value::String((*field).to_string())) {
             return None;
         }
     }
@@ -85,77 +195,25 @@ fn parse_frontmatter_impl(content: &str, required_fields: &[&str]) -> Option<Fro
     })
 }
 
+/// Extract a top-level field from YAML frontmatter as a string.
+/// Returns `None` when the key is absent or the value is empty/null/non-scalar.
 pub fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
-    let prefix = format!("{key}:");
-    let mut lines = frontmatter.lines();
-    let header = lines.find(|l| l.starts_with(&prefix))?;
-    let inline = header[prefix.len()..].trim();
-
-    // YAML block scalar: `description: >` (folded) or `description: |` (literal),
-    // optionally with chomping/indent indicators (`>-`, `|+`, …). The value is the
-    // indented lines that follow, joined per the style. Without this, a multi-line
-    // description collapses to just the `>`/`|` indicator.
-    if let Some(folded) = block_scalar_style(inline) {
-        let body: Vec<&str> = lines
-            .take_while(|l| l.trim().is_empty() || l.starts_with([' ', '\t']))
-            .map(str::trim)
-            .collect();
-        let joined = if folded {
-            body.join(" ")
-        } else {
-            body.join("\n")
-        };
-        let joined = joined.trim().to_string();
-        return (!joined.is_empty()).then_some(joined);
-    }
-
-    let value = inline.trim_matches('"').to_string();
-    (!value.is_empty()).then_some(value)
-}
-
-/// If `inline` is a YAML block-scalar indicator (`>` folded or `|` literal, with
-/// optional chomping/indent indicators), return `true` for folded, `false` for
-/// literal. Returns `None` when it's an ordinary inline value.
-fn block_scalar_style(inline: &str) -> Option<bool> {
-    let mut chars = inline.chars();
-    let style = chars.next()?;
-    if style != '>' && style != '|' {
-        return None;
-    }
-    // Everything after the indicator must be chomping/indent indicators (or a
-    // comment) — otherwise it's an inline value that merely starts with `>`/`|`.
-    let rest = inline[1..].trim();
-    let indicators_only = rest.is_empty()
-        || rest.starts_with('#')
-        || rest.chars().all(|c| matches!(c, '-' | '+' | '0'..='9'));
-    indicators_only.then_some(style == '>')
+    let mapping = parse_yaml_mapping(frontmatter)?;
+    let value = mapping.get(Value::String(key.to_string()))?;
+    scalar_to_string(value)
 }
 
 /// Extract a field nested under `metadata:` in YAML frontmatter.
-/// Matches indented lines (spaces or tabs) under the `metadata:` block.
+/// Handles both block and flow mapping styles.
 pub fn extract_metadata_field(frontmatter: &str, key: &str) -> Option<String> {
-    let mut in_metadata = false;
-    for line in frontmatter.lines() {
-        if line.starts_with("metadata:") {
-            in_metadata = true;
-            continue;
-        }
-        if in_metadata {
-            let trimmed = line.trim_start();
-            // A non-indented, non-empty line means we've left the metadata block
-            if !line.starts_with(' ') && !line.starts_with('\t') && !trimmed.is_empty() {
-                return None;
-            }
-            let prefix = format!("{key}:");
-            if trimmed.starts_with(&prefix) {
-                let value = trimmed[prefix.len()..].trim().trim_matches('"').to_string();
-                if !value.is_empty() {
-                    return Some(value);
-                }
-            }
-        }
-    }
-    None
+    let mapping = parse_yaml_mapping(frontmatter)?;
+    let metadata_key = Value::String("metadata".to_string());
+    let metadata = mapping.get(&metadata_key)?;
+    let Value::Mapping(sub) = metadata else {
+        return None;
+    };
+    let value = sub.get(Value::String(key.to_string()))?;
+    scalar_to_string(value)
 }
 
 /// Extract version from frontmatter, checking root-level first then metadata block.
@@ -174,6 +232,18 @@ pub fn extract_version_from_content(content: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    // --- parse_yaml_mapping ---
+
+    #[test]
+    fn parse_yaml_mapping_valid_returns_mapping() {
+        assert!(parse_yaml_mapping("name: foo\nversion: 1.0.0").is_some());
+    }
+
+    #[test]
+    fn parse_yaml_mapping_malformed_returns_none() {
+        assert!(parse_yaml_mapping("key: [unclosed bracket").is_none());
+    }
+
     // --- extract_field ---
 
     #[test]
@@ -185,6 +255,12 @@ mod tests {
     #[test]
     fn extract_field_quoted_value() {
         let text = "name: \"my-agent\"";
+        assert_eq!(extract_field(text, "name"), Some("my-agent".to_string()));
+    }
+
+    #[test]
+    fn extract_field_single_quoted_value() {
+        let text = "name: 'my-agent'";
         assert_eq!(extract_field(text, "name"), Some("my-agent".to_string()));
     }
 
@@ -250,6 +326,18 @@ mod tests {
         assert_eq!(extract_field(text, "description"), Some(">= 2.0 required".to_string()));
     }
 
+    #[test]
+    fn extract_field_inline_comment_stripped() {
+        let text = "name: x  # a comment";
+        assert_eq!(extract_field(text, "name"), Some("x".to_string()));
+    }
+
+    #[test]
+    fn extract_field_numeric_scalar() {
+        let text = "count: 42";
+        assert_eq!(extract_field(text, "count"), Some("42".to_string()));
+    }
+
     // --- extract_metadata_field ---
 
     #[test]
@@ -293,6 +381,18 @@ mod tests {
     fn extract_metadata_field_with_tabs() {
         let text = "metadata:\n\tversion: 2.0.0";
         assert_eq!(extract_metadata_field(text, "version"), Some("2.0.0".to_string()));
+    }
+
+    #[test]
+    fn extract_metadata_field_flow_mapping() {
+        let text = "metadata: { version: 1.2.3, author: Test }";
+        assert_eq!(extract_metadata_field(text, "version"), Some("1.2.3".to_string()));
+    }
+
+    #[test]
+    fn extract_metadata_field_nested_quoted() {
+        let text = "metadata:\n  version: \"2.5.0\"\n  author: 'Alice'";
+        assert_eq!(extract_metadata_field(text, "author"), Some("Alice".to_string()));
     }
 
     // --- extract_version (root-level vs metadata fallback) ---
@@ -344,6 +444,14 @@ mod tests {
     fn parse_deprecation_absent_returns_none() {
         let text = "name: my-agent\ndescription: A thing";
         assert!(parse_deprecation(text).is_none());
+    }
+
+    #[test]
+    fn parse_deprecation_bool_true_honored() {
+        // YAML `true` is a bool, not the string "true"
+        let text = "deprecated: true\ndeprecated_reason: Old";
+        let dep = parse_deprecation(text).expect("expected Some");
+        assert_eq!(dep.reason.as_deref(), Some("Old"));
     }
 
     // --- split_frontmatter_and_body ---
@@ -483,5 +591,12 @@ mod tests {
         let content = "---\nname: my-agent\ndescription: Does things\nversion: 1.0.0\nmetadata:\n  version: \"2.0.0\"\n---\n# body";
         let fm = parse_agent_frontmatter_str(content).expect("expected Some");
         assert_eq!(fm.version.as_deref(), Some("1.0.0"));
+    }
+
+    #[test]
+    fn parse_frontmatter_impl_no_prefix_collision_on_required_field() {
+        // "namespace" field must not satisfy the "name" requirement
+        let content = "---\nnamespace: foo\ndescription: bar\n---\n";
+        assert!(parse_agent_frontmatter_str(content).is_none());
     }
 }

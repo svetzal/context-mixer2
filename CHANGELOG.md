@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `cmx skill info <name>` / `cmx agent info <name>` — kind-scoped detail for an installed artifact, alongside the existing (both-kinds) `cmx info <name>`. On top of the usual metadata, `info` now shows **Activates when** (for a skill, its `description` frontmatter — precisely the activation trigger the assistant reads to decide whether to load it; for an agent, its role description) and **What it does**, a short LLM-generated paragraph produced via the configured gateway (`cmx config gateway`/`model`). The summary requires a build with the **`llm` feature**; a lean build prints a one-line hint instead, and generation is best-effort so an unreachable provider never fails the command.
 
+### Changed
+
+- Artifact frontmatter is now parsed with `serde_yaml_ng` — a real YAML library — instead of hand-rolled line-prefix matching. This correctly handles single-quoted strings, inline comments, numeric/bool scalars, and flow-style mapping blocks that the previous implementation silently mishandled.
+
 ### Fixed
 
 - `scan::extract_field` now reads YAML **block scalars** (`description: >` folded and `description: |` literal). Previously a multi-line `description` collapsed to just the `>`/`|` indicator, so e.g. `cmx info` showed an activation trigger of `>`. Folded scalars join with spaces, literal scalars keep newlines; an inline value that merely starts with `>` (like `>= 2.0`) is still taken verbatim.
