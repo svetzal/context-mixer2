@@ -1,6 +1,7 @@
 use anyhow::{Result, bail};
 use std::path::{Path, PathBuf};
 
+use crate::artifact_status;
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
@@ -164,9 +165,13 @@ pub(crate) fn gather_info(
         if sa.artifact.deprecation.is_some() {
             deprecation = sa.artifact.deprecation;
         }
-        if let Some(v) = sa.artifact.version.as_deref() {
-            let installed_v = lock_entry.and_then(|e| e.version.as_deref());
-            if installed_v != Some(v) {
+        let source_checksum = checksum::checksum_artifact(&sa.artifact.path, kind, ctx.fs)?;
+        if artifact_status::source_outdated(
+            lock_entry,
+            &source_checksum,
+            sa.artifact.version.as_deref(),
+        ) {
+            if let Some(v) = sa.artifact.version.as_deref() {
                 available_version = Some(v.to_string());
             }
         }
@@ -606,6 +611,60 @@ mod tests {
         let dep = info.deprecation.unwrap();
         assert_eq!(dep.reason.as_deref(), Some("Too old"));
         assert_eq!(dep.replacement.as_deref(), Some("new-agent"));
+    }
+
+    #[test]
+    fn gather_info_no_available_version_when_source_checksum_and_version_match_lock() {
+        // When the lock source_checksum and version match the source, source_outdated
+        // returns false and available_version should remain None.
+        let t = TestContext::new();
+
+        let content = agent_content("my-agent", "A test agent");
+        install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
+
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
+
+        // Set up the source with a known version so we can record the exact checksum
+        setup_source_with_versioned_agent(
+            &t.fs,
+            &t.paths,
+            "my-source",
+            "/sources/my-source",
+            "my-agent",
+            "1.0.0",
+        );
+
+        // Compute the source checksum so the lock entry matches exactly
+        let source_path = std::path::PathBuf::from("/sources/my-source/agents/my-agent.md");
+        let source_cs =
+            crate::checksum::checksum_artifact(&source_path, ArtifactKind::Agent, &t.fs).unwrap();
+
+        // Lock entry with version 1.0.0 and the matching source checksum
+        save_lock_with_entry(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            make_lock_entry_with_checksum(
+                ArtifactKind::Agent,
+                Some("1.0.0"),
+                "my-source",
+                "agents/my-agent.md",
+                &source_cs,
+            ),
+            InstallScope::Global,
+        );
+
+        let ctx = t.ctx();
+        let info = gather_info("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
+            .unwrap();
+
+        assert!(
+            info.available_version.is_none(),
+            "available_version should be None when source checksum+version match lock entry, \
+             got: {:?}",
+            info.available_version
+        );
     }
 
     #[test]

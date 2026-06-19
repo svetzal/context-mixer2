@@ -1,6 +1,7 @@
 use anyhow::{Result, bail};
 use std::path::PathBuf;
 
+use crate::artifact_status;
 use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
@@ -178,12 +179,14 @@ pub fn install_all(
         if sa.artifact.kind != kind {
             continue;
         }
-        // Skip if already tracked with matching version AND checksum
+        // Skip if the source is not considered outdated relative to the lock entry
         if let Some(lock_entry) = lock.packages.get(&sa.artifact.name) {
             let source_cs = checksum::checksum_artifact(&sa.artifact.path, kind, ctx.fs)?;
-            if lock_entry.version.as_deref() == sa.artifact.version.as_deref()
-                && lock_entry.source_checksum == source_cs
-            {
+            if !artifact_status::source_outdated(
+                Some(lock_entry),
+                &source_cs,
+                sa.artifact.version.as_deref(),
+            ) {
                 continue;
             }
         }
@@ -218,7 +221,12 @@ pub fn update_all(
 
             if let Some(source_infos) = all_source_info.get(name)
                 && source_infos.iter().any(|si| {
-                    si.source_name == entry.source.repo && si.checksum != entry.source_checksum
+                    si.source_name == entry.source.repo
+                        && artifact_status::source_outdated(
+                            Some(entry),
+                            &si.checksum,
+                            si.version.as_deref(),
+                        )
                 })
             {
                 let pinned = format!("{}:{name}", entry.source.repo);

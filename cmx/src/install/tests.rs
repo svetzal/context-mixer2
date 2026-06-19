@@ -775,6 +775,99 @@ fn install_force_reinstall_lock_save_failure_keeps_existing_artifact() {
     );
 }
 
+// --- install_all: source_outdated integration ---
+
+#[test]
+fn install_all_skips_artifact_when_source_checksum_and_version_match_lock() {
+    // When the lock entry's source_checksum and version both match the source,
+    // source_outdated returns false and install_all should skip the artifact.
+    let t = TestContext::new();
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
+
+    let ctx = t.ctx();
+    // First install — records checksum and version
+    install_all(ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+
+    // Second install_all — source hasn't changed, so artifact should be skipped
+    let result = install_all(ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    assert!(
+        result.items.is_empty(),
+        "install_all should skip artifact whose lock source_checksum+version match"
+    );
+}
+
+#[test]
+fn install_all_reinstalls_artifact_when_source_checksum_changed() {
+    // When the source checksum differs from the lock entry, source_outdated returns true
+    // and install_all should reinstall the artifact.
+    let t = TestContext::new();
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
+
+    let ctx = t.ctx();
+    // First install
+    install_all(ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+
+    // Now change the source file — checksum will differ
+    t.fs.add_file(
+        "/sources/my-source/agents/my-agent.md",
+        agent_content("my-agent", "Updated description"),
+    );
+
+    let result = install_all(ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    assert_eq!(
+        result.items.len(),
+        1,
+        "install_all should reinstall artifact when source checksum changed"
+    );
+    assert_eq!(result.items[0].artifact_name, "my-agent");
+}
+
+// --- update_all: version-newly-appeared picks up artifact ---
+
+#[test]
+fn update_all_picks_up_artifact_when_version_newly_appears_in_source() {
+    use crate::test_support::{make_lock_entry_with_checksum, save_lock_with_entry};
+    // Install without a version in the lock entry.  Then the source gains a version
+    // (but keep the same checksum so only the version-presence rule fires).
+    // source_outdated should return true and update_all should reinstall.
+    let t = TestContext::new();
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
+
+    let ctx = t.ctx();
+    // Install the artifact so it exists on disk
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+
+    // Manually rewrite the lock entry: same source checksum but no version recorded.
+    // We need the actual checksum so let's compute it via checksum_artifact.
+    let source_path = std::path::PathBuf::from("/sources/my-source/agents/my-agent.md");
+    let source_cs =
+        crate::checksum::checksum_artifact(&source_path, ArtifactKind::Agent, &t.fs).unwrap();
+    let lock_entry = make_lock_entry_with_checksum(
+        ArtifactKind::Agent,
+        None, // no version recorded in lock
+        "my-source",
+        "agents/my-agent.md",
+        &source_cs,
+    );
+    save_lock_with_entry(&t.fs, &t.paths, "my-agent", lock_entry, InstallScope::Global);
+
+    // Now update the source to carry a version (same content bytes, just add version frontmatter).
+    // Because we can't keep byte-identical content with a new version field, we update the source
+    // to a versioned variant. update_all checks source_outdated which will detect the version.
+    t.fs.add_file(
+        "/sources/my-source/agents/my-agent.md",
+        crate::test_support::versioned_agent_content("my-agent", "A test agent", "1.0.0"),
+    );
+
+    let result = update_all(ArtifactKind::Agent, false, &ctx).unwrap();
+    assert_eq!(
+        result.items.len(),
+        1,
+        "update_all should pick up artifact when version newly appears in source"
+    );
+    assert_eq!(result.items[0].artifact_name, "my-agent");
+}
+
 // --- New platform installs ---
 
 #[test]

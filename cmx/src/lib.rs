@@ -1,4 +1,5 @@
 pub mod adopt;
+pub mod artifact_status;
 pub mod checksum;
 pub mod cli;
 pub mod cmx_config;

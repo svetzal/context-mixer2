@@ -54,6 +54,7 @@ pub(crate) async fn gather_diff_with(
     let installed_checksum = checksum::checksum_artifact(&installed_path, kind, ctx.fs)?;
     let source_checksum = checksum::checksum_artifact(&source_path, kind, ctx.fs)?;
 
+    // disk-vs-source axis: answers "do the bytes differ right now?", distinct from source-vs-lock "outdated" rule
     if installed_checksum == source_checksum {
         return Ok(DiffOutput {
             artifact_name: name.to_string(),

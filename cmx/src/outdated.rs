@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+use crate::artifact_status::source_outdated;
 use crate::checksum;
 use crate::config;
 use crate::config::InstalledWithSources;
@@ -50,30 +51,6 @@ pub fn outdated(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
-
-/// Returns `true` if an installed artifact is considered outdated relative to
-/// the source.  Pure function — no I/O.
-fn is_outdated(
-    lock_entry: Option<&crate::types::LockEntry>,
-    source_checksum: &str,
-    source_version: Option<&str>,
-) -> bool {
-    match lock_entry {
-        Some(entry) => {
-            // Checksum changed
-            if entry.source_checksum != source_checksum {
-                return true;
-            }
-            // Installed without a version but source now has one
-            if entry.version.is_none() && source_version.is_some() {
-                return true;
-            }
-            false
-        }
-        // No lock entry — untracked
-        None => true,
-    }
-}
 
 /// Derives the human-readable status label given installed and available version
 /// strings.  Pure function — no I/O.
@@ -162,7 +139,7 @@ fn compare_versions(
         for source_info in source_infos {
             let available_v: Option<String> = source_info.version.clone();
 
-            if !is_outdated(lock_entry, &source_info.checksum, source_info.version.as_deref()) {
+            if !source_outdated(lock_entry, &source_info.checksum, source_info.version.as_deref()) {
                 continue;
             }
 
@@ -322,48 +299,6 @@ mod tests {
         let rows = compare_versions(ArtifactKind::Agent, pairs, &modifications);
         assert!(rows.is_empty(), "orphan with no source should produce no rows");
         let _ = lock;
-    }
-
-    fn make_lock_entry(source_checksum: &str, version: Option<&str>) -> crate::types::LockEntry {
-        make_lock_entry_with_checksum(
-            ArtifactKind::Agent,
-            version,
-            "guidelines",
-            "agents/my-agent.md",
-            source_checksum,
-        )
-    }
-
-    // --- is_outdated ---
-
-    #[test]
-    fn is_outdated_matching_checksum_not_outdated() {
-        let entry = make_lock_entry("sha256:abc", Some("1.0.0"));
-        assert!(!is_outdated(Some(&entry), "sha256:abc", Some("1.0.0")));
-    }
-
-    #[test]
-    fn is_outdated_changed_checksum_is_outdated() {
-        let entry = make_lock_entry("sha256:abc", Some("1.0.0"));
-        assert!(is_outdated(Some(&entry), "sha256:xyz", Some("1.0.0")));
-    }
-
-    #[test]
-    fn is_outdated_no_lock_entry_is_outdated() {
-        assert!(is_outdated(None, "sha256:abc", Some("1.0.0")));
-    }
-
-    #[test]
-    fn is_outdated_version_appeared_in_source_is_outdated() {
-        // Installed without a version; source now carries one
-        let entry = make_lock_entry("sha256:abc", None);
-        assert!(is_outdated(Some(&entry), "sha256:abc", Some("1.0.0")));
-    }
-
-    #[test]
-    fn is_outdated_both_unversioned_same_checksum_not_outdated() {
-        let entry = make_lock_entry("sha256:abc", None);
-        assert!(!is_outdated(Some(&entry), "sha256:abc", None));
     }
 
     // --- outdated_status_label ---
