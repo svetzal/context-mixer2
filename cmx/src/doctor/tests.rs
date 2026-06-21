@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+
 use super::*;
 use crate::platform::Platform;
 use crate::test_support::{
     TestContext, make_lock_entry_with_checksum, save_lock_with_entry, versioned_skill_content,
 };
-use crate::types::{ArtifactKind, InstallScope};
+use crate::types::{ArtifactKind, InstallScope, LockFile};
 
 /// Install a skill directory on disk for the given platform/scope and return
 /// its checksum so a lock entry can be made to match (or deliberately not).
@@ -511,4 +513,265 @@ fn counts_tally_each_state() {
     assert_eq!(c.orphaned, 2);
     assert_eq!(c.tracked, 0);
     assert_eq!(c.drifted, 0);
+}
+
+// --- state_severity ---
+
+#[test]
+fn state_severity_exact_values() {
+    assert_eq!(state_severity(ArtifactState::Drifted), 4);
+    assert_eq!(state_severity(ArtifactState::Orphaned), 3);
+    assert_eq!(state_severity(ArtifactState::Untracked), 2);
+    assert_eq!(state_severity(ArtifactState::External), 1);
+    assert_eq!(state_severity(ArtifactState::Tracked), 0);
+}
+
+#[test]
+fn state_severity_ordering() {
+    assert!(state_severity(ArtifactState::Drifted) > state_severity(ArtifactState::Orphaned));
+    assert!(state_severity(ArtifactState::Orphaned) > state_severity(ArtifactState::Untracked));
+    assert!(state_severity(ArtifactState::Untracked) > state_severity(ArtifactState::External));
+    assert!(state_severity(ArtifactState::External) > state_severity(ArtifactState::Tracked));
+}
+
+// --- group_rows ---
+
+#[test]
+fn group_rows_same_key_collapses() {
+    let rows = vec![
+        make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Tracked),
+        make_doctor_row("skill", "/b/skills", "1.0.0", ArtifactState::Tracked),
+    ];
+    let arts = group_rows(&rows);
+    assert_eq!(arts.len(), 1, "two rows with the same (kind, name, scope) collapse to one");
+}
+
+#[test]
+fn group_rows_different_names_stay_separate() {
+    let rows = vec![
+        make_doctor_row("alpha", "/a/skills", "1.0.0", ArtifactState::Tracked),
+        make_doctor_row("beta", "/a/skills", "1.0.0", ArtifactState::Tracked),
+    ];
+    let arts = group_rows(&rows);
+    assert_eq!(arts.len(), 2, "different names produce separate artifacts");
+}
+
+#[test]
+fn group_rows_diverged_when_states_differ() {
+    let rows = vec![
+        make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Tracked),
+        make_doctor_row("skill", "/b/skills", "1.0.0", ArtifactState::Drifted),
+    ];
+    let arts = group_rows(&rows);
+    assert!(arts[0].diverged, "different states → diverged");
+}
+
+#[test]
+fn group_rows_diverged_when_versions_differ() {
+    let rows = vec![
+        make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Tracked),
+        make_doctor_row("skill", "/b/skills", "2.0.0", ArtifactState::Tracked),
+    ];
+    let arts = group_rows(&rows);
+    assert!(arts[0].diverged, "different versions → diverged");
+}
+
+#[test]
+fn group_rows_not_diverged_when_copies_agree() {
+    let rows = vec![
+        make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Tracked),
+        make_doctor_row("skill", "/b/skills", "1.0.0", ArtifactState::Tracked),
+    ];
+    let arts = group_rows(&rows);
+    assert!(!arts[0].diverged, "same state and version → not diverged");
+}
+
+#[test]
+fn group_rows_state_is_max_severity() {
+    let rows = vec![
+        make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Tracked),
+        make_doctor_row("skill", "/b/skills", "1.0.0", ArtifactState::Drifted),
+    ];
+    let arts = group_rows(&rows);
+    assert_eq!(arts[0].state, ArtifactState::Drifted, "most-actionable state wins");
+}
+
+#[test]
+fn group_rows_version_none_when_copies_disagree() {
+    let rows = vec![
+        make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Tracked),
+        make_doctor_row("skill", "/b/skills", "2.0.0", ArtifactState::Tracked),
+    ];
+    let arts = group_rows(&rows);
+    assert!(arts[0].version.is_none(), "disagreeing versions → no single version");
+    let mut vs = arts[0].versions.clone();
+    vs.sort();
+    assert_eq!(vs, vec!["1.0.0", "2.0.0"], "distinct versions listed");
+}
+
+#[test]
+fn group_rows_version_some_when_all_agree() {
+    let rows = vec![
+        make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Tracked),
+        make_doctor_row("skill", "/b/skills", "1.0.0", ArtifactState::Tracked),
+    ];
+    let arts = group_rows(&rows);
+    assert_eq!(arts[0].version.as_deref(), Some("1.0.0"), "agreed version is surfaced");
+}
+
+#[test]
+fn group_rows_tools_is_union_of_tracked_for() {
+    let rows = vec![
+        DoctorRow {
+            kind: ArtifactKind::Skill,
+            name: "skill".to_string(),
+            scope: InstallScope::Global,
+            location: std::path::PathBuf::from("/a"),
+            platforms: vec![Platform::Claude],
+            tracked_for: vec![Platform::Claude],
+            state: ArtifactState::Tracked,
+            version: Some("1.0.0".to_string()),
+            source: None,
+        },
+        DoctorRow {
+            kind: ArtifactKind::Skill,
+            name: "skill".to_string(),
+            scope: InstallScope::Global,
+            location: std::path::PathBuf::from("/b"),
+            platforms: vec![Platform::Pi],
+            tracked_for: vec![Platform::Pi],
+            state: ArtifactState::Tracked,
+            version: Some("1.0.0".to_string()),
+            source: None,
+        },
+    ];
+    let arts = group_rows(&rows);
+    assert!(arts[0].tools.contains(&Platform::Claude), "claude tracked → in tools");
+    assert!(arts[0].tools.contains(&Platform::Pi), "pi tracked → in tools");
+}
+
+#[test]
+fn group_rows_source_joins_distinct_provenance() {
+    let rows = vec![
+        DoctorRow {
+            kind: ArtifactKind::Skill,
+            name: "skill".to_string(),
+            scope: InstallScope::Global,
+            location: std::path::PathBuf::from("/a"),
+            platforms: vec![Platform::Claude],
+            tracked_for: vec![],
+            state: ArtifactState::Tracked,
+            version: Some("1.0.0".to_string()),
+            source: Some("repo-a".to_string()),
+        },
+        DoctorRow {
+            kind: ArtifactKind::Skill,
+            name: "skill".to_string(),
+            scope: InstallScope::Global,
+            location: std::path::PathBuf::from("/b"),
+            platforms: vec![Platform::Pi],
+            tracked_for: vec![],
+            state: ArtifactState::Tracked,
+            version: Some("1.0.0".to_string()),
+            source: Some("repo-b".to_string()),
+        },
+    ];
+    let arts = group_rows(&rows);
+    let src = arts[0].source.as_deref().expect("distinct sources joined");
+    assert!(src.contains("repo-a") && src.contains("repo-b"), "both repos appear: {src}");
+}
+
+#[test]
+fn group_rows_source_none_when_no_sources_present() {
+    let rows = vec![make_doctor_row(
+        "skill",
+        "/a",
+        "1.0.0",
+        ArtifactState::Orphaned,
+    )];
+    let arts = group_rows(&rows);
+    assert!(arts[0].source.is_none(), "orphaned row with no source → None");
+}
+
+// --- source_of ---
+
+fn lock_with_entry(name: &str, repo: &str) -> LockFile {
+    use crate::types::{LockEntry, LockSource};
+    use std::collections::BTreeMap;
+    let entry = LockEntry {
+        artifact_type: ArtifactKind::Skill,
+        version: None,
+        installed_at: "2024-01-01T00:00:00Z".to_string(),
+        source: LockSource {
+            repo: repo.to_string(),
+            path: name.to_string(),
+        },
+        source_checksum: "sha256:abc".to_string(),
+        installed_checksum: "sha256:abc".to_string(),
+    };
+    let mut packages = BTreeMap::new();
+    packages.insert(name.to_string(), entry);
+    LockFile {
+        version: 1,
+        packages,
+    }
+}
+
+fn skill_agg() -> LocationAgg {
+    LocationAgg {
+        kind: ArtifactKind::Skill,
+        scope: InstallScope::Global,
+        platforms: vec![Platform::Claude],
+    }
+}
+
+#[test]
+fn source_of_tracked_returns_lock_repo() {
+    let agg = skill_agg();
+    let mut locks = HashMap::new();
+    locks.insert(
+        (Platform::Claude, InstallScope::Global),
+        lock_with_entry("my-skill", "guidelines"),
+    );
+    let available: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+    let result = source_of("my-skill", &agg, ArtifactState::Tracked, &locks, &available);
+    assert_eq!(result.as_deref(), Some("guidelines"));
+}
+
+#[test]
+fn source_of_drifted_returns_lock_repo() {
+    let agg = skill_agg();
+    let mut locks = HashMap::new();
+    locks.insert((Platform::Claude, InstallScope::Global), lock_with_entry("my-skill", "my-repo"));
+    let available: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+    let result = source_of("my-skill", &agg, ArtifactState::Drifted, &locks, &available);
+    assert_eq!(result.as_deref(), Some("my-repo"));
+}
+
+#[test]
+fn source_of_untracked_returns_providing_source() {
+    let agg = skill_agg();
+    let locks: HashMap<(Platform, InstallScope), LockFile> = HashMap::new();
+    let mut available: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+    available.insert((ArtifactKind::Skill, "loose".to_string()), vec!["community".to_string()]);
+    let result = source_of("loose", &agg, ArtifactState::Untracked, &locks, &available);
+    assert_eq!(result.as_deref(), Some("community"));
+}
+
+#[test]
+fn source_of_orphaned_returns_none() {
+    let agg = skill_agg();
+    let locks: HashMap<(Platform, InstallScope), LockFile> = HashMap::new();
+    let available: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+    let result = source_of("hand-authored", &agg, ArtifactState::Orphaned, &locks, &available);
+    assert!(result.is_none());
+}
+
+#[test]
+fn source_of_external_returns_none() {
+    let agg = skill_agg();
+    let locks: HashMap<(Platform, InstallScope), LockFile> = HashMap::new();
+    let available: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+    let result = source_of("ext-tool", &agg, ArtifactState::External, &locks, &available);
+    assert!(result.is_none());
 }

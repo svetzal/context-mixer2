@@ -131,7 +131,7 @@ fn available_in_sources(
 /// The source an installed artifact came from, for the doctor `Source` column:
 /// the lock entry's source repo when tracked/drifted, or the providing
 /// source(s) when untracked (installed out-of-band).
-fn source_of(
+pub(crate) fn source_of(
     name: &str,
     agg: &LocationAgg,
     state: ArtifactState,
@@ -165,7 +165,7 @@ fn read_installed_version(
 
 /// Severity ordering used to pick a logical artifact's consolidated state when
 /// its copies disagree — the most actionable state wins.
-fn state_severity(state: ArtifactState) -> u8 {
+pub(crate) fn state_severity(state: ArtifactState) -> u8 {
     match state {
         ArtifactState::Drifted => 4,
         ArtifactState::Orphaned => 3,
@@ -180,7 +180,7 @@ fn state_severity(state: ArtifactState) -> u8 {
 /// tools collapses to one artifact; it's flagged `diverged` only when its copies
 /// actually disagree (different state or version), not merely for existing in
 /// more than one place.
-fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
+pub(crate) fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
     // Key by stringified kind so the map key is Ord without needing Ord on ArtifactKind.
     let mut groups: BTreeMap<(String, String, InstallScope), Vec<&DoctorRow>> = BTreeMap::new();
     for row in rows {

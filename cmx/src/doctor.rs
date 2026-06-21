@@ -25,7 +25,9 @@ pub use types::{ArtifactState, DoctorArtifact, DoctorReport, DoctorRow, MissingR
 
 // Re-export private survey helpers for the test suite.
 #[cfg(test)]
-pub(crate) use survey::{build_locations, survey_scopes};
+pub(crate) use survey::{
+    LocationAgg, build_locations, group_rows, source_of, state_severity, survey_scopes,
+};
 
 // ---------------------------------------------------------------------------
 // Unit tests
