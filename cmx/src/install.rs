@@ -72,21 +72,34 @@ pub fn install(
 
     let source_checksum = checksum::checksum_artifact(&found.artifact.path, kind, ctx.fs)?;
 
-    // Check for local modifications before overwriting
-    if !force {
-        let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
+    // Gather I/O facts needed for the pure install decision.
+    let lock_for_check = if force {
+        None
+    } else {
+        Some(lockfile::load(scope, ctx.fs, ctx.paths)?)
+    };
+    let locally_modified = if let Some(ref lock) = lock_for_check {
         check_local_modifications(
             artifact_name,
             kind,
             scope,
             lock.packages.get(artifact_name),
             ctx,
-        )?;
-    }
-
-    // Record whether this is a fresh install (vs. an update/reinstall) so that
-    // we can roll back if the lockfile write fails.
+        )?
+    } else {
+        false
+    };
     let already_installed = ctx.paths.is_installed(kind, artifact_name, scope, ctx.fs);
+
+    // Pure decision: does local modification block this install, and should we
+    // roll back if the lockfile write fails later?
+    let decision = decide_install(already_installed, locally_modified, force);
+    if decision.blocked {
+        bail!(
+            "'{artifact_name}' has local modifications. Use --force to overwrite, \
+             or 'cmx {kind} diff {artifact_name}' to review changes first."
+        );
+    }
 
     let dest_path =
         copy::copy_artifact(&found.artifact.path, &plan.dest_dir, kind, artifact_name, ctx)?;
@@ -110,8 +123,8 @@ pub fn install(
         // back by removing the artifact we just copied.  This avoids leaving a
         // ghost: an artifact on disk with no lockfile entry.  We ignore any
         // remove error to ensure the original lock error is surfaced.
-        if should_rollback(already_installed) {
-            let _ = kind.remove_installed(&dest_path, ctx.fs);
+        if decision.rollback_on_lock_fail {
+            let _ = crate::uninstall::remove_installed(kind, &dest_path, ctx.fs);
         }
         return Err(lock_err);
     }
@@ -268,28 +281,47 @@ fn plan_install(
     }
 }
 
+/// Resolved decisions for a single install operation — pure, no gateway access.
+pub(crate) struct InstallDecision {
+    /// True when the install should be blocked because the artifact was locally
+    /// modified and `--force` was not passed.
+    pub blocked: bool,
+    /// True when a lockfile write failure should trigger rollback of the copy.
+    /// Only set for fresh installs — rolling back an existing copy is worse than
+    /// the ghost we're trying to prevent.
+    pub rollback_on_lock_fail: bool,
+}
+
+/// Pure decision function: given pre-gathered facts, return the install decisions.
+/// No gateway access — all I/O must happen in the shell before calling this.
+pub(crate) fn decide_install(
+    already_installed: bool,
+    locally_modified: bool,
+    force: bool,
+) -> InstallDecision {
+    InstallDecision {
+        blocked: locally_modified && !force,
+        rollback_on_lock_fail: !already_installed,
+    }
+}
+
 /// Check whether the named artifact has been locally modified since it was
-/// installed. Returns `Ok(())` if clean, or bails with a user-facing error if
-/// modifications are detected.
+/// installed. Returns `Ok(true)` when modifications are detected, `Ok(false)`
+/// when clean. Gateway I/O only — the caller decides what to do with the result.
 fn check_local_modifications(
     artifact_name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
     lock_entry: Option<&LockEntry>,
     ctx: &AppContext<'_>,
-) -> Result<()> {
+) -> Result<bool> {
     let dest_check = ctx.paths.installed_artifact_path(kind, artifact_name, scope);
     if ctx.fs.exists(&dest_check) {
         if let Some(entry) = lock_entry {
-            if checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs)? {
-                bail!(
-                    "'{artifact_name}' has local modifications. Use --force to overwrite, \
-                     or 'cmx {kind} diff {artifact_name}' to review changes first."
-                );
-            }
+            return checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs);
         }
     }
-    Ok(())
+    Ok(false)
 }
 
 /// Pure builder: construct a `LockEntry` from plan data and pre-computed checksums.
@@ -312,13 +344,6 @@ fn build_lock_entry(
         source_checksum,
         installed_checksum,
     }
-}
-
-/// Pure predicate: should we roll back the copied artifact when a lock write fails?
-/// Only true for a *fresh* install — rolling back an existing artifact would discard
-/// the user's current copy, which is worse than the ghost we're trying to prevent.
-fn should_rollback(already_installed: bool) -> bool {
-    !already_installed
 }
 
 fn parse_name(name: &str) -> (Option<&str>, &str) {

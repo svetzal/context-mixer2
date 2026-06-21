@@ -103,16 +103,43 @@ use crate::test_support::{
 use crate::types::{Artifact, ArtifactKind, Deprecation, InstallScope, LockFile};
 use chrono::Utc;
 
-// --- should_rollback (pure) ---
+// --- decide_install (pure) ---
 
 #[test]
-fn should_rollback_true_when_fresh_install() {
-    assert!(should_rollback(false), "fresh install → rollback on lock failure");
+fn decide_install_clean_fresh_install_not_blocked_and_rolls_back() {
+    let d = decide_install(false, false, false);
+    assert!(!d.blocked, "clean install must not be blocked");
+    assert!(d.rollback_on_lock_fail, "fresh install must roll back on lock failure");
 }
 
 #[test]
-fn should_rollback_false_when_already_installed() {
-    assert!(!should_rollback(true), "reinstall → keep existing copy on lock failure");
+fn decide_install_locally_modified_without_force_is_blocked() {
+    let d = decide_install(false, true, false);
+    assert!(d.blocked, "locally modified without --force must be blocked");
+}
+
+#[test]
+fn decide_install_locally_modified_with_force_is_not_blocked() {
+    let d = decide_install(false, true, true);
+    assert!(!d.blocked, "--force must override local modification block");
+}
+
+#[test]
+fn decide_install_fresh_install_lock_fail_rolls_back() {
+    let d = decide_install(false, false, false);
+    assert!(
+        d.rollback_on_lock_fail,
+        "fresh install (already_installed=false) must roll back"
+    );
+}
+
+#[test]
+fn decide_install_existing_install_lock_fail_does_not_roll_back() {
+    let d = decide_install(true, false, false);
+    assert!(
+        !d.rollback_on_lock_fail,
+        "reinstall (already_installed=true) must keep existing copy"
+    );
 }
 
 // --- build_lock_entry (pure, no gateway fakes needed) ---

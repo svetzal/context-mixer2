@@ -4,6 +4,27 @@ use std::path::Path;
 use anyhow::Result;
 use cmx::gateway::Filesystem;
 
+/// Parse a JSON string, returning a validated value or a malformed-file issue.
+///
+/// Pure function — no I/O. Returns `(Some(value), [])` on success or
+/// `(None, [malformed issue])` on parse error.
+pub fn parse_and_validate_json<T: serde::de::DeserializeOwned>(
+    raw: &str,
+    context: &str,
+    file_label: &str,
+) -> (Option<T>, Vec<ValidationIssue>) {
+    match serde_json::from_str(raw) {
+        Ok(v) => (Some(v), vec![]),
+        Err(e) => (
+            None,
+            vec![ValidationIssue::error(
+                context,
+                format!("{file_label} is malformed: {e}"),
+            )],
+        ),
+    }
+}
+
 /// Load and parse a JSON file, collecting validation issues for missing,
 /// unreadable, or malformed files.
 ///
@@ -35,16 +56,7 @@ pub fn load_and_validate_json<T: serde::de::DeserializeOwned>(
         ));
     };
 
-    match serde_json::from_str(&raw) {
-        Ok(v) => Ok((Some(v), vec![])),
-        Err(e) => Ok((
-            None,
-            vec![ValidationIssue::error(
-                context,
-                format!("{file_label} is malformed: {e}"),
-            )],
-        )),
-    }
+    Ok(parse_and_validate_json(&raw, context, file_label))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,6 +95,28 @@ pub struct ValidationReport(pub Vec<ValidationIssue>);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // --- parse_and_validate_json (pure) ---
+
+    #[test]
+    fn parse_and_validate_json_valid_returns_value_and_no_issues() {
+        let raw = r#"{"name": "test"}"#;
+        let (value, issues): (Option<serde_json::Value>, _) =
+            parse_and_validate_json(raw, "ctx", "file.json");
+        assert!(value.is_some(), "valid JSON must return Some(value)");
+        assert!(issues.is_empty(), "valid JSON must produce no issues");
+    }
+
+    #[test]
+    fn parse_and_validate_json_malformed_returns_none_and_error_issue() {
+        let raw = "{ not valid json";
+        let (value, issues): (Option<serde_json::Value>, _) =
+            parse_and_validate_json(raw, "ctx", "file.json");
+        assert!(value.is_none(), "malformed JSON must return None");
+        assert_eq!(issues.len(), 1, "malformed JSON must produce exactly one issue");
+        assert_eq!(issues[0].level, IssueLevel::Error);
+        assert!(issues[0].message.contains("malformed"), "issue message must say 'malformed'");
+    }
 
     #[test]
     fn issue_level_equality() {

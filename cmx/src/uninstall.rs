@@ -1,9 +1,10 @@
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
 use crate::context::AppContext;
+use crate::gateway::Filesystem;
 use crate::lockfile;
 use crate::partition::{Partitioned, partition_by};
 use crate::platform::Platform;
@@ -34,6 +35,20 @@ pub struct BatchUninstallResult {
     pub removed: Vec<UninstallResult>,
     /// Names that were not installed anywhere (nothing to remove).
     pub not_found: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Imperative shell helpers
+// ---------------------------------------------------------------------------
+
+/// Remove an installed artifact from disk, dispatching to the correct strategy:
+/// file removal for agents, recursive directory removal for skills.
+pub(crate) fn remove_installed(kind: ArtifactKind, path: &Path, fs: &dyn Filesystem) -> Result<()> {
+    match kind {
+        ArtifactKind::Agent => fs.remove_file(path)?,
+        ArtifactKind::Skill => fs.remove_dir_all(path)?,
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +98,7 @@ fn uninstall_one(
 
     let was_on_disk = !paths_to_delete.is_empty();
     for path in &paths_to_delete {
-        kind.remove_installed(path, ctx.fs)?;
+        remove_installed(kind, path, ctx.fs)?;
     }
 
     removed_from.sort_by_key(|p| p.slug());

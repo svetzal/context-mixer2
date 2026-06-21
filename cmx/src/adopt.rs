@@ -22,12 +22,14 @@ use anyhow::Result;
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
+use crate::copy;
 use crate::doctor::{self, ArtifactState, DoctorRow};
 use crate::lockfile;
 use crate::platform::Platform;
 use crate::types::{
     self, ArtifactKind, InstallScope, LockEntry, LockSource, SourceEntry, SourceType,
 };
+use crate::uninstall;
 
 /// The canonical source name under which the home is registered.
 pub const HOME_SOURCE: &str = "home";
@@ -95,7 +97,7 @@ fn adopt_row(row: &DoctorRow, home: &Path, ctx: &AppContext<'_>) -> Result<Adopt
     // verbatim (no platform transform — the home always holds markdown).
     let dest_dir = home.join(row.kind.subdir_name());
     ctx.fs.create_dir_all(&dest_dir)?;
-    let home_path = row.kind.copy_to(&src, &dest_dir, ctx.fs)?;
+    let home_path = copy::copy_artifact_to(row.kind, &src, &dest_dir, ctx.fs)?;
 
     let cs = checksum::checksum_artifact(&home_path, row.kind, ctx.fs)?;
     let relative_path = types::relative_path_string(&home_path, home);
@@ -278,7 +280,7 @@ fn unadopt_one(
         return Ok(None);
     }
     if home_present {
-        kind.remove_installed(&home_path, ctx.fs)?;
+        uninstall::remove_installed(kind, &home_path, ctx.fs)?;
     }
     untracked_from.sort_by_key(|p| p.slug());
     untracked_from.dedup();

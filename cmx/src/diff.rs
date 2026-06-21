@@ -73,7 +73,7 @@ pub(crate) async fn gather_diff_with(
     let installed_version = lock.packages.get(name).and_then(|e| e.version.clone());
 
     // Build diff text
-    let diff_text = kind.diff(&installed_path, &source_path, ctx)?;
+    let diff_text = diff_artifact(kind, &installed_path, &source_path, ctx)?;
 
     let installed_ver_display = installed_version.as_deref().unwrap_or("unversioned");
     let source_ver_display = source_version.as_deref().unwrap_or("unversioned");
@@ -118,6 +118,21 @@ fn find_in_sources_with(
         return Ok((sa.artifact.path, sa.source_name, sa.artifact.version));
     }
     bail!("No {kind} named '{name}' found in any registered source.");
+}
+
+/// Produce a textual diff between an installed artifact and its source
+/// counterpart, dispatching to the correct strategy (file diff for agents,
+/// directory diff for skills).
+pub(crate) fn diff_artifact(
+    kind: ArtifactKind,
+    installed: &Path,
+    source: &Path,
+    ctx: &AppContext<'_>,
+) -> Result<String> {
+    match kind {
+        ArtifactKind::Agent => diff_files(installed, source, ctx),
+        ArtifactKind::Skill => diff_dirs(installed, source, ctx),
+    }
 }
 
 pub(crate) fn diff_files(installed: &Path, source: &Path, ctx: &AppContext<'_>) -> Result<String> {

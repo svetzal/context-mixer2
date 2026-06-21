@@ -5,6 +5,32 @@ use crate::context::AppContext;
 use crate::gateway::Filesystem;
 use crate::types::ArtifactKind;
 
+/// Copy an artifact from `source` into `dest_dir`, dispatching to the correct
+/// strategy (file copy for agents, recursive directory copy for skills).
+/// Returns the destination path.
+pub(crate) fn copy_artifact_to(
+    kind: ArtifactKind,
+    source: &Path,
+    dest_dir: &Path,
+    fs: &dyn Filesystem,
+) -> anyhow::Result<PathBuf> {
+    let name = source
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("Invalid source path: {}", source.display()))?;
+    let dest = dest_dir.join(name);
+    match kind {
+        ArtifactKind::Agent => {
+            fs.copy_file(source, &dest).with_context(|| {
+                format!("Failed to copy {} to {}", source.display(), dest.display())
+            })?;
+        }
+        ArtifactKind::Skill => {
+            copy_dir_recursive_with(source, &dest, fs)?;
+        }
+    }
+    Ok(dest)
+}
+
 /// Copy an artifact from source to destination, returning the destination path.
 ///
 /// Most artifacts are copied verbatim. Codex agents are the exception: the
@@ -21,7 +47,7 @@ pub(crate) fn copy_artifact(
         return transform_agent_to_codex_toml(artifact_path, dest_dir, artifact_name, ctx);
     }
 
-    let dest_path = kind.copy_to(artifact_path, dest_dir, ctx.fs)?;
+    let dest_path = copy_artifact_to(kind, artifact_path, dest_dir, ctx.fs)?;
 
     if matches!(kind, ArtifactKind::Skill) {
         let skill_md = dest_path.join("SKILL.md");
