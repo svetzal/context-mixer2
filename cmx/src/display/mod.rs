@@ -9,4 +9,5 @@ mod list;
 mod outdated;
 mod search;
 mod source;
+mod sync;
 mod uninstall;

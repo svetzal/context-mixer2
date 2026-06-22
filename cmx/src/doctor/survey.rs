@@ -368,6 +368,8 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
         artifacts,
         missing,
         included_local: include_local,
+        surveyed_platforms: platforms.len(),
+        scoped_to_managed: !cfg.platforms.is_empty(),
         show_all: false,
     })
 }

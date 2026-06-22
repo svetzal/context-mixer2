@@ -123,6 +123,7 @@ Artifact scanning:
 Install/uninstall:
 - `cmx/src/install.rs` — `cmx agent install` / `cmx skill install`
 - `cmx/src/uninstall.rs` — `cmx agent uninstall` / `cmx skill uninstall`
+- `cmx/src/sync.rs` — `cmx skill sync`: reconcile a skill that diverged across platforms by copying one copy (newest version, or `--from <platform>`) over the others; works for external/source-less skills
 - `cmx/src/copy.rs` — file copy helpers used by install
 
 Query & display:

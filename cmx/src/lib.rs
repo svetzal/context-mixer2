@@ -29,6 +29,7 @@ pub mod search;
 pub mod source;
 pub(crate) mod source_iter;
 pub mod source_update;
+pub mod sync;
 pub mod table;
 #[cfg(test)]
 mod test_support;

@@ -96,7 +96,7 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
     }
     if c.diverged > 0 {
         lines.push(format!(
-            "  • {} artifact(s) diverge across their install locations (different version or state). Re-sync a cmx-managed one with `cmx <kind> update <name> --force`; an external one is the owning tool's to re-sync.",
+            "  • {} artifact(s) diverge across their install locations (different version or state). See what differs with `cmx skill diff <name>`, then reconcile by copying the chosen copy over the others: `cmx skill sync <name>` (newest version wins) or `cmx skill sync <name> --from <platform>`. Works for external skills too.",
             c.diverged
         ));
     }
@@ -146,11 +146,12 @@ impl fmt::Display for DoctorReport {
         } else {
             "global scope"
         };
-        writeln!(
-            f,
-            "cmx doctor — {scope_desc}, {} platforms surveyed.\n",
-            crate::platform::Platform::ALL.len()
-        )?;
+        let platform_note = if self.scoped_to_managed {
+            format!("{} managed platform(s) surveyed", self.surveyed_platforms)
+        } else {
+            format!("{} platforms surveyed", self.surveyed_platforms)
+        };
+        writeln!(f, "cmx doctor — {scope_desc}, {platform_note}.\n")?;
 
         // By default `doctor` shows only what needs attention — it's a doctor.
         // `--all` shows the full inventory.
@@ -242,6 +243,8 @@ mod tests {
             artifacts: vec![orphan_artifact("my-skill")],
             missing: vec![],
             included_local: false,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
             show_all: true,
         };
         let out = r.to_string();
@@ -272,6 +275,8 @@ mod tests {
             }],
             missing: vec![],
             included_local: false,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
             show_all: true,
         };
         let out = r.to_string();
@@ -294,6 +299,8 @@ mod tests {
                 platform: Platform::Pi,
             }],
             included_local: true,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
             show_all: false,
         };
         let out = r.to_string();
@@ -313,6 +320,8 @@ mod tests {
             artifacts: vec![a],
             missing: vec![],
             included_local: false,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
             show_all: false,
         };
         let out = r.to_string();
@@ -334,6 +343,8 @@ mod tests {
             artifacts: vec![a],
             missing: vec![],
             included_local: false,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
             show_all: true,
         };
         let out = r.to_string();
@@ -370,6 +381,8 @@ mod tests {
             artifacts: vec![art],
             missing: vec![],
             included_local: false,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
             show_all: true,
         };
         let out = r.to_string();
@@ -392,6 +405,8 @@ mod tests {
             artifacts: vec![a],
             missing: vec![],
             included_local: false,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
             show_all: false,
         };
         assert!(r.has_issues(), "a diverged external artifact is an issue");
@@ -425,6 +440,8 @@ mod tests {
             }],
             missing: vec![],
             included_local: false,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
             show_all: false,
         };
         let out = healthy.to_string();

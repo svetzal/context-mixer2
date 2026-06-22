@@ -228,6 +228,40 @@ fn build_llm_runtime(ctx: &AppContext<'_>) -> Result<LlmRuntime> {
     })
 }
 
+fn handle_install(
+    names: &[String],
+    all: bool,
+    local: bool,
+    force: bool,
+    kind: ArtifactKind,
+    selector: Option<Platform>,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    let scope = if local {
+        InstallScope::Local
+    } else {
+        InstallScope::Global
+    };
+    cmx::source_update::ensure_fresh(ctx)?;
+    let targets = cmx::install::resolve_targets(selector, kind, scope, ctx)?;
+    if all {
+        let result = cmx::install::install_all(kind, scope, force, &targets, ctx)?;
+        print!("{result}");
+        Ok(ExitCode::SUCCESS)
+    } else if names.is_empty() {
+        bail!("Provide artifact name(s) or use --all")
+    } else {
+        let result = cmx::install::install_many(names, kind, scope, force, &targets, ctx)?;
+        let any_failed = !result.failed.is_empty();
+        print!("{result}");
+        Ok(if any_failed {
+            ExitCode::FAILURE
+        } else {
+            ExitCode::SUCCESS
+        })
+    }
+}
+
 fn handle_artifact(
     action: ArtifactAction,
     kind: ArtifactKind,
@@ -240,31 +274,7 @@ fn handle_artifact(
             all,
             local,
             force,
-        } => {
-            let scope = if local {
-                InstallScope::Local
-            } else {
-                InstallScope::Global
-            };
-            cmx::source_update::ensure_fresh(ctx)?;
-            let targets = cmx::install::resolve_targets(selector, kind, scope, ctx)?;
-            if all {
-                let result = cmx::install::install_all(kind, scope, force, &targets, ctx)?;
-                print!("{result}");
-                Ok(ExitCode::SUCCESS)
-            } else if names.is_empty() {
-                bail!("Provide artifact name(s) or use --all")
-            } else {
-                let result = cmx::install::install_many(&names, kind, scope, force, &targets, ctx)?;
-                let any_failed = !result.failed.is_empty();
-                print!("{result}");
-                Ok(if any_failed {
-                    ExitCode::FAILURE
-                } else {
-                    ExitCode::SUCCESS
-                })
-            }
-        }
+        } => handle_install(&names, all, local, force, kind, selector, ctx),
         ArtifactAction::List { all } => {
             let output = cmx::list::list_kind(kind, all, ctx)?;
             print!("{output}");
@@ -295,6 +305,21 @@ fn handle_artifact(
             } else {
                 bail!("Provide an artifact name or use --all")
             }
+        }
+        ArtifactAction::Sync {
+            name,
+            from,
+            dry_run,
+            local,
+        } => {
+            let scope = if local {
+                InstallScope::Local
+            } else {
+                InstallScope::Global
+            };
+            let result = cmx::sync::sync(&name, kind, scope, from, dry_run, ctx)?;
+            print!("{result}");
+            Ok(ExitCode::SUCCESS)
         }
         ArtifactAction::Uninstall { names, local } => {
             if names.is_empty() {

@@ -158,6 +158,22 @@ pub enum ArtifactAction {
         #[arg(long)]
         force: bool,
     },
+    /// Reconcile a skill that has diverged across platforms by copying one
+    /// copy over the others. Unlike `update` (which pulls from a source), `sync`
+    /// works between install locations — so it also reconciles `external` skills.
+    Sync {
+        /// Skill name to reconcile
+        name: String,
+        /// Platform whose copy wins (default: the newest version)
+        #[arg(long, value_enum)]
+        from: Option<Platform>,
+        /// Preview the reconciliation without writing anything
+        #[arg(long)]
+        dry_run: bool,
+        /// Reconcile within project scope instead of global
+        #[arg(long)]
+        local: bool,
+    },
     /// Uninstall installed artifact(s) — removed everywhere cmx tracks them
     Uninstall {
         /// Artifact name(s) to uninstall

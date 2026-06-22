@@ -113,6 +113,12 @@ pub struct DoctorReport {
     pub missing: Vec<MissingRow>,
     /// Whether project (local) scope was included in the survey.
     pub included_local: bool,
+    /// How many platforms the survey actually inspected — every supported
+    /// platform, or just the managed set when one is configured.
+    pub surveyed_platforms: usize,
+    /// `true` when the survey was narrowed to an explicit managed set (so the
+    /// header can say so rather than implying the whole field was checked).
+    pub scoped_to_managed: bool,
     /// Display hint: when `true`, the full inventory is shown; otherwise only
     /// artifacts that need attention (the default — `doctor` is for problems).
     pub show_all: bool,
