@@ -420,8 +420,8 @@ mod tests {
                 email: "test@example.com".to_string(),
             }),
             metadata: Some(MarketplaceMetadata {
-                description: "A curated marketplace".to_string(),
-                version: "2.0.0".to_string(),
+                description: Some("A curated marketplace".to_string()),
+                version: Some("2.0.0".to_string()),
             }),
             plugins: vec![],
         };
@@ -451,7 +451,7 @@ mod tests {
 
         assert_eq!(mp.name, "my-marketplace");
         assert_eq!(mp.owner.as_ref().unwrap().name, "Test Owner");
-        assert_eq!(mp.metadata.as_ref().unwrap().version, "2.0.0");
+        assert_eq!(mp.metadata.as_ref().unwrap().version.as_deref(), Some("2.0.0"));
         assert_eq!(mp.plugins.len(), 1);
         assert_eq!(mp.plugins[0].name, "only-plugin");
     }

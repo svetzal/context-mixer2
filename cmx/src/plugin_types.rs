@@ -12,10 +12,16 @@ pub struct Author {
 /// ownership.
 pub type Owner = Author;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Optional descriptive block on a `marketplace.json`. Both fields are
+/// optional: third-party marketplaces (e.g. upstream Claude Code plugin repos)
+/// frequently provide only a `description`, or omit the block entirely. cmx
+/// must ingest those files without aborting, so neither field is required.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MarketplaceMetadata {
-    pub description: String,
-    pub version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
 }
 
 /// The source location of a marketplace plugin entry.
@@ -122,7 +128,7 @@ mod tests {
         let mp: Marketplace = serde_json::from_str(json).unwrap();
         assert_eq!(mp.name, "svetzal-guidelines");
         assert_eq!(mp.owner.as_ref().unwrap().name, "Stacey Vetzal");
-        assert_eq!(mp.metadata.as_ref().unwrap().version, "1.0.0");
+        assert_eq!(mp.metadata.as_ref().unwrap().version.as_deref(), Some("1.0.0"));
         assert_eq!(mp.plugins.len(), 1);
         assert_eq!(mp.plugins[0].name, "rust-craft");
         assert_eq!(mp.plugins[0].category.as_deref(), Some("development"));
