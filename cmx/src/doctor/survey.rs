@@ -45,8 +45,7 @@ pub(crate) fn build_locations(
                 if !platform.supports(kind) {
                     continue;
                 }
-                let dir = pv.install_dir(kind, scope)
-                    .expect("guarded by platform.supports(kind)");
+                let dir = pv.install_dir(kind, scope).expect("guarded by platform.supports(kind)");
                 locations
                     .entry(dir)
                     .or_insert_with(|| LocationAgg {

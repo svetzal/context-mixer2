@@ -91,7 +91,9 @@ fn ensure_home_source(home: &Path, ctx: &AppContext<'_>) -> Result<()> {
 fn adopt_row(row: &DoctorRow, home: &Path, ctx: &AppContext<'_>) -> Result<AdoptResult> {
     // The original on-disk artifact (verbatim source for the home copy).
     let representative = ctx.paths.with_platform(row.platforms[0]);
-    let src = representative.installed_artifact_path(row.kind, &row.name, row.scope);
+    let src = representative
+        .installed_artifact_path(row.kind, &row.name, row.scope)
+        .expect("installed_artifact_path: DoctorRow platforms support the artifact kind");
 
     // Destination in the home: <home>/<agents|skills>/<name[.md]>, copied
     // verbatim (no platform transform — the home always holds markdown).
@@ -343,7 +345,7 @@ mod tests {
     /// Place an orphaned skill in a platform's install dir.
     fn place_orphan_skill(t: &TestContext, platform: Platform, name: &str, version: &str) {
         let pv = t.paths.with_platform(platform);
-        let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global);
+        let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
         t.fs.add_file(
             dir.join(name).join("SKILL.md"),
             versioned_skill_content("An orphaned skill", version),
@@ -416,6 +418,7 @@ mod tests {
         let original = t
             .paths
             .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
             .join("my-skill")
             .join("SKILL.md");
         adopt_all(None, None, false, &t.ctx()).unwrap();
@@ -491,7 +494,7 @@ mod tests {
         place_orphan_skill(&t, Platform::Claude, "mine", "1.0.0");
         place_orphan_skill(&t, Platform::Pi, "theirs", "1.0.0");
 
-        let claude_skills = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global);
+        let claude_skills = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
         let outcome =
             adopt_all(Some(ArtifactKind::Skill), Some(&claude_skills), false, &t.ctx()).unwrap();
         let names: Vec<&str> = outcome.adopted.iter().map(|a| a.name.as_str()).collect();
@@ -578,6 +581,7 @@ mod tests {
         let original = t
             .paths
             .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
             .join("tool-skill")
             .join("SKILL.md");
         assert!(t.fs.exists(&original), "tool-created original is left in place");

@@ -3,6 +3,27 @@ use std::path::PathBuf;
 
 use crate::types::{ArtifactKind, InstallScope};
 
+// --- private spec types ---
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AgentFormat {
+    Markdown,
+    Toml,
+}
+
+struct PlatformSpec {
+    name: &'static str,
+    slug: &'static str,
+    /// `Some` only for platforms that define a plugin-manifest format (used by
+    /// cmf). `None` for `.agents`-standard tools, which have no such format.
+    manifest_dir: Option<&'static str>,
+    /// `Some` for platforms that support file-droppable agents; the variant
+    /// selects the installed format. `None` for skills-only tools.
+    agent_format: Option<AgentFormat>,
+}
+
+// --- enum ---
+
 /// The target AI coding assistant platform for artifact installation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, clap::ValueEnum)]
 pub enum Platform {
@@ -32,26 +53,101 @@ pub enum Platform {
 
 impl fmt::Display for Platform {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
-            Self::Claude => "claude",
-            Self::Copilot => "copilot",
-            Self::Cursor => "cursor",
-            Self::Windsurf => "windsurf",
-            Self::Gemini => "gemini",
-            Self::Opencode => "opencode",
-            Self::Codex => "codex",
-            Self::Pi => "pi",
-            Self::Crush => "crush",
-            Self::Amp => "amp",
-            Self::Zed => "zed",
-            Self::Openhands => "openhands",
-            Self::Hermes => "hermes",
-        };
-        f.write_str(name)
+        f.write_str(self.spec().name)
     }
 }
 
 impl Platform {
+    /// Single authoritative per-variant data table.
+    ///
+    /// The exhaustive `match` forces any new variant to be listed here — the
+    /// compiler rejects a build that adds a 14th variant without filling in its
+    /// spec, eliminating the need for parallel matches elsewhere.
+    fn spec(self) -> PlatformSpec {
+        match self {
+            // Claude is the canonical manifest *source* (`.claude-plugin/`), not a
+            // target — cmf reads from it but never writes back to it.
+            Self::Claude => PlatformSpec {
+                name: "claude",
+                slug: "",
+                manifest_dir: None,
+                agent_format: Some(AgentFormat::Markdown),
+            },
+            Self::Copilot => PlatformSpec {
+                name: "copilot",
+                slug: "copilot",
+                manifest_dir: Some(".copilot-plugin"),
+                agent_format: Some(AgentFormat::Markdown),
+            },
+            Self::Cursor => PlatformSpec {
+                name: "cursor",
+                slug: "cursor",
+                manifest_dir: Some(".cursor-plugin"),
+                agent_format: Some(AgentFormat::Markdown),
+            },
+            Self::Windsurf => PlatformSpec {
+                name: "windsurf",
+                slug: "windsurf",
+                manifest_dir: Some(".windsurf-plugin"),
+                agent_format: Some(AgentFormat::Markdown),
+            },
+            Self::Gemini => PlatformSpec {
+                name: "gemini",
+                slug: "gemini",
+                manifest_dir: Some(".gemini-plugin"),
+                agent_format: Some(AgentFormat::Markdown),
+            },
+            Self::Opencode => PlatformSpec {
+                name: "opencode",
+                slug: "opencode",
+                manifest_dir: None,
+                agent_format: Some(AgentFormat::Markdown),
+            },
+            Self::Codex => PlatformSpec {
+                name: "codex",
+                slug: "codex",
+                manifest_dir: None,
+                agent_format: Some(AgentFormat::Toml),
+            },
+            Self::Pi => PlatformSpec {
+                name: "pi",
+                slug: "pi",
+                manifest_dir: None,
+                agent_format: None,
+            },
+            Self::Crush => PlatformSpec {
+                name: "crush",
+                slug: "crush",
+                manifest_dir: None,
+                agent_format: None,
+            },
+            Self::Amp => PlatformSpec {
+                name: "amp",
+                slug: "amp",
+                manifest_dir: None,
+                agent_format: None,
+            },
+            Self::Zed => PlatformSpec {
+                name: "zed",
+                slug: "zed",
+                manifest_dir: None,
+                agent_format: None,
+            },
+            Self::Openhands => PlatformSpec {
+                name: "openhands",
+                slug: "openhands",
+                manifest_dir: None,
+                agent_format: None,
+            },
+            Self::Hermes => PlatformSpec {
+                name: "hermes",
+                slug: "hermes",
+                manifest_dir: None,
+                agent_format: None,
+            },
+        }
+    }
+
     /// The install directory for the given artifact kind and scope.
     ///
     /// The returned path is relative — to the project root for
@@ -59,63 +155,68 @@ impl Platform {
     /// already includes the kind-specific leaf directory (e.g. `agents`,
     /// `skills`), so callers do not append a subdirectory.
     ///
-    /// For an unsupported `(platform, kind)` combination (see [`supports`]) this
-    /// returns a platform-namespaced fallback that is never written to;
-    /// [`supports`] gates the mutating commands before any path is used.
+    /// Returns `None` for unsupported `(platform, kind)` combinations (see
+    /// [`supports`]). Callers should gate on `supports` or `ensure_supports`
+    /// before calling this, so `None` indicates a programming error at the call
+    /// site.
     ///
     /// [`supports`]: Platform::supports
-    pub fn install_subpath(self, kind: ArtifactKind, scope: InstallScope) -> PathBuf {
+    pub fn install_subpath(self, kind: ArtifactKind, scope: InstallScope) -> Option<PathBuf> {
         use ArtifactKind::{Agent, Skill};
 
-        // Two-component relative path helper.
         let dir = |base: &str, leaf: &str| PathBuf::from(base).join(leaf);
         let local = scope.is_local();
 
         match (self, kind) {
-            (Self::Claude, Agent) => dir(".claude", "agents"),
-            (Self::Claude, Skill) => dir(".claude", "skills"),
+            (Self::Claude, Agent) => Some(dir(".claude", "agents")),
+            (Self::Claude, Skill) => Some(dir(".claude", "skills")),
 
             // Copilot reads project files from `.github` but stores user-scoped
             // artifacts under `.copilot`.
-            (Self::Copilot, Agent) => dir(if local { ".github" } else { ".copilot" }, "agents"),
-            (Self::Copilot, Skill) => dir(if local { ".github" } else { ".copilot" }, "skills"),
+            (Self::Copilot, Agent) => {
+                Some(dir(if local { ".github" } else { ".copilot" }, "agents"))
+            }
+            (Self::Copilot, Skill) => {
+                Some(dir(if local { ".github" } else { ".copilot" }, "skills"))
+            }
 
-            (Self::Cursor, Agent) => dir(".cursor", "agents"),
-            (Self::Cursor, Skill) => dir(".cursor", "skills"),
+            (Self::Cursor, Agent) => Some(dir(".cursor", "agents")),
+            (Self::Cursor, Skill) => Some(dir(".cursor", "skills")),
 
             // Windsurf nests user-scoped artifacts under `.codeium/windsurf`.
-            (Self::Windsurf, Agent) if local => dir(".windsurf", "agents"),
-            (Self::Windsurf, Skill) if local => dir(".windsurf", "skills"),
-            (Self::Windsurf, Agent) => PathBuf::from(".codeium").join("windsurf").join("agents"),
-            (Self::Windsurf, Skill) => PathBuf::from(".codeium").join("windsurf").join("skills"),
+            (Self::Windsurf, Agent) if local => Some(dir(".windsurf", "agents")),
+            (Self::Windsurf, Skill) if local => Some(dir(".windsurf", "skills")),
+            (Self::Windsurf, Agent) => {
+                Some(PathBuf::from(".codeium").join("windsurf").join("agents"))
+            }
+            (Self::Windsurf, Skill) => {
+                Some(PathBuf::from(".codeium").join("windsurf").join("skills"))
+            }
 
-            (Self::Gemini, Agent) => dir(".gemini", "agents"),
-            (Self::Gemini, Skill) => dir(".gemini", "skills"),
+            (Self::Gemini, Agent) => Some(dir(".gemini", "agents")),
+            (Self::Gemini, Skill) => Some(dir(".gemini", "skills")),
 
-            // opencode: markdown agents in `.opencode/agent` (singular leaf,
-            // which the loader reads alongside the plural form); user-scoped
-            // config lives under `~/.config/opencode`.
-            (Self::Opencode, Agent) if local => dir(".opencode", "agent"),
-            (Self::Opencode, Agent) => PathBuf::from(".config").join("opencode").join("agent"),
+            // opencode: markdown agents in `.opencode/agent` (singular leaf);
+            // user-scoped config lives under `~/.config/opencode`.
+            (Self::Opencode, Agent) if local => Some(dir(".opencode", "agent")),
+            (Self::Opencode, Agent) => {
+                Some(PathBuf::from(".config").join("opencode").join("agent"))
+            }
 
             // codex: TOML agents in `.codex/agents` (both scopes).
-            (Self::Codex, Agent) => dir(".codex", "agents"),
+            (Self::Codex, Agent) => Some(dir(".codex", "agents")),
 
-            // Skills-only tools have no native agent concept — these agent
-            // fallbacks are never written to (gated by `supports`).
-            (Self::Pi, Agent) => dir(".pi", "agents"),
-            (Self::Crush, Agent) => dir(".crush", "agents"),
-            (Self::Amp, Agent) => dir(".amp", "agents"),
-            (Self::Zed, Agent) => dir(".zed", "agents"),
-            (Self::Openhands, Agent) => dir(".openhands", "agents"),
-            (Self::Hermes, Agent) => dir(".hermes", "agents"),
+            // Skills-only tools have no droppable agent concept.
+            (
+                Self::Pi | Self::Crush | Self::Amp | Self::Zed | Self::Openhands | Self::Hermes,
+                Agent,
+            ) => None,
 
-            // Amp and Hermes diverge only at *global* scope: Amp resolves
-            // user-scoped skills under XDG (`~/.config/agents/skills`); Hermes
-            // uses its own home (`~/.hermes/skills`, its auto-read source of
-            // truth). At project scope both fall through to `.agents/skills`.
-            (Self::Amp, Skill) if !local => PathBuf::from(".config").join("agents").join("skills"),
-            (Self::Hermes, Skill) if !local => dir(".hermes", "skills"),
+            // Amp and Hermes diverge only at *global* scope.
+            (Self::Amp, Skill) if !local => {
+                Some(PathBuf::from(".config").join("agents").join("skills"))
+            }
+            (Self::Hermes, Skill) if !local => Some(dir(".hermes", "skills")),
 
             // All `.agents`-standard tools (plus Amp/Hermes at project scope)
             // resolve skills to the shared cross-tool `.agents/skills` location.
@@ -129,23 +230,18 @@ impl Platform {
                 | Self::Amp
                 | Self::Hermes,
                 Skill,
-            ) => PathBuf::from(".agents").join("skills"),
+            ) => Some(PathBuf::from(".agents").join("skills")),
         }
     }
 
     /// Whether this platform supports installing the given artifact kind.
     ///
-    /// The skills-only tools (Pi, Crush, Amp, Zed, `OpenHands`, Hermes) have no
-    /// file-droppable agent concept, so `(platform, Agent)` is unsupported for
-    /// them. Every other `(platform, kind)` combination is supported.
+    /// Skills-only tools (Pi, Crush, Amp, Zed, `OpenHands`, Hermes) have no
+    /// file-droppable agent concept; `(platform, Agent)` is unsupported for
+    /// them. Derived from [`spec`](Self::spec) — a `None` `agent_format` means
+    /// skills-only.
     pub fn supports(self, kind: ArtifactKind) -> bool {
-        !matches!(
-            (self, kind),
-            (
-                Self::Pi | Self::Crush | Self::Amp | Self::Zed | Self::Openhands | Self::Hermes,
-                ArtifactKind::Agent
-            )
-        )
+        kind == ArtifactKind::Skill || self.spec().agent_format.is_some()
     }
 
     /// The file extension for an installed agent on this platform.
@@ -153,8 +249,8 @@ impl Platform {
     /// Most platforms store agents as markdown (`md`); codex uses TOML (`toml`)
     /// and the source markdown is transformed during install.
     pub fn agent_extension(self) -> &'static str {
-        match self {
-            Self::Codex => "toml",
+        match self.spec().agent_format {
+            Some(AgentFormat::Toml) => "toml",
             _ => "md",
         }
     }
@@ -162,7 +258,7 @@ impl Platform {
     /// Whether installing an agent for this platform requires transforming the
     /// source markdown into codex's TOML subagent format.
     pub fn transforms_agent_to_toml(self) -> bool {
-        matches!(self, Self::Codex)
+        matches!(self.spec().agent_format, Some(AgentFormat::Toml))
     }
 
     /// Slug used to construct platform-specific lock file names.
@@ -170,47 +266,20 @@ impl Platform {
     /// Claude returns an empty string (lock file stays `cmx-lock.json` for
     /// backward compatibility). All other platforms return a non-empty slug.
     pub fn slug(self) -> &'static str {
-        match self {
-            Self::Claude => "",
-            Self::Copilot => "copilot",
-            Self::Cursor => "cursor",
-            Self::Windsurf => "windsurf",
-            Self::Gemini => "gemini",
-            Self::Opencode => "opencode",
-            Self::Codex => "codex",
-            Self::Pi => "pi",
-            Self::Crush => "crush",
-            Self::Amp => "amp",
-            Self::Zed => "zed",
-            Self::Openhands => "openhands",
-            Self::Hermes => "hermes",
-        }
+        self.spec().slug
     }
 
     /// The directory name for this platform's plugin manifest (used by cmf).
     ///
-    /// Only the platforms returned by [`targets`] consume this; the
+    /// Returns `Some` only for platforms that receive generated manifest copies
+    /// (Copilot, Cursor, Windsurf, Gemini). Returns `None` for Claude (which is
+    /// the canonical manifest *source*, not a target) and for all
     /// `.agents`-standard tools (opencode, codex, pi, Crush, Amp, Zed,
-    /// `OpenHands`) have no Claude-style plugin manifest, so their value here is
-    /// unused.
+    /// `OpenHands`, Hermes), which have no plugin-manifest format.
     ///
-    /// [`targets`]: Platform::targets
-    pub fn manifest_dir(self) -> &'static str {
-        match self {
-            Self::Claude => ".claude-plugin",
-            Self::Copilot => ".copilot-plugin",
-            Self::Cursor => ".cursor-plugin",
-            Self::Windsurf => ".windsurf-plugin",
-            Self::Gemini => ".gemini-plugin",
-            Self::Opencode => ".opencode-plugin",
-            Self::Codex => ".codex-plugin",
-            Self::Pi => ".pi-plugin",
-            Self::Crush => ".crush-plugin",
-            Self::Amp => ".amp-plugin",
-            Self::Zed => ".zed-plugin",
-            Self::Openhands => ".openhands-plugin",
-            Self::Hermes => ".hermes-plugin",
-        }
+    /// Use [`targets`](Platform::targets) to iterate only the `Some` platforms.
+    pub fn manifest_dir(self) -> Option<&'static str> {
+        self.spec().manifest_dir
     }
 
     /// Every platform variant, for exhaustive cross-platform operations such as
@@ -234,14 +303,14 @@ impl Platform {
         Self::Hermes,
     ];
 
-    /// All non-Claude platforms that receive generated plugin manifests.
+    /// All platforms that receive generated plugin manifests.
     ///
-    /// The `.agents`-standard tools (opencode, codex, pi, Crush, Amp, Zed,
-    /// `OpenHands`) are intentionally excluded: none of them define a
-    /// plugin/marketplace manifest format, so generating one would produce dead
-    /// files no tool reads.
-    pub fn targets() -> &'static [Platform] {
-        &[Self::Copilot, Self::Cursor, Self::Windsurf, Self::Gemini]
+    /// Derived from `ALL` by filtering for platforms where
+    /// [`manifest_dir`](Self::manifest_dir) is `Some`. The `.agents`-standard
+    /// tools (opencode, codex, pi, Crush, Amp, Zed, `OpenHands`, Hermes) are
+    /// excluded: none of them define a plugin/marketplace manifest format.
+    pub fn targets() -> Vec<Platform> {
+        Self::ALL.iter().filter(|p| p.manifest_dir().is_some()).copied().collect()
     }
 }
 
@@ -273,11 +342,44 @@ mod tests {
 
     #[test]
     fn manifest_dir_values() {
-        assert_eq!(Platform::Claude.manifest_dir(), ".claude-plugin");
-        assert_eq!(Platform::Copilot.manifest_dir(), ".copilot-plugin");
-        assert_eq!(Platform::Cursor.manifest_dir(), ".cursor-plugin");
-        assert_eq!(Platform::Windsurf.manifest_dir(), ".windsurf-plugin");
-        assert_eq!(Platform::Gemini.manifest_dir(), ".gemini-plugin");
+        // Manifest targets receive generated copies.
+        assert_eq!(Platform::Copilot.manifest_dir(), Some(".copilot-plugin"));
+        assert_eq!(Platform::Cursor.manifest_dir(), Some(".cursor-plugin"));
+        assert_eq!(Platform::Windsurf.manifest_dir(), Some(".windsurf-plugin"));
+        assert_eq!(Platform::Gemini.manifest_dir(), Some(".gemini-plugin"));
+        // Claude is the manifest *source*, not a target.
+        assert_eq!(Platform::Claude.manifest_dir(), None);
+    }
+
+    #[test]
+    fn manifest_dir_none_for_non_targets() {
+        for p in [
+            Platform::Claude,
+            Platform::Opencode,
+            Platform::Codex,
+            Platform::Pi,
+            Platform::Crush,
+            Platform::Amp,
+            Platform::Zed,
+            Platform::Openhands,
+            Platform::Hermes,
+        ] {
+            assert!(
+                p.manifest_dir().is_none(),
+                "{p} is not a manifest target; manifest_dir() must be None"
+            );
+        }
+    }
+
+    #[test]
+    fn targets_is_derived_from_all_with_manifest_dir() {
+        let expected: Vec<Platform> =
+            Platform::ALL.iter().filter(|p| p.manifest_dir().is_some()).copied().collect();
+        assert_eq!(
+            Platform::targets(),
+            expected,
+            "targets() must equal ALL filtered by manifest_dir"
+        );
     }
 
     #[test]
@@ -320,11 +422,15 @@ mod tests {
     #[test]
     fn install_subpath_claude() {
         assert_eq!(
-            Platform::Claude.install_subpath(ArtifactKind::Agent, InstallScope::Local),
+            Platform::Claude
+                .install_subpath(ArtifactKind::Agent, InstallScope::Local)
+                .unwrap(),
             PathBuf::from(".claude").join("agents")
         );
         assert_eq!(
-            Platform::Claude.install_subpath(ArtifactKind::Skill, InstallScope::Global),
+            Platform::Claude
+                .install_subpath(ArtifactKind::Skill, InstallScope::Global)
+                .unwrap(),
             PathBuf::from(".claude").join("skills")
         );
     }
@@ -332,11 +438,15 @@ mod tests {
     #[test]
     fn install_subpath_copilot_differs_by_scope() {
         assert_eq!(
-            Platform::Copilot.install_subpath(ArtifactKind::Agent, InstallScope::Local),
+            Platform::Copilot
+                .install_subpath(ArtifactKind::Agent, InstallScope::Local)
+                .unwrap(),
             PathBuf::from(".github").join("agents")
         );
         assert_eq!(
-            Platform::Copilot.install_subpath(ArtifactKind::Agent, InstallScope::Global),
+            Platform::Copilot
+                .install_subpath(ArtifactKind::Agent, InstallScope::Global)
+                .unwrap(),
             PathBuf::from(".copilot").join("agents")
         );
     }
@@ -344,11 +454,15 @@ mod tests {
     #[test]
     fn install_subpath_windsurf_global_nests_under_codeium() {
         assert_eq!(
-            Platform::Windsurf.install_subpath(ArtifactKind::Skill, InstallScope::Global),
+            Platform::Windsurf
+                .install_subpath(ArtifactKind::Skill, InstallScope::Global)
+                .unwrap(),
             PathBuf::from(".codeium").join("windsurf").join("skills")
         );
         assert_eq!(
-            Platform::Windsurf.install_subpath(ArtifactKind::Agent, InstallScope::Local),
+            Platform::Windsurf
+                .install_subpath(ArtifactKind::Agent, InstallScope::Local)
+                .unwrap(),
             PathBuf::from(".windsurf").join("agents")
         );
     }
@@ -358,11 +472,15 @@ mod tests {
     #[test]
     fn install_subpath_opencode_agent_uses_singular_leaf_and_xdg_global() {
         assert_eq!(
-            Platform::Opencode.install_subpath(ArtifactKind::Agent, InstallScope::Local),
+            Platform::Opencode
+                .install_subpath(ArtifactKind::Agent, InstallScope::Local)
+                .unwrap(),
             PathBuf::from(".opencode").join("agent")
         );
         assert_eq!(
-            Platform::Opencode.install_subpath(ArtifactKind::Agent, InstallScope::Global),
+            Platform::Opencode
+                .install_subpath(ArtifactKind::Agent, InstallScope::Global)
+                .unwrap(),
             PathBuf::from(".config").join("opencode").join("agent")
         );
     }
@@ -370,18 +488,21 @@ mod tests {
     #[test]
     fn install_subpath_codex_agent_uses_dot_codex_agents() {
         assert_eq!(
-            Platform::Codex.install_subpath(ArtifactKind::Agent, InstallScope::Local),
+            Platform::Codex
+                .install_subpath(ArtifactKind::Agent, InstallScope::Local)
+                .unwrap(),
             PathBuf::from(".codex").join("agents")
         );
         assert_eq!(
-            Platform::Codex.install_subpath(ArtifactKind::Agent, InstallScope::Global),
+            Platform::Codex
+                .install_subpath(ArtifactKind::Agent, InstallScope::Global)
+                .unwrap(),
             PathBuf::from(".codex").join("agents")
         );
     }
 
     #[test]
     fn install_subpath_new_tools_share_dot_agents_skills() {
-        // Tools that read `.agents/skills` for both project and user scope.
         for p in [
             Platform::Opencode,
             Platform::Codex,
@@ -392,7 +513,7 @@ mod tests {
         ] {
             for scope in InstallScope::ALL {
                 assert_eq!(
-                    p.install_subpath(ArtifactKind::Skill, scope),
+                    p.install_subpath(ArtifactKind::Skill, scope).unwrap(),
                     PathBuf::from(".agents").join("skills"),
                     "{p} skills (scope {scope:?}) should resolve to .agents/skills"
                 );
@@ -402,30 +523,67 @@ mod tests {
 
     #[test]
     fn install_subpath_amp_skill_diverges_at_global_scope() {
-        // Amp reads project skills from `.agents/skills` but user-scoped skills
-        // from XDG `~/.config/agents/skills`.
         assert_eq!(
-            Platform::Amp.install_subpath(ArtifactKind::Skill, InstallScope::Local),
+            Platform::Amp.install_subpath(ArtifactKind::Skill, InstallScope::Local).unwrap(),
             PathBuf::from(".agents").join("skills")
         );
         assert_eq!(
-            Platform::Amp.install_subpath(ArtifactKind::Skill, InstallScope::Global),
+            Platform::Amp
+                .install_subpath(ArtifactKind::Skill, InstallScope::Global)
+                .unwrap(),
             PathBuf::from(".config").join("agents").join("skills")
         );
     }
 
     #[test]
     fn install_subpath_hermes_skill_diverges_at_global_scope() {
-        // Hermes is global-centric: user skills live in `~/.hermes/skills`,
-        // while project skills use the shared `.agents/skills`.
         assert_eq!(
-            Platform::Hermes.install_subpath(ArtifactKind::Skill, InstallScope::Local),
+            Platform::Hermes
+                .install_subpath(ArtifactKind::Skill, InstallScope::Local)
+                .unwrap(),
             PathBuf::from(".agents").join("skills")
         );
         assert_eq!(
-            Platform::Hermes.install_subpath(ArtifactKind::Skill, InstallScope::Global),
+            Platform::Hermes
+                .install_subpath(ArtifactKind::Skill, InstallScope::Global)
+                .unwrap(),
             PathBuf::from(".hermes").join("skills")
         );
+    }
+
+    #[test]
+    fn install_subpath_skills_only_tools_return_none_for_agent() {
+        for p in [
+            Platform::Pi,
+            Platform::Crush,
+            Platform::Amp,
+            Platform::Zed,
+            Platform::Openhands,
+            Platform::Hermes,
+        ] {
+            for scope in InstallScope::ALL {
+                assert!(
+                    p.install_subpath(ArtifactKind::Agent, scope).is_none(),
+                    "{p} has no agent concept; install_subpath(Agent, {scope:?}) must be None"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn supports_and_install_subpath_agent_agree_for_all_variants() {
+        // supports(Agent) == install_subpath(Agent, _).is_some() must hold for
+        // every platform at every scope — the two predicates must never diverge.
+        for p in Platform::ALL {
+            for scope in InstallScope::ALL {
+                let has_path = p.install_subpath(ArtifactKind::Agent, scope).is_some();
+                let supported = p.supports(ArtifactKind::Agent);
+                assert_eq!(
+                    has_path, supported,
+                    "{p}: supports(Agent)={supported} but install_subpath(Agent, {scope:?}).is_some()={has_path}"
+                );
+            }
+        }
     }
 
     // --- supports ---
@@ -501,10 +659,6 @@ mod tests {
 
     #[test]
     fn all_contains_every_variant() {
-        // Every variant the enum can produce must appear in ALL, so the
-        // cross-platform survey never silently skips a platform. Enumerating
-        // the variants explicitly here means adding a 14th without updating
-        // ALL fails this assertion.
         let every = [
             Platform::Claude,
             Platform::Copilot,

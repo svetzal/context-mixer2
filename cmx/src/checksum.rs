@@ -96,7 +96,7 @@ mod tests {
     fn agent_path(paths: &crate::paths::ConfigPaths) -> std::path::PathBuf {
         ArtifactKind::Agent.installed_path(
             "my-agent",
-            &paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            &paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap(),
         )
     }
 

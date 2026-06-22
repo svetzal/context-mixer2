@@ -112,13 +112,17 @@ impl ConfigPaths {
     /// each platform's layout (including per-kind divergence such as codex/pi
     /// skills living under the shared `.agents/skills`). Local installs are
     /// relative to the project root; global installs are anchored at `$HOME`.
-    pub fn install_dir(&self, kind: ArtifactKind, scope: InstallScope) -> PathBuf {
-        let subpath = self.platform.install_subpath(kind, scope);
-        if scope.is_local() {
+    ///
+    /// Returns `None` for unsupported `(platform, kind)` combinations. Callers
+    /// should gate on [`ensure_supports`](Self::ensure_supports) or
+    /// [`Platform::supports`] before calling this.
+    pub fn install_dir(&self, kind: ArtifactKind, scope: InstallScope) -> Option<PathBuf> {
+        let subpath = self.platform.install_subpath(kind, scope)?;
+        Some(if scope.is_local() {
             subpath
         } else {
             self.home_dir.join(subpath)
-        }
+        })
     }
 
     /// Full path to where an artifact of `kind` named `name` is (or would be)
@@ -127,20 +131,24 @@ impl ConfigPaths {
     /// Agents use the platform's [`agent_extension`](Platform::agent_extension)
     /// (e.g. `.md`, or `.toml` for codex); skills resolve to a directory named
     /// after the artifact.
+    ///
+    /// Returns `None` for unsupported `(platform, kind)` combinations.
     pub fn installed_artifact_path(
         &self,
         kind: ArtifactKind,
         name: &str,
         scope: InstallScope,
-    ) -> PathBuf {
-        let dir = self.install_dir(kind, scope);
-        match kind {
+    ) -> Option<PathBuf> {
+        let dir = self.install_dir(kind, scope)?;
+        Some(match kind {
             ArtifactKind::Agent => dir.join(format!("{name}.{}", self.platform.agent_extension())),
             ArtifactKind::Skill => kind.installed_path(name, &dir),
-        }
+        })
     }
 
     /// Returns `true` if an artifact of `kind` named `name` exists on disk under `scope`.
+    ///
+    /// Returns `false` for unsupported `(platform, kind)` combinations.
     pub fn is_installed(
         &self,
         kind: ArtifactKind,
@@ -148,7 +156,8 @@ impl ConfigPaths {
         scope: InstallScope,
         fs: &dyn Filesystem,
     ) -> bool {
-        fs.exists(&self.installed_artifact_path(kind, name, scope))
+        self.installed_artifact_path(kind, name, scope)
+            .is_some_and(|path| fs.exists(&path))
     }
 
     /// Verify the active platform supports the given artifact kind, returning a
@@ -201,8 +210,9 @@ mod tests {
     fn is_installed_returns_true_when_file_present() {
         let paths = test_paths();
         let fs = FakeFilesystem::new();
-        let path =
-            paths.installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Global);
+        let path = paths
+            .installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Global)
+            .unwrap();
         fs.add_file(path, "# agent");
         assert!(paths.is_installed(ArtifactKind::Agent, "my-agent", InstallScope::Global, &fs));
     }
@@ -223,7 +233,7 @@ mod tests {
             PathBuf::from("/home/testuser/.config/context-mixer/cmx-lock-codex.json")
         );
         assert_eq!(
-            codex.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            codex.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.codex/agents")
         );
     }
@@ -279,7 +289,7 @@ mod tests {
     fn install_dir_agent_global_returns_home_claude_agents() {
         let paths = test_paths();
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.claude/agents")
         );
     }
@@ -288,7 +298,7 @@ mod tests {
     fn install_dir_skill_global_returns_home_claude_skills() {
         let paths = test_paths();
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.claude/skills")
         );
     }
@@ -297,7 +307,7 @@ mod tests {
     fn install_dir_agent_local_returns_relative_claude_agents() {
         let paths = test_paths();
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local).unwrap(),
             PathBuf::from(".claude/agents")
         );
     }
@@ -306,7 +316,7 @@ mod tests {
     fn install_dir_skill_local_returns_relative_claude_skills() {
         let paths = test_paths();
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Local),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Local).unwrap(),
             PathBuf::from(".claude/skills")
         );
     }
@@ -317,7 +327,7 @@ mod tests {
     fn install_dir_cursor_agent_local_returns_cursor_agents() {
         let paths = test_paths_for(Platform::Cursor);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local).unwrap(),
             PathBuf::from(".cursor/agents")
         );
     }
@@ -326,7 +336,7 @@ mod tests {
     fn install_dir_cursor_skill_local_returns_cursor_skills() {
         let paths = test_paths_for(Platform::Cursor);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Local),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Local).unwrap(),
             PathBuf::from(".cursor/skills")
         );
     }
@@ -335,7 +345,7 @@ mod tests {
     fn install_dir_cursor_agent_global_returns_home_cursor_agents() {
         let paths = test_paths_for(Platform::Cursor);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.cursor/agents")
         );
     }
@@ -344,7 +354,7 @@ mod tests {
     fn install_dir_cursor_skill_global_returns_home_cursor_skills() {
         let paths = test_paths_for(Platform::Cursor);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.cursor/skills")
         );
     }
@@ -373,7 +383,7 @@ mod tests {
     fn install_dir_copilot_agent_local_returns_github_agents() {
         let paths = test_paths_for(Platform::Copilot);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local).unwrap(),
             PathBuf::from(".github/agents")
         );
     }
@@ -382,7 +392,7 @@ mod tests {
     fn install_dir_copilot_agent_global_returns_home_copilot_agents() {
         let paths = test_paths_for(Platform::Copilot);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.copilot/agents")
         );
     }
@@ -402,7 +412,7 @@ mod tests {
     fn install_dir_windsurf_skill_global_returns_codeium_windsurf_skills() {
         let paths = test_paths_for(Platform::Windsurf);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.codeium/windsurf/skills")
         );
     }
@@ -411,7 +421,7 @@ mod tests {
     fn install_dir_windsurf_agent_local_returns_windsurf_agents() {
         let paths = test_paths_for(Platform::Windsurf);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local).unwrap(),
             PathBuf::from(".windsurf/agents")
         );
     }
@@ -431,7 +441,7 @@ mod tests {
     fn install_dir_gemini_agent_global_returns_home_gemini_agents() {
         let paths = test_paths_for(Platform::Gemini);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.gemini/agents")
         );
     }
@@ -451,7 +461,7 @@ mod tests {
     fn install_dir_opencode_agent_local_uses_singular_leaf() {
         let paths = test_paths_for(Platform::Opencode);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local).unwrap(),
             PathBuf::from(".opencode/agent")
         );
     }
@@ -460,7 +470,7 @@ mod tests {
     fn install_dir_opencode_agent_global_uses_xdg_config() {
         let paths = test_paths_for(Platform::Opencode);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.config/opencode/agent")
         );
     }
@@ -469,11 +479,11 @@ mod tests {
     fn install_dir_opencode_skill_uses_shared_dot_agents() {
         let paths = test_paths_for(Platform::Opencode);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Local),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Local).unwrap(),
             PathBuf::from(".agents/skills")
         );
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.agents/skills")
         );
     }
@@ -493,11 +503,11 @@ mod tests {
     fn install_dir_codex_agent_uses_dot_codex_agents() {
         let paths = test_paths_for(Platform::Codex);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Local),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local).unwrap(),
             PathBuf::from(".codex/agents")
         );
         assert_eq!(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.codex/agents")
         );
     }
@@ -506,7 +516,7 @@ mod tests {
     fn install_dir_codex_skill_uses_shared_dot_agents() {
         let paths = test_paths_for(Platform::Codex);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.agents/skills")
         );
     }
@@ -515,7 +525,9 @@ mod tests {
     fn installed_artifact_path_codex_agent_is_toml() {
         let paths = test_paths_for(Platform::Codex);
         assert_eq!(
-            paths.installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Global),
+            paths
+                .installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Global)
+                .unwrap(),
             PathBuf::from("/home/testuser/.codex/agents/my-agent.toml")
         );
     }
@@ -524,7 +536,9 @@ mod tests {
     fn installed_artifact_path_default_agent_is_md() {
         let paths = test_paths();
         assert_eq!(
-            paths.installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Local),
+            paths
+                .installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Local)
+                .unwrap(),
             PathBuf::from(".claude/agents/my-agent.md")
         );
     }
@@ -533,7 +547,9 @@ mod tests {
     fn installed_artifact_path_skill_is_directory() {
         let paths = test_paths_for(Platform::Codex);
         assert_eq!(
-            paths.installed_artifact_path(ArtifactKind::Skill, "my-skill", InstallScope::Local),
+            paths
+                .installed_artifact_path(ArtifactKind::Skill, "my-skill", InstallScope::Local)
+                .unwrap(),
             PathBuf::from(".agents/skills/my-skill")
         );
     }
@@ -544,7 +560,7 @@ mod tests {
     fn install_dir_pi_skill_uses_shared_dot_agents() {
         let paths = test_paths_for(Platform::Pi);
         assert_eq!(
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Local),
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Local).unwrap(),
             PathBuf::from(".agents/skills")
         );
     }

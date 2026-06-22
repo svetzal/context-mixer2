@@ -80,7 +80,9 @@ fn uninstall_one(
             continue;
         }
         let pv = ctx.paths.with_platform(platform);
-        let path = pv.installed_artifact_path(kind, name, scope);
+        let path = pv
+            .installed_artifact_path(kind, name, scope)
+            .expect("installed_artifact_path: guarded by platform.supports(kind)");
         if ctx.fs.exists(&path) {
             paths_to_delete.insert(path);
         }
@@ -250,6 +252,7 @@ mod tests {
         let agent_path = t
             .paths
             .install_dir(ArtifactKind::Agent, InstallScope::Global)
+            .unwrap()
             .join("my-agent.md");
         t.fs.add_file(agent_path.clone(), "# agent");
 
@@ -263,8 +266,11 @@ mod tests {
     fn uninstall_removes_skill_dir() {
         let t = TestContext::new();
 
-        let skill_dir =
-            t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).join("my-skill");
+        let skill_dir = t
+            .paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("my-skill");
         t.fs.add_file(skill_dir.join("SKILL.md"), "---\n---\n");
         t.fs.add_file(skill_dir.join("tool.py"), "code");
 
@@ -281,6 +287,7 @@ mod tests {
         let agent_path = t
             .paths
             .install_dir(ArtifactKind::Agent, InstallScope::Global)
+            .unwrap()
             .join("my-agent.md");
         t.fs.add_file(agent_path.clone(), "# agent");
 
@@ -314,6 +321,7 @@ mod tests {
         let agent_path = t
             .paths
             .install_dir(ArtifactKind::Agent, InstallScope::Global)
+            .unwrap()
             .join("untracked.md");
         t.fs.add_file(agent_path, "# untracked agent");
 
@@ -332,6 +340,7 @@ mod tests {
         let agent_path = t
             .paths
             .install_dir(ArtifactKind::Agent, InstallScope::Global)
+            .unwrap()
             .join("my-agent.md");
         t.fs.add_file(agent_path, "# agent");
 
@@ -350,8 +359,10 @@ mod tests {
         let paths = test_paths_for(Platform::Cursor);
 
         // Install a file at the Cursor global path
-        let agent_path =
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).join("my-agent.md");
+        let agent_path = paths
+            .install_dir(ArtifactKind::Agent, InstallScope::Global)
+            .unwrap()
+            .join("my-agent.md");
         assert_eq!(
             agent_path,
             std::path::PathBuf::from("/home/testuser/.cursor/agents/my-agent.md")
@@ -397,8 +408,9 @@ mod tests {
         let clock = FakeClock::at(chrono::Utc::now());
         let paths = test_paths_for(Platform::Codex);
 
-        let toml_path =
-            paths.installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Global);
+        let toml_path = paths
+            .installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Global)
+            .unwrap();
         assert_eq!(
             toml_path,
             std::path::PathBuf::from("/home/testuser/.codex/agents/my-agent.toml")
@@ -416,7 +428,7 @@ mod tests {
     #[test]
     fn uninstall_many_removes_each_and_reports_not_found() {
         let t = TestContext::new();
-        let skills_dir = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global);
+        let skills_dir = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
         for s in ["webapp-testing", "web-artifacts-builder"] {
             t.fs.add_file(skills_dir.join(s).join("SKILL.md"), "---\n---\n");
         }
@@ -447,8 +459,10 @@ mod tests {
         // — uninstall is cross-platform, not bound to the active platform.
         let t = TestContext::new(); // active platform = claude
         let codex = t.paths.with_platform(Platform::Codex);
-        let skill_dir =
-            codex.install_dir(ArtifactKind::Skill, InstallScope::Global).join("slack-gif");
+        let skill_dir = codex
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("slack-gif");
         t.fs.add_file(skill_dir.join("SKILL.md"), "---\n---\n");
         let mut packages = BTreeMap::new();
         packages.insert("slack-gif".to_string(), sample_lock_entry());

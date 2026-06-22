@@ -19,7 +19,8 @@ impl fmt::Display for ManifestSummary {
         writeln!(f, "Generated manifests for {} platforms:", Platform::targets().len())?;
 
         for platform in Platform::targets() {
-            let dir_name = platform.manifest_dir();
+            let dir_name =
+                platform.manifest_dir().expect("targets() platforms have a manifest_dir");
 
             let platform_files: Vec<_> = files
                 .iter()
@@ -64,7 +65,9 @@ mod tests {
 
     #[test]
     fn manifest_summary_display_with_files() {
-        let dir = Platform::targets()[0].manifest_dir();
+        let dir = Platform::targets()[0]
+            .manifest_dir()
+            .expect("targets() platforms have a manifest_dir");
         let files = vec![
             PathBuf::from(format!("/{dir}/marketplace.json")),
             PathBuf::from(format!("/{dir}/plugin.json")),

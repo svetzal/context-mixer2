@@ -66,7 +66,8 @@ pub fn generate_manifests(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<Pa
             .to_string_lossy();
 
         for platform in Platform::targets() {
-            let target_dir = containing_dir.join(platform.manifest_dir());
+            let target_dir = containing_dir
+                .join(platform.manifest_dir().expect("targets() platforms have a manifest_dir"));
             fs.create_dir_all(&target_dir)?;
 
             let target_path = target_dir.join(file_name.as_ref());
@@ -121,15 +122,17 @@ mod tests {
 
         // Root-level platform dirs should exist
         for platform in Platform::targets() {
-            let dir = PathBuf::from("/repo").join(platform.manifest_dir());
+            let dir = PathBuf::from("/repo")
+                .join(platform.manifest_dir().expect("targets() platforms have a manifest_dir"));
             assert!(fs.is_dir(&dir), "expected root-level dir {} to exist", dir.display());
         }
 
         // Per-plugin platform dirs should exist
         for plugin in &["alpha", "beta"] {
             for platform in Platform::targets() {
-                let dir =
-                    PathBuf::from(format!("/repo/plugins/{plugin}")).join(platform.manifest_dir());
+                let dir = PathBuf::from(format!("/repo/plugins/{plugin}")).join(
+                    platform.manifest_dir().expect("targets() platforms have a manifest_dir"),
+                );
                 assert!(fs.is_dir(&dir), "expected plugin dir {} to exist", dir.display());
             }
         }
@@ -151,14 +154,15 @@ mod tests {
             .unwrap();
 
         for platform in Platform::targets() {
-            let target_path =
-                PathBuf::from("/repo").join(platform.manifest_dir()).join("marketplace.json");
+            let target_path = PathBuf::from("/repo")
+                .join(platform.manifest_dir().expect("targets() platforms have a manifest_dir"))
+                .join("marketplace.json");
             let target_content = fs.read_to_string(&target_path).unwrap();
+            let dir_name =
+                platform.manifest_dir().expect("targets() platforms have a manifest_dir");
             assert_eq!(
-                source_content,
-                target_content,
-                "marketplace.json content should match for {}",
-                platform.manifest_dir()
+                source_content, target_content,
+                "marketplace.json content should match for {dir_name}"
             );
         }
     }
@@ -176,15 +180,14 @@ mod tests {
         generate_manifests(&root, &fs).unwrap();
 
         for platform in Platform::targets() {
-            let target_path = PathBuf::from("/repo/plugins/alpha")
-                .join(platform.manifest_dir())
-                .join("plugin.json");
+            let dir_name =
+                platform.manifest_dir().expect("targets() platforms have a manifest_dir");
+            let target_path =
+                PathBuf::from("/repo/plugins/alpha").join(dir_name).join("plugin.json");
             let target_content = fs.read_to_string(&target_path).unwrap();
             assert_eq!(
-                plugin_content,
-                target_content,
-                "plugin.json content should match for {}",
-                platform.manifest_dir()
+                plugin_content, target_content,
+                "plugin.json content should match for {dir_name}"
             );
         }
     }
@@ -214,9 +217,15 @@ mod tests {
         for platform in Platform::targets() {
             let count = written
                 .iter()
-                .filter(|p| p.components().any(|c| c.as_os_str() == platform.manifest_dir()))
+                .filter(|p| {
+                    let dir =
+                        platform.manifest_dir().expect("targets() platforms have a manifest_dir");
+                    p.components().any(|c| c.as_os_str() == dir)
+                })
                 .count();
-            assert_eq!(count, 3, "expected 3 files for {}, got {count}", platform.manifest_dir());
+            let dir_name =
+                platform.manifest_dir().expect("targets() platforms have a manifest_dir");
+            assert_eq!(count, 3, "expected 3 files for {dir_name}, got {count}");
         }
     }
 

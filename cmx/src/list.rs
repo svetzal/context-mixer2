@@ -238,7 +238,7 @@ mod tests {
         t.fs.add_file("/src/shared/SKILL.md", versioned_skill_content("s", "1.0.0"));
         for platform in [Platform::Codex, Platform::Pi] {
             let pv = t.paths.with_platform(platform);
-            let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global);
+            let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
             t.fs.add_file(
                 dir.join("shared").join("SKILL.md"),
                 versioned_skill_content("s", "1.0.0"),
@@ -277,10 +277,17 @@ mod tests {
         let t = TestContext::new();
         crate::test_support::setup_empty_sources(&t.fs, &t.paths);
         // A hand-authored skill (mine) and a vendor skill in ~/.hermes/skills.
-        let mine = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).join("mine");
+        let mine = t
+            .paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("mine");
         t.fs.add_file(mine.join("SKILL.md"), versioned_skill_content("m", "1.0.0"));
         let hermes = t.paths.with_platform(Platform::Hermes);
-        let vendored = hermes.install_dir(ArtifactKind::Skill, InstallScope::Global).join("apple");
+        let vendored = hermes
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("apple");
         t.fs.add_file(vendored.join("SKILL.md"), versioned_skill_content("a", "1.0.0"));
         // Declare the Hermes directory external.
         let cfg = crate::types::CmxConfig {

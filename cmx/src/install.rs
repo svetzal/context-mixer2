@@ -269,7 +269,9 @@ fn plan_install(
     found: &source_iter::SourceArtifact,
     paths: &ConfigPaths,
 ) -> InstallPlan {
-    let dest_dir = paths.install_dir(kind, scope);
+    let dest_dir = paths
+        .install_dir(kind, scope)
+        .expect("install_dir: caller must gate on ensure_supports() before plan_install");
     let relative_path = types::relative_path_string(&found.artifact.path, &found.source_root);
     InstallPlan {
         artifact_name: artifact_name.to_string(),
@@ -315,7 +317,10 @@ fn check_local_modifications(
     lock_entry: Option<&LockEntry>,
     ctx: &AppContext<'_>,
 ) -> Result<bool> {
-    let dest_check = ctx.paths.installed_artifact_path(kind, artifact_name, scope);
+    let dest_check = ctx
+        .paths
+        .installed_artifact_path(kind, artifact_name, scope)
+        .expect("installed_artifact_path: caller must gate on ensure_supports()");
     if ctx.fs.exists(&dest_check) {
         if let Some(entry) = lock_entry {
             return checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs);

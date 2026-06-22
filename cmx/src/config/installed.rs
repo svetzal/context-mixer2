@@ -36,9 +36,8 @@ pub fn installed_names(
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<Vec<String>> {
-    let dir = match paths.install_dir(kind, scope) {
-        Some(d) => d,
-        None => return Ok(Vec::new()),
+    let Some(dir) = paths.install_dir(kind, scope) else {
+        return Ok(Vec::new());
     };
     if !fs.exists(&dir) {
         return Ok(Vec::new());
@@ -249,11 +248,17 @@ mod tests {
         let paths = test_paths();
         // Install in both scopes
         fs.add_file(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap().join("my-agent.md"),
+            paths
+                .install_dir(ArtifactKind::Agent, InstallScope::Global)
+                .unwrap()
+                .join("my-agent.md"),
             "global",
         );
         fs.add_file(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Local).unwrap().join("my-agent.md"),
+            paths
+                .install_dir(ArtifactKind::Agent, InstallScope::Local)
+                .unwrap()
+                .join("my-agent.md"),
             "local",
         );
 
@@ -266,8 +271,10 @@ mod tests {
     fn find_installed_path_finds_skill_directory() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let skill_dir =
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join("my-skill");
+        let skill_dir = paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("my-skill");
         fs.add_file(skill_dir.join("SKILL.md"), "---\n---\n");
 
         let result = find_installed_path("my-skill", ArtifactKind::Skill, &fs, &paths);

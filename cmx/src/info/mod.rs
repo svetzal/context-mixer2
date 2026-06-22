@@ -841,7 +841,11 @@ mod tests {
     // --- activation trigger + kind-scoped lookup ---
 
     fn install_skill_on_disk(t: &TestContext, name: &str, desc: &str) -> PathBuf {
-        let dir = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join(name);
+        let dir = t
+            .paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join(name);
         t.fs.add_file(dir.join("SKILL.md"), crate::test_support::skill_content(desc));
         dir
     }
@@ -878,7 +882,10 @@ mod tests {
         // not just the active one (Claude in tests) — else it can't describe it.
         let t = TestContext::new();
         let pv = t.paths.with_platform(Platform::Hermes);
-        let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join("productivity");
+        let dir = pv
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("productivity");
         t.fs.add_file(dir.join("SKILL.md"), crate::test_support::skill_content("Use when busy"));
         setup_empty_sources(&t.fs, &t.paths);
 

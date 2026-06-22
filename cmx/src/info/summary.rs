@@ -108,7 +108,10 @@ mod tests {
         let paths = test_paths();
         let llm = FakeLlmClient::new("It packages curated context.");
 
-        let dir = paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join("my-skill");
+        let dir = paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("my-skill");
         fs.add_file(dir.join("SKILL.md"), crate::test_support::skill_content("Use when X"));
 
         let mut info = minimal_info("my-skill", ArtifactKind::Skill);
@@ -181,7 +184,10 @@ mod tests {
         let paths = test_paths();
         let llm = FakeLlmClient::new("unused");
 
-        let dir = paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join("empty");
+        let dir = paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("empty");
         fs.add_dir(&dir); // exists but has no markdown content
 
         let mut info = minimal_info("empty", ArtifactKind::Skill);
