@@ -8,9 +8,10 @@ impl fmt::Display for InstallResult {
         let version_info = format_version_prefix(self.version.as_deref());
         writeln!(
             f,
-            "Installed {}{version_info} ({}) from '{}' -> {}",
+            "Installed {}{version_info} ({}) for {} from '{}' -> {}",
             self.artifact_name,
             self.kind,
+            self.platform,
             self.source_name,
             self.dest_dir.display()
         )
@@ -65,6 +66,7 @@ mod tests {
             source_name: "guidelines".to_string(),
             dest_dir: PathBuf::from("/home/user/.claude/agents"),
             version: Some("1.2.3".to_string()),
+            platform: crate::platform::Platform::Claude,
         };
         let out = r.to_string();
         assert!(out.contains("my-agent"));
@@ -101,6 +103,7 @@ mod tests {
                 source_name: "src".to_string(),
                 dest_dir: PathBuf::from("/home/user/.claude/skills"),
                 version: None,
+                platform: crate::platform::Platform::Claude,
             }],
             kind: ArtifactKind::Skill,
             is_update: false,

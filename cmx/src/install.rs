@@ -6,8 +6,8 @@ use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
 use crate::lockfile;
-use crate::partition::{Partitioned, partition_by};
 use crate::paths::ConfigPaths;
+use crate::platform::Platform;
 use crate::source_iter;
 use crate::types::{self, ArtifactKind, InstallScope, LockEntry, LockSource};
 
@@ -22,6 +22,8 @@ pub struct InstallResult {
     pub kind: ArtifactKind,
     pub source_name: String,
     pub dest_dir: PathBuf,
+    /// The platform this copy was installed for.
+    pub platform: Platform,
 }
 
 #[derive(Debug)]
@@ -135,26 +137,85 @@ pub fn install(
         kind,
         source_name: plan.source_name,
         dest_dir: plan.dest_dir,
+        platform: ctx.paths.platform,
     })
 }
 
-/// Install several named artifacts in one pass. Best-effort: each name is
-/// installed independently; failures (not found, ambiguous, locally modified
-/// without `--force`) are collected with their reason rather than aborting the
-/// batch. Backs `cmx {skill,agent} install <name>...`.
+/// Resolve the platforms an install targets, given the optional `--platform`
+/// selector.
+///
+/// - `Some(p)` — exactly that platform (a later `ensure_supports` check fails
+///   loudly if it can't host `kind`).
+/// - `None` — every platform already **in use** (a non-empty lock file at
+///   `scope`) that supports `kind`, so a default install lands in the tools you
+///   actually use rather than scattering into all supported tools. Falls back
+///   to `[Claude]` when nothing is tracked yet, so a first-ever install still
+///   has a sensible home.
+pub fn resolve_targets(
+    selector: Option<Platform>,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<Platform>> {
+    if let Some(p) = selector {
+        return Ok(vec![p]);
+    }
+    let mut targets = Vec::new();
+    for platform in Platform::ALL {
+        if !platform.supports(kind) {
+            continue;
+        }
+        let pv = ctx.paths.with_platform(platform);
+        if !lockfile::load(scope, ctx.fs, &pv)?.packages.is_empty() {
+            targets.push(platform);
+        }
+    }
+    if targets.is_empty() {
+        targets.push(Platform::Claude);
+    }
+    Ok(targets)
+}
+
+/// Install several named artifacts in one pass, into each of `targets`.
+///
+/// Best-effort along two axes: each name is installed independently, and each
+/// target platform is attempted independently. A name yields one
+/// [`InstallResult`] per platform it lands on. A name is only recorded as
+/// `failed` when it fails on **every** target (e.g. not found in any source,
+/// ambiguous) — a per-platform failure (such as a locally-modified copy on one
+/// tool) doesn't discard the successes on the others. Backs
+/// `cmx {skill,agent} install <name>...`.
 pub fn install_many(
     names: &[String],
     kind: ArtifactKind,
     scope: InstallScope,
     force: bool,
+    targets: &[Platform],
     ctx: &AppContext<'_>,
 ) -> Result<InstallManyResult> {
-    let (installed, failed) = partition_by(names, |name| {
-        Ok(match install(name, kind, scope, force, ctx) {
-            Ok(r) => Partitioned::Kept(r),
-            Err(e) => Partitioned::Excluded((name.to_string(), e.to_string())),
-        })
-    })?;
+    let mut installed = Vec::new();
+    let mut failed = Vec::new();
+    for name in names {
+        let mut landed = false;
+        let mut last_err: Option<String> = None;
+        for &platform in targets {
+            let pv = ctx.paths.with_platform(platform);
+            let pctx = ctx.with_paths(&pv);
+            match install(name, kind, scope, force, &pctx) {
+                Ok(r) => {
+                    landed = true;
+                    installed.push(r);
+                }
+                Err(e) => last_err = Some(e.to_string()),
+            }
+        }
+        if !landed {
+            failed.push((
+                name.clone(),
+                last_err.unwrap_or_else(|| "no target platforms".to_string()),
+            ));
+        }
+    }
     Ok(InstallManyResult {
         kind,
         installed,
@@ -177,7 +238,29 @@ pub fn update(
     install(&pinned, kind, scope, force, ctx)
 }
 
+/// Install every available artifact of `kind` from the sources into each of
+/// `targets`, concatenating the per-platform results.
 pub fn install_all(
+    kind: ArtifactKind,
+    scope: InstallScope,
+    force: bool,
+    targets: &[Platform],
+    ctx: &AppContext<'_>,
+) -> Result<BatchInstallResult> {
+    let mut items = Vec::new();
+    for &platform in targets {
+        let pv = ctx.paths.with_platform(platform);
+        let pctx = ctx.with_paths(&pv);
+        items.extend(install_all_one(kind, scope, force, &pctx)?.items);
+    }
+    Ok(BatchInstallResult {
+        items,
+        kind,
+        is_update: false,
+    })
+}
+
+fn install_all_one(
     kind: ArtifactKind,
     scope: InstallScope,
     force: bool,

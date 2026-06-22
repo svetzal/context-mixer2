@@ -12,6 +12,7 @@ fn install_result_display_with_version() {
         source_name: "guidelines".to_string(),
         dest_dir: PathBuf::from("/home/user/.config/cmx/agents"),
         version: Some("1.0.0".to_string()),
+        platform: Platform::Claude,
     };
     let out = result.to_string();
     assert!(out.contains("my-agent"));
@@ -27,6 +28,7 @@ fn install_result_display_without_version() {
         source_name: "guidelines".to_string(),
         dest_dir: PathBuf::from("/home/user/.config/cmx/agents"),
         version: None,
+        platform: Platform::Claude,
     };
     let out = result.to_string();
     assert!(!out.contains(" v"));
@@ -55,6 +57,7 @@ fn batch_install_result_display_with_items() {
             source_name: "guidelines".to_string(),
             dest_dir: PathBuf::from("/home/user/.config/cmx/agents"),
             version: Some("1.0.0".to_string()),
+            platform: Platform::Claude,
         }],
         kind: ArtifactKind::Agent,
         is_update: false,
@@ -87,6 +90,7 @@ fn batch_install_result_display_update_with_items() {
             source_name: "guidelines".to_string(),
             dest_dir: PathBuf::from("/home/user/.config/cmx/skills"),
             version: None,
+            platform: Platform::Claude,
         }],
         kind: ArtifactKind::Skill,
         is_update: true,
@@ -275,6 +279,7 @@ fn install_many_installs_each_and_collects_failures() {
         ArtifactKind::Skill,
         InstallScope::Global,
         false,
+        &[Platform::Claude],
         &ctx,
     )
     .unwrap();
@@ -836,10 +841,13 @@ fn install_all_skips_artifact_when_source_checksum_and_version_match_lock() {
 
     let ctx = t.ctx();
     // First install — records checksum and version
-    install_all(ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install_all(ArtifactKind::Agent, InstallScope::Global, false, &[Platform::Claude], &ctx)
+        .unwrap();
 
     // Second install_all — source hasn't changed, so artifact should be skipped
-    let result = install_all(ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    let result =
+        install_all(ArtifactKind::Agent, InstallScope::Global, false, &[Platform::Claude], &ctx)
+            .unwrap();
     assert!(
         result.items.is_empty(),
         "install_all should skip artifact whose lock source_checksum+version match"
@@ -855,7 +863,8 @@ fn install_all_reinstalls_artifact_when_source_checksum_changed() {
 
     let ctx = t.ctx();
     // First install
-    install_all(ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install_all(ArtifactKind::Agent, InstallScope::Global, false, &[Platform::Claude], &ctx)
+        .unwrap();
 
     // Now change the source file — checksum will differ
     t.fs.add_file(
@@ -863,7 +872,9 @@ fn install_all_reinstalls_artifact_when_source_checksum_changed() {
         agent_content("my-agent", "Updated description"),
     );
 
-    let result = install_all(ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    let result =
+        install_all(ArtifactKind::Agent, InstallScope::Global, false, &[Platform::Claude], &ctx)
+            .unwrap();
     assert_eq!(
         result.items.len(),
         1,
@@ -1072,4 +1083,82 @@ fn install_opencode_skill_lands_in_shared_dot_agents() {
 
     let dest = PathBuf::from(".agents/skills/my-skill/SKILL.md");
     assert!(fs.file_exists(&dest), "opencode skill should land in shared .agents/skills");
+}
+
+// --- resolve_targets: which platforms a default vs constrained op acts on ---
+
+#[test]
+fn resolve_targets_explicit_selector_returns_just_that_platform() {
+    let t = TestContext::new();
+    let ctx = t.ctx();
+    let targets =
+        resolve_targets(Some(Platform::Codex), ArtifactKind::Skill, InstallScope::Global, &ctx)
+            .unwrap();
+    assert_eq!(targets, vec![Platform::Codex]);
+}
+
+#[test]
+fn resolve_targets_default_with_nothing_tracked_falls_back_to_claude() {
+    let t = TestContext::new();
+    let ctx = t.ctx();
+    let targets = resolve_targets(None, ArtifactKind::Skill, InstallScope::Global, &ctx).unwrap();
+    assert_eq!(
+        targets,
+        vec![Platform::Claude],
+        "a first-ever install should land on Claude rather than nowhere"
+    );
+}
+
+#[test]
+fn resolve_targets_default_includes_platforms_already_in_use() {
+    let t = TestContext::new();
+    // Mark Codex as "in use" by giving its lock a tracked entry, but leave
+    // Claude's lock empty.
+    let codex = t.paths.with_platform(Platform::Codex);
+    crate::test_support::save_lock_with_entry(
+        &t.fs,
+        &codex,
+        "already-there",
+        crate::test_support::sample_lock_entry(),
+        InstallScope::Global,
+    );
+
+    let ctx = t.ctx();
+    let targets = resolve_targets(None, ArtifactKind::Skill, InstallScope::Global, &ctx).unwrap();
+
+    assert!(targets.contains(&Platform::Codex), "Codex is in use → targeted");
+    assert!(
+        !targets.contains(&Platform::Claude),
+        "Claude has nothing tracked → not targeted"
+    );
+}
+
+#[test]
+fn install_many_fans_out_to_every_target_platform() {
+    let t = TestContext::new();
+    setup_source_with_skill(&t.fs, &t.paths, "src", "/src", "shared-skill", "1.0.0");
+    let ctx = t.ctx();
+
+    let result = install_many(
+        &["shared-skill".to_string()],
+        ArtifactKind::Skill,
+        InstallScope::Global,
+        false,
+        &[Platform::Claude, Platform::Codex],
+        &ctx,
+    )
+    .unwrap();
+
+    // One InstallResult per platform, each naming its own platform.
+    assert_eq!(result.installed.len(), 2);
+    let platforms: Vec<Platform> = result.installed.iter().map(|r| r.platform).collect();
+    assert!(platforms.contains(&Platform::Claude) && platforms.contains(&Platform::Codex));
+    assert!(result.failed.is_empty());
+
+    // Both platforms' lock files now track it.
+    for p in [Platform::Claude, Platform::Codex] {
+        let pv = t.paths.with_platform(p);
+        let lock = crate::lockfile::load(InstallScope::Global, &t.fs, &pv).unwrap();
+        assert!(lock.packages.contains_key("shared-skill"), "{p} should track the skill");
+    }
 }

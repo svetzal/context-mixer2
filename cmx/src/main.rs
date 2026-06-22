@@ -8,6 +8,7 @@ use cmx::cli::{
 use cmx::context::AppContext;
 use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use cmx::paths::ConfigPaths;
+use cmx::platform::Platform;
 use cmx::types::{ArtifactKind, InstallScope};
 
 #[cfg(feature = "llm")]
@@ -15,7 +16,11 @@ use cmx::gateway::real::MojenticLlmClient;
 
 fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
-    let paths = ConfigPaths::from_env(cli.platform)?;
+    // Path resolution needs one concrete "active" platform; absent `--platform`,
+    // Claude is the canonical base (config_dir/home are platform-independent, so
+    // this only affects single-platform commands like info/update/adopt).
+    let active = cli.platform.unwrap_or(Platform::Claude);
+    let paths = ConfigPaths::from_env(active)?;
 
     let ctx = AppContext {
         fs: &RealFilesystem,
@@ -29,12 +34,16 @@ fn main() -> Result<ExitCode> {
 }
 
 fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> {
-    match cli.command {
+    let Cli {
+        platform: selector,
+        command,
+    } = cli;
+    match command {
         Commands::Source { action } => {
             handle_source(action, paths, ctx).map(|()| ExitCode::SUCCESS)
         }
-        Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, ctx),
-        Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, ctx),
+        Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, selector, ctx),
+        Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, selector, ctx),
         Commands::List { all } => {
             let output = cmx::list::list_all(all, ctx)?;
             print!("{output}");
@@ -210,6 +219,7 @@ fn build_llm_runtime(ctx: &AppContext<'_>) -> Result<LlmRuntime> {
 fn handle_artifact(
     action: ArtifactAction,
     kind: ArtifactKind,
+    selector: Option<Platform>,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
     match action {
@@ -225,14 +235,15 @@ fn handle_artifact(
                 InstallScope::Global
             };
             cmx::source_update::ensure_fresh(ctx)?;
+            let targets = cmx::install::resolve_targets(selector, kind, scope, ctx)?;
             if all {
-                let result = cmx::install::install_all(kind, scope, force, ctx)?;
+                let result = cmx::install::install_all(kind, scope, force, &targets, ctx)?;
                 print!("{result}");
                 Ok(ExitCode::SUCCESS)
             } else if names.is_empty() {
                 bail!("Provide artifact name(s) or use --all")
             } else {
-                let result = cmx::install::install_many(&names, kind, scope, force, ctx)?;
+                let result = cmx::install::install_many(&names, kind, scope, force, &targets, ctx)?;
                 let any_failed = !result.failed.is_empty();
                 print!("{result}");
                 Ok(if any_failed {
@@ -282,7 +293,7 @@ fn handle_artifact(
             } else {
                 InstallScope::Global
             };
-            let result = cmx::uninstall::uninstall_many(&names, kind, scope, ctx)?;
+            let result = cmx::uninstall::uninstall_many(&names, kind, scope, selector, ctx)?;
             let none_removed = result.removed.is_empty();
             print!("{result}");
             // Exit non-zero only if nothing at all was removed (e.g. all typos).
@@ -392,6 +403,7 @@ mod tests {
                 force: false,
             },
             ArtifactKind::Agent,
+            None,
             &ctx,
         );
         assert!(result.is_err());
@@ -412,6 +424,7 @@ mod tests {
                 force: false,
             },
             ArtifactKind::Agent,
+            None,
             &ctx,
         );
         assert!(result.is_ok(), "expected Ok, not Err: {:?}", result.err());
@@ -429,6 +442,7 @@ mod tests {
                 force: false,
             },
             ArtifactKind::Agent,
+            None,
             &ctx,
         );
         assert!(result.is_err());
@@ -444,6 +458,7 @@ mod tests {
                 local: false,
             },
             ArtifactKind::Agent,
+            None,
             &ctx,
         );
         assert!(result.is_err());
@@ -584,7 +599,7 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let cli = Cli {
-            platform: Platform::Claude,
+            platform: Some(Platform::Claude),
             command: Commands::List { all: false },
         };
         assert!(run(cli, &ctx, &paths).is_ok());
@@ -595,7 +610,7 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let cli = Cli {
-            platform: Platform::Claude,
+            platform: Some(Platform::Claude),
             command: Commands::Outdated,
         };
         assert!(run(cli, &ctx, &paths).is_ok());
@@ -635,7 +650,7 @@ mod tests {
 
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let cli = Cli {
-            platform: Platform::Claude,
+            platform: Some(Platform::Claude),
             command: Commands::Outdated,
         };
         run(cli, &ctx, &paths).unwrap();
@@ -669,7 +684,7 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let cli = Cli {
-            platform: Platform::Claude,
+            platform: Some(Platform::Claude),
             command: Commands::Search {
                 query: "foo".to_string(),
             },
@@ -682,7 +697,7 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let cli = Cli {
-            platform: Platform::Claude,
+            platform: Some(Platform::Claude),
             command: Commands::Doctor {
                 local: false,
                 adopt_all: false,
@@ -705,7 +720,7 @@ mod tests {
         );
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let cli = Cli {
-            platform: Platform::Claude,
+            platform: Some(Platform::Claude),
             command: Commands::Doctor {
                 local: false,
                 adopt_all: false,

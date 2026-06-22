@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`install` and `uninstall` are now multi-platform by default.** With no `--platform`, `cmx {skill,agent} install` lands the artifact on every platform already **in use** — those with tracked artifacts at the target scope — so a new install joins the tools you actually use (e.g. Claude + Codex + Hermes) and stays in sync across them; it falls back to Claude when nothing is tracked yet. Pass `--platform <tool>` to constrain the install to one platform (which also onboards a new tool). Previously a bare install only ever targeted Claude. Each landing is reported on its own line, naming the platform.
+- **`cmx {skill,agent} uninstall` now honours `--platform`.** Without it, uninstall still sweeps every platform (removing the artifact wherever it's tracked); with `--platform <tool>` it removes only from that platform, leaving the others intact. Previously `--platform` was ignored on uninstall, so there was no way to remove an artifact from just one tool. Together these make it possible to reconcile a divergent set of skills between, say, Claude and Codex.
 - Artifact frontmatter is now parsed with `serde_yaml_ng` — a real YAML library — instead of hand-rolled line-prefix matching. This correctly handles single-quoted strings, inline comments, numeric/bool scalars, and flow-style mapping blocks that the previous implementation silently mishandled.
 
 ### Fixed

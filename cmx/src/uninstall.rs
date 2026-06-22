@@ -68,6 +68,7 @@ fn uninstall_one(
     name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
+    only: Option<Platform>,
     ctx: &AppContext<'_>,
 ) -> Result<Option<UninstallResult>> {
     // Distinct physical locations to delete (the shared `.agents/skills` dir
@@ -75,7 +76,14 @@ fn uninstall_one(
     let mut paths_to_delete: BTreeSet<PathBuf> = BTreeSet::new();
     let mut removed_from: Vec<Platform> = Vec::new();
 
-    for platform in Platform::ALL {
+    // `--platform` narrows the operation to a single platform; without it we
+    // sweep every platform, removing the artifact wherever it's tracked.
+    let candidates: Vec<Platform> = match only {
+        Some(p) => vec![p],
+        None => Platform::ALL.to_vec(),
+    };
+
+    for platform in candidates {
         if !platform.supports(kind) {
             continue;
         }
@@ -115,32 +123,37 @@ fn uninstall_one(
     }))
 }
 
-/// Uninstall a single named artifact, erroring if it isn't installed anywhere.
+/// Uninstall a single named artifact, erroring if it isn't installed anywhere
+/// in the targeted scope (across all platforms, or just `only` when set).
 pub fn uninstall(
     name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
+    only: Option<Platform>,
     ctx: &AppContext<'_>,
 ) -> Result<UninstallResult> {
-    uninstall_one(name, kind, scope, ctx)?.ok_or_else(|| {
-        anyhow::anyhow!(
-            "No {kind} named '{name}' found in {} scope on any platform.",
-            scope.label()
-        )
+    let where_ = match only {
+        Some(p) => format!("the {p} platform"),
+        None => "any platform".to_string(),
+    };
+    uninstall_one(name, kind, scope, only, ctx)?.ok_or_else(|| {
+        anyhow::anyhow!("No {kind} named '{name}' found in {} scope on {where_}.", scope.label())
     })
 }
 
 /// Uninstall several named artifacts in one pass. Best-effort: each name is
-/// removed everywhere it's tracked; names not installed anywhere are collected
-/// into `not_found` rather than aborting the batch.
+/// removed everywhere it's tracked (or just from `only` when set); names not
+/// installed in range are collected into `not_found` rather than aborting the
+/// batch.
 pub fn uninstall_many(
     names: &[String],
     kind: ArtifactKind,
     scope: InstallScope,
+    only: Option<Platform>,
     ctx: &AppContext<'_>,
 ) -> Result<BatchUninstallResult> {
     let (removed, not_found) = partition_by(names, |name| {
-        Ok(match uninstall_one(name, kind, scope, ctx)? {
+        Ok(match uninstall_one(name, kind, scope, only, ctx)? {
             Some(r) => Partitioned::Kept(r),
             None => Partitioned::Excluded(name.to_string()),
         })
@@ -201,7 +214,8 @@ mod tests {
         let t = TestContext::new();
         let ctx = t.ctx();
 
-        let result = uninstall("nonexistent", ArtifactKind::Agent, InstallScope::Global, &ctx);
+        let result =
+            uninstall("nonexistent", ArtifactKind::Agent, InstallScope::Global, None, &ctx);
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("nonexistent"), "unexpected: {msg}");
@@ -224,7 +238,8 @@ mod tests {
 
         let ctx = t.ctx();
         let result =
-            uninstall("skill-writing", ArtifactKind::Skill, InstallScope::Global, &ctx).unwrap();
+            uninstall("skill-writing", ArtifactKind::Skill, InstallScope::Global, None, &ctx)
+                .unwrap();
 
         assert!(result.was_tracked, "the stale lock entry was tracked");
         assert!(!result.was_on_disk, "the file was already gone");
@@ -240,7 +255,7 @@ mod tests {
     fn uninstall_bails_when_neither_on_disk_nor_tracked() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        let result = uninstall("ghost", ArtifactKind::Skill, InstallScope::Global, &ctx);
+        let result = uninstall("ghost", ArtifactKind::Skill, InstallScope::Global, None, &ctx);
         assert!(result.is_err(), "nothing on disk and no lock entry → bail");
         assert!(result.unwrap_err().to_string().contains("ghost"));
     }
@@ -257,7 +272,7 @@ mod tests {
         t.fs.add_file(agent_path.clone(), "# agent");
 
         let ctx = t.ctx();
-        uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
+        uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, None, &ctx).unwrap();
 
         assert!(!t.fs.file_exists(&agent_path), "agent file should be removed");
     }
@@ -275,7 +290,7 @@ mod tests {
         t.fs.add_file(skill_dir.join("tool.py"), "code");
 
         let ctx = t.ctx();
-        uninstall("my-skill", ArtifactKind::Skill, InstallScope::Global, &ctx).unwrap();
+        uninstall("my-skill", ArtifactKind::Skill, InstallScope::Global, None, &ctx).unwrap();
 
         assert!(!t.fs.file_exists(&skill_dir.join("SKILL.md")), "skill dir should be removed");
     }
@@ -302,7 +317,7 @@ mod tests {
 
         let ctx = t.ctx();
         let result =
-            uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
+            uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, None, &ctx).unwrap();
 
         // Verify result fields
         assert_eq!(result.name, "my-agent");
@@ -326,7 +341,7 @@ mod tests {
         t.fs.add_file(agent_path, "# untracked agent");
 
         let ctx = t.ctx();
-        let result = uninstall("untracked", ArtifactKind::Agent, InstallScope::Global, &ctx);
+        let result = uninstall("untracked", ArtifactKind::Agent, InstallScope::Global, None, &ctx);
         assert!(result.is_ok(), "uninstall should succeed even without lock entry");
 
         let result = result.unwrap();
@@ -345,7 +360,7 @@ mod tests {
         t.fs.add_file(agent_path, "# agent");
 
         let ctx = t.ctx();
-        let result = uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx);
+        let result = uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, None, &ctx);
         assert!(result.is_ok(), "uninstall_with should succeed: {:?}", result.err());
     }
 
@@ -388,7 +403,7 @@ mod tests {
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result =
-            uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
+            uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, None, &ctx).unwrap();
 
         assert_eq!(result.name, "my-agent");
         assert!(result.was_tracked);
@@ -419,7 +434,7 @@ mod tests {
 
         let ctx = make_ctx(&fs, &git, &clock, &paths);
         let result =
-            uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
+            uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, None, &ctx).unwrap();
 
         assert_eq!(result.name, "my-agent");
         assert!(!fs.file_exists(&toml_path), "codex agent TOML should be removed");
@@ -442,6 +457,7 @@ mod tests {
             ],
             ArtifactKind::Skill,
             InstallScope::Global,
+            None,
             &ctx,
         )
         .unwrap();
@@ -479,12 +495,51 @@ mod tests {
 
         let ctx = t.ctx();
         let result =
-            uninstall("slack-gif", ArtifactKind::Skill, InstallScope::Global, &ctx).unwrap();
+            uninstall("slack-gif", ArtifactKind::Skill, InstallScope::Global, None, &ctx).unwrap();
 
         assert!(result.was_on_disk, "the shared .agents/skills copy was removed");
         assert!(result.platforms.contains(&Platform::Codex), "codex lock entry cleared");
         assert!(!t.fs.file_exists(&skill_dir.join("SKILL.md")), "physical copy gone");
         let codex_lock = lockfile::load(InstallScope::Global, &t.fs, &codex).unwrap();
         assert!(!codex_lock.packages.contains_key("slack-gif"), "codex lock entry removed");
+    }
+
+    #[test]
+    fn uninstall_with_platform_only_clears_that_platform() {
+        // The same agent is tracked on both Claude and Codex.
+        let t = TestContext::new();
+        let claude = t.paths.with_platform(Platform::Claude);
+        let codex = t.paths.with_platform(Platform::Codex);
+        for pv in [&claude, &codex] {
+            let mut packages = BTreeMap::new();
+            packages.insert("my-agent".to_string(), sample_lock_entry());
+            lockfile::save(
+                &LockFile {
+                    version: 1,
+                    packages,
+                },
+                InstallScope::Global,
+                &t.fs,
+                pv,
+            )
+            .unwrap();
+        }
+
+        // Constrain the uninstall to Codex only.
+        let ctx = t.ctx();
+        let result = uninstall(
+            "my-agent",
+            ArtifactKind::Agent,
+            InstallScope::Global,
+            Some(Platform::Codex),
+            &ctx,
+        )
+        .unwrap();
+
+        assert_eq!(result.platforms, vec![Platform::Codex], "only Codex was touched");
+        let codex_lock = lockfile::load(InstallScope::Global, &t.fs, &codex).unwrap();
+        let claude_lock = lockfile::load(InstallScope::Global, &t.fs, &claude).unwrap();
+        assert!(!codex_lock.packages.contains_key("my-agent"), "Codex entry removed");
+        assert!(claude_lock.packages.contains_key("my-agent"), "Claude entry left intact");
     }
 }

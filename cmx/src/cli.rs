@@ -11,9 +11,13 @@ use crate::platform::Platform;
     version
 )]
 pub struct Cli {
-    /// Target AI coding assistant platform (env: `CMX_PLATFORM`)
-    #[arg(long, value_enum, global = true, default_value_t = Platform::Claude, env = "CMX_PLATFORM")]
-    pub platform: Platform,
+    /// Target AI coding assistant platform (env: `CMX_PLATFORM`).
+    ///
+    /// When omitted, `install`/`uninstall` act across every platform already in
+    /// use (those with tracked artifacts); other commands default to Claude.
+    /// Pass this to constrain an operation to a single platform.
+    #[arg(long, value_enum, global = true, env = "CMX_PLATFORM")]
+    pub platform: Option<Platform>,
 
     #[command(subcommand)]
     pub command: Commands,
