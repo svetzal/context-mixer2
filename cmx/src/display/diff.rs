@@ -43,11 +43,17 @@ impl fmt::Display for DiffOutput {
             writeln!(f)?;
         }
 
-        if let Some(diff) = &self.diff_text {
-            if !diff.is_empty() {
-                writeln!(f, "Diff  (\u{2212} {}, + installed):", self.source_name)?;
-                write!(f, "{diff}")?;
-                writeln!(f)?;
+        // The full line-by-line diff is the firehose — only on request. The
+        // header, file summary, and analysis already convey the shape; `--full`
+        // is there when the exact lines matter.
+        let has_diff = self.diff_text.as_ref().is_some_and(|d| !d.is_empty());
+        if self.show_full {
+            if let Some(diff) = &self.diff_text {
+                if !diff.is_empty() {
+                    writeln!(f, "Diff  (\u{2212} {}, + installed):", self.source_name)?;
+                    write!(f, "{diff}")?;
+                    writeln!(f)?;
+                }
             }
         }
 
@@ -59,6 +65,10 @@ impl fmt::Display for DiffOutput {
                     writeln!(f, "      ({note})")?;
                 }
             }
+        }
+
+        if has_diff && !self.show_full {
+            writeln!(f, "\n(run with --full to see the line-by-line diff)")?;
         }
 
         Ok(())
@@ -114,6 +124,7 @@ mod tests {
                     note: Some("--force overwrites the installed local edits".to_string()),
                 },
             ],
+            show_full: false,
         }
     }
 
@@ -157,5 +168,26 @@ mod tests {
             "update direction: {out}"
         );
         assert!(out.contains("--force overwrites"), "caveat shown: {out}");
+    }
+
+    #[test]
+    fn compact_default_hides_raw_diff_and_hints_at_full() {
+        let out = diverged().to_string();
+        assert!(!out.contains("Diff  (\u{2212} home"), "raw diff hidden by default: {out}");
+        assert!(!out.contains("+ new"), "raw diff lines hidden: {out}");
+        assert!(out.contains("run with --full"), "hints at --full: {out}");
+        // The digestible parts still show.
+        assert!(out.contains("Changed files"), "summary table kept: {out}");
+        assert!(out.contains("Summary:"), "analysis kept: {out}");
+    }
+
+    #[test]
+    fn full_shows_raw_diff_and_drops_the_hint() {
+        let mut r = diverged();
+        r.show_full = true;
+        let out = r.to_string();
+        assert!(out.contains("Diff  (\u{2212} home, + installed):"), "raw diff shown: {out}");
+        assert!(out.contains("+ new"), "raw diff lines shown: {out}");
+        assert!(!out.contains("run with --full"), "no hint when already full: {out}");
     }
 }

@@ -284,11 +284,11 @@ fn handle_artifact(
             handle_info(&name, Some(kind), ctx).map(|()| ExitCode::SUCCESS)
         }
         #[cfg(feature = "llm")]
-        ArtifactAction::Diff { name } => {
+        ArtifactAction::Diff { name, full } => {
             cmx::source_update::ensure_fresh(ctx)?;
             let runner = build_llm_runtime(ctx)?;
             let diff_ctx = ctx.with_llm(&runner.llm);
-            let output = runner.rt.block_on(cmx::diff::diff(&name, kind, &diff_ctx))?;
+            let output = runner.rt.block_on(cmx::diff::diff(&name, kind, full, &diff_ctx))?;
             print!("{output}");
             Ok(ExitCode::SUCCESS)
         }

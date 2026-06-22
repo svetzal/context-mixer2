@@ -37,6 +37,9 @@ pub struct DiffOutput {
     /// The reconciliation directions to offer — both ways, since `diff` can't
     /// know which side is authoritative.
     pub reconciliations: Vec<Reconciliation>,
+    /// When `true`, render the full line-by-line unified diff; otherwise the
+    /// output stays compact (summary + analysis) with a hint to pass `--full`.
+    pub show_full: bool,
 }
 
 /// How one file differs between the source and installed copies.
@@ -80,8 +83,15 @@ struct ArtifactDiff {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-pub async fn diff(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<DiffOutput> {
-    gather_diff_with(name, kind, ctx).await
+pub async fn diff(
+    name: &str,
+    kind: ArtifactKind,
+    full: bool,
+    ctx: &AppContext<'_>,
+) -> Result<DiffOutput> {
+    let mut output = gather_diff_with(name, kind, ctx).await?;
+    output.show_full = full;
+    Ok(output)
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +130,7 @@ pub(crate) async fn gather_diff_with(
             diff_text: None,
             analysis: None,
             reconciliations: Vec::new(),
+            show_full: false,
         });
     }
 
@@ -178,6 +189,7 @@ pub(crate) async fn gather_diff_with(
         diff_text: Some(dir_diff.unified),
         analysis: Some(analysis),
         reconciliations,
+        show_full: false,
     })
 }
 
@@ -747,7 +759,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let output = diff("my-agent", ArtifactKind::Agent, &ctx).await.unwrap();
+        let output = diff("my-agent", ArtifactKind::Agent, false, &ctx).await.unwrap();
         assert!(output.is_up_to_date);
         assert!(output.reconciliations.is_empty(), "nothing to reconcile when in sync");
     }
@@ -772,7 +784,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let result = diff("my-agent", ArtifactKind::Agent, &ctx).await;
+        let result = diff("my-agent", ArtifactKind::Agent, false, &ctx).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("LLM"));
     }

@@ -146,6 +146,9 @@ pub enum ArtifactAction {
     Diff {
         /// Artifact name
         name: String,
+        /// Show the full line-by-line unified diff (default: compact summary)
+        #[arg(long)]
+        full: bool,
     },
     /// Update an installed artifact from its source
     Update {
