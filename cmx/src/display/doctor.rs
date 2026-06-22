@@ -96,7 +96,7 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
     }
     if c.diverged > 0 {
         lines.push(format!(
-            "  • {} artifact(s) diverge across their install locations (different version or state). See what differs with `cmx skill diff <name>`, then reconcile by copying the chosen copy over the others: `cmx skill sync <name>` (newest version wins) or `cmx skill sync <name> --from <platform>`. Works for external skills too.",
+            "  • {} artifact(s) diverge across their install locations (different version or state). For a skill tracked from a source or the home, make one copy canonical and re-project: `cmx skill promote <name>` (push in-place edits into the home) or `cmx skill update <name> --force` (restore from source). For source-less or external skills, reconcile between locations with `cmx skill sync <name>` (newest version wins, or `--from <platform>`). Inspect with `cmx skill diff <name>`.",
             c.diverged
         ));
     }

@@ -14,8 +14,10 @@
 use anyhow::{Result, bail};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::path::PathBuf;
 
+use crate::adopt::HOME_SOURCE;
 use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
@@ -123,19 +125,19 @@ fn cmp_versions(a: Option<&str>, b: Option<&str>) -> Ordering {
     }
 }
 
-/// Choose the winning copy among `copies` (length ≥ 2, not all identical).
-///
-/// - `from` set → the copy that platform reads (error if it has none).
-/// - else → the copy with the strictly-newest version. Ambiguous when another
-///   differing copy ties it on version (or all are unversioned) — the caller
-///   must disambiguate with `--from`.
-fn pick_winner(copies: &[Copy], from: Option<Platform>) -> Result<&Copy> {
-    if let Some(p) = from {
-        return copies
-            .iter()
-            .find(|c| c.platforms.contains(&p))
-            .ok_or_else(|| anyhow::anyhow!("'{p}' has no copy of this skill to sync from."));
-    }
+/// The copy a `--from <platform>` selection points at, or an error if that
+/// platform has no copy.
+fn pick_from(copies: &[Copy], p: Platform) -> Result<&Copy> {
+    copies
+        .iter()
+        .find(|c| c.platforms.contains(&p))
+        .ok_or_else(|| anyhow::anyhow!("'{p}' has no copy of this skill to sync from."))
+}
+
+/// The copy with the strictly-newest version, or `None` when the choice is
+/// ambiguous: another *differing* copy ties it on version, or all are
+/// unversioned. The caller turns `None` into an actionable error.
+fn auto_winner(copies: &[Copy]) -> Option<&Copy> {
     let best = copies
         .iter()
         .max_by(|x, y| cmp_versions(x.version.as_deref(), y.version.as_deref()))
@@ -144,13 +146,96 @@ fn pick_winner(copies: &[Copy], from: Option<Platform>) -> Result<&Copy> {
         c.checksum != best.checksum
             && cmp_versions(c.version.as_deref(), best.version.as_deref()) == Ordering::Equal
     });
-    if ambiguous {
-        bail!(
-            "Can't tell which copy is newest — the differing copies share a version \
-             (or are unversioned). Choose the winner with `--from <platform>`."
+    (!ambiguous).then_some(best)
+}
+
+/// A human label for a set of platforms ("claude, codex").
+fn platforms_label(platforms: &[Platform]) -> String {
+    platforms.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
+}
+
+/// Render a byte count compactly (e.g. `4.2 KB`), using integer math to avoid a
+/// lossy float cast.
+fn human_size(bytes: usize) -> String {
+    if bytes < 1024 {
+        format!("{bytes} B")
+    } else {
+        format!("{}.{} KB", bytes / 1024, (bytes % 1024) * 10 / 1024)
+    }
+}
+
+/// Whether any copy of `name` is tracked from the canonical `home` source — if
+/// so, the user can also promote a copy and re-project instead of picking
+/// between install locations.
+fn is_home_tracked(
+    name: &str,
+    scope: InstallScope,
+    copies: &[Copy],
+    ctx: &AppContext<'_>,
+) -> Result<bool> {
+    for c in copies {
+        for &platform in &c.platforms {
+            let pv = ctx.paths.with_platform(platform);
+            let tracked_from_home = lockfile::load(scope, ctx.fs, &pv)?
+                .packages
+                .get(name)
+                .is_some_and(|e| e.source.repo == HOME_SOURCE);
+            if tracked_from_home {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+/// Build the actionable error for an ambiguous auto-pick: list each diverging
+/// copy (platforms, location, size), the exact `--from` command per copy, and —
+/// when the skill is home-tracked — the `promote` alternative.
+fn ambiguity_error(
+    name: &str,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    copies: &[Copy],
+    ctx: &AppContext<'_>,
+) -> anyhow::Error {
+    let mut msg = format!(
+        "Can't tell which copy of '{name}' is newest — the differing copies are unversioned \
+         or share a version.\n"
+    );
+    for c in copies {
+        let size = ctx.fs.read_to_string(&kind.content_path(&c.path)).map_or(0, |s| s.len());
+        let _ = writeln!(
+            msg,
+            "  {}  {}  ({})",
+            platforms_label(&c.platforms),
+            c.dir.display(),
+            human_size(size)
         );
     }
-    Ok(best)
+    // Prefer a managed platform when naming the `--from` for a copy shared by
+    // several platforms (the `.agents/skills` cohort), so the suggestion reads
+    // in terms of a tool the user actually uses (e.g. `codex`, not `opencode`).
+    let managed = crate::config::managed_platforms(ctx.fs, ctx.paths).ok().flatten();
+    let representative = |c: &Copy| -> Option<Platform> {
+        managed
+            .as_ref()
+            .and_then(|m| c.platforms.iter().find(|p| m.contains(p)).copied())
+            .or_else(|| c.platforms.first().copied())
+    };
+    let _ = writeln!(msg, "Choose which copy wins:");
+    for c in copies {
+        if let Some(p) = representative(c) {
+            let _ = writeln!(msg, "  cmx {kind} sync {name} --from {p}");
+        }
+    }
+    if is_home_tracked(name, scope, copies, ctx).unwrap_or(false) {
+        let _ = write!(
+            msg,
+            "This skill is tracked from the home — you can also make one copy canonical and \
+             re-project it:\n  cmx {kind} promote {name}"
+        );
+    }
+    anyhow::anyhow!(msg)
 }
 
 /// Gather the distinct physical copies of a skill across the candidate
@@ -278,7 +363,13 @@ pub fn sync(
         });
     }
 
-    let winner = pick_winner(&copies, from)?;
+    let winner = match from {
+        Some(p) => pick_from(&copies, p)?,
+        None => match auto_winner(&copies) {
+            Some(w) => w,
+            None => return Err(ambiguity_error(name, kind, scope, &copies, ctx)),
+        },
+    };
     let targets: Vec<&Copy> = copies.iter().filter(|c| c.checksum != winner.checksum).collect();
 
     let result = SyncResult {

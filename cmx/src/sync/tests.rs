@@ -33,6 +33,16 @@ fn read_skill(t: &TestContext, platform: Platform, name: &str) -> String {
     t.fs.read_to_string(&dir.join(name).join("SKILL.md")).unwrap()
 }
 
+/// Declare the managed-platform set in config (the authoritative set that scopes
+/// `--from` suggestions).
+fn set_managed(t: &TestContext, platforms: &[Platform]) {
+    let config = crate::types::CmxConfig {
+        platforms: platforms.to_vec(),
+        ..Default::default()
+    };
+    crate::config::save_config(&config, &t.fs, &t.paths).unwrap();
+}
+
 // --- cmp_versions (pure) ---
 
 #[test]
@@ -105,6 +115,52 @@ fn sync_ambiguous_without_from_errors_but_succeeds_with_from() {
     )
     .unwrap();
     assert!(read_skill(&t, Platform::Codex, "s").contains("alpha"));
+}
+
+#[test]
+fn sync_ambiguous_error_lists_candidates_and_from_commands() {
+    let t = TestContext::new();
+    place_unversioned(&t, Platform::Claude, "s", "alpha");
+    place_unversioned(&t, Platform::Codex, "s", "beta");
+    // Managed set scopes the --from suggestion to a tool the user uses: the
+    // Codex copy lives in the shared .agents/skills cohort, so without this the
+    // suggestion would name some other cohort member (e.g. opencode).
+    set_managed(&t, &[Platform::Claude, Platform::Codex]);
+
+    let err = sync("s", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx())
+        .unwrap_err()
+        .to_string();
+
+    // Names each candidate platform and the exact per-copy --from command.
+    assert!(err.contains("claude"), "lists claude copy: {err}");
+    assert!(err.contains("codex"), "lists codex copy: {err}");
+    assert!(err.contains("cmx skill sync s --from claude"), "claude command: {err}");
+    assert!(err.contains("cmx skill sync s --from codex"), "codex command: {err}");
+}
+
+#[test]
+fn sync_ambiguous_error_suggests_promote_for_home_tracked() {
+    use crate::test_support::{make_lock_entry_builder, save_lock_with_entry};
+
+    let t = TestContext::new();
+    place_unversioned(&t, Platform::Claude, "s", "alpha");
+    place_unversioned(&t, Platform::Codex, "s", "beta");
+    // Mark the Claude copy as tracked from the home.
+    let entry = make_lock_entry_builder(ArtifactKind::Skill, "home", "skills/s/SKILL.md");
+    save_lock_with_entry(
+        &t.fs,
+        &t.paths.with_platform(Platform::Claude),
+        "s",
+        entry,
+        InstallScope::Global,
+    );
+
+    let err = sync("s", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx())
+        .unwrap_err()
+        .to_string();
+
+    assert!(err.contains("tracked from the home"), "mentions the home path: {err}");
+    assert!(err.contains("cmx skill promote s"), "offers promote: {err}");
 }
 
 #[test]
