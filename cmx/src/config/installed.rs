@@ -36,7 +36,10 @@ pub fn installed_names(
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<Vec<String>> {
-    let dir = paths.install_dir(kind, scope);
+    let dir = match paths.install_dir(kind, scope) {
+        Some(d) => d,
+        None => return Ok(Vec::new()),
+    };
     if !fs.exists(&dir) {
         return Ok(Vec::new());
     }
@@ -136,7 +139,9 @@ pub fn find_installed_path(
     paths: &ConfigPaths,
 ) -> Option<(PathBuf, InstallScope)> {
     for scope in InstallScope::ALL {
-        let path = paths.installed_artifact_path(kind, name, scope);
+        let Some(path) = paths.installed_artifact_path(kind, name, scope) else {
+            continue;
+        };
         if fs.exists(&path) {
             return Some((path, scope));
         }
@@ -165,7 +170,7 @@ mod tests {
     fn installed_names_filters_md_files_for_agents() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         fs.add_file(agent_dir.join("alpha.md"), "# agent");
         fs.add_file(agent_dir.join("beta.md"), "# agent");
         fs.add_file(agent_dir.join("not-an-agent.txt"), "ignored");
@@ -179,7 +184,7 @@ mod tests {
     fn installed_names_returns_dirs_for_skills() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let skill_dir = paths.install_dir(ArtifactKind::Skill, InstallScope::Global);
+        let skill_dir = paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
         // Skills are directories — add a file inside each to register the dir
         fs.add_file(skill_dir.join("my-skill").join("SKILL.md"), "---\n---\n");
         fs.add_file(skill_dir.join("other-skill").join("SKILL.md"), "---\n---\n");
@@ -193,7 +198,7 @@ mod tests {
     fn installed_names_skips_hidden_entries() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         fs.add_file(agent_dir.join("visible.md"), "# agent");
         fs.add_file(agent_dir.join(".hidden.md"), "# hidden");
 
@@ -216,7 +221,7 @@ mod tests {
     fn find_installed_path_finds_global_agent() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         fs.add_file(agent_dir.join("my-agent.md"), "# agent");
 
         let result = find_installed_path("my-agent", ArtifactKind::Agent, &fs, &paths);
@@ -229,7 +234,7 @@ mod tests {
     fn find_installed_path_finds_local_agent() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Local);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Local).unwrap();
         fs.add_file(agent_dir.join("my-agent.md"), "# agent");
 
         let result = find_installed_path("my-agent", ArtifactKind::Agent, &fs, &paths);
@@ -244,11 +249,11 @@ mod tests {
         let paths = test_paths();
         // Install in both scopes
         fs.add_file(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).join("my-agent.md"),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap().join("my-agent.md"),
             "global",
         );
         fs.add_file(
-            paths.install_dir(ArtifactKind::Agent, InstallScope::Local).join("my-agent.md"),
+            paths.install_dir(ArtifactKind::Agent, InstallScope::Local).unwrap().join("my-agent.md"),
             "local",
         );
 
@@ -262,7 +267,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
         let skill_dir =
-            paths.install_dir(ArtifactKind::Skill, InstallScope::Global).join("my-skill");
+            paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join("my-skill");
         fs.add_file(skill_dir.join("SKILL.md"), "---\n---\n");
 
         let result = find_installed_path("my-skill", ArtifactKind::Skill, &fs, &paths);
@@ -277,7 +282,7 @@ mod tests {
     fn installed_with_lock_data_returns_name_and_lock_entry() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         fs.add_file(agent_dir.join("my-agent.md"), "# agent");
 
         let mut lock = LockFile::default();
@@ -304,7 +309,7 @@ mod tests {
     fn installed_with_lock_data_absent_lock_entry_gives_none_version() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         fs.add_file(agent_dir.join("my-agent.md"), "# agent");
 
         let lock = LockFile::default();
@@ -356,7 +361,7 @@ mod tests {
     fn match_installed_to_sources_pairs_artifact_with_matching_sources() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         fs.add_file(agent_dir.join("my-agent.md"), "# agent");
 
         let mut lock = LockFile::default();
@@ -395,7 +400,7 @@ mod tests {
     fn match_installed_to_sources_returns_none_when_no_matching_source() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let agent_dir = paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         fs.add_file(agent_dir.join("orphan-agent.md"), "# agent");
 
         let lock = LockFile::default();

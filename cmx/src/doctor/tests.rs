@@ -17,7 +17,7 @@ fn install_skill(
     scope: InstallScope,
 ) -> std::path::PathBuf {
     let pv = t.paths.with_platform(platform);
-    let dir = pv.install_dir(ArtifactKind::Skill, scope);
+    let dir = pv.install_dir(ArtifactKind::Skill, scope).unwrap();
     let skill_dir = dir.join(skill);
     t.fs.add_file(skill_dir.join("SKILL.md"), versioned_skill_content("A test skill", version));
     skill_dir

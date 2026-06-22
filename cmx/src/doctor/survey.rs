@@ -45,7 +45,8 @@ pub(crate) fn build_locations(
                 if !platform.supports(kind) {
                     continue;
                 }
-                let dir = pv.install_dir(kind, scope);
+                let dir = pv.install_dir(kind, scope)
+                    .expect("guarded by platform.supports(kind)");
                 locations
                     .entry(dir)
                     .or_insert_with(|| LocationAgg {
@@ -279,7 +280,9 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
         let pv = ctx.paths.with_platform(agg.platforms[0]);
         let names = config::installed_names(agg.kind, agg.scope, ctx.fs, &pv)?;
         for name in names {
-            let path = pv.installed_artifact_path(agg.kind, &name, agg.scope);
+            let path = pv
+                .installed_artifact_path(agg.kind, &name, agg.scope)
+                .expect("guarded by platform.supports check in survey");
             let mut state = classify_installed(&name, agg, &path, &locks, &available, ctx)?;
             // An artifact cmx doesn't manage (orphaned/untracked) but that the
             // user has declared external is reclassified — managed by another

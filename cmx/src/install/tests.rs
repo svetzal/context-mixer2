@@ -218,7 +218,7 @@ fn plan_install_computes_correct_paths_for_global_agent() {
     let plan = plan_install("my-agent", ArtifactKind::Agent, InstallScope::Global, &found, &paths);
 
     assert_eq!(plan.artifact_name, "my-agent");
-    assert_eq!(plan.dest_dir, paths.install_dir(ArtifactKind::Agent, InstallScope::Global));
+    assert_eq!(plan.dest_dir, paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap());
     assert_eq!(plan.relative_path, "agents/my-agent.md");
     assert_eq!(plan.version, Some("1.0.0".to_string()));
     assert_eq!(plan.source_name, "guidelines");
@@ -231,7 +231,7 @@ fn plan_install_computes_correct_paths_for_local_skill() {
 
     let plan = plan_install("my-skill", ArtifactKind::Skill, InstallScope::Local, &found, &paths);
 
-    assert_eq!(plan.dest_dir, paths.install_dir(ArtifactKind::Skill, InstallScope::Local));
+    assert_eq!(plan.dest_dir, paths.install_dir(ArtifactKind::Skill, InstallScope::Local).unwrap());
     assert_eq!(plan.relative_path, "my-skill");
     assert!(plan.version.is_none());
 }
@@ -380,6 +380,7 @@ fn install_succeeds_with_source_prefix_disambiguation() {
     let expected_dest = t
         .paths
         .install_dir(ArtifactKind::Agent, InstallScope::Global)
+        .unwrap()
         .join("my-agent.md");
     assert!(
         t.fs.file_exists(&expected_dest),
@@ -400,6 +401,7 @@ fn install_copies_agent_file_to_correct_destination() {
     let expected_dest = t
         .paths
         .install_dir(ArtifactKind::Agent, InstallScope::Global)
+        .unwrap()
         .join("my-agent.md");
     assert!(
         t.fs.file_exists(&expected_dest),
@@ -462,6 +464,7 @@ fn install_bails_on_local_modifications_without_force() {
     let installed_path = t
         .paths
         .install_dir(ArtifactKind::Agent, InstallScope::Global)
+        .unwrap()
         .join("my-agent.md");
     t.fs.write(&installed_path, "modified content that differs from source")
         .unwrap();
@@ -487,6 +490,7 @@ fn install_proceeds_on_local_modifications_with_force() {
     let installed_path = t
         .paths
         .install_dir(ArtifactKind::Agent, InstallScope::Global)
+        .unwrap()
         .join("my-agent.md");
     t.fs.write(&installed_path, "modified content").unwrap();
 
@@ -562,7 +566,7 @@ fn install_removes_partial_skill_on_validation_failure() {
     assert!(result.is_ok(), "skill with SKILL.md should install: {:?}", result.err());
 
     // Verify SKILL.md was copied to dest
-    let dest = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).join("my-skill");
+    let dest = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join("my-skill");
     assert!(t.fs.file_exists(&dest.join("SKILL.md")));
 }
 
@@ -616,7 +620,7 @@ fn perform_install_dest_dir_matches_install_dir() {
     let result =
         install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
-    let expected_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+    let expected_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
     assert_eq!(result.dest_dir, expected_dir);
 }
 
@@ -671,6 +675,7 @@ fn install_agent_lock_save_failure_rolls_back_copy() {
     let expected_dest = t
         .paths
         .install_dir(ArtifactKind::Agent, InstallScope::Global)
+        .unwrap()
         .join("my-agent.md");
     assert!(
         !t.fs.file_exists(&expected_dest),
@@ -697,6 +702,7 @@ fn install_skill_lock_save_failure_rolls_back_directory() {
     let expected_dest = t
         .paths
         .install_dir(ArtifactKind::Skill, InstallScope::Global)
+        .unwrap()
         .join("my-skill")
         .join("SKILL.md");
     assert!(
@@ -720,7 +726,7 @@ fn install_agent_with_cursor_platform_places_file_in_cursor_agents() {
     install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
     let expected_dest =
-        paths.install_dir(ArtifactKind::Agent, InstallScope::Global).join("my-agent.md");
+        paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap().join("my-agent.md");
     assert_eq!(expected_dest, PathBuf::from("/home/testuser/.cursor/agents/my-agent.md"));
     assert!(
         fs.file_exists(&expected_dest),
@@ -742,7 +748,7 @@ fn install_agent_with_cursor_platform_local_places_file_in_dot_cursor_agents() {
     install("my-agent", ArtifactKind::Agent, InstallScope::Local, false, &ctx).unwrap();
 
     let expected_dest =
-        paths.install_dir(ArtifactKind::Agent, InstallScope::Local).join("my-agent.md");
+        paths.install_dir(ArtifactKind::Agent, InstallScope::Local).unwrap().join("my-agent.md");
     assert_eq!(expected_dest, PathBuf::from(".cursor/agents/my-agent.md"));
     assert!(
         fs.file_exists(&expected_dest),
@@ -764,7 +770,7 @@ fn install_agent_default_platform_places_file_in_dot_claude_agents() {
     install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
     let expected_dest =
-        paths.install_dir(ArtifactKind::Agent, InstallScope::Global).join("my-agent.md");
+        paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap().join("my-agent.md");
     assert_eq!(expected_dest, PathBuf::from("/home/testuser/.claude/agents/my-agent.md"));
     assert!(
         fs.file_exists(&expected_dest),
@@ -786,6 +792,7 @@ fn install_force_reinstall_lock_save_failure_keeps_existing_artifact() {
     let expected_dest = t
         .paths
         .install_dir(ArtifactKind::Agent, InstallScope::Global)
+        .unwrap()
         .join("my-agent.md");
     assert!(t.fs.file_exists(&expected_dest), "agent should be installed");
 
@@ -1016,6 +1023,7 @@ fn install_skills_only_cohort_installs_skill_and_rejects_agent() {
             .unwrap_or_else(|e| panic!("{platform} skill install should succeed: {e}"));
         let skill_md = paths
             .install_dir(ArtifactKind::Skill, InstallScope::Local)
+            .unwrap()
             .join("my-skill")
             .join("SKILL.md");
         assert!(

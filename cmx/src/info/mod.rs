@@ -481,7 +481,7 @@ mod tests {
         install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
         // Compute the actual checksum to make it match
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Use a checksum that matches the content (we'll rely on the file being there)
@@ -524,7 +524,7 @@ mod tests {
         setup_empty_sources(&t.fs, &t.paths);
 
         let ctx = t.ctx();
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
         let info = gather_info("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
             .unwrap();
@@ -548,7 +548,7 @@ mod tests {
             InstallScope::Global,
         );
 
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Write a lock entry with a different checksum (simulating modification)
@@ -580,7 +580,7 @@ mod tests {
         let content = agent_content("my-agent", "A test agent");
         install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Setup sources with a deprecated agent
@@ -622,7 +622,7 @@ mod tests {
         let content = agent_content("my-agent", "A test agent");
         install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Set up the source with a known version so we can record the exact checksum
@@ -674,7 +674,7 @@ mod tests {
         let content = agent_content("my-agent", "A test agent");
         install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
-        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global);
+        let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
         let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
 
         // Lock entry with version 1.0.0
@@ -841,7 +841,7 @@ mod tests {
     // --- activation trigger + kind-scoped lookup ---
 
     fn install_skill_on_disk(t: &TestContext, name: &str, desc: &str) -> PathBuf {
-        let dir = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).join(name);
+        let dir = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join(name);
         t.fs.add_file(dir.join("SKILL.md"), crate::test_support::skill_content(desc));
         dir
     }
@@ -878,7 +878,7 @@ mod tests {
         // not just the active one (Claude in tests) — else it can't describe it.
         let t = TestContext::new();
         let pv = t.paths.with_platform(Platform::Hermes);
-        let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).join("productivity");
+        let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join("productivity");
         t.fs.add_file(dir.join("SKILL.md"), crate::test_support::skill_content("Use when busy"));
         setup_empty_sources(&t.fs, &t.paths);
 
