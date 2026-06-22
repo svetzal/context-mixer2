@@ -46,6 +46,11 @@ pub struct DiffOutput {
     /// one entry the display shows a per-platform matrix; the detailed diff and
     /// analysis below focus the copy flagged `is_focus`.
     pub copies: Vec<CopyStatus>,
+    /// Concrete name for the focused (changed) side — the platform whose copy is
+    /// being shown, e.g. `codex`. Paired with `source_name` (e.g. `home`) these
+    /// are the only two labels the output (and the LLM summary) uses, so the
+    /// reader never has to map "installed"/"source" onto a real copy.
+    pub changed_label: String,
 }
 
 /// One installed copy of the artifact and how it compares to the source.
@@ -178,11 +183,15 @@ pub(crate) async fn gather_diff_with(
             reconciliations: Vec::new(),
             show_full: false,
             copies,
+            changed_label: String::new(),
         });
     };
 
     let multi = copies.len() > 1;
     let focus_platform = representative_platform(&evals[focus_idx].copy, active, ctx);
+    // The two labels the whole output uses: `home`/<repo> on the `−` side, the
+    // platform name on the `+` side.
+    let changed_label = focus_platform.to_string();
 
     // Version + "locally edited" come from the focus copy's lock baseline.
     let focus_checksum = evals[focus_idx].copy.checksum.clone();
@@ -193,33 +202,22 @@ pub(crate) async fn gather_diff_with(
         name,
         kind,
         &source_name,
+        &changed_label,
         locally_modified,
         multi.then_some(focus_platform),
     );
 
-    let installed_ver_display = installed_version.as_deref().unwrap_or("unversioned");
-    let source_ver_display = source_version.as_deref().unwrap_or("unversioned");
-
-    let system_prompt = "You are a technical analyst comparing two versions of an AI coding assistant artifact (an agent definition or skill definition written in markdown). \
-        You are given a unified diff where lines prefixed with `-` come from the SOURCE copy and lines prefixed with `+` come from the INSTALLED copy. \
-        Provide a clear, concise summary of the differences. Focus on:\n\
-        1. What capabilities or behaviors were added, removed, or changed (and on which side)\n\
-        2. Whether the update is significant or cosmetic\n\
-        3. A recommendation: which copy looks more authoritative, and which direction to reconcile\n\n\
-        Keep your analysis brief and actionable — a few paragraphs at most.";
-
-    let user_prompt = format!(
-        "Compare these two versions of the {kind} '{name}':\n\
-        - Installed copy (the `+` side): {installed_ver_display}\n\
-        - Source copy from '{source_name}' (the `−` side): {source_ver_display}\n\n\
-        {}",
-        evals[focus_idx].dir_diff.unified
-    );
-
-    let analysis = match ctx.llm {
-        Some(llm) => llm.analyze(system_prompt, &user_prompt).await?,
-        None => bail!("LLM client not configured for diff analysis"),
-    };
+    let analysis = analyze_focus(
+        kind,
+        name,
+        &source_name,
+        &changed_label,
+        source_version.as_deref().unwrap_or("unversioned"),
+        installed_version.as_deref().unwrap_or("unversioned"),
+        &evals[focus_idx].dir_diff.unified,
+        ctx,
+    )
+    .await?;
 
     let focus_eval = &evals[focus_idx];
     Ok(DiffOutput {
@@ -238,7 +236,45 @@ pub(crate) async fn gather_diff_with(
         reconciliations,
         show_full: false,
         copies,
+        changed_label,
     })
+}
+
+/// Ask the LLM to summarize the focused copy's diff, naming the two sides by
+/// their concrete identities (`source_name`, `changed`) so the summary speaks the
+/// same language as the rest of the output (never "source"/"installed").
+#[allow(clippy::too_many_arguments)]
+async fn analyze_focus(
+    kind: ArtifactKind,
+    name: &str,
+    source_name: &str,
+    changed: &str,
+    source_ver: &str,
+    changed_ver: &str,
+    unified: &str,
+    ctx: &AppContext<'_>,
+) -> Result<String> {
+    let system_prompt = format!(
+        "You are a technical analyst comparing two copies of an AI coding assistant {kind} \
+        (written in markdown). You are given a unified diff: lines prefixed with `-` belong to \
+        the '{source_name}' copy; lines prefixed with `+` belong to the '{changed}' copy. \
+        Refer to the two copies as '{source_name}' and '{changed}' — do not call them \
+        \"source\" or \"installed\". Provide a clear, concise summary. Focus on:\n\
+        1. What capabilities or behaviors were added, removed, or changed (and in which copy)\n\
+        2. Whether the difference is significant or cosmetic\n\
+        3. A recommendation: which copy looks more authoritative, and which way to reconcile\n\n\
+        Keep it brief and actionable — a few paragraphs at most."
+    );
+    let user_prompt = format!(
+        "Compare these two copies of the {kind} '{name}':\n\
+        - '{source_name}' copy (the `−` lines): {source_ver}\n\
+        - '{changed}' copy (the `+` lines): {changed_ver}\n\n\
+        {unified}"
+    );
+    match ctx.llm {
+        Some(llm) => llm.analyze(&system_prompt, &user_prompt).await,
+        None => bail!("LLM client not configured for diff analysis"),
+    }
 }
 
 /// One installed copy with its computed comparison to the source.
@@ -406,14 +442,16 @@ fn focus_lock_state(
     Ok((None, false))
 }
 
-/// Build the reconciliation directions. When the source is the canonical home,
-/// the installed edits can be promoted into it; either way they can be discarded
-/// by re-installing from source. `diff` never picks for the user. `platform`, set
-/// when copies span platforms, qualifies the commands to the focused copy.
+/// Build the reconciliation directions, naming the two copies concretely
+/// (`{changed}` is the edited platform copy, `{source_name}` the canonical one).
+/// When the source is the home, `{changed}`'s edits can be promoted into it;
+/// either way they can be discarded by re-installing. `diff` never picks for the
+/// user. `platform`, set when copies span platforms, qualifies the commands.
 fn reconciliations(
     name: &str,
     kind: ArtifactKind,
     source_name: &str,
+    changed: &str,
     locally_modified: bool,
     platform: Option<Platform>,
 ) -> Vec<Reconciliation> {
@@ -423,25 +461,20 @@ fn reconciliations(
 
     if source_is_home {
         out.push(Reconciliation {
-            description: "keep the installed edits, update the home".to_string(),
+            description: format!("keep {changed}'s edits — copy {changed} into {source_name}"),
             command: format!("cmx {kind} promote {name}{plat}"),
             note: None,
         });
     }
 
-    let restore_target = if source_is_home {
-        "home".to_string()
-    } else {
-        format!("{source_name} copy")
-    };
     out.push(Reconciliation {
-        description: format!("discard the installed edits, restore the {restore_target}"),
+        description: format!("discard {changed}'s edits — restore {changed} from {source_name}"),
         command: if locally_modified {
             format!("cmx {kind} update {name}{plat} --force")
         } else {
             format!("cmx {kind} update {name}{plat}")
         },
-        note: locally_modified.then(|| "--force overwrites the installed local edits".to_string()),
+        note: locally_modified.then(|| format!("--force overwrites {changed}'s local edits")),
     });
     out
 }
@@ -919,25 +952,44 @@ mod tests {
 
     #[test]
     fn reconciliations_offers_promote_when_source_is_home() {
-        let rs = reconciliations("pf", ArtifactKind::Skill, "home", true, None);
+        let rs = reconciliations("pf", ArtifactKind::Skill, "home", "claude", true, None);
         assert_eq!(rs.len(), 2, "promote + update");
         assert!(rs[0].command.contains("promote pf"), "promote offered first: {:?}", rs[0]);
         assert!(rs[1].command.contains("update pf --force"), "update with force: {:?}", rs[1]);
-        assert!(rs[1].note.is_some(), "force carries a caveat");
+        // Descriptions name the concrete copies, not "installed"/"source".
+        assert!(
+            rs[0].description.contains("claude") && rs[0].description.contains("home"),
+            "{:?}",
+            rs[0]
+        );
+        assert!(!rs[0].description.contains("installed"), "no abstract 'installed': {:?}", rs[0]);
+        assert!(
+            rs[1].note.as_deref().unwrap().contains("claude"),
+            "caveat names the copy: {:?}",
+            rs[1]
+        );
     }
 
     #[test]
     fn reconciliations_no_promote_for_git_source() {
-        let rs = reconciliations("slidev", ArtifactKind::Skill, "guidelines", false, None);
+        let rs = reconciliations("slidev", ArtifactKind::Skill, "guidelines", "codex", false, None);
         assert_eq!(rs.len(), 1, "only restore-from-source for a git source");
         assert!(rs[0].command.contains("update slidev"), "{:?}", rs[0]);
         assert!(!rs[0].command.contains("--force"), "no force when not locally modified");
-        assert!(rs[0].description.contains("guidelines copy"), "names the source: {:?}", rs[0]);
+        assert!(rs[0].description.contains("guidelines"), "names the source: {:?}", rs[0]);
+        assert!(rs[0].description.contains("codex"), "names the changed copy: {:?}", rs[0]);
     }
 
     #[test]
     fn reconciliations_qualify_commands_with_platform_when_multi() {
-        let rs = reconciliations("pf", ArtifactKind::Skill, "home", true, Some(Platform::Codex));
+        let rs = reconciliations(
+            "pf",
+            ArtifactKind::Skill,
+            "home",
+            "codex",
+            true,
+            Some(Platform::Codex),
+        );
         assert!(rs[0].command.contains("promote pf --platform codex"), "{:?}", rs[0]);
         assert!(rs[1].command.contains("update pf --platform codex --force"), "{:?}", rs[1]);
     }

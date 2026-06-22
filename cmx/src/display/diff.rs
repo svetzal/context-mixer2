@@ -15,19 +15,25 @@ impl DiffOutput {
     /// simple installed/source pair for a single copy.
     fn write_header(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let edited = if self.installed_locally_edited {
-            ", locally edited"
+            ", edited locally"
         } else {
             ""
         };
+        let changed = &self.changed_label;
+        let changed_ver = self.installed_version.as_deref().unwrap_or("unversioned");
+        let source_ver = self.source_version.as_deref().unwrap_or("unversioned");
         if self.copies.len() > 1 {
             for c in &self.copies {
                 let status = if c.matches {
                     format!("matches {}", self.source_name)
                 } else {
-                    format!("differs  (+{}  \u{2212}{})", c.added, c.removed)
+                    format!(
+                        "differs from {} (+{} \u{2212}{})",
+                        self.source_name, c.added, c.removed
+                    )
                 };
                 let marker = if c.is_focus {
-                    "   \u{2190} shown below"
+                    "   \u{2190} detailed below"
                 } else {
                     ""
                 };
@@ -39,24 +45,26 @@ impl DiffOutput {
                 )?;
             }
             writeln!(f)?;
-            if let Some(focus) = self.copies.iter().find(|c| c.is_focus) {
-                writeln!(
-                    f,
-                    "Showing the {} copy ({}{edited})  (\u{2212} {}, + installed):",
-                    platforms_label(&focus.platforms),
-                    self.installed_version.as_deref().unwrap_or("unversioned"),
-                    self.source_name
-                )?;
-            }
-        } else {
-            let installed_ver = self.installed_version.as_deref().unwrap_or("unversioned");
-            let source_ver = self.source_version.as_deref().unwrap_or("unversioned");
             writeln!(
                 f,
-                "  installed  {}  ({installed_ver}{edited})",
+                "Showing {changed} ({changed_ver}{edited}) against {} \u{2014} \
+                 \u{2212} lines are {}, + lines are {changed}:",
+                self.source_name, self.source_name
+            )?;
+        } else {
+            writeln!(
+                f,
+                "  {changed:<8} {}  ({changed_ver}{edited})",
                 self.installed_path.display()
             )?;
-            writeln!(f, "  {}  {}  ({source_ver})", self.source_name, self.source_path.display())?;
+            writeln!(
+                f,
+                "  {:<8} {}  ({source_ver})",
+                self.source_name,
+                self.source_path.display()
+            )?;
+            writeln!(f)?;
+            writeln!(f, "\u{2212} lines are {}, + lines are {changed}:", self.source_name)?;
         }
         writeln!(f)
     }
@@ -84,11 +92,11 @@ impl fmt::Display for DiffOutput {
         self.write_header(f)?;
 
         if !self.file_changes.is_empty() {
-            writeln!(f, "Changed files  (\u{2212} {}, + installed):", self.source_name)?;
+            writeln!(f, "Changed files:")?;
             for c in &self.file_changes {
                 let (flag, detail) = match c.status {
                     FileStatus::Modified => ('M', format!("+{}  \u{2212}{}", c.added, c.removed)),
-                    FileStatus::OnlyInInstalled => ('A', "only in installed".to_string()),
+                    FileStatus::OnlyInInstalled => ('A', format!("only in {}", self.changed_label)),
                     FileStatus::OnlyInSource => ('D', format!("only in {}", self.source_name)),
                 };
                 writeln!(f, "  {flag}  {:<42}  {detail}", c.path)?;
@@ -109,7 +117,11 @@ impl fmt::Display for DiffOutput {
         if self.show_full {
             if let Some(diff) = &self.diff_text {
                 if !diff.is_empty() {
-                    writeln!(f, "Diff  (\u{2212} {}, + installed):", self.source_name)?;
+                    writeln!(
+                        f,
+                        "Line-by-line  (\u{2212} {}, + {}):",
+                        self.source_name, self.changed_label
+                    )?;
                     write!(f, "{diff}")?;
                     writeln!(f)?;
                 }
@@ -193,6 +205,7 @@ mod tests {
                 removed: 6,
                 is_focus: true,
             }],
+            changed_label: "claude".to_string(),
         }
     }
 
@@ -201,8 +214,9 @@ mod tests {
     fn diverged_across_platforms() -> DiffOutput {
         let mut d = diverged();
         d.installed_path = PathBuf::from("/u/.agents/skills/personal-finance");
+        d.changed_label = "codex".to_string();
         d.reconciliations = vec![Reconciliation {
-            description: "keep the installed edits, update the home".to_string(),
+            description: "keep codex's edits — copy codex into home".to_string(),
             command: "cmx skill promote personal-finance --platform codex".to_string(),
             note: None,
         }];
@@ -239,20 +253,28 @@ mod tests {
     #[test]
     fn header_names_both_sides_with_paths_and_edit_flag() {
         let out = diverged().to_string();
-        assert!(out.contains("installed  /u/.claude/skills/personal-finance"), "{out}");
-        assert!(out.contains("locally edited"), "flags the local edit: {out}");
-        assert!(out.contains("home  /u/.config/cmx/home/skills/personal-finance"), "{out}");
+        // The changed side is named by its concrete platform (claude), not "installed".
+        assert!(out.contains("claude"), "names the platform copy: {out}");
+        assert!(out.contains("/u/.claude/skills/personal-finance"), "shows its path: {out}");
+        assert!(!out.contains("installed  /u"), "drops the abstract 'installed' label: {out}");
+        assert!(out.contains("edited locally"), "flags the local edit: {out}");
+        assert!(out.contains("/u/.config/cmx/home/skills/personal-finance"), "{out}");
     }
 
     #[test]
-    fn file_summary_is_directional() {
+    fn file_summary_uses_concrete_side_names() {
         let out = diverged().to_string();
         assert!(out.contains("Changed files"), "{out}");
-        assert!(out.contains("\u{2212} home, + installed"), "states the convention: {out}");
+        // Convention stated once, with concrete names, in the header.
+        assert!(
+            out.contains("\u{2212} lines are home, + lines are claude"),
+            "states the convention concretely: {out}"
+        );
+        assert!(!out.contains("+ installed"), "no abstract 'installed': {out}");
         assert!(out.contains("M  SKILL.md"), "modified flag: {out}");
         assert!(out.contains("+124"), "added count: {out}");
         assert!(out.contains("A  references/new.md"), "added-file flag: {out}");
-        assert!(out.contains("only in installed"), "{out}");
+        assert!(out.contains("only in claude"), "names the platform copy: {out}");
     }
 
     #[test]
@@ -272,7 +294,7 @@ mod tests {
     #[test]
     fn compact_default_hides_raw_diff_and_hints_at_full() {
         let out = diverged().to_string();
-        assert!(!out.contains("Diff  (\u{2212} home"), "raw diff hidden by default: {out}");
+        assert!(!out.contains("Line-by-line"), "raw diff hidden by default: {out}");
         assert!(!out.contains("+ new"), "raw diff lines hidden: {out}");
         assert!(out.contains("run with --full"), "hints at --full: {out}");
         // The digestible parts still show.
@@ -285,7 +307,10 @@ mod tests {
         let mut r = diverged();
         r.show_full = true;
         let out = r.to_string();
-        assert!(out.contains("Diff  (\u{2212} home, + installed):"), "raw diff shown: {out}");
+        assert!(
+            out.contains("Line-by-line  (\u{2212} home, + claude):"),
+            "raw diff shown with concrete labels: {out}"
+        );
         assert!(out.contains("+ new"), "raw diff lines shown: {out}");
         assert!(!out.contains("run with --full"), "no hint when already full: {out}");
     }
@@ -295,9 +320,10 @@ mod tests {
         let out = diverged_across_platforms().to_string();
         // The matrix names both copies and their status — no false "matches".
         assert!(out.contains("matches home"), "claude copy shown as matching: {out}");
-        assert!(out.contains("differs  (+11"), "codex copy shown as differing: {out}");
-        assert!(out.contains("Showing the codex copy"), "focuses the differing copy: {out}");
-        assert!(out.contains("\u{2190} shown below"), "marks the focused copy: {out}");
+        assert!(out.contains("differs from home (+11"), "codex copy shown as differing: {out}");
+        assert!(out.contains("Showing codex"), "focuses the differing copy: {out}");
+        assert!(out.contains("\u{2190} detailed below"), "marks the focused copy: {out}");
+        assert!(out.contains("+ lines are codex"), "convention names codex: {out}");
         // Reconcile targets the focused (codex) copy.
         assert!(
             out.contains("cmx skill promote personal-finance --platform codex"),
