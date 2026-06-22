@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-06-22
+
 ### Added
 
 - **`cmx {skill,agent} promote <name>`** — the mirror of `update`: push in-place edits of an installed artifact back into the canonical **home**. Where `update` pulls the home copy over the installed one (discarding local edits), `promote` copies the *installed* copy into the home and refreshes the `home`-provenance lock baselines so the artifact reads as tracked again. This supports the common authoring loop — an assistant edits its own skill where it's installed, then you promote those edits to the canonical home. Promotes the copy `cmx diff` shows (global scope preferred, then project). Home target only for now: a git-sourced artifact is rejected with guidance (edit the source clone, or `update --force` to discard the edits), as is an untracked one (steered to `adopt`/`install`); agents on a platform that reformats them to TOML are rejected too (the installed copy is no longer canonical markdown). Other home-tracked platforms whose copy still differs from the promoted content are reported as drifted afterwards and pointed at `sync`.
