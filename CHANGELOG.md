@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A source whose `marketplace.json` had a `metadata` block missing `version` (or `description`) crashed **all** survey-backed commands — `cmx list`, `cmx doctor`, etc. — with `missing field \`version\``, because one strict parse aborted the whole scan. These fields are optional in the Claude Code marketplace spec (upstream repos such as slidev ship only a `description`), so both are now optional; partial or absent `metadata` blocks are tolerated.
 - `scan::extract_field` now reads YAML **block scalars** (`description: >` folded and `description: |` literal). Previously a multi-line `description` collapsed to just the `>`/`|` indicator, so e.g. `cmx info` showed an activation trigger of `>`. Folded scalars join with spaces, literal scalars keep newlines; an inline value that merely starts with `>` (like `>= 2.0`) is still taken verbatim.
 
 ## [2.9.0] - 2026-05-30
