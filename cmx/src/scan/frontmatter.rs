@@ -107,13 +107,81 @@ fn fix_unquoted_block_indicator_value(line: &str) -> String {
 }
 
 /// Parse a YAML frontmatter string into a `Mapping`. Returns `None` if the
-/// input is not valid YAML or does not deserialize to a mapping.
+/// input is neither valid YAML nor recoverable by the lenient fallback.
+///
+/// Strict YAML is tried first (after [`normalize_frontmatter`]). Only when that
+/// fails do we fall back to [`lenient_mapping`], so well-formed frontmatter is
+/// unaffected and keeps its exact YAML semantics.
 fn parse_yaml_mapping(frontmatter: &str) -> Option<Mapping> {
     let normalized = normalize_frontmatter(frontmatter);
     match serde_yaml_ng::from_str::<Value>(&normalized) {
         Ok(Value::Mapping(m)) => Some(m),
-        _ => None,
+        _ => lenient_mapping(frontmatter),
     }
+}
+
+/// Best-effort frontmatter parse for input that strict YAML rejects.
+///
+/// Real-world skill/agent frontmatter sometimes carries an unquoted, multi-
+/// paragraph `description:` value broken by a blank line — accepted by Claude
+/// Code's loader but invalid YAML (a plain scalar can't resume after a blank
+/// line at column 0). Rather than silently dropping the whole artifact, recover
+/// a flat top-level mapping by scanning `key: value` lines: a value continues
+/// across following lines that are not themselves top-level keys (blank lines
+/// included) and is whitespace-joined into a single line.
+///
+/// Invoked only when strict parsing fails, so well-formed frontmatter never
+/// takes this looser path. Nested mappings (e.g. a `metadata:` block) are not
+/// reconstructed — indented children fold into the parent value — which is an
+/// acceptable trade for the malformed inputs this rescues.
+fn lenient_mapping(frontmatter: &str) -> Option<Mapping> {
+    /// Split a line into `(key, inline_value)` when it is a top-level mapping
+    /// entry: at column 0, an identifier key, then `:` followed by a space or
+    /// end-of-line. Returns `None` for indented lines, blank lines, and prose
+    /// (so `http://x` mid-value isn't mistaken for a key).
+    fn top_level_key(line: &str) -> Option<(&str, &str)> {
+        if line.starts_with([' ', '\t']) {
+            return None;
+        }
+        let colon = line.find(':')?;
+        let key = &line[..colon];
+        if key.is_empty() || !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
+            return None;
+        }
+        let rest = &line[colon + 1..];
+        match rest.strip_prefix(' ') {
+            Some(value) => Some((key, value)),
+            None if rest.is_empty() => Some((key, "")),
+            None => None,
+        }
+    }
+
+    /// Collapse the collected value lines into a single whitespace-normalized
+    /// string and record it (dropping empty values, e.g. bare `metadata:`).
+    fn flush(mapping: &mut Mapping, entry: Option<(String, Vec<String>)>) {
+        if let Some((key, parts)) = entry {
+            let value = parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ");
+            if !value.is_empty() {
+                mapping.insert(Value::String(key), Value::String(value));
+            }
+        }
+    }
+
+    let mut mapping = Mapping::new();
+    let mut current: Option<(String, Vec<String>)> = None;
+
+    for line in frontmatter.lines() {
+        if let Some((key, value)) = top_level_key(line) {
+            flush(&mut mapping, current.take());
+            current = Some((key.to_string(), vec![value.to_string()]));
+        } else if let Some((_, parts)) = current.as_mut() {
+            parts.push(line.to_string());
+        }
+    }
+    flush(&mut mapping, current.take());
+
+    (!mapping.is_empty()).then_some(mapping)
 }
 
 /// Convert a `Value` scalar to a non-empty `String`, or `None` for null/empty.
@@ -240,8 +308,68 @@ mod tests {
     }
 
     #[test]
-    fn parse_yaml_mapping_malformed_returns_none() {
-        assert!(parse_yaml_mapping("key: [unclosed bracket").is_none());
+    fn parse_yaml_mapping_unrecoverable_returns_none() {
+        // No top-level `key:` line anywhere — neither strict YAML nor the
+        // lenient fallback can make a mapping of it.
+        assert!(parse_yaml_mapping("  just indented prose, no keys").is_none());
+    }
+
+    #[test]
+    fn parse_yaml_mapping_yaml_invalid_but_recoverable_falls_back() {
+        // Strict YAML rejects an unclosed flow sequence; the fallback still
+        // recovers the key with a best-effort scalar value rather than dropping
+        // the whole frontmatter.
+        let mapping =
+            parse_yaml_mapping("key: [unclosed bracket").expect("fallback recovers the key");
+        assert!(mapping.contains_key(Value::String("key".to_string())));
+    }
+
+    // --- lenient fallback for YAML-invalid frontmatter ---
+
+    #[test]
+    fn lenient_recovers_multiparagraph_description() {
+        // An unquoted description broken by a blank line into a second paragraph
+        // is invalid YAML, but Claude Code accepts it. The fallback recovers the
+        // skill instead of dropping it, joining the paragraphs into one line.
+        let text = "name: personal-finance\n\
+                    description: First paragraph runs long.\n\
+                    \n\
+                    Second paragraph after a blank line.";
+        let mapping = parse_yaml_mapping(text).expect("fallback should recover a mapping");
+        assert!(mapping.contains_key(Value::String("name".to_string())));
+        assert_eq!(
+            extract_field(text, "description").as_deref(),
+            Some("First paragraph runs long. Second paragraph after a blank line."),
+        );
+        assert_eq!(extract_field(text, "name").as_deref(), Some("personal-finance"));
+    }
+
+    #[test]
+    fn lenient_does_not_engage_for_valid_yaml() {
+        // A genuine block scalar must keep its YAML semantics (newlines), proving
+        // the fallback only runs when strict parsing fails.
+        let text = "description: |\n  line one\n  line two\n";
+        assert_eq!(extract_field(text, "description"), Some("line one\nline two".to_string()));
+    }
+
+    #[test]
+    fn lenient_skill_frontmatter_round_trips_through_parser() {
+        let content = "---\nname: personal-finance\n\
+                       description: Maintain the ledger.\n\
+                       \n\
+                       For the CLI itself, see the gilt skill.\n---\n# body";
+        let fm = parse_frontmatter_str(content).expect("skill should parse via fallback");
+        assert_eq!(fm.description, "Maintain the ledger. For the CLI itself, see the gilt skill.");
+    }
+
+    #[test]
+    fn lenient_agent_frontmatter_recovers_required_fields() {
+        let content = "---\nname: my-agent\n\
+                       description: Does things across\n\
+                       \n\
+                       multiple paragraphs.\n---\n# body";
+        let fm = parse_agent_frontmatter_str(content).expect("agent should parse via fallback");
+        assert_eq!(fm.description, "Does things across multiple paragraphs.");
     }
 
     // --- extract_field ---
