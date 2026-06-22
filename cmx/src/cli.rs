@@ -174,6 +174,14 @@ pub enum ArtifactAction {
         #[arg(long)]
         local: bool,
     },
+    /// Promote in-place edits of an installed artifact back into the canonical
+    /// home — the mirror of `update`. Use after editing a skill where it's
+    /// installed, to make those edits the canonical copy. Promotes the copy
+    /// `cmx diff` shows (global scope preferred, then project).
+    Promote {
+        /// Artifact name to promote into the home
+        name: String,
+    },
     /// Uninstall installed artifact(s) — removed everywhere cmx tracks them
     Uninstall {
         /// Artifact name(s) to uninstall

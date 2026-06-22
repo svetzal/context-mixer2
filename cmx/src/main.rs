@@ -321,6 +321,11 @@ fn handle_artifact(
             print!("{result}");
             Ok(ExitCode::SUCCESS)
         }
+        ArtifactAction::Promote { name } => {
+            let result = cmx::promote::promote(&name, kind, ctx)?;
+            print!("{result}");
+            Ok(ExitCode::SUCCESS)
+        }
         ArtifactAction::Uninstall { names, local } => {
             if names.is_empty() {
                 bail!("Provide artifact name(s) to uninstall")

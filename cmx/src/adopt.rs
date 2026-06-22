@@ -55,7 +55,7 @@ pub struct AdoptOutcome {
 }
 
 /// Resolve the effective canonical home directory from config.
-fn resolve_home(ctx: &AppContext<'_>) -> Result<PathBuf> {
+pub(crate) fn resolve_home(ctx: &AppContext<'_>) -> Result<PathBuf> {
     let config = config::load_config(ctx.fs, ctx.paths)?;
     Ok(config::resolve_artifact_home(&config, ctx.paths))
 }
@@ -63,7 +63,7 @@ fn resolve_home(ctx: &AppContext<'_>) -> Result<PathBuf> {
 /// Ensure the home directory exists and is registered as a local source named
 /// `home`. Idempotent: re-registers (pointing at the resolved home) if absent or
 /// stale, leaves it untouched otherwise.
-fn ensure_home_source(home: &Path, ctx: &AppContext<'_>) -> Result<()> {
+pub(crate) fn ensure_home_source(home: &Path, ctx: &AppContext<'_>) -> Result<()> {
     ctx.fs.create_dir_all(home)?;
     let now = ctx.clock.now().to_rfc3339();
     config::mutate_sources(ctx.fs, ctx.paths, |sources| {

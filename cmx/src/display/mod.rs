@@ -7,6 +7,7 @@ mod info;
 mod install;
 mod list;
 mod outdated;
+mod promote;
 mod search;
 mod source;
 mod sync;
