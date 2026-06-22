@@ -25,7 +25,23 @@ struct PlatformSpec {
 // --- enum ---
 
 /// The target AI coding assistant platform for artifact installation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, clap::ValueEnum)]
+///
+/// Serializes to its lowercase name (`"claude"`, `"codex"`, …) — the same token
+/// the `--platform` flag accepts — so the `platforms` list in `config.json`
+/// stays human-readable and round-trips with the CLI.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Default,
+    clap::ValueEnum,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum Platform {
     #[default]
     Claude,
@@ -637,6 +653,15 @@ mod tests {
     }
 
     // --- slug ---
+
+    #[test]
+    fn serializes_to_lowercase_cli_name() {
+        // The config `platforms` list must round-trip with the tokens the
+        // `--platform` flag and `cmx config platforms add` accept.
+        assert_eq!(serde_json::to_string(&Platform::Codex).unwrap(), "\"codex\"");
+        assert_eq!(serde_json::to_string(&Platform::Claude).unwrap(), "\"claude\"");
+        assert_eq!(serde_json::from_str::<Platform>("\"openhands\"").unwrap(), Platform::Openhands);
+    }
 
     #[test]
     fn slug_values() {

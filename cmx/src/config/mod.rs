@@ -43,6 +43,20 @@ pub fn save_config(config: &CmxConfig, fs: &dyn Filesystem, paths: &ConfigPaths)
     crate::json_file::save_json(config, &paths.config_path(), fs)
 }
 
+/// The explicit set of platforms the user has told cmx to manage, if any.
+///
+/// Returns `Some(list)` when `config.platforms` is non-empty (the authoritative
+/// managed set), or `None` when unset — signalling callers to fall back to their
+/// own default (every supported platform for `doctor`/`uninstall`; the in-use
+/// inference for `install`).
+pub fn managed_platforms(
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+) -> Result<Option<Vec<crate::platform::Platform>>> {
+    let cfg = load_config(fs, paths)?;
+    Ok((!cfg.platforms.is_empty()).then_some(cfg.platforms))
+}
+
 /// Resolve the effective canonical artifact home: the `home` override in the
 /// config if set, otherwise the default under the config root.
 pub fn resolve_artifact_home(config: &CmxConfig, paths: &ConfigPaths) -> PathBuf {

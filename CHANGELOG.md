@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`cmx config platforms add|remove|list`** — declare the platforms cmx manages instead of letting it infer. When the list is non-empty it becomes authoritative: a default (no `--platform`) `install`/`uninstall` acts on exactly those platforms, and `cmx doctor` surveys only those — so cmx ignores tools you don't use rather than scanning all thirteen. When the list is empty (the default), behaviour is unchanged: install infers from platforms in use, while uninstall and doctor consider every supported platform. The set is stored as lowercase names in `config.json` (`"platforms": ["claude", "codex"]`) and shown by `cmx config show` (as `(inferred)` when unset). Onboard a tool before any install with `cmx config platforms add codex`.
 - `cmx skill info <name>` / `cmx agent info <name>` — kind-scoped detail for an installed artifact, alongside the existing (both-kinds) `cmx info <name>`. On top of the usual metadata, `info` now shows **Activates when** (for a skill, its `description` frontmatter — precisely the activation trigger the assistant reads to decide whether to load it; for an agent, its role description) and **What it does**, a short LLM-generated paragraph produced via the configured gateway (`cmx config gateway`/`model`). The summary requires a build with the **`llm` feature**; a lean build prints a one-line hint instead, and generation is best-effort so an unreachable provider never fails the command.
 
 ### Changed

@@ -3,7 +3,8 @@ use clap::Parser;
 use std::process::ExitCode;
 
 use cmx::cli::{
-    ArtifactAction, Cli, Commands, ConfigAction, ExternalAction, HomeAction, SourceAction,
+    ArtifactAction, Cli, Commands, ConfigAction, ExternalAction, HomeAction, PlatformsAction,
+    SourceAction,
 };
 use cmx::context::AppContext;
 use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
@@ -162,6 +163,17 @@ fn handle_config(action: ConfigAction, ctx: &AppContext<'_>) -> Result<()> {
                 ExternalAction::List => cmx::cmx_config::external_list(ctx)?,
                 ExternalAction::Add { entry } => cmx::cmx_config::external_add(&entry, ctx)?,
                 ExternalAction::Remove { entry } => cmx::cmx_config::external_remove(&entry, ctx)?,
+            };
+            print!("{result}");
+            Ok(())
+        }
+        ConfigAction::Platforms { action } => {
+            let result = match action {
+                PlatformsAction::List => cmx::cmx_config::platforms_list(ctx)?,
+                PlatformsAction::Add { platform } => cmx::cmx_config::platforms_add(platform, ctx)?,
+                PlatformsAction::Remove { platform } => {
+                    cmx::cmx_config::platforms_remove(platform, ctx)?
+                }
             };
             print!("{result}");
             Ok(())

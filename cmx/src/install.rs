@@ -146,11 +146,14 @@ pub fn install(
 ///
 /// - `Some(p)` — exactly that platform (a later `ensure_supports` check fails
 ///   loudly if it can't host `kind`).
-/// - `None` — every platform already **in use** (a non-empty lock file at
-///   `scope`) that supports `kind`, so a default install lands in the tools you
-///   actually use rather than scattering into all supported tools. Falls back
-///   to `[Claude]` when nothing is tracked yet, so a first-ever install still
-///   has a sensible home.
+/// - `None`, explicit managed set configured — every managed platform that
+///   supports `kind`. The user has declared which tools cmx manages, so that
+///   list is authoritative.
+/// - `None`, no managed set — every platform already **in use** (a non-empty
+///   lock file at `scope`) that supports `kind`, so a default install lands in
+///   the tools you actually use rather than scattering into all supported
+///   tools. Falls back to `[Claude]` when nothing is tracked yet, so a
+///   first-ever install still has a sensible home.
 pub fn resolve_targets(
     selector: Option<Platform>,
     kind: ArtifactKind,
@@ -159,6 +162,9 @@ pub fn resolve_targets(
 ) -> Result<Vec<Platform>> {
     if let Some(p) = selector {
         return Ok(vec![p]);
+    }
+    if let Some(managed) = crate::config::managed_platforms(ctx.fs, ctx.paths)? {
+        return Ok(managed.into_iter().filter(|p| p.supports(kind)).collect());
     }
     let mut targets = Vec::new();
     for platform in Platform::ALL {

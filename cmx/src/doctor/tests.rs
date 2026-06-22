@@ -151,7 +151,7 @@ fn survey_scopes_includes_local_when_requested() {
 fn build_locations_collapses_shared_agents_skills_cohort() {
     let t = TestContext::new();
     let ctx = t.ctx();
-    let locations = build_locations(&ctx, &[InstallScope::Global]);
+    let locations = build_locations(&ctx, &[InstallScope::Global], &crate::platform::Platform::ALL);
 
     // The shared global .agents/skills directory must be a single location
     // attributed to every cohort platform.
@@ -210,6 +210,26 @@ fn untracked_when_on_disk_no_lock_but_source_provides_it() {
     assert_eq!(report.counts().untracked, 1);
     assert_eq!(report.counts().orphaned, 0);
     assert!(report.has_issues());
+}
+
+#[test]
+fn survey_with_managed_set_ignores_unmanaged_platforms() {
+    let t = TestContext::new();
+    crate::test_support::setup_empty_sources(&t.fs, &t.paths);
+    // A skill present only on Codex (shared .agents/skills), with no lock entry.
+    install_skill(&t, Platform::Codex, "codex-only", "1.0.0", InstallScope::Global);
+    // The user manages Claude only.
+    let cfg = crate::types::CmxConfig {
+        platforms: vec![Platform::Claude],
+        ..Default::default()
+    };
+    crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
+
+    let report = survey(false, &t.ctx()).unwrap();
+    assert!(
+        report.rows.iter().all(|r| r.name != "codex-only"),
+        "doctor must not survey platforms outside the managed set"
+    );
 }
 
 #[test]

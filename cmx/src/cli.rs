@@ -218,6 +218,31 @@ pub enum ConfigAction {
         #[command(subcommand)]
         action: ExternalAction,
     },
+    /// Manage the set of platforms cmx manages. When set, `install`/`uninstall`
+    /// act on exactly these and `doctor` surveys only these; when empty, cmx
+    /// infers the set from the platforms already in use.
+    Platforms {
+        #[command(subcommand)]
+        action: PlatformsAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PlatformsAction {
+    /// List the platforms cmx manages
+    List,
+    /// Add a platform to the managed set
+    Add {
+        /// Platform to manage (e.g. claude, codex)
+        #[arg(value_enum)]
+        platform: Platform,
+    },
+    /// Remove a platform from the managed set
+    Remove {
+        /// Platform to stop managing
+        #[arg(value_enum)]
+        platform: Platform,
+    },
 }
 
 #[derive(Subcommand)]

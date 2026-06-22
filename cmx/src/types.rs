@@ -28,6 +28,14 @@ pub struct CmxConfig {
     /// [`config::matches_external`](crate::config::matches_external).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub external: Vec<String>,
+    /// The platforms cmx manages. When non-empty, this is the **authoritative**
+    /// set: default (no `--platform`) `install`/`uninstall` act on exactly these,
+    /// and `doctor` surveys only these. When empty (the default), cmx infers the
+    /// set — install targets platforms already in use, while uninstall and
+    /// doctor consider every supported platform. Manage with
+    /// `cmx config platforms add|remove|list`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub platforms: Vec<crate::platform::Platform>,
 }
 
 impl Default for CmxConfig {
@@ -37,6 +45,7 @@ impl Default for CmxConfig {
             llm: LlmConfig::default(),
             home: None,
             external: Vec::new(),
+            platforms: Vec::new(),
         }
     }
 }

@@ -36,9 +36,10 @@ pub(crate) struct LocationAgg {
 pub(crate) fn build_locations(
     ctx: &AppContext<'_>,
     scopes: &[InstallScope],
+    platforms: &[Platform],
 ) -> BTreeMap<PathBuf, LocationAgg> {
     let mut locations: BTreeMap<PathBuf, LocationAgg> = BTreeMap::new();
-    for platform in Platform::ALL {
+    for &platform in platforms {
         let pv = ctx.paths.with_platform(platform);
         for &scope in scopes {
             for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
@@ -66,9 +67,10 @@ pub(crate) fn build_locations(
 fn load_all_locks(
     ctx: &AppContext<'_>,
     scopes: &[InstallScope],
+    platforms: &[Platform],
 ) -> Result<HashMap<(Platform, InstallScope), LockFile>> {
     let mut locks = HashMap::new();
-    for platform in Platform::ALL {
+    for &platform in platforms {
         let pv = ctx.paths.with_platform(platform);
         for &scope in scopes {
             locks.insert((platform, scope), lockfile::load(scope, ctx.fs, &pv)?);
@@ -264,10 +266,18 @@ pub(crate) fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
 /// (local) scope when `include_local` is set.
 pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport> {
     let scopes = survey_scopes(include_local);
-    let locations = build_locations(ctx, &scopes);
-    let locks = load_all_locks(ctx, &scopes)?;
+    let cfg = config::load_config(ctx.fs, ctx.paths)?;
+    // When the user has declared a managed set, `doctor` surveys only those
+    // platforms; otherwise it inspects every supported platform.
+    let platforms = if cfg.platforms.is_empty() {
+        Platform::ALL.to_vec()
+    } else {
+        cfg.platforms.clone()
+    };
+    let locations = build_locations(ctx, &scopes, &platforms);
+    let locks = load_all_locks(ctx, &scopes, &platforms)?;
     let available = available_in_sources(ctx)?;
-    let external = config::load_config(ctx.fs, ctx.paths)?.external;
+    let external = cfg.external;
 
     let mut rows = Vec::new();
     for (dir, agg) in &locations {

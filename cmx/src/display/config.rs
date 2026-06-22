@@ -1,14 +1,38 @@
 use std::fmt;
 
-use crate::cmx_config::{ConfigSetResult, ConfigShowResult, ExternalResult};
+use crate::cmx_config::{ConfigSetResult, ConfigShowResult, ExternalResult, PlatformsResult};
+
+fn join_platforms(platforms: &[crate::platform::Platform]) -> String {
+    platforms.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
+}
 
 impl fmt::Display for ConfigShowResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "LLM gateway: {}\nLLM model:   {}\n", self.gateway, self.model)?;
         if self.external.is_empty() {
-            writeln!(f, "External:    (none)")
+            writeln!(f, "External:    (none)")?;
         } else {
-            writeln!(f, "External:    {}", self.external.join(", "))
+            writeln!(f, "External:    {}", self.external.join(", "))?;
+        }
+        // "(inferred)" signals the fall-back behaviour: with no explicit set,
+        // cmx infers which platforms to manage rather than using a fixed list.
+        if self.platforms.is_empty() {
+            writeln!(f, "Platforms:   (inferred)")
+        } else {
+            writeln!(f, "Platforms:   {}", join_platforms(&self.platforms))
+        }
+    }
+}
+
+impl fmt::Display for PlatformsResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(platform) = &self.platform {
+            writeln!(f, "{} platform: {platform}", self.action)?;
+        }
+        if self.platforms.is_empty() {
+            writeln!(f, "Managed platforms: (none — cmx infers from platforms in use)")
+        } else {
+            writeln!(f, "Managed platforms: {}", join_platforms(&self.platforms))
         }
     }
 }
@@ -48,11 +72,13 @@ mod tests {
             gateway: "ollama".to_string(),
             model: "llama3".to_string(),
             external: vec!["~/.hermes/skills".to_string()],
+            platforms: vec![crate::platform::Platform::Codex],
         };
         let out = r.to_string();
         assert!(out.contains("LLM gateway:"));
         assert!(out.contains("LLM model:"));
         assert!(out.contains("External:    ~/.hermes/skills"));
+        assert!(out.contains("Platforms:   codex"));
     }
 
     #[test]

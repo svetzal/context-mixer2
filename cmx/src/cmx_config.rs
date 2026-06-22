@@ -2,12 +2,24 @@ use anyhow::{Result, bail};
 
 use crate::config;
 use crate::context::AppContext;
+use crate::platform::Platform;
 use crate::types::LlmGatewayType;
 
 pub struct ConfigShowResult {
     pub gateway: String,
     pub model: String,
     pub external: Vec<String>,
+    pub platforms: Vec<Platform>,
+}
+
+/// Result of listing or mutating the managed `platforms` set.
+pub struct PlatformsResult {
+    /// Human-facing verb: "Added", "Removed", "Already managed", "Not managed",
+    /// or "Managed platforms" for a plain listing.
+    pub action: &'static str,
+    pub platform: Option<Platform>,
+    /// The resulting (or current) managed set.
+    pub platforms: Vec<Platform>,
 }
 
 pub struct ConfigSetResult {
@@ -31,6 +43,54 @@ pub fn show(ctx: &AppContext<'_>) -> Result<ConfigShowResult> {
         gateway: cfg.llm.gateway.to_string(),
         model: cfg.llm.model.clone(),
         external: cfg.external.clone(),
+        platforms: cfg.platforms.clone(),
+    })
+}
+
+/// List the managed platforms.
+pub fn platforms_list(ctx: &AppContext<'_>) -> Result<PlatformsResult> {
+    let cfg = config::load_config(ctx.fs, ctx.paths)?;
+    Ok(PlatformsResult {
+        action: "Managed platforms",
+        platform: None,
+        platforms: cfg.platforms,
+    })
+}
+
+/// Add a platform to the managed set. Idempotent; keeps the list sorted/deduped.
+pub fn platforms_add(platform: Platform, ctx: &AppContext<'_>) -> Result<PlatformsResult> {
+    let mut cfg = config::load_config(ctx.fs, ctx.paths)?;
+    let action = if cfg.platforms.contains(&platform) {
+        "Already managed"
+    } else {
+        cfg.platforms.push(platform);
+        cfg.platforms.sort_by_key(ToString::to_string);
+        config::save_config(&cfg, ctx.fs, ctx.paths)?;
+        "Added"
+    };
+    Ok(PlatformsResult {
+        action,
+        platform: Some(platform),
+        platforms: cfg.platforms,
+    })
+}
+
+/// Remove a platform from the managed set. Reports "Not managed" without error
+/// if absent.
+pub fn platforms_remove(platform: Platform, ctx: &AppContext<'_>) -> Result<PlatformsResult> {
+    let mut cfg = config::load_config(ctx.fs, ctx.paths)?;
+    let before = cfg.platforms.len();
+    cfg.platforms.retain(|p| *p != platform);
+    let action = if cfg.platforms.len() == before {
+        "Not managed"
+    } else {
+        config::save_config(&cfg, ctx.fs, ctx.paths)?;
+        "Removed"
+    };
+    Ok(PlatformsResult {
+        action,
+        platform: Some(platform),
+        platforms: cfg.platforms,
     })
 }
 
@@ -117,11 +177,13 @@ mod tests {
             gateway: "ollama".to_string(),
             model: "llama3".to_string(),
             external: vec![],
+            platforms: vec![],
         };
         let out = result.to_string();
         assert!(out.contains("LLM gateway: ollama"));
         assert!(out.contains("LLM model:   llama3"));
         assert!(out.contains("External:    (none)"));
+        assert!(out.contains("Platforms:   (inferred)"));
     }
 
     // --- Display for ConfigSetResult ---
@@ -241,5 +303,36 @@ mod tests {
 
         let shown = show(&ctx).unwrap();
         assert_eq!(shown.model, "gpt-4");
+    }
+
+    #[test]
+    fn platforms_add_list_remove_roundtrip() {
+        let t = TestContext::new();
+        let ctx = t.ctx();
+
+        assert_eq!(platforms_add(Platform::Codex, &ctx).unwrap().action, "Added");
+        assert_eq!(platforms_add(Platform::Claude, &ctx).unwrap().action, "Added");
+        assert_eq!(
+            platforms_add(Platform::Codex, &ctx).unwrap().action,
+            "Already managed",
+            "adding a managed platform again is idempotent"
+        );
+
+        // Listed sorted by display name (claude before codex).
+        assert_eq!(
+            platforms_list(&ctx).unwrap().platforms,
+            vec![Platform::Claude, Platform::Codex]
+        );
+
+        assert_eq!(platforms_remove(Platform::Claude, &ctx).unwrap().action, "Removed");
+        assert_eq!(
+            platforms_remove(Platform::Claude, &ctx).unwrap().action,
+            "Not managed",
+            "removing an unmanaged platform reports without erroring"
+        );
+        assert_eq!(platforms_list(&ctx).unwrap().platforms, vec![Platform::Codex]);
+
+        // `show` surfaces the managed set too.
+        assert_eq!(show(&ctx).unwrap().platforms, vec![Platform::Codex]);
     }
 }

@@ -148,7 +148,7 @@ System survey / adoption:
 Config & persistence:
 - `cmx/src/config/mod.rs` — config dir paths, sources.json read/write
 - `cmx/src/config/installed.rs` — installed-artifact config records
-- `cmx/src/cmx_config.rs` — `cmx config` subcommands (show, set)
+- `cmx/src/cmx_config.rs` — `cmx config` subcommands (show, set, external, platforms — the managed-platform allowlist that scopes install/uninstall/doctor)
 - `cmx/src/paths.rs` — ConfigPaths: global/local install dir resolution
 - `cmx/src/lockfile.rs` — lock file read/write
 - `cmx/src/json_file.rs` — generic JSON file load/save helpers

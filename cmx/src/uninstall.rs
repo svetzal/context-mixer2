@@ -55,9 +55,25 @@ pub(crate) fn remove_installed(kind: ArtifactKind, path: &Path, fs: &dyn Filesys
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Uninstall one artifact **everywhere cmx tracks it** at the given scope, across
-/// every platform — returning `Ok(None)` when it isn't installed anywhere
-/// (rather than erroring), so batch callers can report it without aborting.
+/// Resolve which platforms an uninstall considers.
+///
+/// - `Some(p)` — only that platform (`--platform`).
+/// - `None`, explicit managed set configured — exactly the managed platforms.
+/// - `None`, no managed set — every platform, so the artifact is removed
+///   wherever it's tracked.
+fn candidate_platforms(selector: Option<Platform>, ctx: &AppContext<'_>) -> Result<Vec<Platform>> {
+    if let Some(p) = selector {
+        return Ok(vec![p]);
+    }
+    if let Some(managed) = crate::config::managed_platforms(ctx.fs, ctx.paths)? {
+        return Ok(managed);
+    }
+    Ok(Platform::ALL.to_vec())
+}
+
+/// Uninstall one artifact from the given `candidates`, at the given scope —
+/// returning `Ok(None)` when it isn't installed on any of them (rather than
+/// erroring), so batch callers can report it without aborting.
 ///
 /// `cmx doctor` presents a cross-platform, grouped view, so its inverse should
 /// too: removing a skill deletes every physical copy and clears every platform's
@@ -68,7 +84,7 @@ fn uninstall_one(
     name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
-    only: Option<Platform>,
+    candidates: &[Platform],
     ctx: &AppContext<'_>,
 ) -> Result<Option<UninstallResult>> {
     // Distinct physical locations to delete (the shared `.agents/skills` dir
@@ -76,14 +92,7 @@ fn uninstall_one(
     let mut paths_to_delete: BTreeSet<PathBuf> = BTreeSet::new();
     let mut removed_from: Vec<Platform> = Vec::new();
 
-    // `--platform` narrows the operation to a single platform; without it we
-    // sweep every platform, removing the artifact wherever it's tracked.
-    let candidates: Vec<Platform> = match only {
-        Some(p) => vec![p],
-        None => Platform::ALL.to_vec(),
-    };
-
-    for platform in candidates {
+    for &platform in candidates {
         if !platform.supports(kind) {
             continue;
         }
@@ -134,9 +143,10 @@ pub fn uninstall(
 ) -> Result<UninstallResult> {
     let where_ = match only {
         Some(p) => format!("the {p} platform"),
-        None => "any platform".to_string(),
+        None => "any managed platform".to_string(),
     };
-    uninstall_one(name, kind, scope, only, ctx)?.ok_or_else(|| {
+    let candidates = candidate_platforms(only, ctx)?;
+    uninstall_one(name, kind, scope, &candidates, ctx)?.ok_or_else(|| {
         anyhow::anyhow!("No {kind} named '{name}' found in {} scope on {where_}.", scope.label())
     })
 }
@@ -152,8 +162,9 @@ pub fn uninstall_many(
     only: Option<Platform>,
     ctx: &AppContext<'_>,
 ) -> Result<BatchUninstallResult> {
+    let candidates = candidate_platforms(only, ctx)?;
     let (removed, not_found) = partition_by(names, |name| {
-        Ok(match uninstall_one(name, kind, scope, only, ctx)? {
+        Ok(match uninstall_one(name, kind, scope, &candidates, ctx)? {
             Some(r) => Partitioned::Kept(r),
             None => Partitioned::Excluded(name.to_string()),
         })
@@ -541,5 +552,44 @@ mod tests {
         let claude_lock = lockfile::load(InstallScope::Global, &t.fs, &claude).unwrap();
         assert!(!codex_lock.packages.contains_key("my-agent"), "Codex entry removed");
         assert!(claude_lock.packages.contains_key("my-agent"), "Claude entry left intact");
+    }
+
+    #[test]
+    fn uninstall_default_sweeps_only_the_managed_platform_set() {
+        // Tracked on both Claude and Codex, but the user manages Codex only.
+        let t = TestContext::new();
+        let claude = t.paths.with_platform(Platform::Claude);
+        let codex = t.paths.with_platform(Platform::Codex);
+        for pv in [&claude, &codex] {
+            let mut packages = BTreeMap::new();
+            packages.insert("my-agent".to_string(), sample_lock_entry());
+            lockfile::save(
+                &LockFile {
+                    version: 1,
+                    packages,
+                },
+                InstallScope::Global,
+                &t.fs,
+                pv,
+            )
+            .unwrap();
+        }
+        let cfg = crate::types::CmxConfig {
+            platforms: vec![Platform::Codex],
+            ..Default::default()
+        };
+        crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
+
+        // No --platform: the sweep is bounded by the managed set, not all platforms.
+        let ctx = t.ctx();
+        let result =
+            uninstall("my-agent", ArtifactKind::Agent, InstallScope::Global, None, &ctx).unwrap();
+
+        assert_eq!(result.platforms, vec![Platform::Codex]);
+        let claude_lock = lockfile::load(InstallScope::Global, &t.fs, &claude).unwrap();
+        assert!(
+            claude_lock.packages.contains_key("my-agent"),
+            "an unmanaged platform is left untouched"
+        );
     }
 }

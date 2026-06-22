@@ -1162,3 +1162,38 @@ fn install_many_fans_out_to_every_target_platform() {
         assert!(lock.packages.contains_key("shared-skill"), "{p} should track the skill");
     }
 }
+
+#[test]
+fn resolve_targets_default_prefers_explicit_managed_set_over_inference() {
+    let t = TestContext::new();
+    // Declare a managed set even though nothing is tracked anywhere yet.
+    let cfg = crate::types::CmxConfig {
+        platforms: vec![Platform::Codex],
+        ..Default::default()
+    };
+    crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
+
+    let ctx = t.ctx();
+    let targets = resolve_targets(None, ArtifactKind::Skill, InstallScope::Global, &ctx).unwrap();
+    assert_eq!(
+        targets,
+        vec![Platform::Codex],
+        "the explicit managed set wins over the in-use inference and the Claude fallback"
+    );
+}
+
+#[test]
+fn resolve_targets_managed_set_is_filtered_by_kind_support() {
+    let t = TestContext::new();
+    // Hermes is skills-only; managing it then installing an *agent* yields no
+    // viable target rather than erroring globally.
+    let cfg = crate::types::CmxConfig {
+        platforms: vec![Platform::Hermes],
+        ..Default::default()
+    };
+    crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
+
+    let ctx = t.ctx();
+    let targets = resolve_targets(None, ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
+    assert!(targets.is_empty(), "a skills-only platform is not an agent target");
+}
