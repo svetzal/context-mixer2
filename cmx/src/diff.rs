@@ -24,6 +24,17 @@ pub struct DiffOutput {
     pub source_name: String,
     pub diff_text: Option<String>,
     pub analysis: Option<String>,
+    /// The concrete `cmx` command to bring the installed copy back in line with
+    /// source. `None` when already up to date (nothing to remediate).
+    pub remediation: Option<Remediation>,
+}
+
+/// A copy-pasteable next step: the exact command to run, plus an optional
+/// caveat (e.g. that it overwrites local edits).
+#[derive(Debug)]
+pub struct Remediation {
+    pub command: String,
+    pub note: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -65,12 +76,30 @@ pub(crate) async fn gather_diff_with(
             source_name,
             diff_text: None,
             analysis: None,
+            remediation: None,
         });
     }
 
     // Get installed version from lock file if available
     let lock = lockfile::load(local, ctx.fs, ctx.paths)?;
     let installed_version = lock.packages.get(name).and_then(|e| e.version.clone());
+
+    // The installed copy differs from source. `update` re-installs the source
+    // version; it needs `--force` when the copy was modified after install
+    // (its bytes no longer match the lock's recorded checksum).
+    let locally_modified = lock
+        .packages
+        .get(name)
+        .is_some_and(|e| e.installed_checksum != installed_checksum);
+    let remediation = Some(Remediation {
+        command: if locally_modified {
+            format!("cmx {kind} update {name} --force")
+        } else {
+            format!("cmx {kind} update {name}")
+        },
+        note: locally_modified
+            .then(|| "the installed copy has local edits; --force overwrites them".to_string()),
+    });
 
     // Build diff text
     let diff_text = diff_artifact(kind, &installed_path, &source_path, ctx)?;
@@ -106,6 +135,7 @@ pub(crate) async fn gather_diff_with(
         source_name,
         diff_text: Some(diff_text),
         analysis: Some(analysis),
+        remediation,
     })
 }
 
@@ -586,6 +616,7 @@ mod tests {
             source_name: "src".to_string(),
             diff_text: None,
             analysis: None,
+            remediation: None,
         };
         assert!(r.to_string().contains("is up to date with source."));
     }
@@ -602,10 +633,16 @@ mod tests {
             source_name: "src".to_string(),
             diff_text: Some("--- a\n+++ b\n".to_string()),
             analysis: Some("Breaking changes added.".to_string()),
+            remediation: Some(Remediation {
+                command: "cmx agent update my-agent".to_string(),
+                note: None,
+            }),
         };
         let out = r.to_string();
         assert!(out.contains("Comparing my-agent"));
         assert!(out.contains("Breaking changes added."));
+        assert!(out.contains("To remediate, run:"));
+        assert!(out.contains("cmx agent update my-agent"));
     }
 
     #[cfg(feature = "llm")]
@@ -620,6 +657,7 @@ mod tests {
             source_name: "src".to_string(),
             diff_text: Some("--- a\n+++ b\n".to_string()),
             analysis: None,
+            remediation: None,
         };
         assert!(r.to_string().contains("Differences:"));
     }

@@ -27,6 +27,15 @@ impl fmt::Display for DiffOutput {
             writeln!(f, "{diff}")?;
         }
 
+        if let Some(rem) = &self.remediation {
+            writeln!(f)?;
+            writeln!(f, "To remediate, run:")?;
+            writeln!(f, "  {}", rem.command)?;
+            if let Some(note) = &rem.note {
+                writeln!(f, "  ({note})")?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -49,8 +58,11 @@ mod tests {
             source_name: "src".to_string(),
             diff_text: None,
             analysis: None,
+            remediation: None,
         };
-        assert!(r.to_string().contains("is up to date with source."));
+        let out = r.to_string();
+        assert!(out.contains("is up to date with source."));
+        assert!(!out.contains("To remediate"), "no remediation when up to date");
     }
 
     #[test]
@@ -64,10 +76,19 @@ mod tests {
             source_name: "src".to_string(),
             diff_text: Some("--- a\n+++ b\n".to_string()),
             analysis: Some("Notable changes found.".to_string()),
+            remediation: Some(crate::diff::Remediation {
+                command: "cmx agent update my-agent --force".to_string(),
+                note: Some(
+                    "the installed copy has local edits; --force overwrites them".to_string(),
+                ),
+            }),
         };
         let out = r.to_string();
         assert!(out.contains("Analyzing differences..."));
         assert!(out.contains("Notable changes found."));
+        assert!(out.contains("To remediate, run:"));
+        assert!(out.contains("cmx agent update my-agent --force"));
+        assert!(out.contains("--force overwrites them"));
     }
 
     #[test]
@@ -81,7 +102,13 @@ mod tests {
             source_name: "src".to_string(),
             diff_text: Some("--- a\n+++ b\n".to_string()),
             analysis: None,
+            remediation: Some(crate::diff::Remediation {
+                command: "cmx agent update my-agent".to_string(),
+                note: None,
+            }),
         };
-        assert!(r.to_string().contains("Differences:"));
+        let out = r.to_string();
+        assert!(out.contains("Differences:"));
+        assert!(out.contains("cmx agent update my-agent"));
     }
 }
