@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail};
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -7,8 +8,9 @@ use crate::config;
 use crate::context::AppContext;
 use crate::fs_util;
 use crate::lockfile;
+use crate::platform::Platform;
 use crate::source_iter;
-use crate::types::{self, ArtifactKind};
+use crate::types::{self, ArtifactKind, InstallScope};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -40,6 +42,25 @@ pub struct DiffOutput {
     /// When `true`, render the full line-by-line unified diff; otherwise the
     /// output stays compact (summary + analysis) with a hint to pass `--full`.
     pub show_full: bool,
+    /// Every installed copy and how it compares to the source. With more than
+    /// one entry the display shows a per-platform matrix; the detailed diff and
+    /// analysis below focus the copy flagged `is_focus`.
+    pub copies: Vec<CopyStatus>,
+}
+
+/// One installed copy of the artifact and how it compares to the source.
+#[derive(Debug, Clone)]
+pub struct CopyStatus {
+    /// The platforms whose install directory resolves to this copy (a shared
+    /// `.agents/skills` copy lists several).
+    pub platforms: Vec<Platform>,
+    pub path: PathBuf,
+    /// `true` when this copy is byte-identical to the source.
+    pub matches: bool,
+    pub added: usize,
+    pub removed: usize,
+    /// `true` for the copy whose detailed diff/analysis is shown below.
+    pub is_focus: bool,
 }
 
 /// How one file differs between the source and installed copies.
@@ -103,24 +124,49 @@ pub(crate) async fn gather_diff_with(
     kind: ArtifactKind,
     ctx: &AppContext<'_>,
 ) -> Result<DiffOutput> {
-    // Find the installed file on disk (global then local)
-    let (installed_path, local) = config::find_installed_path(name, kind, ctx.fs, ctx.paths)
-        .with_context(|| format!("No installed {kind} named '{name}' found on disk."))?;
-
     // Find the source artifact by scanning all sources
     let (source_path, source_name, source_version) = find_in_sources_with(name, kind, ctx)?;
-
-    // Compare checksums
-    let installed_checksum = checksum::checksum_artifact(&installed_path, kind, ctx.fs)?;
     let source_checksum = checksum::checksum_artifact(&source_path, kind, ctx.fs)?;
 
-    // disk-vs-source axis: answers "do the bytes differ right now?", distinct from source-vs-lock "outdated" rule
-    if installed_checksum == source_checksum {
+    // Discover every installed copy (skills can live on several platforms; a copy
+    // matching source on one platform says nothing about the others).
+    let (raw_copies, scope) = discover_copies(name, kind, ctx)?;
+    if raw_copies.is_empty() {
+        bail!("No installed {kind} named '{name}' found on disk.");
+    }
+
+    // Compare each copy to the source; build the per-copy diff for differing ones.
+    let evals =
+        evaluate_copies(raw_copies, kind, &source_checksum, &source_path, &source_name, ctx)?;
+
+    // Focus the copy the user most likely means: the active platform's copy when
+    // it differs, otherwise the first differing copy.
+    let active = ctx.paths.platform;
+    let focus = evals
+        .iter()
+        .position(|e| !e.matches && e.copy.platforms.contains(&active))
+        .or_else(|| evals.iter().position(|e| !e.matches));
+
+    let copies: Vec<CopyStatus> = evals
+        .iter()
+        .enumerate()
+        .map(|(i, e)| CopyStatus {
+            platforms: e.copy.platforms.clone(),
+            path: e.copy.path.clone(),
+            matches: e.matches,
+            added: e.added,
+            removed: e.removed,
+            is_focus: Some(i) == focus,
+        })
+        .collect();
+
+    // Every copy matches the source — nothing to reconcile anywhere.
+    let Some(focus_idx) = focus else {
         return Ok(DiffOutput {
             artifact_name: name.to_string(),
             kind,
             is_up_to_date: true,
-            installed_path,
+            installed_path: evals[0].copy.path.clone(),
             installed_version: None,
             installed_locally_edited: false,
             source_path,
@@ -131,25 +177,25 @@ pub(crate) async fn gather_diff_with(
             analysis: None,
             reconciliations: Vec::new(),
             show_full: false,
+            copies,
         });
-    }
+    };
 
-    // Get installed version from lock file if available
-    let lock = lockfile::load(local, ctx.fs, ctx.paths)?;
-    let installed_version = lock.packages.get(name).and_then(|e| e.version.clone());
+    let multi = copies.len() > 1;
+    let focus_platform = representative_platform(&evals[focus_idx].copy, active, ctx);
 
-    // The installed copy differs from source. It is "locally edited" when its
-    // bytes no longer match the lock's recorded checksum (so re-installing from
-    // source would need `--force` to overwrite the edits).
-    let locally_modified = lock
-        .packages
-        .get(name)
-        .is_some_and(|e| e.installed_checksum != installed_checksum);
+    // Version + "locally edited" come from the focus copy's lock baseline.
+    let focus_checksum = evals[focus_idx].copy.checksum.clone();
+    let (installed_version, locally_modified) =
+        focus_lock_state(name, &evals[focus_idx].copy, &focus_checksum, scope, ctx)?;
 
-    let reconciliations = reconciliations(name, kind, &source_name, locally_modified);
-
-    // Build the directional, file-level diff.
-    let dir_diff = diff_artifact(kind, &installed_path, &source_path, &source_name, ctx)?;
+    let reconciliations = reconciliations(
+        name,
+        kind,
+        &source_name,
+        locally_modified,
+        multi.then_some(focus_platform),
+    );
 
     let installed_ver_display = installed_version.as_deref().unwrap_or("unversioned");
     let source_ver_display = source_version.as_deref().unwrap_or("unversioned");
@@ -167,7 +213,7 @@ pub(crate) async fn gather_diff_with(
         - Installed copy (the `+` side): {installed_ver_display}\n\
         - Source copy from '{source_name}' (the `−` side): {source_ver_display}\n\n\
         {}",
-        dir_diff.unified
+        evals[focus_idx].dir_diff.unified
     );
 
     let analysis = match ctx.llm {
@@ -175,40 +221,210 @@ pub(crate) async fn gather_diff_with(
         None => bail!("LLM client not configured for diff analysis"),
     };
 
+    let focus_eval = &evals[focus_idx];
     Ok(DiffOutput {
         artifact_name: name.to_string(),
         kind,
         is_up_to_date: false,
-        installed_path,
+        installed_path: focus_eval.copy.path.clone(),
         installed_version,
         installed_locally_edited: locally_modified,
         source_path,
         source_version,
         source_name,
-        file_changes: dir_diff.changes,
-        diff_text: Some(dir_diff.unified),
+        file_changes: focus_eval.dir_diff.changes.clone(),
+        diff_text: Some(focus_eval.dir_diff.unified.clone()),
         analysis: Some(analysis),
         reconciliations,
         show_full: false,
+        copies,
     })
+}
+
+/// One installed copy with its computed comparison to the source.
+struct CopyEval {
+    copy: InstalledCopy,
+    matches: bool,
+    dir_diff: ArtifactDiff,
+    added: usize,
+    removed: usize,
+}
+
+/// Compare each discovered copy to the source, computing the per-copy diff (and
+/// its +/- totals) for the ones that differ.
+fn evaluate_copies(
+    raw_copies: Vec<InstalledCopy>,
+    kind: ArtifactKind,
+    source_checksum: &str,
+    source_path: &Path,
+    source_name: &str,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<CopyEval>> {
+    let mut evals = Vec::with_capacity(raw_copies.len());
+    for copy in raw_copies {
+        let matches = copy.checksum == source_checksum;
+        let dir_diff = if matches {
+            ArtifactDiff {
+                changes: Vec::new(),
+                unified: String::new(),
+            }
+        } else {
+            diff_artifact(kind, &copy.path, source_path, source_name, ctx)?
+        };
+        let added = dir_diff.changes.iter().map(|c| c.added).sum();
+        let removed = dir_diff.changes.iter().map(|c| c.removed).sum();
+        evals.push(CopyEval {
+            copy,
+            matches,
+            dir_diff,
+            added,
+            removed,
+        });
+    }
+    Ok(evals)
+}
+
+/// A distinct physical install of the artifact, shared by ≥1 platform.
+struct InstalledCopy {
+    platforms: Vec<Platform>,
+    path: PathBuf,
+    checksum: String,
+}
+
+/// Discover every installed copy of the artifact and the scope it lives at.
+///
+/// Skills can be installed on several platforms (some sharing the
+/// `.agents/skills` directory), so they're surveyed across the managed
+/// platforms. Agents are reformatted per platform (e.g. Codex TOML), so a
+/// cross-platform byte comparison is meaningless — they stay single-copy on the
+/// active platform.
+fn discover_copies(
+    name: &str,
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<(Vec<InstalledCopy>, InstallScope)> {
+    if kind == ArtifactKind::Agent {
+        return match config::find_installed_path(name, kind, ctx.fs, ctx.paths) {
+            Some((path, scope)) => {
+                let checksum = checksum::checksum_artifact(&path, kind, ctx.fs)?;
+                Ok((
+                    vec![InstalledCopy {
+                        platforms: vec![ctx.paths.platform],
+                        path,
+                        checksum,
+                    }],
+                    scope,
+                ))
+            }
+            None => Ok((Vec::new(), InstallScope::Global)),
+        };
+    }
+    // Skills: global scope first, then project.
+    for scope in InstallScope::ALL {
+        let copies = gather_skill_copies(name, scope, ctx)?;
+        if !copies.is_empty() {
+            return Ok((copies, scope));
+        }
+    }
+    Ok((Vec::new(), InstallScope::Global))
+}
+
+/// Gather distinct skill copies across the managed platforms at `scope`, one
+/// entry per install directory (the shared `.agents/skills` dir collapses
+/// several platforms into one copy).
+fn gather_skill_copies(
+    name: &str,
+    scope: InstallScope,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<InstalledCopy>> {
+    let candidates =
+        config::managed_platforms(ctx.fs, ctx.paths)?.unwrap_or_else(|| Platform::ALL.to_vec());
+    let mut by_dir: BTreeMap<PathBuf, InstalledCopy> = BTreeMap::new();
+    for platform in candidates {
+        if !platform.supports(ArtifactKind::Skill) {
+            continue;
+        }
+        let pv = ctx.paths.with_platform(platform);
+        let Some(path) = pv.installed_artifact_path(ArtifactKind::Skill, name, scope) else {
+            continue;
+        };
+        if !ctx.fs.exists(&path) {
+            continue;
+        }
+        if let Some(existing) = by_dir.get_mut(&path) {
+            existing.platforms.push(platform);
+        } else {
+            let checksum = checksum::checksum_artifact(&path, ArtifactKind::Skill, ctx.fs)?;
+            by_dir.insert(
+                path.clone(),
+                InstalledCopy {
+                    platforms: vec![platform],
+                    path,
+                    checksum,
+                },
+            );
+        }
+    }
+    Ok(by_dir.into_values().collect())
+}
+
+/// Pick the platform to name in reconcile commands for a copy shared by several:
+/// the active platform if it reads this copy, else a managed platform, else the
+/// first — so `--platform codex` is suggested over `--platform opencode`.
+fn representative_platform(
+    copy: &InstalledCopy,
+    active: Platform,
+    ctx: &AppContext<'_>,
+) -> Platform {
+    if copy.platforms.contains(&active) {
+        return active;
+    }
+    let managed = config::managed_platforms(ctx.fs, ctx.paths).ok().flatten();
+    managed
+        .as_ref()
+        .and_then(|m| copy.platforms.iter().find(|p| m.contains(p)).copied())
+        .or_else(|| copy.platforms.first().copied())
+        .unwrap_or(active)
+}
+
+/// Read the focus copy's lock baseline (from any platform that reads it): its
+/// recorded version, and whether the copy was edited after install (its bytes no
+/// longer match the lock's checksum).
+fn focus_lock_state(
+    name: &str,
+    copy: &InstalledCopy,
+    checksum: &str,
+    scope: InstallScope,
+    ctx: &AppContext<'_>,
+) -> Result<(Option<String>, bool)> {
+    for &platform in &copy.platforms {
+        let pv = ctx.paths.with_platform(platform);
+        if let Some(entry) = lockfile::load(scope, ctx.fs, &pv)?.packages.get(name) {
+            return Ok((entry.version.clone(), entry.installed_checksum != checksum));
+        }
+    }
+    Ok((None, false))
 }
 
 /// Build the reconciliation directions. When the source is the canonical home,
 /// the installed edits can be promoted into it; either way they can be discarded
-/// by re-installing from source. `diff` never picks for the user.
+/// by re-installing from source. `diff` never picks for the user. `platform`, set
+/// when copies span platforms, qualifies the commands to the focused copy.
 fn reconciliations(
     name: &str,
     kind: ArtifactKind,
     source_name: &str,
     locally_modified: bool,
+    platform: Option<Platform>,
 ) -> Vec<Reconciliation> {
     let mut out = Vec::new();
     let source_is_home = source_name == crate::adopt::HOME_SOURCE;
+    let plat = platform.map(|p| format!(" --platform {p}")).unwrap_or_default();
 
     if source_is_home {
         out.push(Reconciliation {
             description: "keep the installed edits, update the home".to_string(),
-            command: format!("cmx {kind} promote {name}"),
+            command: format!("cmx {kind} promote {name}{plat}"),
             note: None,
         });
     }
@@ -221,9 +437,9 @@ fn reconciliations(
     out.push(Reconciliation {
         description: format!("discard the installed edits, restore the {restore_target}"),
         command: if locally_modified {
-            format!("cmx {kind} update {name} --force")
+            format!("cmx {kind} update {name}{plat} --force")
         } else {
-            format!("cmx {kind} update {name}")
+            format!("cmx {kind} update {name}{plat}")
         },
         note: locally_modified.then(|| "--force overwrites the installed local edits".to_string()),
     });
@@ -703,7 +919,7 @@ mod tests {
 
     #[test]
     fn reconciliations_offers_promote_when_source_is_home() {
-        let rs = reconciliations("pf", ArtifactKind::Skill, "home", true);
+        let rs = reconciliations("pf", ArtifactKind::Skill, "home", true, None);
         assert_eq!(rs.len(), 2, "promote + update");
         assert!(rs[0].command.contains("promote pf"), "promote offered first: {:?}", rs[0]);
         assert!(rs[1].command.contains("update pf --force"), "update with force: {:?}", rs[1]);
@@ -712,11 +928,18 @@ mod tests {
 
     #[test]
     fn reconciliations_no_promote_for_git_source() {
-        let rs = reconciliations("slidev", ArtifactKind::Skill, "guidelines", false);
+        let rs = reconciliations("slidev", ArtifactKind::Skill, "guidelines", false, None);
         assert_eq!(rs.len(), 1, "only restore-from-source for a git source");
         assert!(rs[0].command.contains("update slidev"), "{:?}", rs[0]);
         assert!(!rs[0].command.contains("--force"), "no force when not locally modified");
         assert!(rs[0].description.contains("guidelines copy"), "names the source: {:?}", rs[0]);
+    }
+
+    #[test]
+    fn reconciliations_qualify_commands_with_platform_when_multi() {
+        let rs = reconciliations("pf", ArtifactKind::Skill, "home", true, Some(Platform::Codex));
+        assert!(rs[0].command.contains("promote pf --platform codex"), "{:?}", rs[0]);
+        assert!(rs[1].command.contains("update pf --platform codex --force"), "{:?}", rs[1]);
     }
 
     // --- find_in_sources_with ---
@@ -829,5 +1052,75 @@ mod tests {
         assert!(output.installed_path.ends_with("my-agent.md"), "installed path set");
         assert!(!output.reconciliations.is_empty(), "reconciliation directions offered");
         assert!(output.installed_locally_edited, "edited after install (checksum mismatch)");
+    }
+
+    #[tokio::test]
+    async fn gather_diff_skill_focuses_the_differing_platform() {
+        use crate::test_support::{setup_source, skill_content};
+
+        let fs = FakeFilesystem::new();
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc::now());
+        let paths = test_paths();
+        let llm = FakeLlmClient::new("analysis");
+
+        // Source is the home; the Claude copy matches it, the Codex copy differs.
+        let source = skill_content("the canonical skill");
+        setup_source(&fs, &paths, "home", "/home-src");
+        fs.add_file("/home-src/pf/SKILL.md", source.clone());
+        let claude = paths.with_platform(crate::platform::Platform::Claude);
+        fs.add_file(
+            claude
+                .install_dir(ArtifactKind::Skill, InstallScope::Global)
+                .unwrap()
+                .join("pf/SKILL.md"),
+            source,
+        );
+        let codex = paths.with_platform(crate::platform::Platform::Codex);
+        fs.add_file(
+            codex
+                .install_dir(ArtifactKind::Skill, InstallScope::Global)
+                .unwrap()
+                .join("pf/SKILL.md"),
+            skill_content("the codex edits"),
+        );
+        // Scope the survey + suggestions to the two managed platforms.
+        let config = crate::types::CmxConfig {
+            platforms: vec![
+                crate::platform::Platform::Claude,
+                crate::platform::Platform::Codex,
+            ],
+            ..Default::default()
+        };
+        crate::config::save_config(&config, &fs, &paths).unwrap();
+
+        let ctx = AppContext {
+            fs: &fs,
+            git: &git,
+            clock: &clock,
+            paths: &paths,
+            llm: Some(&llm),
+        };
+        // Active platform is Claude (the matching copy), yet diff must surface the
+        // Codex divergence rather than report "matches".
+        let output = gather_diff_with("pf", ArtifactKind::Skill, &ctx).await.unwrap();
+
+        assert!(!output.is_up_to_date, "must not claim up-to-date while a copy differs");
+        assert_eq!(output.copies.len(), 2, "both platform copies surveyed");
+        let focus = output.copies.iter().find(|c| c.is_focus).expect("a focus copy");
+        assert!(focus.platforms.contains(&crate::platform::Platform::Codex), "focuses Codex");
+        assert!(!focus.matches, "the focused copy differs");
+        assert!(
+            output
+                .copies
+                .iter()
+                .any(|c| c.platforms.contains(&crate::platform::Platform::Claude) && c.matches),
+            "the Claude copy is reported as matching"
+        );
+        assert!(
+            output.reconciliations[0].command.contains("--platform codex"),
+            "reconcile qualified to the diverging platform: {:?}",
+            output.reconciliations[0]
+        );
     }
 }
