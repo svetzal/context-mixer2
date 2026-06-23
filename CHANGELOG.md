@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.1] - 2026-06-23
+
 ### Fixed
 
 - `cmf validate` (and `cmf facet validate`, `cmf plugin validate`, `cmf marketplace validate`) now **exit non-zero** when validation surfaces an error-level issue, instead of always exiting `0`. The report was printed either way, but a publisher running validation in CI couldn't gate on the exit status — a failing validation looked like success. Error-level issues now map to exit code `2` (matching `cmx doctor`); warnings-only and clean runs still exit `0`.
+
+### Documentation
+
+- The mdBook documentation site is brought current with the 2.10.0 feature set, which had drifted behind the code. New guide pages for **Promoting Local Edits** (`promote`) and **Reconciling Across Platforms** (`skill sync`); the command reference gains `promote`, `skill sync`, and `config platforms`, documents multi-platform `install`/`uninstall` and `--platform` scoping, and lists all 13 platform values. Corrected stale pages: directional `diff` (with `--full`), multi-platform-by-default install, optional marketplace `metadata`, and the `cmf validate` exit-code note above.
+
+### Internal
+
+- Consolidated duplicated platform-set handling (a shared `platforms_label` helper and a `managed_or_all_platforms` config helper) and fixed two spots that silently swallowed config-load I/O errors. Made `ArtifactKind::installed_path` platform-aware via an explicit agent extension, removing a latent path-construction mismatch for Codex agents. No user-visible behaviour change.
 
 ## [2.10.0] - 2026-06-22
 
