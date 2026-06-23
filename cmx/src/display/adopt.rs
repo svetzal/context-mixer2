@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::adopt::{AdoptOutcome, UnadoptOutcome};
+use crate::platform::platforms_label;
 
 impl fmt::Display for AdoptOutcome {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -17,8 +18,13 @@ impl fmt::Display for AdoptOutcome {
         }
         writeln!(f, "Adopted {} artifact(s) into {}:", self.adopted.len(), self.home.display())?;
         for a in &self.adopted {
-            let tools: Vec<String> = a.platforms.iter().map(ToString::to_string).collect();
-            writeln!(f, "  {} {} — now tracked for: {}", a.kind, a.name, tools.join(", "))?;
+            writeln!(
+                f,
+                "  {} {} — now tracked for: {}",
+                a.kind,
+                a.name,
+                platforms_label(&a.platforms)
+            )?;
         }
         writeln!(f)?;
         writeln!(
@@ -35,9 +41,7 @@ impl fmt::Display for UnadoptOutcome {
             if r.untracked_from.is_empty() {
                 writeln!(f, ".")?;
             } else {
-                let tools =
-                    r.untracked_from.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
-                writeln!(f, "; un-tracked for: {tools}.")?;
+                writeln!(f, "; un-tracked for: {}.", platforms_label(&r.untracked_from))?;
             }
         }
         if !self.not_adopted.is_empty() {

@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::doctor::DoctorReport;
+use crate::platform::platforms_label;
 use crate::table::Table;
 
 /// Build the artifact table from the given grouped logical artifacts — one row
@@ -17,7 +18,7 @@ fn doctor_artifact_table(artifacts: &[&crate::doctor::DoctorArtifact]) -> Table 
                 let tools = if a.tools.is_empty() {
                     "-".to_string()
                 } else {
-                    a.tools.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
+                    platforms_label(&a.tools)
                 };
                 // When copies agree show the single version; when they diverge
                 // name the skew (`3.2.0 / 3.3.0`) rather than an opaque `-`.

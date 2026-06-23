@@ -1,10 +1,7 @@
 use std::fmt;
 
+use crate::platform::platforms_label;
 use crate::promote::PromoteResult;
-
-fn platforms_label(platforms: &[crate::platform::Platform]) -> String {
-    platforms.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
-}
 
 impl fmt::Display for PromoteResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

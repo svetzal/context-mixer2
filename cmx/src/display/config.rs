@@ -1,10 +1,7 @@
 use std::fmt;
 
 use crate::cmx_config::{ConfigSetResult, ConfigShowResult, ExternalResult, PlatformsResult};
-
-fn join_platforms(platforms: &[crate::platform::Platform]) -> String {
-    platforms.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
-}
+use crate::platform::platforms_label;
 
 impl fmt::Display for ConfigShowResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -19,7 +16,7 @@ impl fmt::Display for ConfigShowResult {
         if self.platforms.is_empty() {
             writeln!(f, "Platforms:   (inferred)")
         } else {
-            writeln!(f, "Platforms:   {}", join_platforms(&self.platforms))
+            writeln!(f, "Platforms:   {}", platforms_label(&self.platforms))
         }
     }
 }
@@ -32,7 +29,7 @@ impl fmt::Display for PlatformsResult {
         if self.platforms.is_empty() {
             writeln!(f, "Managed platforms: (none — cmx infers from platforms in use)")
         } else {
-            writeln!(f, "Managed platforms: {}", join_platforms(&self.platforms))
+            writeln!(f, "Managed platforms: {}", platforms_label(&self.platforms))
         }
     }
 }

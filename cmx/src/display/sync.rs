@@ -1,10 +1,7 @@
 use std::fmt;
 
+use crate::platform::platforms_label;
 use crate::sync::SyncResult;
-
-fn platforms_label(platforms: &[crate::platform::Platform]) -> String {
-    platforms.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
-}
 
 fn version_label(version: Option<&str>) -> String {
     version.map_or_else(|| "unversioned".to_string(), |v| format!("v{v}"))

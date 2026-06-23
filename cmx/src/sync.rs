@@ -22,7 +22,7 @@ use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
 use crate::lockfile;
-use crate::platform::Platform;
+use crate::platform::{Platform, platforms_label};
 use crate::types::{ArtifactKind, InstallScope};
 
 // ---------------------------------------------------------------------------
@@ -149,11 +149,6 @@ fn auto_winner(copies: &[Copy]) -> Option<&Copy> {
     (!ambiguous).then_some(best)
 }
 
-/// A human label for a set of platforms ("claude, codex").
-fn platforms_label(platforms: &[Platform]) -> String {
-    platforms.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
-}
-
 /// Render a byte count compactly (e.g. `4.2 KB`), using integer math to avoid a
 /// lossy float cast.
 fn human_size(bytes: usize) -> String {
@@ -196,6 +191,7 @@ fn ambiguity_error(
     kind: ArtifactKind,
     scope: InstallScope,
     copies: &[Copy],
+    managed: Option<&[Platform]>,
     ctx: &AppContext<'_>,
 ) -> anyhow::Error {
     let mut msg = format!(
@@ -215,10 +211,8 @@ fn ambiguity_error(
     // Prefer a managed platform when naming the `--from` for a copy shared by
     // several platforms (the `.agents/skills` cohort), so the suggestion reads
     // in terms of a tool the user actually uses (e.g. `codex`, not `opencode`).
-    let managed = crate::config::managed_platforms(ctx.fs, ctx.paths).ok().flatten();
     let representative = |c: &Copy| -> Option<Platform> {
         managed
-            .as_ref()
             .and_then(|m| c.platforms.iter().find(|p| m.contains(p)).copied())
             .or_else(|| c.platforms.first().copied())
     };
@@ -247,10 +241,7 @@ fn gather_copies(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Copy>> {
-    let candidates = match crate::config::managed_platforms(ctx.fs, ctx.paths)? {
-        Some(managed) => managed,
-        None => Platform::ALL.to_vec(),
-    };
+    let candidates = crate::config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
     let mut by_dir: BTreeMap<PathBuf, Copy> = BTreeMap::new();
     for platform in candidates {
         if !platform.supports(kind) {
@@ -363,12 +354,15 @@ pub fn sync(
         });
     }
 
-    let winner = match from {
-        Some(p) => pick_from(&copies, p)?,
-        None => match auto_winner(&copies) {
-            Some(w) => w,
-            None => return Err(ambiguity_error(name, kind, scope, &copies, ctx)),
-        },
+    let winner = if let Some(p) = from {
+        pick_from(&copies, p)?
+    } else if let Some(w) = auto_winner(&copies) {
+        w
+    } else {
+        // Load the managed set here (propagating I/O errors) rather than
+        // swallowing them inside the error constructor.
+        let managed = crate::config::managed_platforms(ctx.fs, ctx.paths)?;
+        return Err(ambiguity_error(name, kind, scope, &copies, managed.as_deref(), ctx));
     };
     let targets: Vec<&Copy> = copies.iter().filter(|c| c.checksum != winner.checksum).collect();
 

@@ -1,10 +1,11 @@
 use std::fmt;
 
+use crate::platform::platforms_label;
 use crate::uninstall::{BatchUninstallResult, UninstallResult};
 
 impl fmt::Display for UninstallResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let tools = self.platforms.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+        let tools = platforms_label(&self.platforms);
         if self.was_on_disk {
             writeln!(f, "Uninstalled {} ({}) from {} scope.", self.name, self.kind, self.scope)?;
             if self.was_tracked {

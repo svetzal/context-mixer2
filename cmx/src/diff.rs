@@ -188,7 +188,9 @@ pub(crate) async fn gather_diff_with(
     };
 
     let multi = copies.len() > 1;
-    let focus_platform = representative_platform(&evals[focus_idx].copy, active, ctx);
+    let managed = config::managed_platforms(ctx.fs, ctx.paths)?;
+    let focus_platform =
+        representative_platform(&evals[focus_idx].copy, active, managed.as_deref());
     // The two labels the whole output uses: `home`/<repo> on the `−` side, the
     // platform name on the `+` side.
     let changed_label = focus_platform.to_string();
@@ -373,8 +375,7 @@ fn gather_skill_copies(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<InstalledCopy>> {
-    let candidates =
-        config::managed_platforms(ctx.fs, ctx.paths)?.unwrap_or_else(|| Platform::ALL.to_vec());
+    let candidates = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
     let mut by_dir: BTreeMap<PathBuf, InstalledCopy> = BTreeMap::new();
     for platform in candidates {
         if !platform.supports(ArtifactKind::Skill) {
@@ -410,14 +411,12 @@ fn gather_skill_copies(
 fn representative_platform(
     copy: &InstalledCopy,
     active: Platform,
-    ctx: &AppContext<'_>,
+    managed: Option<&[Platform]>,
 ) -> Platform {
     if copy.platforms.contains(&active) {
         return active;
     }
-    let managed = config::managed_platforms(ctx.fs, ctx.paths).ok().flatten();
     managed
-        .as_ref()
         .and_then(|m| copy.platforms.iter().find(|p| m.contains(p)).copied())
         .or_else(|| copy.platforms.first().copied())
         .unwrap_or(active)

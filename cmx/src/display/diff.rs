@@ -1,12 +1,9 @@
 #[cfg(feature = "llm")]
 use crate::diff::{DiffOutput, FileStatus};
 #[cfg(feature = "llm")]
-use std::fmt;
-
+use crate::platform::platforms_label;
 #[cfg(feature = "llm")]
-fn platforms_label(platforms: &[crate::platform::Platform]) -> String {
-    platforms.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
-}
+use std::fmt;
 
 #[cfg(feature = "llm")]
 impl DiffOutput {

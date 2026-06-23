@@ -57,6 +57,21 @@ pub fn managed_platforms(
     Ok((!cfg.platforms.is_empty()).then_some(cfg.platforms))
 }
 
+/// The platforms a default (no `--platform`) cross-platform command considers:
+/// the explicit managed set when one is configured, otherwise every supported
+/// platform.
+///
+/// This is the shared "managed-or-all" fallback used by `uninstall`, `sync`, and
+/// `diff`. Callers still filter by [`Platform::supports`](crate::platform::Platform::supports)
+/// for the relevant kind. (`install` deliberately differs — with no managed set
+/// it infers the platforms already in use rather than falling back to all.)
+pub fn managed_or_all_platforms(
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+) -> Result<Vec<crate::platform::Platform>> {
+    Ok(managed_platforms(fs, paths)?.unwrap_or_else(|| crate::platform::Platform::ALL.to_vec()))
+}
+
 /// Resolve the effective canonical artifact home: the `home` override in the
 /// config if set, otherwise the default under the config root.
 pub fn resolve_artifact_home(config: &CmxConfig, paths: &ConfigPaths) -> PathBuf {

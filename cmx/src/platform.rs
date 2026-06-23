@@ -330,6 +330,15 @@ impl Platform {
     }
 }
 
+/// A human-readable, comma-separated label for a set of platforms
+/// (e.g. `"claude, codex"`).
+///
+/// The single home for what was an identical `platforms_label`/`join_platforms`
+/// helper copy-pasted across the display modules and the sync core.
+pub fn platforms_label(platforms: &[Platform]) -> String {
+    platforms.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
