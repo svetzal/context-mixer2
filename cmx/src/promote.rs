@@ -26,6 +26,7 @@ use crate::config;
 use crate::context::AppContext;
 use crate::copy;
 use crate::lockfile;
+use crate::platform::Platform;
 use crate::platform_iter;
 use crate::scan;
 use crate::types::{ArtifactKind, InstallScope};
@@ -166,17 +167,13 @@ fn home_tracked_platforms(
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Platform>> {
     let mut platforms = Vec::new();
-    for platform in Platform::ALL {
-        if !platform.supports(kind) {
-            continue;
-        }
-        let pv = ctx.paths.with_platform(platform);
-        let tracked_from_home = lockfile::load(scope, ctx.fs, &pv)?
+    for view in platform_iter::views_for(ctx.paths, platform_iter::all(), kind) {
+        let tracked_from_home = lockfile::load(scope, ctx.fs, &view.paths)?
             .packages
             .get(name)
             .is_some_and(|e| e.source.repo == HOME_SOURCE);
         if tracked_from_home {
-            platforms.push(platform);
+            platforms.push(view.platform);
         }
     }
     Ok(platforms)
@@ -191,12 +188,8 @@ fn non_home_guidance(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<String> {
-    for platform in Platform::ALL {
-        if !platform.supports(kind) {
-            continue;
-        }
-        let pv = ctx.paths.with_platform(platform);
-        if let Some(entry) = lockfile::load(scope, ctx.fs, &pv)?.packages.get(name) {
+    for view in platform_iter::views_for(ctx.paths, platform_iter::all(), kind) {
+        if let Some(entry) = lockfile::load(scope, ctx.fs, &view.paths)?.packages.get(name) {
             return Ok(format!(
                 "'{name}' is tracked from the '{repo}' source, not the home. Promoting edits into a \
                  registered source isn't supported yet — edit the source clone directly, or run \

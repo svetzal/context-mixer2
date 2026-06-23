@@ -6,7 +6,7 @@ use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
 use crate::lockfile;
-use crate::platform::Platform;
+use crate::platform_iter;
 use crate::source_iter;
 use crate::types::{ArtifactKind, Deprecation, InstallScope};
 
@@ -90,15 +90,11 @@ fn find_and_gather(
     ctx: &AppContext<'_>,
 ) -> Result<Option<ArtifactInfo>> {
     let active = ctx.paths.platform;
-    let platforms =
-        std::iter::once(active).chain(Platform::ALL.iter().copied().filter(|&p| p != active));
-
-    for platform in platforms {
-        let pv = ctx.paths.with_platform(platform);
-        if let Some((path, scope)) = config::find_installed_path(name, kind, ctx.fs, &pv) {
+    for view in platform_iter::views_for(ctx.paths, platform_iter::active_first(active), kind) {
+        if let Some((path, scope)) = config::find_installed_path(name, kind, ctx.fs, &view.paths) {
             // Gather against the platform the artifact actually lives in, so its
             // (per-platform) lock file is the one consulted.
-            let pv_ctx = ctx.with_paths(&pv);
+            let pv_ctx = ctx.with_paths(&view.paths);
             return Ok(Some(gather_info(name, kind, scope, &path, &pv_ctx)?));
         }
     }
@@ -273,6 +269,7 @@ mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
     use crate::lockfile;
+    use crate::platform::Platform;
     use crate::test_support::{
         TestContext, agent_content, deprecated_agent_content, install_agent_on_disk,
         make_lock_entry_with_checksum, save_lock_with_entry, setup_empty_sources, setup_source,

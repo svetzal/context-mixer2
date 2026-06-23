@@ -26,6 +26,7 @@ use crate::copy;
 use crate::doctor::{self, ArtifactState, DoctorRow};
 use crate::lockfile;
 use crate::platform::Platform;
+use crate::platform_iter;
 use crate::types::{
     self, ArtifactKind, InstallScope, LockEntry, LockSource, SourceEntry, SourceType,
 };
@@ -260,21 +261,17 @@ fn unadopt_one(
     let home_present = ctx.fs.exists(&home_path);
 
     let mut untracked_from: Vec<Platform> = Vec::new();
-    for platform in Platform::ALL {
-        if !platform.supports(kind) {
-            continue;
-        }
-        let pv = ctx.paths.with_platform(platform);
+    for view in platform_iter::views_for(ctx.paths, platform_iter::all(), kind) {
         for scope in InstallScope::ALL {
-            let tracked_from_home = lockfile::load(scope, ctx.fs, &pv)?
+            let tracked_from_home = lockfile::load(scope, ctx.fs, &view.paths)?
                 .packages
                 .get(name)
                 .is_some_and(|e| e.source.repo == HOME_SOURCE);
             if tracked_from_home {
-                lockfile::mutate(scope, ctx.fs, &pv, |lock| {
+                lockfile::mutate(scope, ctx.fs, &view.paths, |lock| {
                     lock.packages.remove(name);
                 })?;
-                untracked_from.push(platform);
+                untracked_from.push(view.platform);
             }
         }
     }
