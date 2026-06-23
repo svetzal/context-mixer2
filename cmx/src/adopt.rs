@@ -181,6 +181,37 @@ pub fn adopt_all(
     adopt_rows(&rows, include_local, ctx)
 }
 
+/// Choose which surveyed row to adopt for `name`.
+///
+/// A hand-authored skill can occupy several install locations at once — most
+/// often the shared `.agents/skills` cohort *and* `~/.claude/skills` — which the
+/// survey reports as separate rows. When more than one matches, prefer an
+/// adoptable (orphaned) copy, then the copy belonging to the earliest platform
+/// in `priority` (the configured managed set, or every platform when unset).
+///
+/// This makes adoption follow the user's `platforms` order rather than the
+/// alphabetical order of the install directories — `.agents` sorts before
+/// `.claude`, which otherwise silently homes a diverged skill under the wrong
+/// platform (e.g. Codex instead of the higher-priority Claude).
+fn select_adopt_row<'a>(
+    rows: &'a [DoctorRow],
+    kind: ArtifactKind,
+    name: &str,
+    priority: &[Platform],
+) -> Option<&'a DoctorRow> {
+    rows.iter().filter(|r| r.kind == kind && r.name == name).min_by_key(|r| {
+        let rank = r
+            .platforms
+            .iter()
+            .filter_map(|p| priority.iter().position(|q| q == p))
+            .min()
+            .unwrap_or(usize::MAX);
+        // Orphaned (`false`) sorts before everything; ties break by the
+        // earliest configured platform the row is read by.
+        (r.state != ArtifactState::Orphaned, rank)
+    })
+}
+
 /// Adopt the named orphan artifacts of the given kind. Backs
 /// `cmx {skill,agent} adopt <name>...`.
 ///
@@ -195,9 +226,13 @@ pub fn adopt_named(
     ctx: &AppContext<'_>,
 ) -> Result<AdoptOutcome> {
     let report = doctor::survey(include_local, ctx)?;
+    // When a name spans several diverged install locations, pick the copy from
+    // the highest-priority configured platform — not whichever directory sorts
+    // first. See `select_adopt_row`.
+    let priority = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
     let mut chosen = Vec::new();
     for name in names {
-        let row = report.rows.iter().find(|r| r.kind == kind && &r.name == name);
+        let row = select_adopt_row(&report.rows, kind, name, &priority);
         match row {
             Some(r) => match r.state {
                 ArtifactState::Orphaned => chosen.push(r.clone()),
@@ -350,6 +385,13 @@ mod tests {
         );
     }
 
+    /// Declare the authoritative managed-platform set (and its priority order).
+    fn set_managed_platforms(t: &TestContext, platforms: &[Platform]) {
+        let mut cfg = config::load_config(&t.fs, &t.paths).unwrap();
+        cfg.platforms = platforms.to_vec();
+        config::save_config(&cfg, &t.fs, &t.paths).unwrap();
+    }
+
     #[test]
     fn home_path_defaults_under_config_root() {
         let t = TestContext::new();
@@ -438,6 +480,41 @@ mod tests {
         let report = doctor::survey(false, &t.ctx()).unwrap();
         let other = report.rows.iter().find(|r| r.name == "other").unwrap();
         assert_eq!(other.state, ArtifactState::Orphaned);
+    }
+
+    #[test]
+    fn adopt_named_follows_configured_platform_order_when_diverged() {
+        // A skill present in both the Claude dir and the shared `.agents` (Codex)
+        // dir surfaces as two orphan rows. `.agents` sorts before `.claude`, so a
+        // naive "first matching row" pick would home it under Codex. With Claude
+        // listed first in the managed set, adoption must home it under Claude.
+        let t = TestContext::new();
+        set_managed_platforms(&t, &[Platform::Claude, Platform::Codex]);
+        place_orphan_skill(&t, Platform::Claude, "shared", "1.0.0");
+        place_orphan_skill(&t, Platform::Codex, "shared", "1.0.0");
+
+        let outcome =
+            adopt_named(ArtifactKind::Skill, &["shared".to_string()], false, &t.ctx()).unwrap();
+        assert_eq!(outcome.adopted.len(), 1);
+        assert_eq!(
+            outcome.adopted[0].platforms,
+            vec![Platform::Claude],
+            "the highest-priority configured platform wins, not the alphabetically-first dir",
+        );
+    }
+
+    #[test]
+    fn adopt_named_honors_reversed_platform_order() {
+        // Reversing the managed set flips the winner — proving adoption follows
+        // configured order, not a hard-coded Claude preference.
+        let t = TestContext::new();
+        set_managed_platforms(&t, &[Platform::Codex, Platform::Claude]);
+        place_orphan_skill(&t, Platform::Claude, "shared", "1.0.0");
+        place_orphan_skill(&t, Platform::Codex, "shared", "1.0.0");
+
+        let outcome =
+            adopt_named(ArtifactKind::Skill, &["shared".to_string()], false, &t.ctx()).unwrap();
+        assert_eq!(outcome.adopted[0].platforms, vec![Platform::Codex]);
     }
 
     #[test]
