@@ -92,6 +92,14 @@ impl ValidationIssue {
 
 pub struct ValidationReport(pub Vec<ValidationIssue>);
 
+impl ValidationReport {
+    /// Whether the report contains any `Error`-level issue (warnings don't
+    /// count). Drives the process exit code so CI can gate on `cmf validate`.
+    pub fn has_errors(&self) -> bool {
+        self.0.iter().any(|i| i.level == IssueLevel::Error)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,6 +163,19 @@ mod tests {
         let out = ValidationReport(issues).to_string();
         assert!(out.contains("Warnings:"));
         assert!(!out.contains("Errors:"));
+    }
+
+    #[test]
+    fn validation_report_has_errors_distinguishes_levels() {
+        assert!(!ValidationReport(vec![]).has_errors(), "empty report has no errors");
+        assert!(
+            !ValidationReport(vec![ValidationIssue::warning("ctx", "warn")]).has_errors(),
+            "warnings alone are not errors"
+        );
+        assert!(
+            ValidationReport(vec![ValidationIssue::error("ctx", "boom")]).has_errors(),
+            "an error-level issue counts"
+        );
     }
 
     #[test]

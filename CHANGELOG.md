@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `cmf validate` (and `cmf facet validate`, `cmf plugin validate`, `cmf marketplace validate`) now **exit non-zero** when validation surfaces an error-level issue, instead of always exiting `0`. The report was printed either way, but a publisher running validation in CI couldn't gate on the exit status — a failing validation looked like success. Error-level issues now map to exit code `2` (matching `cmx doctor`); warnings-only and clean runs still exit `0`.
+
 ## [2.10.0] - 2026-06-22
 
 ### Added

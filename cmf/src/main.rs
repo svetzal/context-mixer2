@@ -1,4 +1,5 @@
 use std::env;
+use std::process::ExitCode;
 
 use anyhow::Result;
 use clap::Parser;
@@ -19,7 +20,7 @@ use cmf::cli::{
     Cli, Commands, FacetAction, ManifestAction, MarketplaceAction, PluginAction, RecipeAction,
 };
 
-fn main() -> Result<()> {
+fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
     let fs = RealFilesystem;
     let cwd = env::current_dir()?;
@@ -28,42 +29,52 @@ fn main() -> Result<()> {
     run(cli, &root, &fs)
 }
 
-fn run(cli: Cli, root: &RepoRoot, fs: &dyn Filesystem) -> Result<()> {
+/// Print a validation report and map it to an exit code: `2` when it carries any
+/// error-level issue (so CI can gate on it), `SUCCESS` otherwise.
+fn report_and_exit(report: &ValidationReport) -> ExitCode {
+    print!("{report}");
+    if report.has_errors() {
+        ExitCode::from(2)
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+fn run(cli: Cli, root: &RepoRoot, fs: &dyn Filesystem) -> Result<ExitCode> {
     match cli.command {
-        Commands::Facet { action } => handle_facet(&action, root, fs)?,
-        Commands::Recipe { action } => handle_recipe(action, root, fs)?,
-        Commands::Plugin { action } => handle_plugin(&action, root, fs)?,
-        Commands::Manifest { action } => handle_manifest(&action, root, fs)?,
-        Commands::Marketplace { action } => handle_marketplace(&action, root, fs)?,
+        Commands::Facet { action } => handle_facet(&action, root, fs),
+        Commands::Recipe { action } => handle_recipe(action, root, fs),
+        Commands::Plugin { action } => handle_plugin(&action, root, fs),
+        Commands::Manifest { action } => handle_manifest(&action, root, fs),
+        Commands::Marketplace { action } => handle_marketplace(&action, root, fs),
         Commands::Validate => {
             let issues = validate_all(root, fs)?;
-            print!("{}", ValidationReport(issues));
+            Ok(report_and_exit(&ValidationReport(issues)))
         }
         Commands::Status => {
             print!("{}", status_report(root, fs));
+            Ok(ExitCode::SUCCESS)
         }
     }
-
-    Ok(())
 }
 
-fn handle_facet(action: &FacetAction, root: &RepoRoot, fs: &dyn Filesystem) -> Result<()> {
+fn handle_facet(action: &FacetAction, root: &RepoRoot, fs: &dyn Filesystem) -> Result<ExitCode> {
     match action {
         FacetAction::List => {
             let facets = scan_facets(root, fs)?;
             print!("{}", FacetList(facets));
             let recipes = scan_recipes(root, fs)?;
             print!("{}", RecipeList(recipes));
+            Ok(ExitCode::SUCCESS)
         }
         FacetAction::Validate => {
             let issues = validate_facets(root, fs)?;
-            print!("{}", ValidationReport(issues));
+            Ok(report_and_exit(&ValidationReport(issues)))
         }
     }
-    Ok(())
 }
 
-fn handle_recipe(action: RecipeAction, root: &RepoRoot, fs: &dyn Filesystem) -> Result<()> {
+fn handle_recipe(action: RecipeAction, root: &RepoRoot, fs: &dyn Filesystem) -> Result<ExitCode> {
     match action {
         RecipeAction::List => {
             let recipes = scan_recipes(root, fs)?;
@@ -98,7 +109,7 @@ fn handle_recipe(action: RecipeAction, root: &RepoRoot, fs: &dyn Filesystem) -> 
             }
         }
     }
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }
 
 fn find_recipe<'a>(
@@ -111,50 +122,55 @@ fn find_recipe<'a>(
         .ok_or_else(|| anyhow::anyhow!("Recipe '{name}' not found"))
 }
 
-fn handle_plugin(action: &PluginAction, root: &RepoRoot, fs: &dyn Filesystem) -> Result<()> {
+fn handle_plugin(action: &PluginAction, root: &RepoRoot, fs: &dyn Filesystem) -> Result<ExitCode> {
     match action {
         PluginAction::Init { name } => {
             let path = init_plugin(root, name, fs)?;
             println!("Created plugin '{name}' at {}", path.display());
+            Ok(ExitCode::SUCCESS)
         }
         PluginAction::Validate => {
             let issues = validate_all_plugins(root, fs)?;
-            print!("{}", ValidationReport(issues));
+            Ok(report_and_exit(&ValidationReport(issues)))
         }
         PluginAction::List => {
             let plugins = scan_plugins(root, fs)?;
             print!("{}", PluginList(plugins));
+            Ok(ExitCode::SUCCESS)
         }
     }
-    Ok(())
 }
 
-fn handle_manifest(action: &ManifestAction, root: &RepoRoot, fs: &dyn Filesystem) -> Result<()> {
+fn handle_manifest(
+    action: &ManifestAction,
+    root: &RepoRoot,
+    fs: &dyn Filesystem,
+) -> Result<ExitCode> {
     match action {
         ManifestAction::Generate => {
             let written = generate_manifests(root, fs)?;
             print!("{}", ManifestSummary(written));
         }
     }
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }
 
 fn handle_marketplace(
     action: &MarketplaceAction,
     root: &RepoRoot,
     fs: &dyn Filesystem,
-) -> Result<()> {
+) -> Result<ExitCode> {
     match action {
         MarketplaceAction::Validate => {
             let issues = validate_marketplace(root, fs)?;
-            print!("{}", ValidationReport(issues));
+            Ok(report_and_exit(&ValidationReport(issues)))
         }
         MarketplaceAction::Generate => {
             let count = generate_marketplace(root, fs)?;
             println!("Generated marketplace.json with {count} plugins");
+            Ok(ExitCode::SUCCESS)
         }
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -276,5 +292,27 @@ mod tests {
             command: Commands::Validate,
         };
         assert!(run(cli, &root, &fs).is_ok());
+    }
+
+    #[test]
+    fn validation_errors_propagate_nonzero_exit() {
+        let root = unknown_root();
+        let fs = FakeFilesystem::new();
+        let cli = Cli {
+            command: Commands::Validate,
+        };
+        // `validate_all` flags the missing marketplace.json as an error; that must
+        // surface as a non-zero exit (previously it printed but exited 0).
+        assert_eq!(run(cli, &root, &fs).unwrap(), ExitCode::from(2));
+    }
+
+    #[test]
+    fn report_and_exit_maps_errors_to_code_2() {
+        use cmf::validation::{ValidationIssue, ValidationReport};
+        assert_eq!(report_and_exit(&ValidationReport(vec![])), ExitCode::SUCCESS);
+        assert_eq!(
+            report_and_exit(&ValidationReport(vec![ValidationIssue::error("ctx", "boom")])),
+            ExitCode::from(2)
+        );
     }
 }
