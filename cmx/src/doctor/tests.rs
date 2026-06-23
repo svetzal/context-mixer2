@@ -450,6 +450,9 @@ fn make_doctor_artifact(name: &str, diverged: bool) -> DoctorArtifact {
     }
 }
 
+/// Build a synthetic row whose content checksum tracks its version — the common
+/// case where a version bump reflects a content change. Tests needing two copies
+/// that share a version but differ in content set `content_checksum` explicitly.
 fn make_doctor_row(name: &str, loc: &str, ver: &str, state: ArtifactState) -> DoctorRow {
     DoctorRow {
         kind: ArtifactKind::Skill,
@@ -461,6 +464,7 @@ fn make_doctor_row(name: &str, loc: &str, ver: &str, state: ArtifactState) -> Do
         state,
         version: Some(ver.to_string()),
         source: None,
+        content_checksum: format!("sha256:{ver}"),
     }
 }
 
@@ -577,23 +581,41 @@ fn group_rows_different_names_stay_separate() {
 }
 
 #[test]
-fn group_rows_diverged_when_states_differ() {
-    let rows = vec![
-        make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Tracked),
-        make_doctor_row("skill", "/b/skills", "1.0.0", ArtifactState::Drifted),
-    ];
-    let arts = group_rows(&rows);
-    assert!(arts[0].diverged, "different states → diverged");
+fn group_rows_not_diverged_when_only_tracking_state_differs() {
+    // Byte-identical copies that merely differ in tracking state (tracked for one
+    // tool, untracked for another) are NOT diverged — the content agrees. This is
+    // the false positive that content-based detection fixes.
+    let mut a = make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Tracked);
+    let mut b = make_doctor_row("skill", "/b/skills", "1.0.0", ArtifactState::Untracked);
+    a.content_checksum = "sha256:same".to_string();
+    b.content_checksum = "sha256:same".to_string();
+    let arts = group_rows(&[a, b]);
+    assert!(!arts[0].diverged, "identical content, differing state → not diverged");
+}
+
+#[test]
+fn group_rows_diverged_when_content_differs_at_same_version() {
+    // Two copies sharing a version (here, both unbumped at 1.0.0) but with
+    // different bytes ARE diverged — the false negative the old state/version
+    // heuristic missed for edited-but-unversioned skills.
+    let mut a = make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Orphaned);
+    let mut b = make_doctor_row("skill", "/b/skills", "1.0.0", ArtifactState::Orphaned);
+    a.content_checksum = "sha256:aaa".to_string();
+    b.content_checksum = "sha256:bbb".to_string();
+    let arts = group_rows(&[a, b]);
+    assert!(arts[0].diverged, "same version, different content → diverged");
 }
 
 #[test]
 fn group_rows_diverged_when_versions_differ() {
+    // A version bump reflects a content change (distinct checksums), so copies at
+    // different versions diverge.
     let rows = vec![
         make_doctor_row("skill", "/a/skills", "1.0.0", ArtifactState::Tracked),
         make_doctor_row("skill", "/b/skills", "2.0.0", ArtifactState::Tracked),
     ];
     let arts = group_rows(&rows);
-    assert!(arts[0].diverged, "different versions → diverged");
+    assert!(arts[0].diverged, "different versions imply different content → diverged");
 }
 
 #[test]
@@ -652,6 +674,7 @@ fn group_rows_tools_is_union_of_tracked_for() {
             state: ArtifactState::Tracked,
             version: Some("1.0.0".to_string()),
             source: None,
+            content_checksum: "sha256:1.0.0".to_string(),
         },
         DoctorRow {
             kind: ArtifactKind::Skill,
@@ -663,6 +686,7 @@ fn group_rows_tools_is_union_of_tracked_for() {
             state: ArtifactState::Tracked,
             version: Some("1.0.0".to_string()),
             source: None,
+            content_checksum: "sha256:1.0.0".to_string(),
         },
     ];
     let arts = group_rows(&rows);
@@ -683,6 +707,7 @@ fn group_rows_source_joins_distinct_provenance() {
             state: ArtifactState::Tracked,
             version: Some("1.0.0".to_string()),
             source: Some("repo-a".to_string()),
+            content_checksum: "sha256:1.0.0".to_string(),
         },
         DoctorRow {
             kind: ArtifactKind::Skill,
@@ -694,6 +719,7 @@ fn group_rows_source_joins_distinct_provenance() {
             state: ArtifactState::Tracked,
             version: Some("1.0.0".to_string()),
             source: Some("repo-b".to_string()),
+            content_checksum: "sha256:1.0.0".to_string(),
         },
     ];
     let arts = group_rows(&rows);

@@ -59,6 +59,12 @@ pub struct DoctorRow {
     /// The source this came from: the lock entry's repo when tracked/drifted, or
     /// the providing source when untracked. `None` for orphaned/external.
     pub source: Option<String>,
+    /// The artifact's current on-disk content checksum (SHA-256). Drives
+    /// content-based divergence: copies whose bytes differ are flagged diverged,
+    /// independent of their version or tracking state — so a genuine content
+    /// difference between two unversioned copies is caught, while byte-identical
+    /// copies that merely differ in tracking state are not.
+    pub content_checksum: String,
 }
 
 /// One *logical* artifact — a `(kind, name, scope)` grouped across every install
@@ -86,9 +92,12 @@ pub struct DoctorArtifact {
     pub source: Option<String>,
     /// The distinct install locations it occupies.
     pub locations: Vec<PathBuf>,
-    /// True when the copies **disagree** — different state or different version
-    /// across locations. This is the only multi-location situation worth
-    /// flagging; consistent copies are just one skill installed to many tools.
+    /// True when the copies' **content differs** across locations (distinct
+    /// checksums). This is the multi-location situation worth flagging — the
+    /// copies have genuinely drifted apart and need reconciling. Byte-identical
+    /// copies are just one skill installed to many tools, even when their
+    /// tracking state differs (e.g. tracked for one tool, untracked for
+    /// another) — that asymmetry surfaces through the per-copy state, not here.
     pub diverged: bool,
 }
 

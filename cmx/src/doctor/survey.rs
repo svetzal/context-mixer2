@@ -87,14 +87,21 @@ fn load_all_locks(
 /// no lock entry, the artifact is *untracked* if a registered source provides it
 /// (installed out-of-band → track via `install`) or *orphaned* if no source does
 /// (hand-authored → adopt candidate).
+/// Classify an installed artifact from its current content checksum.
+///
+/// Tracked when a lock entry's recorded checksum matches the current content;
+/// drifted when a lock entry exists but the content has changed; untracked when
+/// a registered source provides it but no lock records it; orphaned otherwise.
+///
+/// Pure: the caller hashes the artifact once (the same checksum feeds divergence
+/// detection) and passes it here, so classification performs no I/O.
 fn classify_installed(
     name: &str,
     agg: &LocationAgg,
-    path: &std::path::Path,
+    content_checksum: &str,
     locks: &HashMap<(Platform, InstallScope), LockFile>,
     available_in_source: &HashMap<(ArtifactKind, String), Vec<String>>,
-    ctx: &AppContext<'_>,
-) -> Result<ArtifactState> {
+) -> ArtifactState {
     let mut found_entry = false;
     for &platform in &agg.platforms {
         let Some(lock) = locks.get(&(platform, agg.scope)) else {
@@ -102,17 +109,17 @@ fn classify_installed(
         };
         if let Some(entry) = lock.packages.get(name) {
             found_entry = true;
-            if !checksum::is_locally_modified(path, agg.kind, entry, ctx.fs)? {
-                return Ok(ArtifactState::Tracked);
+            if content_checksum == entry.installed_checksum {
+                return ArtifactState::Tracked;
             }
         }
     }
     if found_entry {
-        Ok(ArtifactState::Drifted)
+        ArtifactState::Drifted
     } else if available_in_source.contains_key(&(agg.kind, name.to_string())) {
-        Ok(ArtifactState::Untracked)
+        ArtifactState::Untracked
     } else {
-        Ok(ArtifactState::Orphaned)
+        ArtifactState::Orphaned
     }
 }
 
@@ -209,10 +216,16 @@ pub(crate) fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
             locations.sort();
             locations.dedup();
 
-            let states: BTreeSet<&'static str> = members.iter().map(|r| r.state.label()).collect();
             let versions: BTreeSet<Option<&str>> =
                 members.iter().map(|r| r.version.as_deref()).collect();
-            let diverged = states.len() > 1 || versions.len() > 1;
+            // Divergence is a content question: copies are diverged only when
+            // their bytes actually differ. This catches genuinely different
+            // copies that happen to share a version (or carry none), and stops
+            // false-flagging byte-identical copies that merely differ in
+            // tracking state (e.g. tracked for one tool, untracked for another).
+            let checksums: BTreeSet<&str> =
+                members.iter().map(|r| r.content_checksum.as_str()).collect();
+            let diverged = checksums.len() > 1;
 
             // Consolidated state: the most actionable across copies.
             let state = members
@@ -292,7 +305,10 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
             let path = pv
                 .installed_artifact_path(agg.kind, &name, agg.scope)
                 .expect("guarded by platform.supports check in survey");
-            let mut state = classify_installed(&name, agg, &path, &locks, &available, ctx)?;
+            // Hash once: this checksum classifies the copy *and* decides content
+            // divergence against the artifact's other copies.
+            let content_checksum = checksum::checksum_artifact(&path, agg.kind, ctx.fs)?;
+            let mut state = classify_installed(&name, agg, &content_checksum, &locks, &available);
             // An artifact cmx doesn't manage (orphaned/untracked) but that the
             // user has declared external is reclassified — managed by another
             // tool, not a cmx issue.
@@ -323,6 +339,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
                 state,
                 version,
                 source,
+                content_checksum,
             });
         }
     }
