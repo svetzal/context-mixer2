@@ -8,6 +8,7 @@ use crate::gateway::Filesystem;
 use crate::lockfile;
 use crate::partition::{Partitioned, partition_by};
 use crate::platform::Platform;
+use crate::platform_iter;
 use crate::types::{ArtifactKind, InstallScope};
 
 // ---------------------------------------------------------------------------
@@ -89,22 +90,19 @@ fn uninstall_one(
     let mut paths_to_delete: BTreeSet<PathBuf> = BTreeSet::new();
     let mut removed_from: Vec<Platform> = Vec::new();
 
-    for &platform in candidates {
-        if !platform.supports(kind) {
-            continue;
-        }
-        let pv = ctx.paths.with_platform(platform);
-        let path = pv
+    for view in platform_iter::views_for(ctx.paths, candidates.iter().copied(), kind) {
+        let path = view
+            .paths
             .installed_artifact_path(kind, name, scope)
             .expect("installed_artifact_path: guarded by platform.supports(kind)");
         if ctx.fs.exists(&path) {
             paths_to_delete.insert(path);
         }
-        if lockfile::load(scope, ctx.fs, &pv)?.packages.contains_key(name) {
-            lockfile::mutate(scope, ctx.fs, &pv, |lock| {
+        if lockfile::load(scope, ctx.fs, &view.paths)?.packages.contains_key(name) {
+            lockfile::mutate(scope, ctx.fs, &view.paths, |lock| {
                 lock.packages.remove(name);
             })?;
-            removed_from.push(platform);
+            removed_from.push(view.platform);
         }
     }
 

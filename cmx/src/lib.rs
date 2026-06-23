@@ -29,6 +29,7 @@ pub(crate) mod scan_marketplace;
 pub mod search;
 pub mod source;
 pub(crate) mod source_iter;
+pub mod platform_iter;
 pub mod source_update;
 pub mod sync;
 pub mod table;

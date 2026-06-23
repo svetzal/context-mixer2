@@ -8,6 +8,7 @@ use crate::copy;
 use crate::lockfile;
 use crate::paths::ConfigPaths;
 use crate::platform::Platform;
+use crate::platform_iter;
 use crate::source_iter;
 use crate::types::{self, ArtifactKind, InstallScope, LockEntry, LockSource};
 
@@ -167,13 +168,9 @@ pub fn resolve_targets(
         return Ok(managed.into_iter().filter(|p| p.supports(kind)).collect());
     }
     let mut targets = Vec::new();
-    for platform in Platform::ALL {
-        if !platform.supports(kind) {
-            continue;
-        }
-        let pv = ctx.paths.with_platform(platform);
-        if !lockfile::load(scope, ctx.fs, &pv)?.packages.is_empty() {
-            targets.push(platform);
+    for view in platform_iter::views_for(ctx.paths, platform_iter::all(), kind) {
+        if !lockfile::load(scope, ctx.fs, &view.paths)?.packages.is_empty() {
+            targets.push(view.platform);
         }
     }
     if targets.is_empty() {

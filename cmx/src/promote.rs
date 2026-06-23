@@ -26,7 +26,7 @@ use crate::config;
 use crate::context::AppContext;
 use crate::copy;
 use crate::lockfile;
-use crate::platform::Platform;
+use crate::platform_iter;
 use crate::scan;
 use crate::types::{ArtifactKind, InstallScope};
 
