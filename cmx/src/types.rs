@@ -206,11 +206,24 @@ impl std::fmt::Display for ArtifactKind {
 }
 
 impl ArtifactKind {
+    /// The agent file extension used in the canonical, tool-neutral home.
+    ///
+    /// The home predates any platform-specific projection, so home agents are
+    /// always plain markdown regardless of which tools they're later installed
+    /// for. Pass this to [`installed_path`](Self::installed_path) when building a
+    /// home path.
+    pub const HOME_AGENT_EXT: &'static str = "md";
+
     /// Compute the expected filesystem path for an installed artifact within a
     /// given install directory.
-    pub fn installed_path(&self, name: &str, dir: &Path) -> PathBuf {
+    ///
+    /// `agent_ext` is the platform's agent file extension (e.g. `md`, or `toml`
+    /// for codex). It is ignored for skills, which install as a directory named
+    /// after the artifact. Pass [`HOME_AGENT_EXT`](Self::HOME_AGENT_EXT) when the
+    /// target is the canonical home.
+    pub fn installed_path(&self, name: &str, dir: &Path, agent_ext: &str) -> PathBuf {
         match self {
-            ArtifactKind::Agent => dir.join(format!("{name}.md")),
+            ArtifactKind::Agent => dir.join(format!("{name}.{agent_ext}")),
             ArtifactKind::Skill => dir.join(name),
         }
     }
@@ -402,14 +415,16 @@ mod tests {
     #[test]
     fn installed_path_agent_appends_md_extension() {
         let dir = Path::new("/home/user/.claude/agents");
-        let path = ArtifactKind::Agent.installed_path("my-agent", dir);
+        let path =
+            ArtifactKind::Agent.installed_path("my-agent", dir, ArtifactKind::HOME_AGENT_EXT);
         assert_eq!(path, PathBuf::from("/home/user/.claude/agents/my-agent.md"));
     }
 
     #[test]
     fn installed_path_skill_uses_bare_name() {
         let dir = Path::new("/home/user/.claude/skills");
-        let path = ArtifactKind::Skill.installed_path("my-skill", dir);
+        let path =
+            ArtifactKind::Skill.installed_path("my-skill", dir, ArtifactKind::HOME_AGENT_EXT);
         assert_eq!(path, PathBuf::from("/home/user/.claude/skills/my-skill"));
     }
 

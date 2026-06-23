@@ -140,10 +140,7 @@ impl ConfigPaths {
         scope: InstallScope,
     ) -> Option<PathBuf> {
         let dir = self.install_dir(kind, scope)?;
-        Some(match kind {
-            ArtifactKind::Agent => dir.join(format!("{name}.{}", self.platform.agent_extension())),
-            ArtifactKind::Skill => kind.installed_path(name, &dir),
-        })
+        Some(kind.installed_path(name, &dir, self.platform.agent_extension()))
     }
 
     /// Returns `true` if an artifact of `kind` named `name` exists on disk under `scope`.

@@ -482,7 +482,11 @@ mod tests {
 
         // Compute the actual checksum to make it match
         let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
-        let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
+        let path = ArtifactKind::Agent.installed_path(
+            "my-agent",
+            &install_dir,
+            ArtifactKind::HOME_AGENT_EXT,
+        );
 
         // Use a checksum that matches the content (we'll rely on the file being there)
         write_lock_entry(
@@ -525,7 +529,11 @@ mod tests {
 
         let ctx = t.ctx();
         let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
-        let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
+        let path = ArtifactKind::Agent.installed_path(
+            "my-agent",
+            &install_dir,
+            ArtifactKind::HOME_AGENT_EXT,
+        );
         let info = gather_info("my-agent", ArtifactKind::Agent, InstallScope::Global, &path, &ctx)
             .unwrap();
 
@@ -549,7 +557,11 @@ mod tests {
         );
 
         let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
-        let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
+        let path = ArtifactKind::Agent.installed_path(
+            "my-agent",
+            &install_dir,
+            ArtifactKind::HOME_AGENT_EXT,
+        );
 
         // Write a lock entry with a different checksum (simulating modification)
         let mut entry = make_lock_entry_with_checksum(
@@ -581,7 +593,11 @@ mod tests {
         install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
         let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
-        let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
+        let path = ArtifactKind::Agent.installed_path(
+            "my-agent",
+            &install_dir,
+            ArtifactKind::HOME_AGENT_EXT,
+        );
 
         // Setup sources with a deprecated agent
         setup_source(&t.fs, &t.paths, "my-source", "/sources/my-source");
@@ -623,7 +639,11 @@ mod tests {
         install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
         let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
-        let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
+        let path = ArtifactKind::Agent.installed_path(
+            "my-agent",
+            &install_dir,
+            ArtifactKind::HOME_AGENT_EXT,
+        );
 
         // Set up the source with a known version so we can record the exact checksum
         setup_source_with_versioned_agent(
@@ -675,7 +695,11 @@ mod tests {
         install_agent_on_disk(&t.fs, &t.paths, "my-agent", &content, InstallScope::Global);
 
         let install_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
-        let path = ArtifactKind::Agent.installed_path("my-agent", &install_dir);
+        let path = ArtifactKind::Agent.installed_path(
+            "my-agent",
+            &install_dir,
+            ArtifactKind::HOME_AGENT_EXT,
+        );
 
         // Lock entry with version 1.0.0
         save_lock_with_entry(

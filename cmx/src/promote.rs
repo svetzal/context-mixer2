@@ -85,7 +85,7 @@ pub fn promote(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<P
     let home = resolve_home(ctx)?;
     ensure_home_source(&home, ctx)?;
     let dest_dir = home.join(kind.subdir_name());
-    let home_path = kind.installed_path(name, &dest_dir);
+    let home_path = kind.installed_path(name, &dest_dir, ArtifactKind::HOME_AGENT_EXT);
 
     let installed_cs = checksum::checksum_artifact(&installed_path, kind, ctx.fs)?;
     let home_cs = ctx

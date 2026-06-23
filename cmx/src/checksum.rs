@@ -97,6 +97,7 @@ mod tests {
         ArtifactKind::Agent.installed_path(
             "my-agent",
             &paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap(),
+            ArtifactKind::HOME_AGENT_EXT,
         )
     }
 

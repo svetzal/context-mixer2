@@ -255,7 +255,8 @@ fn unadopt_one(
     home: &Path,
     ctx: &AppContext<'_>,
 ) -> Result<Option<UnadoptResult>> {
-    let home_path = kind.installed_path(name, &home.join(kind.subdir_name()));
+    let home_path =
+        kind.installed_path(name, &home.join(kind.subdir_name()), ArtifactKind::HOME_AGENT_EXT);
     let home_present = ctx.fs.exists(&home_path);
 
     let mut untracked_from: Vec<Platform> = Vec::new();

@@ -262,10 +262,9 @@ pub(crate) fn install_agent_on_disk(
     content: &str,
     scope: crate::types::InstallScope,
 ) {
-    let dir = paths
-        .install_dir(crate::types::ArtifactKind::Agent, scope)
+    let path = paths
+        .installed_artifact_path(crate::types::ArtifactKind::Agent, name, scope)
         .expect("install_agent_on_disk: caller uses platform that supports Agent");
-    let path = crate::types::ArtifactKind::Agent.installed_path(name, &dir);
     fs.add_file(path, content);
 }
 
