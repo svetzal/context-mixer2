@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.2] - 2026-06-23
+
 ### Fixed
 
 - **`cmx {skill,agent} adopt <name>`** now homes a skill that exists in several install locations at once (a copy diverged across platforms) under the **highest-priority configured platform**, instead of whichever install directory sorted first alphabetically. Because the shared `.agents/skills` directory sorts before `~/.claude/skills`, adopting a skill present in both could silently track it for Codex even when Claude was listed first in `config platforms` — and then report `now tracked for: codex`. Adoption now follows the configured `platforms` order (falling back to the default platform order when no managed set is declared), preferring an adoptable orphaned copy.
