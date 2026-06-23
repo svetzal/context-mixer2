@@ -36,7 +36,14 @@ This installs to the platform's project-scoped directory (e.g. `.claude/agents/`
 
 ## Choosing a platform
 
-By default, cmx installs to Claude Code paths. Use `--platform` to target a different tool:
+By default — with no `--platform` — cmx installs to **every platform already in
+use**, i.e. those with tracked artifacts at the target scope. A new install
+joins the tools you actually run (e.g. Claude + Codex + Hermes) and stays in sync
+across them; when nothing is tracked yet it falls back to Claude. Each landing is
+reported on its own line, naming the platform.
+
+Use `--platform` to constrain the install to one tool (which also onboards a new
+one):
 
 ```bash
 cmx agent install python-craftsperson --platform cursor
@@ -50,9 +57,12 @@ export CMX_PLATFORM=copilot
 cmx agent install python-craftsperson
 ```
 
-Supported platform values: `claude` (default), `copilot`, `cursor`, `windsurf`, `gemini`.
+Supported platform values: `claude`, `copilot`, `cursor`, `windsurf`, `gemini`,
+`opencode`, `codex`, `pi`, `crush`, `amp`, `zed`, `openhands`, `hermes`.
 
-See [Platform Paths](../reference/platforms.md) for the full directory table.
+To make the in-use set explicit rather than inferred, declare a managed set with
+[`cmx config platforms`](../reference/commands.md#managed-platforms). See
+[Platform Paths](../reference/platforms.md) for the full directory table.
 
 ## What happens on install
 

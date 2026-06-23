@@ -4,10 +4,18 @@
 
 | Option | Description |
 |--------|-------------|
-| `--platform <platform>` | Target platform: `claude` (default), `copilot`, `cursor`, `windsurf`, `gemini` |
+| `--platform <platform>` | Target a single platform: `claude`, `copilot`, `cursor`, `windsurf`, `gemini`, `opencode`, `codex`, `pi`, `crush`, `amp`, `zed`, `openhands`, `hermes` |
 
 The `--platform` flag is global and can be placed anywhere on the command line.
 It can also be set via the `CMX_PLATFORM` environment variable.
+
+When omitted, `install` and `uninstall` act across **every platform already in
+use** (those with tracked artifacts) — so a curated set stays in sync across the
+tools you actually run — while single-target commands (`info`, `update`,
+`adopt`, …) default to Claude. Pass `--platform <tool>` to constrain an
+operation to one platform (which also onboards a new tool on install). See
+[Platform Paths](./platforms.md) for the full directory table, and
+`cmx config platforms` (below) to make the managed set explicit.
 
 ## Source management
 
@@ -28,26 +36,61 @@ It can also be set via the `CMX_PLATFORM` environment variable.
 | `cmx agent install --all` | Install all available agents |
 | `cmx agent install <name> --local` | Install into current project |
 | `cmx agent install <name> --platform cursor` | Install to Cursor |
-| `cmx agent update <name>` | Update an agent from its source |
+| `cmx agent update <name>` | Update an agent from its source (pulls the source over the installed copy) |
 | `cmx agent update --all` | Update all tracked agents |
-| `cmx agent uninstall <name>...` | Uninstall one or more agents (everywhere cmx tracks them) |
+| `cmx agent promote <name>` | Push in-place edits of the installed copy back into the canonical home — the mirror of `update` |
+| `cmx agent uninstall <name>...` | Uninstall one or more agents; sweeps every platform unless `--platform` is given |
 | `cmx agent adopt <name>...` | Adopt one or more orphaned, hand-authored agents into the canonical home |
 | `cmx agent unadopt <name>...` | Remove agents from the home (originals stay); `--external` also marks them external |
 | `cmx agent list` | List installed agents (cmx-managed); `--all` includes external |
 | `cmx agent info <name>` | Show source, version, activation trigger, and (in an `llm` build) a summary |
-| `cmx agent diff <name>` | LLM-powered diff analysis (requires `llm` feature) |
+| `cmx agent diff <name>` | Directional diff vs the source; `--full` for the line-by-line view (requires `llm` feature) |
 
 `install` and `uninstall` accept **multiple names** in one command (e.g.
 `cmx agent install a b c`). Both are best-effort: each name is processed
 independently and per-name failures are collected and reported rather than
 aborting the batch. `install` exits non-zero if any name failed; `uninstall`
-exits non-zero only when nothing at all was removed. `uninstall` is
-**cross-platform** — it removes every physical copy and clears every platform's
-lock entry, not just the active `--platform`'s.
+exits non-zero only when nothing at all was removed.
+
+Both are **multi-platform by default**. With no `--platform`, a bare `install`
+lands the artifact on every platform already in use (falling back to Claude when
+nothing is tracked yet), and `uninstall` sweeps every platform — removing each
+physical copy and clearing every platform's lock entry. Pass `--platform <tool>`
+to scope either to one platform: install onboards just that tool, uninstall
+removes from just that one and leaves the others intact.
 
 ## Skill management
 
-Same commands as agent, using `cmx skill` instead of `cmx agent`.
+Same commands as agent, using `cmx skill` instead of `cmx agent`, plus one
+skill-only command:
+
+| Command | Description |
+|---------|-------------|
+| `cmx skill sync <name>` | Reconcile a skill that has diverged across platforms by copying one copy over the others |
+
+`sync` works **between install locations** rather than from a registered source,
+so it also reconciles `external` skills and any skill with no source. By default
+the **newest version wins**; pass `--from <platform>` to force the direction,
+`--dry-run` to preview, or `--local` to reconcile project scope. When the
+differing copies are unversioned (or share a version) it asks for `--from`
+rather than guessing, and lists each copy so you can choose. Agents are excluded
+because they're reformatted per platform (e.g. Codex TOML), so a byte-level
+cross-platform comparison isn't meaningful.
+
+### `cmx {agent,skill} promote`
+
+`promote` is the mirror of `update`. Where `update` pulls the source copy over
+your installed one (discarding local edits), `promote` copies the **installed**
+copy into the canonical home and refreshes its `home`-provenance lock baselines,
+so the artifact reads as tracked again. Use it for the common authoring loop: an
+assistant edits its own skill where it's installed, then you promote those edits
+to the home. It promotes the copy `cmx diff` shows (global scope preferred, then
+project). The target is the home only — a git-sourced artifact is rejected with
+guidance (edit the source clone, or `update --force` to discard), as is an
+untracked one (steered to `adopt`/`install`); a Codex agent is rejected too,
+since its installed copy is TOML rather than canonical markdown. Any other
+home-tracked platform whose copy still differs afterward is reported as drifted
+and pointed at `sync`.
 
 ## Aggregate commands
 
@@ -85,9 +128,12 @@ The top-level `cmx info <name>` searches both kinds; the kind-scoped
 
 ### `cmx doctor`
 
-`doctor` is a **read-only** survey across *every* supported platform's install
-directories and lock files. It mutates nothing — its job is to make a
-disorganized installation visible before any command changes it.
+`doctor` is a **read-only** survey of your platforms' install directories and
+lock files. It mutates nothing — its job is to make a disorganized installation
+visible before any command changes it. By default it surveys every supported
+platform; once you declare a managed set with `cmx config platforms`, it surveys
+only those, and the header reports the count it actually looked at (e.g. "2
+managed platform(s) surveyed") rather than always claiming all thirteen.
 
 By default `doctor` shows **only what needs attention** — drifted, untracked,
 orphaned, missing, or diverged artifacts — because it's a doctor, for fixing
@@ -127,7 +173,12 @@ summary names which copy is where:
   • hopper-coordinator diverges: ~/.agents/skills @ 3.2.0, ~/.claude/skills @ 3.3.0
 ```
 
-Re-sync a cmx-managed divergence with `cmx <kind> update <name> --force`.
+Re-sync a divergence with the tool that fits its provenance, which `doctor`'s
+hint names for you: `cmx skill sync <name>` (or `--from <platform>`) to reconcile
+copies **between install locations** — the right move for an `external` or
+source-less skill — or `cmx <kind> update <name> --force` / `cmx <kind> promote
+<name>` when the artifact is tracked from a source or the home. `cmx skill diff
+<name>` shows exactly which copy differs first.
 
 `doctor` exits non-zero (`2`) when it finds drift, untracked, orphaned, missing,
 or diverged artifacts, so it is usable in a pre-commit hook or CI check. A
@@ -179,12 +230,35 @@ just `install --all --platform <tool>`.
 
 | Command | Description |
 |---------|-------------|
-| `cmx config show` | Show current LLM settings and external rules |
+| `cmx config show` | Show current LLM settings, external rules, and the managed-platform set |
 | `cmx config gateway <openai\|ollama>` | Set LLM provider |
 | `cmx config model <name>` | Set LLM model |
 | `cmx config external list` | List the configured external rules |
 | `cmx config external add <dir-or-name>` | Mark a directory or artifact name as external |
 | `cmx config external remove <dir-or-name>` | Remove an external rule |
+| `cmx config platforms list` | List the platforms cmx manages |
+| `cmx config platforms add <platform>` | Add a platform to the managed set |
+| `cmx config platforms remove <platform>` | Remove a platform from the managed set |
+
+### Managed platforms
+
+By default cmx **infers** which platforms to act on: a bare `install` targets the
+platforms already in use, while `uninstall` and `doctor` consider every supported
+platform. Declaring a managed set makes that explicit and authoritative — when it
+is non-empty, a default (no `--platform`) `install`/`uninstall` acts on exactly
+those platforms and `doctor` surveys only those, so cmx ignores tools you don't
+use instead of scanning all thirteen:
+
+```bash
+cmx config platforms add claude
+cmx config platforms add codex     # now cmx manages exactly claude + codex
+cmx config platforms list
+```
+
+The set is stored as lowercase names in `config.json` (`"platforms": ["claude",
+"codex"]`) and shown by `cmx config show` (as `(inferred)` when unset). Onboard a
+tool before any install with `cmx config platforms add <tool>`; an explicit
+`--platform` still overrides the set for a single command.
 
 ### External artifacts
 

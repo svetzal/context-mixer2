@@ -213,5 +213,10 @@ everything that isn't is acknowledged but unflagged.
 > reported as a *single* tracked artifact whose `Tools` column lists every tool
 > it's installed for — not as "duplicates." `diverged` is reserved for the rare
 > case where copies actually disagree (different version or state across
-> locations); fix those with `cmx <kind> update <name> --force` to re-sync every
-> copy from one source.
+> locations). `doctor`'s hint names the fix that fits the artifact's provenance:
+> [`cmx skill sync <name>`](./reconciling.md) reconciles copies **between install
+> locations** (the right move for an `external` or source-less skill), while
+> `cmx <kind> update <name> --force` (re-sync from the source) or
+> [`cmx <kind> promote <name>`](./promoting.md) (keep the edited copy) apply when
+> the artifact is tracked from a source or the home. `cmx skill diff <name>`
+> shows which copy differs first.

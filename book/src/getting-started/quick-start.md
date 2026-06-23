@@ -64,9 +64,15 @@ cmx agent update --all
 
 ## Where artifacts get installed
 
-By default, cmx installs to Claude Code's global directories:
+On a fresh setup with nothing tracked yet, cmx installs to Claude Code's global
+directories:
 
 | Type | Global | Local |
 |------|--------|-------|
 | Agents | `~/.claude/agents/` | `.claude/agents/` |
 | Skills | `~/.claude/skills/` | `.claude/skills/` |
+
+Once you use more tools, a bare `install` lands on **every platform already in
+use** so your set stays in sync — or pass `--platform <tool>` to target one. See
+[Installing Artifacts](../guide/installing.md) and
+[Platform Paths](../reference/platforms.md).

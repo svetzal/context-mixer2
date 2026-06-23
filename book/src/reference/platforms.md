@@ -1,8 +1,12 @@
 # Platform Paths
 
 cmx can install agents and skills to any supported AI coding assistant platform.
-Use the `--platform` flag or the `CMX_PLATFORM` environment variable to choose a target.
-The default platform is Claude Code, which preserves backward compatibility.
+With no `--platform`, `install`/`uninstall` act across every platform already in
+use (falling back to Claude Code when nothing is tracked yet), and single-target
+commands default to Claude Code. Use the `--platform` flag or the `CMX_PLATFORM`
+environment variable to target one specific platform — Claude Code's unsuffixed
+lock file (below) preserves backward compatibility with installs made before
+platform selection existed.
 
 ## Selecting a platform
 

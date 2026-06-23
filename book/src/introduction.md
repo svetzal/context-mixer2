@@ -12,9 +12,10 @@ cmx manages the lifecycle of **agents** and **skills** for AI coding assistants 
 ## What cmx does
 
 - **Source management** — register git repositories or local directories as artifact sources (plugin marketplaces)
-- **Install & update** — install agents and skills globally or per-project, track versions and checksums
-- **Status tracking** — see what's installed, what's outdated, what's deprecated
-- **LLM-powered diff** — use AI to analyze differences between installed and source versions
+- **Install & update** — install agents and skills globally or per-project, across the platforms you use, tracking versions and checksums
+- **Status tracking** — see what's installed, what's outdated, what's deprecated; `cmx doctor` surveys the whole system
+- **Reconcile** — promote in-place edits back to a canonical home, and sync a skill that has diverged across tools
+- **LLM-powered diff** — use AI to analyze differences between installed and source versions, directionally
 - **Cross-platform** — works with Claude Code, GitHub Copilot, Cursor, Windsurf, Gemini CLI, opencode, Codex CLI, Pi, Crush, Amp, Zed, OpenHands, and Hermes
 
 ## Quick example

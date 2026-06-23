@@ -181,11 +181,16 @@ surveyed.
   verbatim into the home and records `home` provenance so orphans reclassify as
   tracked. Projection reuses the existing `install --all --platform <tool>` (the
   home is just a registered source) — no new code.
-- **Phase 3 — projection ergonomics (optional, not started):** a `cmx sync`
-  convenience that fans the home out to a configured set of platforms in one
-  command. Not needed for the cutover — `install --all --platform X` already
-  covers it — so this is a fast-follow only if the per-platform invocation proves
-  tedious.
+- **Phase 3 — reconciliation ergonomics — done (with a different shape than first
+  sketched).** Rather than a projection convenience that fans the home out (still
+  just `install --all --platform X`), the gap that proved worth closing was
+  reconciling copies that have *diverged* across tools. Two commands cover it:
+  `cmx {skill,agent} promote <name>` pushes in-place edits back into the home (the
+  mirror of `update`), and `cmx skill sync <name>` reconciles a skill between
+  install locations by copying one copy over the others. `doctor`'s divergence
+  hint routes to whichever fits the artifact's provenance. See
+  [Promoting Local Edits](../guide/promoting.md) and
+  [Reconciling Across Platforms](../guide/reconciling.md).
 
 > **Note on frontmatter normalization.** An earlier sketch had `adopt` default a
 > missing `version` to `0.1.0`. We deliberately *don't*: normalizing the home

@@ -14,6 +14,8 @@
 - [Installing Artifacts](./guide/installing.md)
 - [Listing & Status](./guide/listing.md)
 - [Updating Artifacts](./guide/updating.md)
+- [Promoting Local Edits](./guide/promoting.md)
+- [Reconciling Across Platforms](./guide/reconciling.md)
 - [Bringing a System Under Control](./guide/under-control.md)
 - [Diffing with LLM Analysis](./guide/diffing.md)
 - [Configuration](./guide/configuration.md)

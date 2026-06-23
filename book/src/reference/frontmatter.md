@@ -60,3 +60,9 @@ version: 1.0.0
   }]
 }
 ```
+
+The `metadata` block — and both of its fields, `description` and `version` — is
+**optional**, matching the Claude Code marketplace spec; a partial or absent
+`metadata` block parses fine. (cmx once required both fields, so a source that
+omitted either failed to load during the survey that backs `cmx list` and
+`cmx doctor`.)

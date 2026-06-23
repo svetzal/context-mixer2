@@ -26,7 +26,10 @@ Validation: all clean
 |---------|-------------|
 | `cmf validate` | Run all validation checks (marketplace, plugins, facets, recipes) |
 
-Prints errors first, then warnings. Exit code is 0 even with issues (use the output to determine status).
+Prints errors first, then warnings. Exits non-zero (`2`) when any **error-level**
+issue is found — so it's usable as a CI gate — while warnings-only and clean runs
+exit `0`. The per-domain validators (`cmf facet validate`, `cmf plugin validate`,
+`cmf marketplace validate`) follow the same rule.
 
 ## Plugin management
 
