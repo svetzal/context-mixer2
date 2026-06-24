@@ -105,6 +105,17 @@ struct ArtifactDiff {
     unified: String,
 }
 
+/// Names the two copies being compared by their concrete identities, so every
+/// downstream function speaks the same language (never "source"/"installed").
+struct FocusedComparison<'a> {
+    name: &'a str,
+    kind: ArtifactKind,
+    source_name: &'a str,
+    changed_label: &'a str,
+    source_version: Option<&'a str>,
+    changed_version: Option<&'a str>,
+}
+
 // ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
@@ -200,26 +211,18 @@ pub(crate) async fn gather_diff_with(
     let (installed_version, locally_modified) =
         focus_lock_state(name, &evals[focus_idx].copy, &focus_checksum, scope, ctx)?;
 
-    let reconciliations = reconciliations(
+    let cmp = FocusedComparison {
         name,
         kind,
-        &source_name,
-        &changed_label,
-        locally_modified,
-        multi.then_some(focus_platform),
-    );
+        source_name: &source_name,
+        changed_label: &changed_label,
+        source_version: source_version.as_deref(),
+        changed_version: installed_version.as_deref(),
+    };
 
-    let analysis = analyze_focus(
-        kind,
-        name,
-        &source_name,
-        &changed_label,
-        source_version.as_deref().unwrap_or("unversioned"),
-        installed_version.as_deref().unwrap_or("unversioned"),
-        &evals[focus_idx].dir_diff.unified,
-        ctx,
-    )
-    .await?;
+    let reconciliations = reconciliations(&cmp, locally_modified, multi.then_some(focus_platform));
+
+    let analysis = analyze_focus(&cmp, &evals[focus_idx].dir_diff.unified, ctx).await?;
 
     let focus_eval = &evals[focus_idx];
     Ok(DiffOutput {
@@ -245,17 +248,13 @@ pub(crate) async fn gather_diff_with(
 /// Ask the LLM to summarize the focused copy's diff, naming the two sides by
 /// their concrete identities (`source_name`, `changed`) so the summary speaks the
 /// same language as the rest of the output (never "source"/"installed").
-#[allow(clippy::too_many_arguments)]
 async fn analyze_focus(
-    kind: ArtifactKind,
-    name: &str,
-    source_name: &str,
-    changed: &str,
-    source_ver: &str,
-    changed_ver: &str,
+    cmp: &FocusedComparison<'_>,
     unified: &str,
     ctx: &AppContext<'_>,
 ) -> Result<String> {
+    let source_ver = cmp.source_version.unwrap_or("unversioned");
+    let changed_ver = cmp.changed_version.unwrap_or("unversioned");
     let system_prompt = format!(
         "You are a technical analyst comparing two copies of an AI coding assistant {kind} \
         (written in markdown). You are given a unified diff: lines prefixed with `-` belong to \
@@ -265,13 +264,20 @@ async fn analyze_focus(
         1. What capabilities or behaviors were added, removed, or changed (and in which copy)\n\
         2. Whether the difference is significant or cosmetic\n\
         3. A recommendation: which copy looks more authoritative, and which way to reconcile\n\n\
-        Keep it brief and actionable — a few paragraphs at most."
+        Keep it brief and actionable — a few paragraphs at most.",
+        kind = cmp.kind,
+        source_name = cmp.source_name,
+        changed = cmp.changed_label,
     );
     let user_prompt = format!(
         "Compare these two copies of the {kind} '{name}':\n\
         - '{source_name}' copy (the `−` lines): {source_ver}\n\
         - '{changed}' copy (the `+` lines): {changed_ver}\n\n\
-        {unified}"
+        {unified}",
+        kind = cmp.kind,
+        name = cmp.name,
+        source_name = cmp.source_name,
+        changed = cmp.changed_label,
     );
     match ctx.llm {
         Some(llm) => llm.analyze(&system_prompt, &user_prompt).await,
@@ -447,16 +453,17 @@ fn focus_lock_state(
 /// either way they can be discarded by re-installing. `diff` never picks for the
 /// user. `platform`, set when copies span platforms, qualifies the commands.
 fn reconciliations(
-    name: &str,
-    kind: ArtifactKind,
-    source_name: &str,
-    changed: &str,
+    cmp: &FocusedComparison<'_>,
     locally_modified: bool,
     platform: Option<Platform>,
 ) -> Vec<Reconciliation> {
     let mut out = Vec::new();
-    let source_is_home = source_name == crate::adopt::HOME_SOURCE;
+    let source_is_home = cmp.source_name == crate::adopt::HOME_SOURCE;
     let plat = platform.map(|p| format!(" --platform {p}")).unwrap_or_default();
+    let name = cmp.name;
+    let kind = cmp.kind;
+    let source_name = cmp.source_name;
+    let changed = cmp.changed_label;
 
     if source_is_home {
         out.push(Reconciliation {
@@ -951,7 +958,15 @@ mod tests {
 
     #[test]
     fn reconciliations_offers_promote_when_source_is_home() {
-        let rs = reconciliations("pf", ArtifactKind::Skill, "home", "claude", true, None);
+        let cmp = FocusedComparison {
+            name: "pf",
+            kind: ArtifactKind::Skill,
+            source_name: "home",
+            changed_label: "claude",
+            source_version: None,
+            changed_version: None,
+        };
+        let rs = reconciliations(&cmp, true, None);
         assert_eq!(rs.len(), 2, "promote + update");
         assert!(rs[0].command.contains("promote pf"), "promote offered first: {:?}", rs[0]);
         assert!(rs[1].command.contains("update pf --force"), "update with force: {:?}", rs[1]);
@@ -971,7 +986,15 @@ mod tests {
 
     #[test]
     fn reconciliations_no_promote_for_git_source() {
-        let rs = reconciliations("slidev", ArtifactKind::Skill, "guidelines", "codex", false, None);
+        let cmp = FocusedComparison {
+            name: "slidev",
+            kind: ArtifactKind::Skill,
+            source_name: "guidelines",
+            changed_label: "codex",
+            source_version: None,
+            changed_version: None,
+        };
+        let rs = reconciliations(&cmp, false, None);
         assert_eq!(rs.len(), 1, "only restore-from-source for a git source");
         assert!(rs[0].command.contains("update slidev"), "{:?}", rs[0]);
         assert!(!rs[0].command.contains("--force"), "no force when not locally modified");
@@ -981,14 +1004,15 @@ mod tests {
 
     #[test]
     fn reconciliations_qualify_commands_with_platform_when_multi() {
-        let rs = reconciliations(
-            "pf",
-            ArtifactKind::Skill,
-            "home",
-            "codex",
-            true,
-            Some(Platform::Codex),
-        );
+        let cmp = FocusedComparison {
+            name: "pf",
+            kind: ArtifactKind::Skill,
+            source_name: "home",
+            changed_label: "codex",
+            source_version: None,
+            changed_version: None,
+        };
+        let rs = reconciliations(&cmp, true, Some(Platform::Codex));
         assert!(rs[0].command.contains("promote pf --platform codex"), "{:?}", rs[0]);
         assert!(rs[1].command.contains("update pf --platform codex --force"), "{:?}", rs[1]);
     }
