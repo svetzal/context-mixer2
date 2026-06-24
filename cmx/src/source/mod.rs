@@ -244,7 +244,6 @@ pub fn looks_like_url(s: &str) -> bool {
 mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
-    use crate::scan::ScanWarning;
     use crate::test_support::{
         TestContext, make_ctx, make_git_entry, make_local_entry, setup_empty_sources,
         setup_sources_from_entries, test_paths,
@@ -252,85 +251,6 @@ mod tests {
     use chrono::Utc;
     use std::cell::RefCell;
     use std::path::PathBuf;
-
-    // --- Display for SourceListResult ---
-
-    #[test]
-    fn source_list_result_display_empty() {
-        let result = SourceListResult { entries: vec![] };
-        let out = result.to_string();
-        assert!(out.contains("No sources registered."));
-        assert!(out.contains("cmx source add"));
-    }
-
-    #[test]
-    fn source_list_result_display_with_entries() {
-        let result = SourceListResult {
-            entries: vec![SourceListEntry {
-                name: "guidelines".to_string(),
-                kind: "local",
-                location: "/home/user/repos/guidelines".to_string(),
-            }],
-        };
-        let out = result.to_string();
-        assert!(out.contains("guidelines"));
-        assert!(out.contains("local"));
-        assert!(out.contains("/home/user/repos/guidelines"));
-    }
-
-    // --- Display for SourceScanResult ---
-
-    #[test]
-    fn source_scan_result_display_no_warnings() {
-        let result = SourceScanResult {
-            name: "my-source".to_string(),
-            agents_found: 3,
-            skills_found: 1,
-            warnings: vec![],
-        };
-        let out = result.to_string();
-        assert!(out.contains("my-source"));
-        assert!(out.contains("3 agent(s)"));
-        assert!(!out.contains("Warning:"));
-    }
-
-    #[test]
-    fn source_scan_result_display_with_warnings() {
-        let result = SourceScanResult {
-            name: "my-source".to_string(),
-            agents_found: 0,
-            skills_found: 0,
-            warnings: vec![ScanWarning {
-                message: "something fishy".to_string(),
-            }],
-        };
-        let out = result.to_string();
-        assert!(out.contains("Warning: something fishy"));
-    }
-
-    // --- Display for SourceRemoveResult ---
-
-    #[test]
-    fn source_remove_result_display_with_clone_deleted() {
-        let result = SourceRemoveResult {
-            name: "git-source".to_string(),
-            clone_deleted: true,
-        };
-        let out = result.to_string();
-        assert!(out.contains("git-source"));
-        assert!(out.contains("cloned repo deleted"));
-    }
-
-    #[test]
-    fn source_remove_result_display_without_clone() {
-        let result = SourceRemoveResult {
-            name: "local-source".to_string(),
-            clone_deleted: false,
-        };
-        let out = result.to_string();
-        assert!(out.contains("local-source"));
-        assert!(!out.contains("cloned repo deleted"));
-    }
 
     // --- looks_like_url ---
 

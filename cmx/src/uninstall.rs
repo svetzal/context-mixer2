@@ -184,37 +184,6 @@ mod tests {
     use crate::types::{ArtifactKind, InstallScope, LockFile};
     use std::collections::BTreeMap;
 
-    // --- Display for UninstallResult ---
-
-    #[test]
-    fn uninstall_result_display_tracked() {
-        let result = UninstallResult {
-            name: "my-agent".to_string(),
-            kind: ArtifactKind::Agent,
-            scope: "global",
-            was_tracked: true,
-            was_on_disk: true,
-            platforms: vec![Platform::Claude],
-        };
-        let out = result.to_string();
-        assert!(out.contains("Uninstalled my-agent"));
-        assert!(!out.contains("untracked"));
-    }
-
-    #[test]
-    fn uninstall_result_display_untracked() {
-        let result = UninstallResult {
-            name: "my-agent".to_string(),
-            kind: ArtifactKind::Agent,
-            scope: "global",
-            was_tracked: false,
-            was_on_disk: true,
-            platforms: vec![],
-        };
-        let out = result.to_string();
-        assert!(out.contains("untracked"));
-    }
-
     #[test]
     fn uninstall_bails_when_agent_not_installed() {
         let t = TestContext::new();

@@ -136,6 +136,7 @@ Query & display:
 - `cmx/src/display/mod.rs` — output formatting for all commands; one submodule per command:
   `adopt.rs`, `config.rs`, `diff.rs`, `doctor.rs`, `info.rs`, `install.rs`, `list.rs`,
   `outdated.rs`, `search.rs`, `source.rs`, `uninstall.rs`
+- Tests for a `Display` impl live in the same `display/<command>.rs` module as the impl; core modules (`install.rs`, `uninstall.rs`, etc.) must not contain `Display`-formatting tests.
 - `cmx/src/table.rs` — table rendering helpers
 
 System survey / adoption:

@@ -170,4 +170,45 @@ mod tests {
         r.untracked = true;
         assert!(r.to_string().contains("untracked"));
     }
+
+    #[test]
+    fn display_skill_shows_activates_when_and_summary() {
+        let mut r = minimal_artifact_info("my-skill");
+        r.kind = crate::types::ArtifactKind::Skill;
+        r.activates_when = Some("Use this skill when you need X".to_string());
+        r.summary = Some("It does a thing.".to_string());
+        let out = r.to_string();
+        assert!(out.contains("Activates when:"), "skill activation label: {out}");
+        assert!(out.contains("Use this skill when you need X"));
+        assert!(out.contains("What it does:"));
+        assert!(out.contains("It does a thing."));
+    }
+
+    #[test]
+    fn display_agent_uses_description_label() {
+        let mut r = minimal_artifact_info("my-agent");
+        r.activates_when = Some("A helpful agent".to_string());
+        let out = r.to_string();
+        assert!(out.contains("Description:"), "agent uses Description label: {out}");
+        assert!(!out.contains("Activates when:"), "agent does not use the skill label");
+    }
+
+    #[test]
+    fn display_summary_hint_when_no_attempt() {
+        // Neither a summary nor an error: no attempt was made (a lean build).
+        let r = minimal_artifact_info("my-skill");
+        let out = r.to_string();
+        assert!(out.contains("--features llm"), "lean build hint: {out}");
+    }
+
+    #[test]
+    fn display_summary_reports_attempt_failure_reason() {
+        // A summary was attempted but failed — show the real reason verbatim,
+        // not a generic "provider unavailable".
+        let mut r = minimal_artifact_info("productivity");
+        r.summary_error = Some("no readable content to summarize at /x".to_string());
+        let out = r.to_string();
+        assert!(out.contains("no readable content to summarize"), "names real reason: {out}");
+        assert!(!out.contains("--features llm"), "not the lean hint: {out}");
+    }
 }

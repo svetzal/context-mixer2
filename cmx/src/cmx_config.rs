@@ -169,43 +169,6 @@ mod tests {
     use super::*;
     use crate::test_support::TestContext;
 
-    // --- Display for ConfigShowResult ---
-
-    #[test]
-    fn config_show_result_display() {
-        let result = ConfigShowResult {
-            gateway: "ollama".to_string(),
-            model: "llama3".to_string(),
-            external: vec![],
-            platforms: vec![],
-        };
-        let out = result.to_string();
-        assert!(out.contains("LLM gateway: ollama"));
-        assert!(out.contains("LLM model:   llama3"));
-        assert!(out.contains("External:    (none)"));
-        assert!(out.contains("Platforms:   (inferred)"));
-    }
-
-    // --- Display for ConfigSetResult ---
-
-    #[test]
-    fn config_set_result_display_gateway() {
-        let result = ConfigSetResult {
-            field: "gateway",
-            value: "ollama".to_string(),
-        };
-        assert_eq!(result.to_string(), "LLM gateway set to: ollama\n");
-    }
-
-    #[test]
-    fn config_set_result_display_model() {
-        let result = ConfigSetResult {
-            field: "model",
-            value: "gemma2".to_string(),
-        };
-        assert_eq!(result.to_string(), "LLM model set to: gemma2\n");
-    }
-
     #[test]
     fn show_returns_defaults_when_no_config_file() {
         let t = TestContext::new();

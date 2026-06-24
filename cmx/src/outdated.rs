@@ -182,30 +182,6 @@ mod tests {
     use crate::types::{ArtifactKind, InstallScope, InstalledArtifact, LockFile};
     use std::collections::{BTreeMap, HashMap};
 
-    // --- Display for OutdatedReport ---
-
-    #[test]
-    fn outdated_report_display_empty() {
-        let report = OutdatedReport(vec![]);
-        assert_eq!(report.to_string(), "Everything is up to date.\n");
-    }
-
-    #[test]
-    fn outdated_report_display_with_rows() {
-        let report = OutdatedReport(vec![OutdatedRow {
-            name: "my-agent".to_string(),
-            kind: ArtifactKind::Agent,
-            installed_version: "1.0.0".to_string(),
-            available_version: "2.0.0".to_string(),
-            source: "guidelines".to_string(),
-            status: "update".to_string(),
-        }]);
-        let out = report.to_string();
-        assert!(out.contains("my-agent"));
-        assert!(out.contains("1.0.0"));
-        assert!(out.contains("2.0.0"));
-    }
-
     // --- compare_versions (pure, no gateway fakes needed) ---
 
     #[test]
