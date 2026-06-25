@@ -132,7 +132,8 @@ Query & display:
 - `cmx/src/search.rs` — `cmx search` (full-text search across sources)
 - `cmx/src/info/mod.rs` — `cmx info` (artifact detail view)
 - `cmx/src/info/summary.rs` — LLM-backed prose summary for `cmx info` (feature-gated)
-- `cmx/src/diff.rs` — LLM-powered diff analysis between installed and source versions (feature-gated)
+- `cmx/src/diff.rs` — `cmx diff`: artifact diff orchestration, installed-copy discovery, lock-state reconciliation, and LLM-powered analysis between installed and source versions (LLM path feature-gated)
+- `cmx/src/text_diff.rs` — general line-oriented LCS text differ (`split_lines`/`lcs_ops`/`render_hunks`); pure, no coupling to the artifact model
 - `cmx/src/display/mod.rs` — output formatting for all commands; one submodule per command:
   `adopt.rs`, `config.rs`, `diff.rs`, `doctor.rs`, `info.rs`, `install.rs`, `list.rs`,
   `outdated.rs`, `search.rs`, `source.rs`, `uninstall.rs`
