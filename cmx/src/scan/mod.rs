@@ -6,6 +6,7 @@ use crate::scan_marketplace;
 use crate::types::{Artifact, ArtifactKind};
 
 mod frontmatter;
+pub(crate) mod yaml_repair;
 pub(crate) use frontmatter::{
     Frontmatter, artifact_from_frontmatter, parse_agent_frontmatter_str, parse_frontmatter_str,
 };
