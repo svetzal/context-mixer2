@@ -35,6 +35,7 @@ pub mod sync;
 pub mod table;
 #[cfg(test)]
 mod test_support;
+#[cfg(feature = "llm")]
 pub(crate) mod text_diff;
 pub mod types;
 pub mod uninstall;
