@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use serde_yaml_ng::{Mapping, Value};
 
-use crate::types::{Artifact, ArtifactKind, Deprecation};
 use super::yaml_repair::{lenient_mapping, normalize_frontmatter, scalar_to_string};
+use crate::types::{Artifact, ArtifactKind, Deprecation};
 
 pub(crate) struct Frontmatter {
     pub(crate) description: String,
