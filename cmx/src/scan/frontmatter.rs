@@ -41,19 +41,40 @@ fn parse_yaml_mapping(frontmatter: &str) -> Option<Mapping> {
     }
 }
 
-fn parse_deprecation(fm_text: &str) -> Option<Deprecation> {
-    let mapping = parse_yaml_mapping(fm_text)?;
+// ---------------------------------------------------------------------------
+// Mapping-based readers (operate on an already-parsed Mapping, no re-parsing)
+// ---------------------------------------------------------------------------
+
+fn field_from_mapping(m: &Mapping, key: &str) -> Option<String> {
+    let value = m.get(Value::String(key.to_string()))?;
+    scalar_to_string(value)
+}
+
+fn metadata_field_from_mapping(m: &Mapping, key: &str) -> Option<String> {
+    let metadata_key = Value::String("metadata".to_string());
+    let metadata = m.get(&metadata_key)?;
+    let Value::Mapping(sub) = metadata else {
+        return None;
+    };
+    let value = sub.get(Value::String(key.to_string()))?;
+    scalar_to_string(value)
+}
+
+fn version_from_mapping(m: &Mapping) -> Option<String> {
+    field_from_mapping(m, "version").or_else(|| metadata_field_from_mapping(m, "version"))
+}
+
+fn deprecation_from_mapping(m: &Mapping) -> Option<Deprecation> {
     let deprecated_key = Value::String("deprecated".to_string());
-    let deprecated = mapping.get(&deprecated_key)?;
-    // Accept both `true` (YAML bool) and the string `"true"` for resilience.
+    let deprecated = m.get(&deprecated_key)?;
     let is_deprecated = matches!(deprecated, Value::Bool(true))
         || matches!(deprecated, Value::String(s) if s == "true");
     if !is_deprecated {
         return None;
     }
     Some(Deprecation {
-        reason: extract_field(fm_text, "deprecated_reason"),
-        replacement: extract_field(fm_text, "deprecated_replacement"),
+        reason: field_from_mapping(m, "deprecated_reason"),
+        replacement: field_from_mapping(m, "deprecated_replacement"),
     })
 }
 
@@ -102,36 +123,31 @@ fn parse_frontmatter_impl(content: &str, required_fields: &[&str]) -> Option<Fro
         }
     }
     Some(Frontmatter {
-        description: extract_field(fm_text, "description").unwrap_or_default(),
-        version: extract_version(fm_text),
-        deprecation: parse_deprecation(fm_text),
+        description: field_from_mapping(&mapping, "description").unwrap_or_default(),
+        version: version_from_mapping(&mapping),
+        deprecation: deprecation_from_mapping(&mapping),
     })
 }
+
+// ---------------------------------------------------------------------------
+// Public &str helpers (thin wrappers: parse once, delegate to mapping readers)
+// ---------------------------------------------------------------------------
 
 /// Extract a top-level field from YAML frontmatter as a string.
 /// Returns `None` when the key is absent or the value is empty/null/non-scalar.
 pub fn extract_field(frontmatter: &str, key: &str) -> Option<String> {
-    let mapping = parse_yaml_mapping(frontmatter)?;
-    let value = mapping.get(Value::String(key.to_string()))?;
-    scalar_to_string(value)
+    field_from_mapping(&parse_yaml_mapping(frontmatter)?, key)
 }
 
 /// Extract a field nested under `metadata:` in YAML frontmatter.
 /// Handles both block and flow mapping styles.
 pub fn extract_metadata_field(frontmatter: &str, key: &str) -> Option<String> {
-    let mapping = parse_yaml_mapping(frontmatter)?;
-    let metadata_key = Value::String("metadata".to_string());
-    let metadata = mapping.get(&metadata_key)?;
-    let Value::Mapping(sub) = metadata else {
-        return None;
-    };
-    let value = sub.get(Value::String(key.to_string()))?;
-    scalar_to_string(value)
+    metadata_field_from_mapping(&parse_yaml_mapping(frontmatter)?, key)
 }
 
 /// Extract version from frontmatter, checking root-level first then metadata block.
 pub fn extract_version(frontmatter: &str) -> Option<String> {
-    extract_field(frontmatter, "version").or_else(|| extract_metadata_field(frontmatter, "version"))
+    version_from_mapping(&parse_yaml_mapping(frontmatter)?)
 }
 
 /// Extract the version from an installed artifact's file content.
@@ -370,13 +386,14 @@ mod tests {
         assert_eq!(extract_version(text), None);
     }
 
-    // --- parse_deprecation ---
+    // --- deprecation_from_mapping (via parse_frontmatter_str) ---
 
     #[test]
     fn parse_deprecation_true_with_reason_and_replacement() {
         let text =
             "deprecated: true\ndeprecated_reason: Too old\ndeprecated_replacement: new-agent";
-        let dep = parse_deprecation(text).expect("expected Some");
+        let mapping = parse_yaml_mapping(text).unwrap();
+        let dep = deprecation_from_mapping(&mapping).expect("expected Some");
         assert_eq!(dep.reason.as_deref(), Some("Too old"));
         assert_eq!(dep.replacement.as_deref(), Some("new-agent"));
     }
@@ -384,7 +401,8 @@ mod tests {
     #[test]
     fn parse_deprecation_true_no_reason_or_replacement() {
         let text = "deprecated: true";
-        let dep = parse_deprecation(text).expect("expected Some");
+        let mapping = parse_yaml_mapping(text).unwrap();
+        let dep = deprecation_from_mapping(&mapping).expect("expected Some");
         assert!(dep.reason.is_none());
         assert!(dep.replacement.is_none());
     }
@@ -392,20 +410,23 @@ mod tests {
     #[test]
     fn parse_deprecation_false_returns_none() {
         let text = "deprecated: false";
-        assert!(parse_deprecation(text).is_none());
+        let mapping = parse_yaml_mapping(text).unwrap();
+        assert!(deprecation_from_mapping(&mapping).is_none());
     }
 
     #[test]
     fn parse_deprecation_absent_returns_none() {
         let text = "name: my-agent\ndescription: A thing";
-        assert!(parse_deprecation(text).is_none());
+        let mapping = parse_yaml_mapping(text).unwrap();
+        assert!(deprecation_from_mapping(&mapping).is_none());
     }
 
     #[test]
     fn parse_deprecation_bool_true_honored() {
         // YAML `true` is a bool, not the string "true"
         let text = "deprecated: true\ndeprecated_reason: Old";
-        let dep = parse_deprecation(text).expect("expected Some");
+        let mapping = parse_yaml_mapping(text).unwrap();
+        let dep = deprecation_from_mapping(&mapping).expect("expected Some");
         assert_eq!(dep.reason.as_deref(), Some("Old"));
     }
 
@@ -553,5 +574,18 @@ mod tests {
         // "namespace" field must not satisfy the "name" requirement
         let content = "---\nnamespace: foo\ndescription: bar\n---\n";
         assert!(parse_agent_frontmatter_str(content).is_none());
+    }
+
+    // --- single-parse regression: description + version + deprecation all populated ---
+
+    #[test]
+    fn parse_frontmatter_str_all_fields_from_single_parse() {
+        let content = "---\ndescription: My skill\nversion: 1.0.0\ndeprecated: true\ndeprecated_reason: Use new-skill instead\ndeprecated_replacement: new-skill\n---\n# body";
+        let fm = parse_frontmatter_str(content).expect("expected Some");
+        assert_eq!(fm.description, "My skill");
+        assert_eq!(fm.version.as_deref(), Some("1.0.0"));
+        let dep = fm.deprecation.expect("expected deprecation");
+        assert_eq!(dep.reason.as_deref(), Some("Use new-skill instead"));
+        assert_eq!(dep.replacement.as_deref(), Some("new-skill"));
     }
 }
