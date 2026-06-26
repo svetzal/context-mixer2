@@ -5,8 +5,8 @@ use crate::lockfile;
 use crate::platform::Platform;
 use crate::types::InstallScope;
 
-use super::{FocusedComparison, Reconciliation};
 use super::discovery::InstalledCopy;
+use super::{FocusedComparison, Reconciliation};
 
 /// Read the focus copy's lock baseline (from any platform that reads it): its
 /// recorded version, and whether the copy was edited after install (its bytes no

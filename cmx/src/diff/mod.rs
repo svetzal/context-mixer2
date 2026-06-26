@@ -13,7 +13,7 @@ mod discovery;
 mod reconcile;
 mod structural;
 
-use discovery::{CopyEval, discover_copies, evaluate_copies, representative_platform};
+use discovery::{discover_copies, evaluate_copies, representative_platform};
 use reconcile::{focus_lock_state, reconciliations};
 
 // ---------------------------------------------------------------------------

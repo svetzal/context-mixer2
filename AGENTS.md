@@ -132,7 +132,11 @@ Query & display:
 - `cmx/src/search.rs` — `cmx search` (full-text search across sources)
 - `cmx/src/info/mod.rs` — `cmx info` (artifact detail view)
 - `cmx/src/info/summary.rs` — LLM-backed prose summary for `cmx info` (feature-gated)
-- `cmx/src/diff.rs` — `cmx diff`: artifact diff orchestration, installed-copy discovery, lock-state reconciliation, and LLM-powered analysis between installed and source versions (LLM path feature-gated)
+- `cmx/src/diff/mod.rs` — `cmx diff` orchestration: entry point, gather loop, source lookup, copy-focus selection; public result types (`DiffOutput`, `CopyStatus`, `FileStatus`, `FileChange`, `Reconciliation`, `FocusedComparison`)
+- `cmx/src/diff/discovery.rs` — installed-copy discovery: `InstalledCopy`, `CopyEval`, `discover_copies`, `gather_skill_copies`, `evaluate_copies`, `representative_platform`
+- `cmx/src/diff/structural.rs` — per-file structural diff: `ArtifactDiff`, `diff_artifact`, `diff_files`, `diff_dirs`, `modified_file_block`, `collect_relative_files_with`
+- `cmx/src/diff/reconcile.rs` — lock-state reconciliation: `focus_lock_state`, `reconciliations`
+- `cmx/src/diff/analyze.rs` — LLM-powered analysis (feature-gated path): `analyze_focus`
 - `cmx/src/text_diff.rs` — general line-oriented LCS text differ (`split_lines`/`lcs_ops`/`render_hunks`); pure, no coupling to the artifact model
 - `cmx/src/display/mod.rs` — output formatting for all commands; one submodule per command:
   `adopt.rs`, `config.rs`, `diff.rs`, `doctor.rs`, `info.rs`, `install.rs`, `list.rs`,
