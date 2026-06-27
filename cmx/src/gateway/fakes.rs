@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::Mutex;
 
 use super::clock::Clock;
 use super::filesystem::{DirEntry, Filesystem};
@@ -317,9 +318,11 @@ impl Clock for FakeClock {
 // ---------------------------------------------------------------------------
 
 /// Returns a canned response string, or fails if `should_fail` is set.
+/// Also records every `(system_prompt, user_prompt)` pair passed to `analyze`.
 pub struct FakeLlmClient {
     pub response: String,
     pub should_fail: bool,
+    pub calls: Mutex<Vec<(String, String)>>,
 }
 
 impl FakeLlmClient {
@@ -327,16 +330,31 @@ impl FakeLlmClient {
         Self {
             response: response.into(),
             should_fail: false,
+            calls: Mutex::new(Vec::new()),
         }
+    }
+
+    /// Return the most recent `(system_prompt, user_prompt)` pair, if any.
+    pub fn last_call(&self) -> Option<(String, String)> {
+        self.calls.lock().unwrap().last().cloned()
+    }
+
+    /// Return all recorded `(system_prompt, user_prompt)` pairs in call order.
+    pub fn all_calls(&self) -> Vec<(String, String)> {
+        self.calls.lock().unwrap().clone()
     }
 }
 
 impl LlmClient for FakeLlmClient {
     fn analyze(
         &self,
-        _system_prompt: &str,
-        _user_prompt: &str,
+        system_prompt: &str,
+        user_prompt: &str,
     ) -> Pin<Box<dyn Future<Output = Result<String>> + Send + '_>> {
+        self.calls
+            .lock()
+            .unwrap()
+            .push((system_prompt.to_string(), user_prompt.to_string()));
         let should_fail = self.should_fail;
         let response = self.response.clone();
         Box::pin(async move {
@@ -456,6 +474,25 @@ mod tests {
         assert_eq!(result, "This is the analysis.");
     }
 
+    #[tokio::test]
+    async fn fake_llm_client_captures_prompts() {
+        let client = FakeLlmClient::new("result");
+        assert!(client.last_call().is_none(), "no calls yet");
+        client.analyze("sys", "usr").await.unwrap();
+        assert_eq!(
+            client.last_call(),
+            Some(("sys".to_string(), "usr".to_string())),
+            "captures the (system, user) pair"
+        );
+        client.analyze("sys2", "usr2").await.unwrap();
+        assert_eq!(client.all_calls().len(), 2, "accumulates calls");
+        assert_eq!(
+            client.last_call(),
+            Some(("sys2".to_string(), "usr2".to_string())),
+            "last_call returns the most recent"
+        );
+    }
+
     #[test]
     fn fake_filesystem_write_fails_on_configured_path() {
         let fs = FakeFilesystem::new();
@@ -491,6 +528,7 @@ mod tests {
         let client = FakeLlmClient {
             response: "unreachable".to_string(),
             should_fail: true,
+            calls: Mutex::new(Vec::new()),
         };
         let result = client.analyze("system", "user").await;
         assert!(result.is_err());
