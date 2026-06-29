@@ -110,7 +110,7 @@ pub(crate) fn copy_dir_recursive_with(src: &Path, dest: &Path, fs: &dyn Filesyst
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
-    use crate::test_support::TestContext;
+    use crate::test_support::{TestContext, add_skill, skill_content};
 
     #[test]
     fn copy_dir_recursive_with_copies_flat_directory() {
@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn copy_dir_recursive_with_copies_nested_directories() {
         let fs = FakeFilesystem::new();
-        fs.add_file("/src/SKILL.md", "# skill");
+        fs.add_file("/src/SKILL.md", skill_content(""));
         fs.add_file("/src/subdir/tool.py", "code");
 
         copy_dir_recursive_with(Path::new("/src"), Path::new("/dest"), &fs).unwrap();
@@ -139,7 +139,7 @@ mod tests {
     #[test]
     fn copy_dir_recursive_with_skips_transient_content() {
         let fs = FakeFilesystem::new();
-        fs.add_file("/src/SKILL.md", "# skill");
+        fs.add_file("/src/SKILL.md", skill_content(""));
         fs.add_file("/src/scripts/tool.mjs", "code");
         fs.add_file("/src/scripts/package.json", "{}");
         fs.add_file("/src/scripts/node_modules/dep/index.js", "vendored");
@@ -173,7 +173,7 @@ mod tests {
     fn copy_artifact_skill_with_skill_md_succeeds() {
         let t = TestContext::new();
 
-        t.fs.add_file("/source/my-skill/SKILL.md", "---\ndescription: A skill\n---\n");
+        add_skill(&t.fs, "/source", "my-skill", "A skill");
         t.fs.add_file("/source/my-skill/tool.py", "code");
 
         let ctx = t.ctx();

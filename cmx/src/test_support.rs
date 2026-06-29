@@ -269,6 +269,30 @@ pub(crate) fn install_agent_on_disk(
 }
 
 #[cfg(test)]
+pub(crate) fn install_skill_on_disk(
+    fs: &crate::gateway::fakes::FakeFilesystem,
+    paths: &crate::paths::ConfigPaths,
+    name: &str,
+    content: &str,
+    scope: crate::types::InstallScope,
+) {
+    let dir = paths
+        .installed_artifact_path(crate::types::ArtifactKind::Skill, name, scope)
+        .expect("install_skill_on_disk: caller uses platform that supports Skill");
+    fs.add_file(dir.join("SKILL.md"), content);
+}
+
+#[cfg(test)]
+pub(crate) fn add_skill(
+    fs: &crate::gateway::fakes::FakeFilesystem,
+    dir: impl AsRef<std::path::Path>,
+    name: &str,
+    desc: &str,
+) {
+    fs.add_file(dir.as_ref().join(name).join("SKILL.md"), skill_content(desc));
+}
+
+#[cfg(test)]
 pub(crate) fn setup_source_with_agent(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -368,11 +392,26 @@ pub(crate) struct TestContext {
 #[cfg(test)]
 impl TestContext {
     pub fn new() -> Self {
+        Self::build(test_paths(), crate::gateway::fakes::FakeClock::at(chrono::Utc::now()))
+    }
+
+    pub fn for_platform(platform: crate::platform::Platform) -> Self {
+        Self::build(
+            test_paths_for(platform),
+            crate::gateway::fakes::FakeClock::at(chrono::Utc::now()),
+        )
+    }
+
+    pub fn at(time: chrono::DateTime<chrono::Utc>) -> Self {
+        Self::build(test_paths(), crate::gateway::fakes::FakeClock::at(time))
+    }
+
+    fn build(paths: crate::paths::ConfigPaths, clock: crate::gateway::fakes::FakeClock) -> Self {
         Self {
             fs: crate::gateway::fakes::FakeFilesystem::new(),
             git: crate::gateway::fakes::FakeGitClient::new(),
-            clock: crate::gateway::fakes::FakeClock::at(chrono::Utc::now()),
-            paths: test_paths(),
+            clock,
+            paths,
         }
     }
 

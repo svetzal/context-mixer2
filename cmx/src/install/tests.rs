@@ -1,11 +1,10 @@
 use super::*;
 use crate::gateway::Filesystem;
-use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
 use crate::platform::Platform;
 use crate::source_iter::SourceArtifact;
 use crate::test_support::{
-    TestContext, agent_content, make_ctx, setup_empty_sources, setup_source,
-    setup_source_with_agent, setup_source_with_skill, setup_sources, test_paths, test_paths_for,
+    TestContext, add_skill, agent_content, setup_empty_sources, setup_source,
+    setup_source_with_agent, setup_source_with_skill, setup_sources, test_paths,
 };
 use crate::types::{Artifact, ArtifactKind, Deprecation, InstallScope, LockFile};
 use chrono::Utc;
@@ -169,8 +168,8 @@ fn plan_install_uses_deprecation_none_for_plain_artifact() {
 fn install_many_installs_each_and_collects_failures() {
     let t = TestContext::new();
     setup_source(&t.fs, &t.paths, "src", "/src");
-    t.fs.add_file("/src/alpha/SKILL.md", "---\ndescription: a\n---\n");
-    t.fs.add_file("/src/beta/SKILL.md", "---\ndescription: b\n---\n");
+    add_skill(&t.fs, "/src", "alpha", "a");
+    add_skill(&t.fs, "/src", "beta", "b");
 
     let ctx = t.ctx();
     let result = install_many(
@@ -344,18 +343,15 @@ fn install_records_checksums_in_lock() {
 #[test]
 fn install_records_timestamp_from_clock() {
     use chrono::TimeZone;
-    let fs = FakeFilesystem::new();
-    let git = FakeGitClient::new();
     let fixed_time = Utc.with_ymd_and_hms(2024, 6, 1, 12, 0, 0).unwrap();
-    let clock = FakeClock::at(fixed_time);
-    let paths = test_paths();
+    let t = TestContext::at(fixed_time);
 
-    setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-    let ctx = make_ctx(&fs, &git, &clock, &paths);
+    let ctx = t.ctx();
     install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
-    let lock = lockfile::load(InstallScope::Global, &fs, &paths).unwrap();
+    let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
     let entry = lock.packages.get("my-agent").unwrap();
     assert!(
         entry.installed_at.starts_with("2024-06-01"),
@@ -472,7 +468,7 @@ fn install_removes_partial_skill_on_validation_failure() {
 
     setup_source(&t.fs, &t.paths, "my-source", "/sources/my-source");
     // Skill WITH SKILL.md
-    t.fs.add_file("/sources/my-source/my-skill/SKILL.md", "---\ndescription: My skill\n---\n");
+    add_skill(&t.fs, "/sources/my-source", "my-skill", "My skill");
     t.fs.add_file("/sources/my-source/my-skill/tool.py", "code");
 
     let ctx = t.ctx();
@@ -606,7 +602,7 @@ fn install_skill_lock_save_failure_rolls_back_directory() {
     let t = TestContext::new();
 
     setup_source(&t.fs, &t.paths, "my-source", "/sources/my-source");
-    t.fs.add_file("/sources/my-source/my-skill/SKILL.md", "---\ndescription: My skill\n---\n");
+    add_skill(&t.fs, "/sources/my-source", "my-skill", "My skill");
     t.fs.add_file("/sources/my-source/my-skill/tool.py", "code");
 
     // Cause the lock file rename (atomic write) to fail
@@ -633,23 +629,21 @@ fn install_skill_lock_save_failure_rolls_back_directory() {
 
 #[test]
 fn install_agent_with_cursor_platform_places_file_in_cursor_agents() {
-    let fs = FakeFilesystem::new();
-    let git = FakeGitClient::new();
-    let clock = FakeClock::at(Utc::now());
-    let paths = test_paths_for(Platform::Cursor);
+    let t = TestContext::for_platform(Platform::Cursor);
 
-    setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-    let ctx = make_ctx(&fs, &git, &clock, &paths);
+    let ctx = t.ctx();
     install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
-    let expected_dest = paths
+    let expected_dest = t
+        .paths
         .install_dir(ArtifactKind::Agent, InstallScope::Global)
         .unwrap()
         .join("my-agent.md");
     assert_eq!(expected_dest, PathBuf::from("/home/testuser/.cursor/agents/my-agent.md"));
     assert!(
-        fs.file_exists(&expected_dest),
+        t.fs.file_exists(&expected_dest),
         "agent file should be installed at {}",
         expected_dest.display()
     );
@@ -657,23 +651,21 @@ fn install_agent_with_cursor_platform_places_file_in_cursor_agents() {
 
 #[test]
 fn install_agent_with_cursor_platform_local_places_file_in_dot_cursor_agents() {
-    let fs = FakeFilesystem::new();
-    let git = FakeGitClient::new();
-    let clock = FakeClock::at(Utc::now());
-    let paths = test_paths_for(Platform::Cursor);
+    let t = TestContext::for_platform(Platform::Cursor);
 
-    setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-    let ctx = make_ctx(&fs, &git, &clock, &paths);
+    let ctx = t.ctx();
     install("my-agent", ArtifactKind::Agent, InstallScope::Local, false, &ctx).unwrap();
 
-    let expected_dest = paths
+    let expected_dest = t
+        .paths
         .install_dir(ArtifactKind::Agent, InstallScope::Local)
         .unwrap()
         .join("my-agent.md");
     assert_eq!(expected_dest, PathBuf::from(".cursor/agents/my-agent.md"));
     assert!(
-        fs.file_exists(&expected_dest),
+        t.fs.file_exists(&expected_dest),
         "agent file should be installed at {}",
         expected_dest.display()
     );
@@ -681,23 +673,21 @@ fn install_agent_with_cursor_platform_local_places_file_in_dot_cursor_agents() {
 
 #[test]
 fn install_agent_default_platform_places_file_in_dot_claude_agents() {
-    let fs = FakeFilesystem::new();
-    let git = FakeGitClient::new();
-    let clock = FakeClock::at(Utc::now());
-    let paths = test_paths();
+    let t = TestContext::new();
 
-    setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-    let ctx = make_ctx(&fs, &git, &clock, &paths);
+    let ctx = t.ctx();
     install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
-    let expected_dest = paths
+    let expected_dest = t
+        .paths
         .install_dir(ArtifactKind::Agent, InstallScope::Global)
         .unwrap()
         .join("my-agent.md");
     assert_eq!(expected_dest, PathBuf::from("/home/testuser/.claude/agents/my-agent.md"));
     assert!(
-        fs.file_exists(&expected_dest),
+        t.fs.file_exists(&expected_dest),
         "agent file should be installed at {}",
         expected_dest.display()
     );
@@ -836,44 +826,38 @@ fn update_all_picks_up_artifact_when_version_newly_appears_in_source() {
 
 #[test]
 fn install_codex_agent_transforms_markdown_to_toml() {
-    let fs = FakeFilesystem::new();
-    let git = FakeGitClient::new();
-    let clock = FakeClock::at(Utc::now());
-    let paths = test_paths_for(Platform::Codex);
+    let t = TestContext::for_platform(Platform::Codex);
 
-    setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-    let ctx = make_ctx(&fs, &git, &clock, &paths);
+    let ctx = t.ctx();
     install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
 
     let dest = PathBuf::from("/home/testuser/.codex/agents/my-agent.toml");
     assert!(
-        fs.file_exists(&dest),
+        t.fs.file_exists(&dest),
         "codex agent should be written as TOML at {}",
         dest.display()
     );
 
-    let content = fs.read_to_string(&dest).unwrap();
+    let content = t.fs.read_to_string(&dest).unwrap();
     assert!(content.contains("name = \"my-agent\""), "got: {content}");
     assert!(content.contains("description = \"A test agent\""), "got: {content}");
     assert!(content.contains("developer_instructions = \"# my-agent\""), "got: {content}");
 
     // No stray markdown file should exist alongside the TOML.
-    assert!(!fs.file_exists(&PathBuf::from("/home/testuser/.codex/agents/my-agent.md")));
+    assert!(!t.fs.file_exists(&PathBuf::from("/home/testuser/.codex/agents/my-agent.md")));
 }
 
 #[test]
 fn install_codex_agent_is_idempotent_without_force() {
     // The transform is deterministic, so a second install with no source
     // change must not trip the local-modification guard.
-    let fs = FakeFilesystem::new();
-    let git = FakeGitClient::new();
-    let clock = FakeClock::at(Utc::now());
-    let paths = test_paths_for(Platform::Codex);
+    let t = TestContext::for_platform(Platform::Codex);
 
-    setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-    let ctx = make_ctx(&fs, &git, &clock, &paths);
+    let ctx = t.ctx();
     install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
     let again = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
     assert!(
@@ -885,14 +869,11 @@ fn install_codex_agent_is_idempotent_without_force() {
 
 #[test]
 fn install_pi_agent_is_rejected_with_clear_error() {
-    let fs = FakeFilesystem::new();
-    let git = FakeGitClient::new();
-    let clock = FakeClock::at(Utc::now());
-    let paths = test_paths_for(Platform::Pi);
+    let t = TestContext::for_platform(Platform::Pi);
 
-    setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
-    let ctx = make_ctx(&fs, &git, &clock, &paths);
+    let ctx = t.ctx();
     let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
     assert!(result.is_err(), "pi must reject agent installs");
     let msg = result.unwrap_err().to_string();
@@ -902,19 +883,23 @@ fn install_pi_agent_is_rejected_with_clear_error() {
 
 #[test]
 fn install_pi_skill_is_allowed_and_lands_in_dot_agents() {
-    let fs = FakeFilesystem::new();
-    let git = FakeGitClient::new();
-    let clock = FakeClock::at(Utc::now());
-    let paths = test_paths_for(Platform::Pi);
+    let t = TestContext::for_platform(Platform::Pi);
 
-    setup_source_with_skill(&fs, &paths, "my-source", "/sources/my-source", "my-skill", "1.0.0");
+    setup_source_with_skill(
+        &t.fs,
+        &t.paths,
+        "my-source",
+        "/sources/my-source",
+        "my-skill",
+        "1.0.0",
+    );
 
-    let ctx = make_ctx(&fs, &git, &clock, &paths);
+    let ctx = t.ctx();
     install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx).unwrap();
 
     let dest = PathBuf::from("/home/testuser/.agents/skills/my-skill/SKILL.md");
     assert!(
-        fs.file_exists(&dest),
+        t.fs.file_exists(&dest),
         "pi skill should land in shared .agents/skills at {}",
         dest.display()
     );
@@ -932,32 +917,30 @@ fn install_skills_only_cohort_installs_skill_and_rejects_agent() {
         Platform::Openhands,
         Platform::Hermes,
     ] {
-        let fs = FakeFilesystem::new();
-        let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
-        let paths = test_paths_for(platform);
+        let t = TestContext::for_platform(platform);
 
         setup_source_with_skill(
-            &fs,
-            &paths,
+            &t.fs,
+            &t.paths,
             "my-source",
             "/sources/my-source",
             "my-skill",
             "1.0.0",
         );
 
-        let ctx = make_ctx(&fs, &git, &clock, &paths);
+        let ctx = t.ctx();
 
         // Skill install lands in the platform's resolved skills dir.
         install("my-skill", ArtifactKind::Skill, InstallScope::Local, false, &ctx)
             .unwrap_or_else(|e| panic!("{platform} skill install should succeed: {e}"));
-        let skill_md = paths
+        let skill_md = t
+            .paths
             .install_dir(ArtifactKind::Skill, InstallScope::Local)
             .unwrap()
             .join("my-skill")
             .join("SKILL.md");
         assert!(
-            fs.file_exists(&skill_md),
+            t.fs.file_exists(&skill_md),
             "{platform}: skill should be at {}",
             skill_md.display()
         );
@@ -974,18 +957,22 @@ fn install_skills_only_cohort_installs_skill_and_rejects_agent() {
 
 #[test]
 fn install_opencode_skill_lands_in_shared_dot_agents() {
-    let fs = FakeFilesystem::new();
-    let git = FakeGitClient::new();
-    let clock = FakeClock::at(Utc::now());
-    let paths = test_paths_for(Platform::Opencode);
+    let t = TestContext::for_platform(Platform::Opencode);
 
-    setup_source_with_skill(&fs, &paths, "my-source", "/sources/my-source", "my-skill", "1.0.0");
+    setup_source_with_skill(
+        &t.fs,
+        &t.paths,
+        "my-source",
+        "/sources/my-source",
+        "my-skill",
+        "1.0.0",
+    );
 
-    let ctx = make_ctx(&fs, &git, &clock, &paths);
+    let ctx = t.ctx();
     install("my-skill", ArtifactKind::Skill, InstallScope::Local, false, &ctx).unwrap();
 
     let dest = PathBuf::from(".agents/skills/my-skill/SKILL.md");
-    assert!(fs.file_exists(&dest), "opencode skill should land in shared .agents/skills");
+    assert!(t.fs.file_exists(&dest), "opencode skill should land in shared .agents/skills");
 }
 
 // --- resolve_targets: which platforms a default vs constrained op acts on ---

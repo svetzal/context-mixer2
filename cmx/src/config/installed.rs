@@ -152,7 +152,9 @@ pub fn find_installed_path(
 mod tests {
     use super::*;
     use crate::gateway::fakes::FakeFilesystem;
-    use crate::test_support::{make_lock_entry_versioned, test_paths};
+    use crate::test_support::{
+        add_skill, install_skill_on_disk, make_lock_entry_versioned, skill_content, test_paths,
+    };
 
     // --- installed_names_with ---
 
@@ -185,8 +187,8 @@ mod tests {
         let paths = test_paths();
         let skill_dir = paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
         // Skills are directories — add a file inside each to register the dir
-        fs.add_file(skill_dir.join("my-skill").join("SKILL.md"), "---\n---\n");
-        fs.add_file(skill_dir.join("other-skill").join("SKILL.md"), "---\n---\n");
+        add_skill(&fs, &skill_dir, "my-skill", "");
+        add_skill(&fs, &skill_dir, "other-skill", "");
 
         let names =
             installed_names(ArtifactKind::Skill, InstallScope::Global, &fs, &paths).unwrap();
@@ -271,11 +273,7 @@ mod tests {
     fn find_installed_path_finds_skill_directory() {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
-        let skill_dir = paths
-            .install_dir(ArtifactKind::Skill, InstallScope::Global)
-            .unwrap()
-            .join("my-skill");
-        fs.add_file(skill_dir.join("SKILL.md"), "---\n---\n");
+        install_skill_on_disk(&fs, &paths, "my-skill", &skill_content(""), InstallScope::Global);
 
         let result = find_installed_path("my-skill", ArtifactKind::Skill, &fs, &paths);
         assert!(result.is_some(), "expected Some for installed global skill");
