@@ -75,10 +75,7 @@ fn check_locally_modified(
     let Some(entry) = lock_entry else {
         return Ok(false);
     };
-    let install_path = ctx
-        .paths
-        .installed_artifact_path(kind, name, scope)
-        .expect("installed_artifact_path: locked artifacts are on supported platforms");
+    let install_path = ctx.paths.require_installed_artifact_path(kind, name, scope)?;
     if !ctx.fs.exists(&install_path) {
         return Ok(false);
     }

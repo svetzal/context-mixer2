@@ -302,9 +302,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
         let pv = ctx.paths.with_platform(agg.platforms[0]);
         let names = config::installed_names(agg.kind, agg.scope, ctx.fs, &pv)?;
         for name in names {
-            let path = pv
-                .installed_artifact_path(agg.kind, &name, agg.scope)
-                .expect("guarded by platform.supports check in survey");
+            let path = pv.require_installed_artifact_path(agg.kind, &name, agg.scope)?;
             // Hash once: this checksum classifies the copy *and* decides content
             // divergence against the artifact's other copies.
             let content_checksum = checksum::checksum_artifact(&path, agg.kind, ctx.fs)?;

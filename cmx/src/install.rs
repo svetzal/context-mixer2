@@ -348,6 +348,10 @@ pub fn update_all(
 
 /// Compute the destination directory and relative source path for an install.
 /// Pure function — no filesystem access.
+///
+/// Panics if the `(platform, kind)` combination is unsupported. Callers
+/// must gate on [`ConfigPaths::ensure_supports`] before calling this, which is
+/// enforced by the `install` entry point.
 fn plan_install(
     artifact_name: &str,
     kind: ArtifactKind,
@@ -403,10 +407,7 @@ fn check_local_modifications(
     lock_entry: Option<&LockEntry>,
     ctx: &AppContext<'_>,
 ) -> Result<bool> {
-    let dest_check = ctx
-        .paths
-        .installed_artifact_path(kind, artifact_name, scope)
-        .expect("installed_artifact_path: caller must gate on ensure_supports()");
+    let dest_check = ctx.paths.require_installed_artifact_path(kind, artifact_name, scope)?;
     if ctx.fs.exists(&dest_check) {
         if let Some(entry) = lock_entry {
             return checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs);

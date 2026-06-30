@@ -92,9 +92,7 @@ pub(crate) fn ensure_home_source(home: &Path, ctx: &AppContext<'_>) -> Result<()
 fn adopt_row(row: &DoctorRow, home: &Path, ctx: &AppContext<'_>) -> Result<AdoptResult> {
     // The original on-disk artifact (verbatim source for the home copy).
     let representative = ctx.paths.with_platform(row.platforms[0]);
-    let src = representative
-        .installed_artifact_path(row.kind, &row.name, row.scope)
-        .expect("installed_artifact_path: DoctorRow platforms support the artifact kind");
+    let src = representative.require_installed_artifact_path(row.kind, &row.name, row.scope)?;
 
     // Destination in the home: <home>/<agents|skills>/<name[.md]>, copied
     // verbatim (no platform transform — the home always holds markdown).

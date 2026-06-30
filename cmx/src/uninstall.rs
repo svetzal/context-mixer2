@@ -91,10 +91,7 @@ fn uninstall_one(
     let mut removed_from: Vec<Platform> = Vec::new();
 
     for view in platform_iter::views_for(ctx.paths, candidates.iter().copied(), kind) {
-        let path = view
-            .paths
-            .installed_artifact_path(kind, name, scope)
-            .expect("installed_artifact_path: guarded by platform.supports(kind)");
+        let path = view.paths.require_installed_artifact_path(kind, name, scope)?;
         if ctx.fs.exists(&path) {
             paths_to_delete.insert(path);
         }

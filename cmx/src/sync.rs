@@ -136,12 +136,12 @@ fn pick_from(copies: &[Copy], p: Platform) -> Result<&Copy> {
 
 /// The copy with the strictly-newest version, or `None` when the choice is
 /// ambiguous: another *differing* copy ties it on version, or all are
-/// unversioned. The caller turns `None` into an actionable error.
+/// unversioned, or the slice is empty. The caller turns `None` into an
+/// actionable error.
 fn auto_winner(copies: &[Copy]) -> Option<&Copy> {
     let best = copies
         .iter()
-        .max_by(|x, y| cmp_versions(x.version.as_deref(), y.version.as_deref()))
-        .expect("copies is non-empty");
+        .max_by(|x, y| cmp_versions(x.version.as_deref(), y.version.as_deref()))?;
     let ambiguous = copies.iter().any(|c| {
         c.checksum != best.checksum
             && cmp_versions(c.version.as_deref(), best.version.as_deref()) == Ordering::Equal
@@ -254,7 +254,7 @@ fn gather_copies(
         if !ctx.fs.exists(&path) {
             continue;
         }
-        let dir = pv.install_dir(kind, scope).expect("supported above");
+        let dir = pv.require_install_dir(kind, scope)?;
         if let Some(existing) = by_dir.get_mut(&dir) {
             existing.platforms.push(platform);
         } else {

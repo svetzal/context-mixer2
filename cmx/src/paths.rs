@@ -171,6 +171,32 @@ impl ConfigPaths {
             );
         }
     }
+
+    /// Like [`install_dir`](Self::install_dir), but returns `Err` for unsupported
+    /// `(platform, kind)` combinations instead of `None`.
+    pub fn require_install_dir(&self, kind: ArtifactKind, scope: InstallScope) -> Result<PathBuf> {
+        self.install_dir(kind, scope)
+            .ok_or_else(|| unsupported_artifact_error(self.platform, kind))
+    }
+
+    /// Like [`installed_artifact_path`](Self::installed_artifact_path), but returns
+    /// `Err` for unsupported `(platform, kind)` combinations instead of `None`.
+    pub fn require_installed_artifact_path(
+        &self,
+        kind: ArtifactKind,
+        name: &str,
+        scope: InstallScope,
+    ) -> Result<PathBuf> {
+        self.installed_artifact_path(kind, name, scope)
+            .ok_or_else(|| unsupported_artifact_error(self.platform, kind))
+    }
+}
+
+fn unsupported_artifact_error(platform: Platform, kind: ArtifactKind) -> anyhow::Error {
+    anyhow::anyhow!(
+        "The {platform} platform does not support {kind}s. \
+         {platform} has no native {kind} concept."
+    )
 }
 
 #[cfg(test)]
@@ -560,6 +586,52 @@ mod tests {
             paths.install_dir(ArtifactKind::Skill, InstallScope::Local).unwrap(),
             PathBuf::from(".agents/skills")
         );
+    }
+
+    // --- require_install_dir ---
+
+    #[test]
+    fn require_install_dir_returns_ok_for_supported_combo() {
+        let paths = test_paths(); // Claude platform
+        let result = paths.require_install_dir(ArtifactKind::Skill, InstallScope::Global);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PathBuf::from("/home/testuser/.claude/skills"));
+    }
+
+    #[test]
+    fn require_install_dir_returns_err_for_unsupported_combo() {
+        let paths = test_paths_for(Platform::Pi);
+        let err = paths
+            .require_install_dir(ArtifactKind::Agent, InstallScope::Global)
+            .unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("pi"), "error should name the platform: {msg}");
+        assert!(msg.contains("agent"), "error should name the kind: {msg}");
+    }
+
+    // --- require_installed_artifact_path ---
+
+    #[test]
+    fn require_installed_artifact_path_returns_ok_for_supported_combo() {
+        let paths = test_paths();
+        let result = paths.require_installed_artifact_path(
+            ArtifactKind::Agent,
+            "my-agent",
+            InstallScope::Global,
+        );
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PathBuf::from("/home/testuser/.claude/agents/my-agent.md"));
+    }
+
+    #[test]
+    fn require_installed_artifact_path_returns_err_for_unsupported_combo() {
+        let paths = test_paths_for(Platform::Pi);
+        let err = paths
+            .require_installed_artifact_path(ArtifactKind::Agent, "x", InstallScope::Global)
+            .unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("pi"), "error should name the platform: {msg}");
+        assert!(msg.contains("agent"), "error should name the kind: {msg}");
     }
 
     #[test]
