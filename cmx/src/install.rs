@@ -69,7 +69,7 @@ pub fn install(
 
     let found = source_iter::find_unique(artifact_name, kind, source_name, ctx)?;
 
-    let plan = plan_install(artifact_name, kind, scope, &found, ctx.paths);
+    let plan = plan_install(artifact_name, kind, scope, &found, ctx.paths)?;
 
     ctx.fs.create_dir_all(&plan.dest_dir)?;
 
@@ -348,29 +348,23 @@ pub fn update_all(
 
 /// Compute the destination directory and relative source path for an install.
 /// Pure function — no filesystem access.
-///
-/// Panics if the `(platform, kind)` combination is unsupported. Callers
-/// must gate on [`ConfigPaths::ensure_supports`] before calling this, which is
-/// enforced by the `install` entry point.
 fn plan_install(
     artifact_name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
     found: &source_iter::SourceArtifact,
     paths: &ConfigPaths,
-) -> InstallPlan {
-    let dest_dir = paths
-        .install_dir(kind, scope)
-        .expect("install_dir: caller must gate on ensure_supports() before plan_install");
+) -> Result<InstallPlan> {
+    let dest_dir = paths.require_install_dir(kind, scope)?;
     let relative_path = types::relative_path_string(&found.artifact.path, &found.source_root);
-    InstallPlan {
+    Ok(InstallPlan {
         artifact_name: artifact_name.to_string(),
         version: found.artifact.version.clone(),
         source_name: found.source_name.clone(),
         source_root: found.source_root.clone(),
         dest_dir,
         relative_path,
-    }
+    })
 }
 
 /// Resolved decisions for a single install operation — pure, no gateway access.

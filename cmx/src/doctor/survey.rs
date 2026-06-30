@@ -37,7 +37,7 @@ pub(crate) fn build_locations(
     ctx: &AppContext<'_>,
     scopes: &[InstallScope],
     platforms: &[Platform],
-) -> BTreeMap<PathBuf, LocationAgg> {
+) -> Result<BTreeMap<PathBuf, LocationAgg>> {
     let mut locations: BTreeMap<PathBuf, LocationAgg> = BTreeMap::new();
     for &platform in platforms {
         let pv = ctx.paths.with_platform(platform);
@@ -46,7 +46,7 @@ pub(crate) fn build_locations(
                 if !platform.supports(kind) {
                     continue;
                 }
-                let dir = pv.install_dir(kind, scope).expect("guarded by platform.supports(kind)");
+                let dir = pv.require_install_dir(kind, scope)?;
                 locations
                     .entry(dir)
                     .or_insert_with(|| LocationAgg {
@@ -59,7 +59,7 @@ pub(crate) fn build_locations(
             }
         }
     }
-    locations
+    Ok(locations)
 }
 
 /// Pre-load every `(platform, scope)` lock file once, so classification does no
@@ -287,7 +287,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
     } else {
         cfg.platforms.clone()
     };
-    let locations = build_locations(ctx, &scopes, &platforms);
+    let locations = build_locations(ctx, &scopes, &platforms)?;
     let locks = load_all_locks(ctx, &scopes, &platforms)?;
     let available = available_in_sources(ctx)?;
     let external = cfg.external;

@@ -121,7 +121,8 @@ fn plan_install_computes_correct_paths_for_global_agent() {
     let paths = test_paths();
     let found = make_source_artifact(ArtifactKind::Agent, "my-agent", Some("1.0.0"));
 
-    let plan = plan_install("my-agent", ArtifactKind::Agent, InstallScope::Global, &found, &paths);
+    let plan = plan_install("my-agent", ArtifactKind::Agent, InstallScope::Global, &found, &paths)
+        .unwrap();
 
     assert_eq!(plan.artifact_name, "my-agent");
     assert_eq!(
@@ -138,7 +139,8 @@ fn plan_install_computes_correct_paths_for_local_skill() {
     let paths = test_paths();
     let found = make_source_artifact(ArtifactKind::Skill, "my-skill", None);
 
-    let plan = plan_install("my-skill", ArtifactKind::Skill, InstallScope::Local, &found, &paths);
+    let plan =
+        plan_install("my-skill", ArtifactKind::Skill, InstallScope::Local, &found, &paths).unwrap();
 
     assert_eq!(
         plan.dest_dir,
@@ -157,7 +159,8 @@ fn plan_install_uses_deprecation_none_for_plain_artifact() {
         replacement: Some("new-agent".to_string()),
     });
 
-    let plan = plan_install("legacy", ArtifactKind::Agent, InstallScope::Global, &found, &paths);
+    let plan =
+        plan_install("legacy", ArtifactKind::Agent, InstallScope::Global, &found, &paths).unwrap();
     assert_eq!(plan.version, Some("0.1.0".to_string()));
     assert_eq!(plan.source_name, "guidelines");
 }

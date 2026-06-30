@@ -151,7 +151,8 @@ fn survey_scopes_includes_local_when_requested() {
 fn build_locations_collapses_shared_agents_skills_cohort() {
     let t = TestContext::new();
     let ctx = t.ctx();
-    let locations = build_locations(&ctx, &[InstallScope::Global], &crate::platform::Platform::ALL);
+    let locations =
+        build_locations(&ctx, &[InstallScope::Global], &crate::platform::Platform::ALL).unwrap();
 
     // The shared global .agents/skills directory must be a single location
     // attributed to every cohort platform.
