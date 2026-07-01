@@ -65,9 +65,8 @@ pub fn generate_manifests(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<Pa
             })?
             .to_string_lossy();
 
-        for platform in Platform::targets() {
-            let target_dir = containing_dir
-                .join(platform.manifest_dir().expect("targets() platforms have a manifest_dir"));
+        for (_platform, manifest_dir) in Platform::manifest_targets() {
+            let target_dir = containing_dir.join(manifest_dir);
             fs.create_dir_all(&target_dir)?;
 
             let target_path = target_dir.join(file_name.as_ref());

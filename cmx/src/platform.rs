@@ -328,6 +328,16 @@ impl Platform {
     pub fn targets() -> Vec<Platform> {
         Self::ALL.iter().filter(|p| p.manifest_dir().is_some()).copied().collect()
     }
+
+    /// All manifest-target platforms paired with their manifest directory name.
+    ///
+    /// Each tuple `(platform, dir)` is guaranteed to have a non-empty `dir`
+    /// string — callers never need to handle an `Option`. Use this instead of
+    /// `targets()` when the manifest directory name is needed alongside the
+    /// platform, to avoid unwrapping `manifest_dir()` at each call site.
+    pub fn manifest_targets() -> Vec<(Platform, &'static str)> {
+        Self::ALL.iter().filter_map(|p| p.manifest_dir().map(|dir| (*p, dir))).collect()
+    }
 }
 
 /// A human-readable, comma-separated label for a set of platforms
@@ -405,6 +415,27 @@ mod tests {
             expected,
             "targets() must equal ALL filtered by manifest_dir"
         );
+    }
+
+    #[test]
+    fn manifest_targets_pairs_each_target_with_its_dir() {
+        let targets = Platform::targets();
+        let manifest_targets = Platform::manifest_targets();
+        assert_eq!(
+            targets.len(),
+            manifest_targets.len(),
+            "manifest_targets() must yield the same platforms as targets()"
+        );
+        for (p, dir) in &manifest_targets {
+            assert_eq!(
+                p.manifest_dir().unwrap(),
+                *dir,
+                "{p}: manifest_targets dir must equal manifest_dir().unwrap()"
+            );
+            assert!(!dir.is_empty(), "{p}: manifest_targets dir must be non-empty");
+        }
+        let platforms: Vec<Platform> = manifest_targets.iter().map(|(p, _)| *p).collect();
+        assert_eq!(platforms, targets, "manifest_targets() platforms must match targets() order");
     }
 
     #[test]

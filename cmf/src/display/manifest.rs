@@ -18,10 +18,7 @@ impl fmt::Display for ManifestSummary {
 
         writeln!(f, "Generated manifests for {} platforms:", Platform::targets().len())?;
 
-        for platform in Platform::targets() {
-            let dir_name =
-                platform.manifest_dir().expect("targets() platforms have a manifest_dir");
-
+        for (_platform, dir_name) in Platform::manifest_targets() {
             let platform_files: Vec<_> = files
                 .iter()
                 .filter(|p| p.components().any(|c| c.as_os_str() == dir_name))
