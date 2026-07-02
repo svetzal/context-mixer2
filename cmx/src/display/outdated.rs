@@ -1,32 +1,33 @@
 use std::fmt;
 
 use crate::outdated::OutdatedReport;
-use crate::table::render_table;
+
+use super::util;
 
 impl fmt::Display for OutdatedReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let rows = &self.0;
-        if rows.is_empty() {
-            return writeln!(f, "Everything is up to date.");
-        }
+        let mapped_rows: Vec<Vec<String>> = rows
+            .iter()
+            .map(|r| {
+                vec![
+                    r.name.clone(),
+                    r.kind.to_string(),
+                    r.installed_version.clone(),
+                    r.available_version.clone(),
+                    r.source.clone(),
+                    r.status.clone(),
+                ]
+            })
+            .collect();
         write!(
             f,
             "{}",
-            render_table(
+            util::table_or_empty(
+                "Everything is up to date.",
                 vec!["Name", "Type", "Installed", "Available", "Source", "Status"],
                 6,
-                rows.iter()
-                    .map(|r| {
-                        vec![
-                            r.name.clone(),
-                            r.kind.to_string(),
-                            r.installed_version.clone(),
-                            r.available_version.clone(),
-                            r.source.clone(),
-                            r.status.clone(),
-                        ]
-                    })
-                    .collect(),
+                mapped_rows,
             )
         )
     }

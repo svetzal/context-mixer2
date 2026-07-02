@@ -3,6 +3,8 @@ use std::fmt;
 use crate::install::{BatchInstallResult, InstallManyResult, InstallResult};
 use crate::types::format_version_prefix;
 
+use super::util;
+
 impl fmt::Display for InstallResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let version_info = format_version_prefix(self.version.as_deref());
@@ -27,19 +29,14 @@ impl fmt::Display for BatchInstallResult {
                 writeln!(f, "All available {}s are already installed and up to date.", self.kind)
             }
         } else {
-            for item in &self.items {
-                write!(f, "{item}")?;
-            }
-            Ok(())
+            util::write_each(f, &self.items)
         }
     }
 }
 
 impl fmt::Display for InstallManyResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for r in &self.installed {
-            write!(f, "{r}")?;
-        }
+        util::write_each(f, &self.installed)?;
         for (name, reason) in &self.failed {
             writeln!(f, "Failed: {name} — {reason}")?;
         }

@@ -1,33 +1,37 @@
 use std::fmt;
 
 use crate::search::SearchOutput;
-use crate::table::render_table;
+
+use super::util;
 
 impl fmt::Display for SearchOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let query = &self.query;
         let results = &self.results;
 
-        if results.is_empty() {
-            return writeln!(f, "No results for '{query}'.");
-        }
+        let rows: Vec<Vec<String>> = results
+            .iter()
+            .map(|r| {
+                vec![
+                    r.name.clone(),
+                    r.kind.clone(),
+                    r.version.clone(),
+                    r.source.clone(),
+                    r.description.clone(),
+                ]
+            })
+            .collect();
 
-        let table = render_table(
+        let table = util::table_or_empty(
+            &format!("No results for '{query}'."),
             vec!["Name", "Type", "Version", "Source", "Description"],
             4,
-            results
-                .iter()
-                .map(|r| {
-                    vec![
-                        r.name.clone(),
-                        r.kind.clone(),
-                        r.version.clone(),
-                        r.source.clone(),
-                        r.description.clone(),
-                    ]
-                })
-                .collect(),
+            rows,
         );
+
+        if results.is_empty() {
+            return write!(f, "{table}");
+        }
 
         write!(f, "{table}\n{} result(s) found.\n", results.len())
     }

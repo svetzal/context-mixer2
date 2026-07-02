@@ -12,3 +12,4 @@ mod search;
 mod source;
 mod sync;
 mod uninstall;
+mod util;

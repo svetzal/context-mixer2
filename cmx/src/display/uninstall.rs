@@ -3,6 +3,8 @@ use std::fmt;
 use crate::platform::platforms_label;
 use crate::uninstall::{BatchUninstallResult, UninstallResult};
 
+use super::util;
+
 impl fmt::Display for UninstallResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let tools = platforms_label(&self.platforms);
@@ -27,9 +29,7 @@ impl fmt::Display for UninstallResult {
 
 impl fmt::Display for BatchUninstallResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for r in &self.removed {
-            write!(f, "{r}")?;
-        }
+        util::write_each(f, &self.removed)?;
         if !self.not_found.is_empty() {
             writeln!(f, "Not found (nothing to uninstall): {}", self.not_found.join(", "))?;
         }
