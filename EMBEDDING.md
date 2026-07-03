@@ -1,6 +1,6 @@
 # EMBEDDING.md — the cmx-core library extraction
 
-**Status: DRAFT for review — no code has been extracted yet.**
+**Status: REVIEWED 2026-07-03 — design decisions settled (see Decisions below). Extraction not yet started.**
 
 This document imagines the path from cmx-the-CLI to cmx-the-library: a reusable core that our other CLI tools embed to install their companion agent skills, instead of each hand-rolling its own mechanism.
 
@@ -84,10 +84,10 @@ Native ports over FFI bindings: the domain is file copying, JSON lockfiles, and 
 4. **Port** to Python and TypeScript; migrate gilt, researcher, hopper, hone. Standardize the command (`<tool> init`; gilt's `skill-init` folds into this) and the frontmatter version key (`metadata.version`, per the guidelines repo's baseline standards).
 5. **Close the gaps**: evt gains a skill; foundry's registry `installs_skill` keeps working unchanged (it just invokes each tool's `init`, which now runs through cmx-core underneath).
 
-## Open questions (for review before any extraction starts)
+## Decisions (reviewed with Stacey, 2026-07-03)
 
-1. **Naming** — `cmx-core` everywhere (crate/PyPI/npm), or a standalone name that doesn't presume cmx (e.g. `skillbase`)? Leaning `cmx-core`: the lockfile format is cmx's, and honesty about that beats false neutrality.
-2. **Lock entries without cmx present** — recommended above (the format is the contract), but it means tools write into `~/.config/context-mixer/` on machines that have never seen cmx. Comfortable with that footprint?
-3. **Command convention** — settle `<tool> init` as the standard companion-skill command in `conventions/cli-ux.md` once this ships? (`init` currently also does non-skill setup in some tools.)
-4. **Scope default** — tools today default to local (project) scope; cmx thinking is global-first. Which default serves the "up-arrow, add --apply" workflow better?
-5. **cmf's role** — does the marketplace/manifest side (`plugin_types`) belong in cmx-core, or stay CLI-side? Initial instinct: stay CLI-side; tools don't need it.
+1. **Naming: `cmx-core`** — everywhere (crates.io, PyPI, npm). The lockfile format is cmx's; honesty about that beats false neutrality.
+2. **Lock entries without cmx present: yes** — the lockfile format is the integration contract. Tools write entries into `~/.config/context-mixer/` even on machines that have never seen cmx, so a later cmx arrival finds everything tracked.
+3. **Command convention: `<tool> init`** — the standard companion-skill command across the fleet. gilt's `skill-init` folds into `init` during migration; codified in `conventions/cli-ux.md` §12.
+4. **Scope default: global** — skills install to the user's global platform directory (`~/.claude/skills/`, etc.) by default; `--local` opts into project scope. A tool's companion skill describes the tool, not the project.
+5. **cmf stays external for now** — the marketplace/manifest machinery (`plugin_types`) remains CLI-side; cmx-core carries only what embedding tools need.
