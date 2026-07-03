@@ -66,37 +66,13 @@ pub fn install(
     ctx.paths.ensure_supports(kind)?;
 
     let (source_name, artifact_name) = parse_name(name);
-
     let found = source_iter::find_unique(artifact_name, kind, source_name, ctx)?;
-
     let plan = plan_install(artifact_name, kind, scope, &found, ctx.paths)?;
-
     ctx.fs.create_dir_all(&plan.dest_dir)?;
-
     let source_checksum = checksum::checksum_artifact(&found.artifact.path, kind, ctx.fs)?;
 
-    // Gather I/O facts needed for the pure install decision.
-    let lock_for_check = if force {
-        None
-    } else {
-        Some(lockfile::load(scope, ctx.fs, ctx.paths)?)
-    };
-    let locally_modified = if let Some(ref lock) = lock_for_check {
-        check_local_modifications(
-            artifact_name,
-            kind,
-            scope,
-            lock.packages.get(artifact_name),
-            ctx,
-        )?
-    } else {
-        false
-    };
-    let already_installed = ctx.paths.is_installed(kind, artifact_name, scope, ctx.fs);
-
-    // Pure decision: does local modification block this install, and should we
-    // roll back if the lockfile write fails later?
-    let decision = decide_install(already_installed, locally_modified, force);
+    let facts = gather_install_facts(artifact_name, kind, scope, force, ctx)?;
+    let decision = decide_install(facts.already_installed, facts.locally_modified, force);
     if decision.blocked {
         bail!(
             "'{artifact_name}' has local modifications. Use --force to overwrite, \
@@ -104,33 +80,7 @@ pub fn install(
         );
     }
 
-    let dest_path =
-        copy::copy_artifact(&found.artifact.path, &plan.dest_dir, kind, artifact_name, ctx)?;
-    let installed_checksum = checksum::checksum_artifact(&dest_path, kind, ctx.fs)?;
-
-    let lock_result = lockfile::mutate(scope, ctx.fs, ctx.paths, |lock| {
-        lock.packages.insert(
-            artifact_name.to_string(),
-            build_lock_entry(
-                &plan,
-                kind,
-                source_checksum,
-                installed_checksum,
-                ctx.clock.now().to_rfc3339(),
-            ),
-        );
-    });
-
-    if let Err(lock_err) = lock_result {
-        // If we performed a fresh install and the lockfile write failed, roll
-        // back by removing the artifact we just copied.  This avoids leaving a
-        // ghost: an artifact on disk with no lockfile entry.  We ignore any
-        // remove error to ensure the original lock error is surfaced.
-        if decision.rollback_on_lock_fail {
-            let _ = crate::uninstall::remove_installed(kind, &dest_path, ctx.fs);
-        }
-        return Err(lock_err);
-    }
+    commit_install(&plan, kind, scope, &found.artifact.path, source_checksum, &decision, ctx)?;
 
     Ok(InstallResult {
         artifact_name: artifact_name.to_string(),
@@ -345,6 +295,87 @@ pub fn update_all(
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
+
+/// I/O facts gathered before the pure install decision is made.
+struct InstallFacts {
+    locally_modified: bool,
+    already_installed: bool,
+}
+
+/// Gather the I/O facts needed to decide whether an install should proceed.
+/// All filesystem access for the decision lives here; the caller passes the
+/// result to the pure [`decide_install`].
+fn gather_install_facts(
+    artifact_name: &str,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    force: bool,
+    ctx: &AppContext<'_>,
+) -> Result<InstallFacts> {
+    let lock_for_check = if force {
+        None
+    } else {
+        Some(lockfile::load(scope, ctx.fs, ctx.paths)?)
+    };
+    let locally_modified = if let Some(ref lock) = lock_for_check {
+        check_local_modifications(
+            artifact_name,
+            kind,
+            scope,
+            lock.packages.get(artifact_name),
+            ctx,
+        )?
+    } else {
+        false
+    };
+    let already_installed = ctx.paths.is_installed(kind, artifact_name, scope, ctx.fs);
+    Ok(InstallFacts {
+        locally_modified,
+        already_installed,
+    })
+}
+
+/// Copy the artifact, checksum the installed copy, write the lock entry, and
+/// roll back the copy if the lockfile write fails (fresh installs only).
+fn commit_install(
+    plan: &InstallPlan,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    source_path: &std::path::Path,
+    source_checksum: String,
+    decision: &InstallDecision,
+    ctx: &AppContext<'_>,
+) -> Result<PathBuf> {
+    let dest_path =
+        copy::copy_artifact(source_path, &plan.dest_dir, kind, &plan.artifact_name, ctx)?;
+    let installed_checksum = checksum::checksum_artifact(&dest_path, kind, ctx.fs)?;
+
+    let lock_result = lockfile::mutate(scope, ctx.fs, ctx.paths, |lock| {
+        lock.packages.insert(
+            plan.artifact_name.clone(),
+            build_lock_entry(
+                plan,
+                kind,
+                source_checksum,
+                installed_checksum,
+                ctx.clock.now().to_rfc3339(),
+            ),
+        );
+    });
+
+    if let Err(lock_err) = lock_result {
+        // If we performed a fresh install and the lockfile write failed, roll
+        // back by removing the artifact we just copied.  This avoids leaving a
+        // ghost: an artifact on disk with no lockfile entry.  We ignore any
+        // remove error to ensure the original lock error is surfaced.
+        if decision.rollback_on_lock_fail {
+            let _ = crate::uninstall::remove_installed(kind, &dest_path, ctx.fs);
+        }
+        return Err(lock_err);
+    }
+
+    Ok(dest_path)
+}
 
 /// Compute the destination directory and relative source path for an install.
 /// Pure function — no filesystem access.

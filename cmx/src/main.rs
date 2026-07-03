@@ -292,20 +292,7 @@ fn handle_artifact(
             print!("{output}");
             Ok(ExitCode::SUCCESS)
         }
-        ArtifactAction::Update { name, all, force } => {
-            cmx::source_update::ensure_fresh(ctx)?;
-            if all {
-                let result = cmx::install::update_all(kind, force, ctx)?;
-                print!("{result}");
-                Ok(ExitCode::SUCCESS)
-            } else if let Some(name) = name {
-                let result = cmx::install::update(&name, kind, force, ctx)?;
-                print!("{result}");
-                Ok(ExitCode::SUCCESS)
-            } else {
-                bail!("Provide an artifact name or use --all")
-            }
-        }
+        ArtifactAction::Update { name, all, force } => handle_update(name, all, force, kind, ctx),
         ArtifactAction::Sync {
             name,
             from,
@@ -327,23 +314,7 @@ fn handle_artifact(
             Ok(ExitCode::SUCCESS)
         }
         ArtifactAction::Uninstall { names, local } => {
-            if names.is_empty() {
-                bail!("Provide artifact name(s) to uninstall")
-            }
-            let scope = if local {
-                InstallScope::Local
-            } else {
-                InstallScope::Global
-            };
-            let result = cmx::uninstall::uninstall_many(&names, kind, scope, selector, ctx)?;
-            let none_removed = result.removed.is_empty();
-            print!("{result}");
-            // Exit non-zero only if nothing at all was removed (e.g. all typos).
-            Ok(if none_removed {
-                ExitCode::FAILURE
-            } else {
-                ExitCode::SUCCESS
-            })
+            handle_uninstall(&names, local, kind, selector, ctx)
         }
         ArtifactAction::Unadopt { names, external } => {
             handle_unadopt(&names, kind, external, ctx).map(|()| ExitCode::SUCCESS)
@@ -357,6 +328,52 @@ fn handle_artifact(
             handle_adopt(&names, kind, all, from.as_deref(), local, ctx).map(|()| ExitCode::SUCCESS)
         }
     }
+}
+
+fn handle_update(
+    name: Option<String>,
+    all: bool,
+    force: bool,
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    cmx::source_update::ensure_fresh(ctx)?;
+    if all {
+        let result = cmx::install::update_all(kind, force, ctx)?;
+        print!("{result}");
+        Ok(ExitCode::SUCCESS)
+    } else if let Some(name) = name {
+        let result = cmx::install::update(&name, kind, force, ctx)?;
+        print!("{result}");
+        Ok(ExitCode::SUCCESS)
+    } else {
+        bail!("Provide an artifact name or use --all")
+    }
+}
+
+fn handle_uninstall(
+    names: &[String],
+    local: bool,
+    kind: ArtifactKind,
+    selector: Option<Platform>,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    if names.is_empty() {
+        bail!("Provide artifact name(s) to uninstall")
+    }
+    let scope = if local {
+        InstallScope::Local
+    } else {
+        InstallScope::Global
+    };
+    let result = cmx::uninstall::uninstall_many(names, kind, scope, selector, ctx)?;
+    let none_removed = result.removed.is_empty();
+    print!("{result}");
+    Ok(if none_removed {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    })
 }
 
 fn handle_unadopt(

@@ -122,38 +122,17 @@ pub fn promote(
         });
     }
 
-    ensure_home_source(&home, ctx)?;
+    write_home_copy(kind, &home, &home_path, &dest_dir, &installed_path, ctx)?;
 
-    // Replace the home copy with the installed one (remove first so files
-    // deleted from the installed copy don't linger in the home).
-    if ctx.fs.exists(&home_path) {
-        crate::uninstall::remove_installed(kind, &home_path, ctx.fs)?;
-    }
-    ctx.fs.create_dir_all(&dest_dir)?;
-    copy::copy_artifact_to(kind, &installed_path, &dest_dir, ctx.fs)?;
-
-    // Refresh every home-provenance lock baseline to the promoted content. A
-    // platform whose installed copy matches becomes tracked; one that still
-    // differs reads as drifted afterwards (truthfully — it diverges from the
-    // freshly promoted home).
-    let now = ctx.clock.now().to_rfc3339();
-    let mut still_divergent = Vec::new();
-    for &platform in &home_tracked {
-        let pv = ctx.paths.with_platform(platform);
-        if let Some(p) = pv.installed_artifact_path(kind, name, scope) {
-            if ctx.fs.exists(&p) && checksum::checksum_artifact(&p, kind, ctx.fs)? != installed_cs {
-                still_divergent.push(platform);
-            }
-        }
-        lockfile::mutate(scope, ctx.fs, &pv, |lock| {
-            if let Some(entry) = lock.packages.get_mut(name) {
-                entry.source_checksum.clone_from(&installed_cs);
-                entry.installed_checksum.clone_from(&installed_cs);
-                entry.version.clone_from(&version);
-                entry.installed_at.clone_from(&now);
-            }
-        })?;
-    }
+    let still_divergent = refresh_home_baselines(
+        name,
+        kind,
+        scope,
+        &home_tracked,
+        &installed_cs,
+        version.as_deref(),
+        ctx,
+    )?;
 
     Ok(PromoteResult {
         name: name.to_string(),
@@ -348,6 +327,60 @@ fn drifted_labels(drifted: &[&HomeCopy], active: Platform) -> String {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/// Replace the home copy with the installed one (remove first so files deleted
+/// from the installed copy don't linger in the home).
+fn write_home_copy(
+    kind: ArtifactKind,
+    home: &std::path::Path,
+    home_path: &std::path::Path,
+    dest_dir: &std::path::Path,
+    installed_path: &std::path::Path,
+    ctx: &AppContext<'_>,
+) -> Result<()> {
+    ensure_home_source(home, ctx)?;
+    if ctx.fs.exists(home_path) {
+        crate::uninstall::remove_installed(kind, home_path, ctx.fs)?;
+    }
+    ctx.fs.create_dir_all(dest_dir)?;
+    copy::copy_artifact_to(kind, installed_path, dest_dir, ctx.fs)?;
+    Ok(())
+}
+
+/// Refresh every home-provenance lock baseline to the promoted content.
+///
+/// A platform whose installed copy matches becomes tracked; one that still
+/// differs reads as drifted afterwards (truthfully — it diverges from the
+/// freshly promoted home). Returns the platforms that are still divergent.
+fn refresh_home_baselines(
+    name: &str,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    home_tracked: &[Platform],
+    installed_cs: &str,
+    version: Option<&str>,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<Platform>> {
+    let now = ctx.clock.now().to_rfc3339();
+    let mut still_divergent = Vec::new();
+    for &platform in home_tracked {
+        let pv = ctx.paths.with_platform(platform);
+        if let Some(p) = pv.installed_artifact_path(kind, name, scope) {
+            if ctx.fs.exists(&p) && checksum::checksum_artifact(&p, kind, ctx.fs)? != installed_cs {
+                still_divergent.push(platform);
+            }
+        }
+        lockfile::mutate(scope, ctx.fs, &pv, |lock| {
+            if let Some(entry) = lock.packages.get_mut(name) {
+                entry.source_checksum = installed_cs.to_string();
+                entry.installed_checksum = installed_cs.to_string();
+                entry.version = version.map(str::to_string);
+                entry.installed_at.clone_from(&now);
+            }
+        })?;
+    }
+    Ok(still_divergent)
+}
 
 /// Platforms whose lock entry for `name` (at `scope`) records `home` provenance.
 fn home_tracked_platforms(

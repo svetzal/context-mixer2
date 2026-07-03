@@ -273,6 +273,111 @@ pub(crate) fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
         .collect()
 }
 
+/// Build one [`DoctorRow`] per installed artifact across all locations.
+fn build_rows(
+    locations: &BTreeMap<PathBuf, LocationAgg>,
+    locks: &HashMap<(Platform, InstallScope), LockFile>,
+    available: &HashMap<(ArtifactKind, String), Vec<String>>,
+    external: &[String],
+    ctx: &AppContext<'_>,
+) -> Result<Vec<DoctorRow>> {
+    let mut rows = Vec::new();
+    for (dir, agg) in locations {
+        if !ctx.fs.exists(dir) {
+            continue;
+        }
+        // For skills the agent extension is irrelevant; for agents each location
+        // maps to a single platform, so any attributed platform's view is correct.
+        let pv = ctx.paths.with_platform(agg.platforms[0]);
+        let names = config::installed_names(agg.kind, agg.scope, ctx.fs, &pv)?;
+        for name in names {
+            let path = pv.require_installed_artifact_path(agg.kind, &name, agg.scope)?;
+            // Hash once: this checksum classifies the copy *and* decides content
+            // divergence against the artifact's other copies.
+            let content_checksum = checksum::checksum_artifact(&path, agg.kind, ctx.fs)?;
+            let mut state = classify_installed(&name, agg, &content_checksum, locks, available);
+            // An artifact cmx doesn't manage (orphaned/untracked) but that the
+            // user has declared external is reclassified — managed by another
+            // tool, not a cmx issue.
+            if matches!(state, ArtifactState::Orphaned | ArtifactState::Untracked)
+                && config::matches_external(external, &name, dir, &ctx.paths.home_dir)
+            {
+                state = ArtifactState::External;
+            }
+            let version = read_installed_version(agg.kind, &path, ctx);
+            // The platforms cmx actually tracks this for: those whose lock file
+            // records it (a subset of the location's readers).
+            let tracked_for: Vec<Platform> = agg
+                .platforms
+                .iter()
+                .copied()
+                .filter(|p| {
+                    locks.get(&(*p, agg.scope)).is_some_and(|l| l.packages.contains_key(&name))
+                })
+                .collect();
+            let source = source_of(&name, agg, state, locks, available);
+            rows.push(DoctorRow {
+                kind: agg.kind,
+                name,
+                scope: agg.scope,
+                location: dir.clone(),
+                platforms: agg.platforms.clone(),
+                tracked_for,
+                state,
+                version,
+                source,
+                content_checksum,
+            });
+        }
+    }
+    Ok(rows)
+}
+
+/// Collect lock entries whose artifact file is gone from disk.
+fn collect_missing(
+    locks: &HashMap<(Platform, InstallScope), LockFile>,
+    ctx: &AppContext<'_>,
+) -> Vec<MissingRow> {
+    let mut missing = Vec::new();
+    for ((platform, scope), lock) in locks {
+        let pv = ctx.paths.with_platform(*platform);
+        for (name, entry) in &lock.packages {
+            let kind = entry.artifact_type;
+            if !pv.is_installed(kind, name, *scope, ctx.fs) {
+                missing.push(MissingRow {
+                    kind,
+                    name: name.clone(),
+                    scope: *scope,
+                    platform: *platform,
+                });
+            }
+        }
+    }
+    missing
+}
+
+fn sort_rows(rows: &mut [DoctorRow]) {
+    rows.sort_by(|a, b| {
+        a.kind
+            .to_string()
+            .cmp(&b.kind.to_string())
+            .then(a.scope.cmp(&b.scope))
+            .then(a.name.cmp(&b.name))
+            .then(a.location.cmp(&b.location))
+    });
+}
+
+fn sort_missing(missing: &mut [MissingRow]) {
+    missing.sort_by(|a, b| {
+        a.kind
+            .to_string()
+            .cmp(&b.kind.to_string())
+            .then(a.scope.cmp(&b.scope))
+            .then(a.name.cmp(&b.name))
+            .then(a.platform.slug().cmp(b.platform.slug()))
+    });
+}
+
 /// Survey the whole system installation and classify every artifact.
 ///
 /// Read-only: performs no writes. Surveys global scope always, and project
@@ -292,90 +397,10 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
     let available = available_in_sources(ctx)?;
     let external = cfg.external;
 
-    let mut rows = Vec::new();
-    for (dir, agg) in &locations {
-        if !ctx.fs.exists(dir) {
-            continue;
-        }
-        // For skills the agent extension is irrelevant; for agents each location
-        // maps to a single platform, so any attributed platform's view is correct.
-        let pv = ctx.paths.with_platform(agg.platforms[0]);
-        let names = config::installed_names(agg.kind, agg.scope, ctx.fs, &pv)?;
-        for name in names {
-            let path = pv.require_installed_artifact_path(agg.kind, &name, agg.scope)?;
-            // Hash once: this checksum classifies the copy *and* decides content
-            // divergence against the artifact's other copies.
-            let content_checksum = checksum::checksum_artifact(&path, agg.kind, ctx.fs)?;
-            let mut state = classify_installed(&name, agg, &content_checksum, &locks, &available);
-            // An artifact cmx doesn't manage (orphaned/untracked) but that the
-            // user has declared external is reclassified — managed by another
-            // tool, not a cmx issue.
-            if matches!(state, ArtifactState::Orphaned | ArtifactState::Untracked)
-                && config::matches_external(&external, &name, dir, &ctx.paths.home_dir)
-            {
-                state = ArtifactState::External;
-            }
-            let version = read_installed_version(agg.kind, &path, ctx);
-            // The platforms cmx actually tracks this for: those whose lock file
-            // records it (a subset of the location's readers).
-            let tracked_for: Vec<Platform> = agg
-                .platforms
-                .iter()
-                .copied()
-                .filter(|p| {
-                    locks.get(&(*p, agg.scope)).is_some_and(|l| l.packages.contains_key(&name))
-                })
-                .collect();
-            let source = source_of(&name, agg, state, &locks, &available);
-            rows.push(DoctorRow {
-                kind: agg.kind,
-                name,
-                scope: agg.scope,
-                location: dir.clone(),
-                platforms: agg.platforms.clone(),
-                tracked_for,
-                state,
-                version,
-                source,
-                content_checksum,
-            });
-        }
-    }
-
-    // Missing: lock entries whose artifact file is gone from disk.
-    let mut missing = Vec::new();
-    for ((platform, scope), lock) in &locks {
-        let pv = ctx.paths.with_platform(*platform);
-        for (name, entry) in &lock.packages {
-            let kind = entry.artifact_type;
-            if !pv.is_installed(kind, name, *scope, ctx.fs) {
-                missing.push(MissingRow {
-                    kind,
-                    name: name.clone(),
-                    scope: *scope,
-                    platform: *platform,
-                });
-            }
-        }
-    }
-
-    rows.sort_by(|a, b| {
-        a.kind
-            .to_string()
-            .cmp(&b.kind.to_string())
-            .then(a.scope.cmp(&b.scope))
-            .then(a.name.cmp(&b.name))
-            .then(a.location.cmp(&b.location))
-    });
-    missing.sort_by(|a, b| {
-        a.kind
-            .to_string()
-            .cmp(&b.kind.to_string())
-            .then(a.scope.cmp(&b.scope))
-            .then(a.name.cmp(&b.name))
-            .then(a.platform.slug().cmp(b.platform.slug()))
-    });
-
+    let mut rows = build_rows(&locations, &locks, &available, &external, ctx)?;
+    let mut missing = collect_missing(&locks, ctx);
+    sort_rows(&mut rows);
+    sort_missing(&mut missing);
     let artifacts = group_rows(&rows);
 
     Ok(DoctorReport {
