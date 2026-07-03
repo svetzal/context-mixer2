@@ -8,7 +8,6 @@ use crate::copy;
 use crate::lockfile;
 use crate::paths::ConfigPaths;
 use crate::platform::Platform;
-use crate::platform_iter;
 use crate::source_iter;
 use crate::types::{self, ArtifactKind, InstallScope, LockEntry, LockSource};
 
@@ -111,22 +110,7 @@ pub fn resolve_targets(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Platform>> {
-    if let Some(p) = selector {
-        return Ok(vec![p]);
-    }
-    if let Some(managed) = crate::config::managed_platforms(ctx.fs, ctx.paths)? {
-        return Ok(managed.into_iter().filter(|p| p.supports(kind)).collect());
-    }
-    let mut targets = Vec::new();
-    for view in platform_iter::views_for(ctx.paths, platform_iter::all(), kind) {
-        if !lockfile::load(scope, ctx.fs, &view.paths)?.packages.is_empty() {
-            targets.push(view.platform);
-        }
-    }
-    if targets.is_empty() {
-        targets.push(Platform::Claude);
-    }
-    Ok(targets)
+    crate::targets::resolve_targets(selector, kind, scope, ctx)
 }
 
 /// Install several named artifacts in one pass, into each of `targets`.

@@ -9,6 +9,10 @@ pub mod lockfile;
 pub mod paths;
 pub mod platform;
 pub mod platform_iter;
+pub mod production;
+pub mod skill_fs;
+pub mod skill_install;
+pub mod targets;
 pub mod types;
 
 #[cfg(any(test, feature = "test-support"))]

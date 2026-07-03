@@ -20,19 +20,39 @@ pub fn checksum_file(path: &Path, fs: &dyn Filesystem) -> Result<String> {
 /// Compute SHA-256 checksum for a skill (directory) via the given filesystem.
 /// Hashes all files in sorted order for determinism.
 pub fn checksum_dir(path: &Path, fs: &dyn Filesystem) -> Result<String> {
-    let mut hasher = Sha256::new();
     let mut files = fs_util::collect_files_recursive(path, fs)?;
     files.sort();
 
-    for file in &files {
-        let relative = file.strip_prefix(path).unwrap_or(file);
-        hasher.update(relative.to_string_lossy().as_bytes());
-        let content = fs.read(file)?;
-        hasher.update(&content);
-    }
+    let entries: Vec<(std::path::PathBuf, Vec<u8>)> = files
+        .iter()
+        .map(|file| {
+            let relative = file.strip_prefix(path).unwrap_or(file).to_path_buf();
+            let content = fs.read(file)?;
+            Ok((relative, content))
+        })
+        .collect::<Result<_>>()?;
 
+    Ok(checksum_in_memory(
+        entries.iter().map(|(rel, content)| (rel.as_path(), content.as_slice())),
+    ))
+}
+
+/// Compute a SHA-256 checksum over an in-memory set of `(relative_path, bytes)` pairs.
+///
+/// Each entry contributes its relative path (as UTF-8 bytes) then its content to
+/// the hash stream. The result is prefixed with `sha256:`.
+///
+/// The caller is responsible for providing entries in a stable (sorted) order.
+pub fn checksum_in_memory<'a>(
+    entries: impl IntoIterator<Item = (&'a std::path::Path, &'a [u8])>,
+) -> String {
+    let mut hasher = Sha256::new();
+    for (rel, content) in entries {
+        hasher.update(rel.to_string_lossy().as_bytes());
+        hasher.update(content);
+    }
     let hash = hasher.finalize();
-    Ok(format!("sha256:{}", hex_encode(&hash)))
+    format!("sha256:{}", hex_encode(&hash))
 }
 
 /// Compute the checksum for an artifact, dispatching to the correct strategy

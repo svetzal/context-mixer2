@@ -39,6 +39,7 @@ pub use cmx_core::lockfile;
 pub use cmx_core::paths;
 pub use cmx_core::platform;
 pub use cmx_core::platform_iter;
+pub use cmx_core::targets;
 pub use cmx_core::types;
 
 #[cfg(test)]
