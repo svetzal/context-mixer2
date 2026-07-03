@@ -20,6 +20,22 @@ pub struct SkillFile {
     pub bytes: Vec<u8>,
 }
 
+impl SkillFile {
+    /// Construct from text content, the common case for `include_str!` embeds:
+    ///
+    /// ```
+    /// # use cmx_core::skill_fs::SkillFile;
+    /// let f = SkillFile::text("references/workflows.md", "# Workflows\n");
+    /// assert_eq!(f.rel_path.to_str(), Some("references/workflows.md"));
+    /// ```
+    pub fn text(rel_path: impl Into<PathBuf>, content: &str) -> Self {
+        Self {
+            rel_path: rel_path.into(),
+            bytes: content.as_bytes().to_vec(),
+        }
+    }
+}
+
 /// Filter and sort `files` the same way `checksum_dir` processes a directory:
 ///
 /// - Exclude files whose relative path contains a dotfile component (any

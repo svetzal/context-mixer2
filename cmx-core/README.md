@@ -44,6 +44,29 @@ platform lock file(s). It intentionally leaves the shared `cmx-lock.json` file o
 — that file is shared with other tools and cmx itself. The `RemoveReport` display
 output notes this explicitly.
 
+## Multi-file bundles
+
+Skills with more than one file build the bundle from `SkillFile::text` entries; relative paths (including subdirectories) are preserved under the installed skill directory:
+
+```rust
+let skill = BundledSkill::from_files(vec![
+    SkillFile::text("SKILL.md", include_str!("../skill/SKILL.md")),
+    SkillFile::text("references/workflows.md", include_str!("../skill/references/workflows.md")),
+]);
+```
+
+## Testing your integration
+
+The `test-support` feature exposes `test_support::TestContext`, an in-memory context for exercising your init command without touching the real filesystem. Because features unify across a dependency graph, enable it from `[dev-dependencies]` by repeating the dependency with the feature:
+
+```toml
+[dependencies]
+cmx-core = { version = "0.1" }
+
+[dev-dependencies]
+cmx-core = { version = "0.1", features = ["test-support"] }
+```
+
 ## `TargetAction` is non-exhaustive
 
 `TargetAction` is marked `#[non_exhaustive]`: new variants may be added in future
