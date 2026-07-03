@@ -1,12 +1,17 @@
 [package]
 name = "cmx-core"
-version.workspace = true
+# Versioned independently of the cmx CLI: embedders pin this crate's API,
+# which stabilizes on its own schedule. Publish via `cmx-core-v*` tags.
+version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Core library for cmx: types, paths, gateway traits, and lockfile management"
-publish = false
+description = "Embeddable core for installing agent skills across platforms — cmx-aware lockfile tracking, plan/apply installs, version guards"
+repository = "https://github.com/svetzal/context-mixer2"
+readme = "README.md"
+keywords = ["agent", "skills", "cli", "install", "claude"]
+categories = ["development-tools", "filesystem"]
 
 [features]
 default = []
