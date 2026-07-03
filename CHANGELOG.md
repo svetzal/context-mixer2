@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`cmx skill promote <name>` now selects the copy to canonicalize by drift**, and honors `--platform <name>` to break ties. It previously promoted whichever copy path resolution landed on — always the default platform (Claude), blind to which copy was actually edited. Because agents edit their own installed copy without knowing cmx's canonical home, an in-place edit on a non-default platform (e.g. the shared `.agents/skills` copy Codex reads) could be silently discarded when a stale Claude copy got promoted instead. Promotion now chooses the copy that was **edited in place**: exactly one drifted copy is promoted regardless of platform; an explicit `--platform <name>` always wins (matching the `--platform` target `cmx skill diff` already suggests); no drifted copy is a no-op (or a refusal when the home diverged elsewhere); and two or more copies that disagree are refused with a pointer to `cmx skill diff <name>` and `--platform <name>` to pick the winner. Agents remain single-copy on the active platform — they're reformatted per platform, so a cross-platform byte comparison is meaningless.
+
 ## [2.10.2] - 2026-06-23
 
 ### Fixed
