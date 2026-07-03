@@ -5,17 +5,21 @@
 //! any cmx internals.
 //!
 //! ```no_run
+//! # use anyhow::Result;
+//! # fn main() -> Result<()> {
+//! use cmx_core::production::ProductionContext;
 //! use cmx_core::skill_install::{BundledSkill, Scope, SkillInstaller, ToolIdentity};
-//! use cmx_core::skill_fs::SkillFile;
-//! use std::path::PathBuf;
 //!
-//! let files = vec![
-//!     SkillFile { rel_path: PathBuf::from("SKILL.md"), bytes: b"---\nversion: 1.0.0\n---\n# My skill\n".to_vec() },
-//! ];
-//! let skill = BundledSkill::from_files(files);
-//! let installer = SkillInstaller::new(ToolIdentity { name: "mytool".into(), version: "1.0.0".into() });
-//! // let plan = installer.plan(&skill, Scope::Global, false, &ctx)?;
-//! // let report = installer.apply(&skill, &plan, &ctx)?;
+//! let skill = BundledSkill::single_md("---\nversion: 1.2.0\n---\n# My skill\n");
+//! let installer = SkillInstaller::new(ToolIdentity::new("mytool", "1.2.0"));
+//! let prod_ctx = ProductionContext::claude()?;
+//! let ctx = prod_ctx.ctx();
+//! let plan = installer.plan(&skill, Scope::Global, false, &ctx)?;
+//! println!("{plan}");
+//! let report = installer.apply(&skill, &plan, &ctx)?;
+//! println!("{report}");
+//! # Ok(())
+//! # }
 //! ```
 
 use anyhow::{Result, bail};
@@ -44,6 +48,16 @@ pub struct ToolIdentity {
     pub version: String,
 }
 
+impl ToolIdentity {
+    /// Construct a tool identity from a name and version string.
+    pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            version: version.into(),
+        }
+    }
+}
+
 /// A skill bundled inside a tool binary (via `include_str!` or similar).
 pub struct BundledSkill {
     pub files: Vec<SkillFile>,
@@ -56,6 +70,19 @@ impl BundledSkill {
         Self { files }
     }
 
+    /// Convenience constructor for the common single-`SKILL.md` case.
+    ///
+    /// Builds a bundle containing exactly one file at path `SKILL.md` with the
+    /// given content. Use `from_files` when the skill includes additional files.
+    pub fn single_md(content: &str) -> Self {
+        Self {
+            files: vec![SkillFile {
+                rel_path: PathBuf::from("SKILL.md"),
+                bytes: content.as_bytes().to_vec(),
+            }],
+        }
+    }
+
     /// Returns `true` when the bundle contains a `SKILL.md` at the root level
     /// (i.e. `rel_path == "SKILL.md"`).
     pub fn has_skill_md(&self) -> bool {
@@ -64,7 +91,7 @@ impl BundledSkill {
 }
 
 /// Installation scope — global (user-wide) or local (project-scoped).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Scope {
     #[default]
     Global,
@@ -85,6 +112,16 @@ impl Scope {
 // ---------------------------------------------------------------------------
 
 /// The action to take for a single target platform during an install.
+///
+/// # Non-exhaustive
+///
+/// This enum is `#[non_exhaustive]`: new action variants may be added in
+/// future minor releases. Embedders should render actions via the `Display`
+/// impl on `Report`/`InstallPlan` or match on specific variants they care
+/// about with a catch-all `_` arm. The `will_write()` and `is_blocked()`
+/// helpers cover the two common branching points without requiring exhaustive
+/// matching.
+#[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum TargetAction {
     /// First-time install (no existing copy).
@@ -171,7 +208,7 @@ impl std::fmt::Display for InstallPlan {
         for target in &self.targets {
             writeln!(
                 f,
-                "  {} → {:?} ({})",
+                "  {} → {} ({})",
                 target.platform,
                 target.dest_dir.display(),
                 format_action(&target.action)
@@ -202,25 +239,91 @@ fn format_action(action: &TargetAction) -> String {
 // Apply result types
 // ---------------------------------------------------------------------------
 
-/// The outcome for a single platform after `apply`.
+/// The outcome for a single target platform after `apply`.
+///
+/// Both written and skipped targets appear in `Report::targets`; the `action`
+/// field distinguishes them. Use `Report::applied()` / `Report::skipped()` for
+/// filtered views.
 #[derive(Debug)]
-pub struct AppliedTarget {
+pub struct TargetOutcome {
     pub platform: Platform,
     pub dest_dir: PathBuf,
     pub action: TargetAction,
+    /// Number of files written to disk (0 for skipped targets).
     pub files_written: usize,
-    pub installed_checksum: String,
+    /// Checksum recorded in the lock file. `Some` for written targets, `None`
+    /// for skipped targets (no lock entry was touched).
+    pub installed_checksum: Option<String>,
 }
 
 /// The full report returned by [`SkillInstaller::apply`].
+///
+/// All targets — both written and skipped — are captured in `targets` so that
+/// skipped targets retain their `dest_dir` and the `action` discriminant
+/// distinguishes an ordinary up-to-date skip from a `DriftedSkip` (local edits
+/// preserved). Use the `applied()` and `skipped()` iterators for filtered views.
 #[derive(Debug)]
 pub struct Report {
     pub tool: ToolIdentity,
     pub scope: InstallScope,
-    pub applied: Vec<AppliedTarget>,
-    pub skipped: Vec<Platform>,
+    /// Every platform that was considered, written or not.
+    pub targets: Vec<TargetOutcome>,
     /// Whether a source entry was registered in sources.json.
     pub source_registered: bool,
+}
+
+impl Report {
+    /// Targets where files were written to disk (Install / Update / Downgrade).
+    pub fn applied(&self) -> impl Iterator<Item = &TargetOutcome> {
+        self.targets.iter().filter(|o| o.action.will_write())
+    }
+
+    /// Targets where no files were written (`Skip` / `DriftedSkip` / `RefuseNewer`).
+    pub fn skipped(&self) -> impl Iterator<Item = &TargetOutcome> {
+        self.targets.iter().filter(|o| !o.action.will_write())
+    }
+}
+
+impl std::fmt::Display for Report {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Installed {} v{} ({})",
+            self.tool.name,
+            self.tool.version,
+            self.scope.label()
+        )?;
+        for outcome in &self.targets {
+            writeln!(
+                f,
+                "  {} → {} ({})",
+                outcome.platform,
+                outcome.dest_dir.display(),
+                format_action(&outcome.action)
+            )?;
+        }
+        if self.source_registered {
+            writeln!(f, "  (registered as cmx source)")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for RemoveReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Removed {} ({})", self.tool_name, self.scope.label())?;
+        for platform in &self.platforms_cleared {
+            writeln!(f, "  {platform} lock entry cleared")?;
+        }
+        for dir in &self.removed_dirs {
+            writeln!(f, "  removed: {}", dir.display())?;
+        }
+        if self.source_unregistered {
+            writeln!(f, "  unregistered from cmx sources")?;
+        }
+        writeln!(f, "  note: cmx-lock.json left on disk (shared with other tools)")?;
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -411,12 +514,17 @@ impl SkillInstaller {
         let installed_checksum = plan.source_checksum.clone();
         let installed_at = ctx.clock.now().to_rfc3339();
 
-        let mut applied = Vec::new();
-        let mut skipped = Vec::new();
+        let mut targets: Vec<TargetOutcome> = Vec::new();
 
         for target in &plan.targets {
             if !target.action.will_write() {
-                skipped.push(target.platform);
+                targets.push(TargetOutcome {
+                    platform: target.platform,
+                    dest_dir: target.dest_dir.clone(),
+                    action: target.action.clone(),
+                    files_written: 0,
+                    installed_checksum: None,
+                });
                 continue;
             }
 
@@ -429,12 +537,12 @@ impl SkillInstaller {
                 );
             })?;
 
-            applied.push(AppliedTarget {
+            targets.push(TargetOutcome {
                 platform: target.platform,
                 dest_dir: target.dest_dir.clone(),
                 action: target.action.clone(),
                 files_written: target.files.len(),
-                installed_checksum: installed_checksum.clone(),
+                installed_checksum: Some(installed_checksum.clone()),
             });
         }
 
@@ -468,8 +576,7 @@ impl SkillInstaller {
         Ok(Report {
             tool: self.tool.clone(),
             scope: plan.scope,
-            applied,
-            skipped,
+            targets,
             source_registered,
         })
     }
@@ -1035,7 +1142,7 @@ mod tests {
         let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
         let report = installer("1.0.0").apply(&skill, &plan, &ctx).unwrap();
 
-        assert_eq!(report.applied.len(), 1);
+        assert_eq!(report.applied().count(), 1);
         assert!(!report.source_registered, "no managed set → no source registration");
 
         // Files should be on disk
@@ -1059,7 +1166,8 @@ mod tests {
         let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
         let report = installer("1.0.0").apply(&skill, &plan, &ctx).unwrap();
 
-        assert_eq!(report.applied[0].installed_checksum, plan.source_checksum);
+        let first_applied = report.applied().next().unwrap();
+        assert_eq!(first_applied.installed_checksum.as_deref().unwrap(), plan.source_checksum);
     }
 
     #[test]
@@ -1354,5 +1462,216 @@ mod tests {
         assert!(!report.was_on_disk);
         assert!(!report.was_tracked);
         assert!(!report.source_unregistered);
+    }
+
+    // -----------------------------------------------------------------------
+    // New constructor and derive tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn single_md_builds_single_skill_md() {
+        let skill = BundledSkill::single_md("---\nversion: 1.0.0\n---\n# My skill\n");
+        assert_eq!(skill.files.len(), 1);
+        assert!(skill.has_skill_md());
+        assert_eq!(skill.files[0].rel_path, std::path::PathBuf::from("SKILL.md"));
+    }
+
+    #[test]
+    fn tool_identity_new_sets_fields() {
+        let id = ToolIdentity::new("mytool", "1.2.3");
+        assert_eq!(id.name, "mytool");
+        assert_eq!(id.version, "1.2.3");
+    }
+
+    #[test]
+    fn scope_partial_eq() {
+        assert_eq!(Scope::Global, Scope::Global);
+        assert_eq!(Scope::Local, Scope::Local);
+        assert_ne!(Scope::Global, Scope::Local);
+    }
+
+    // -----------------------------------------------------------------------
+    // Report fidelity tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn skipped_target_outcome_carries_dest_dir() {
+        let t = TestContext::new();
+        let skill = sample_skill("1.0.0");
+        let checksum = skill_fs::checksum_bundled(&skill.files);
+
+        let claude_paths = t.paths.with_platform(Platform::Claude);
+        let skill_dir = claude_paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("sample");
+        t.fs.add_file(skill_dir.join("SKILL.md"), "---\nversion: 1.0.0\n---\n# Sample skill\n");
+
+        crate::test_support::save_lock_with_entry(
+            &t.fs,
+            &claude_paths,
+            "sample",
+            LockEntry {
+                artifact_type: ArtifactKind::Skill,
+                version: Some("1.0.0".to_string()),
+                installed_at: "2024-01-01T00:00:00Z".to_string(),
+                source: LockSource {
+                    repo: "bundled:sample".to_string(),
+                    path: "skills/sample".to_string(),
+                },
+                source_checksum: checksum.clone(),
+                installed_checksum: checksum.clone(),
+            },
+            InstallScope::Global,
+        );
+
+        let ctx = t.ctx();
+        let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
+        let report = installer("1.0.0").apply(&skill, &plan, &ctx).unwrap();
+
+        // The skip target must preserve dest_dir
+        let skip = report.skipped().next().expect("expected a skipped target");
+        assert!(
+            !skip.dest_dir.as_os_str().is_empty(),
+            "dest_dir must be non-empty on skipped target"
+        );
+        assert!(matches!(skip.action, TargetAction::Skip));
+        assert_eq!(skip.installed_checksum, None);
+    }
+
+    #[test]
+    fn drifted_skip_outcome_is_distinguishable_from_plain_skip() {
+        let t = TestContext::new();
+        let skill = sample_skill("1.0.0");
+
+        let claude_paths = t.paths.with_platform(Platform::Claude);
+        let skill_dir = claude_paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("sample");
+        t.fs.add_file(skill_dir.join("SKILL.md"), "---\nversion: 1.0.0\n---\n# Modified\n");
+
+        crate::test_support::save_lock_with_entry(
+            &t.fs,
+            &claude_paths,
+            "sample",
+            LockEntry {
+                artifact_type: ArtifactKind::Skill,
+                version: Some("1.0.0".to_string()),
+                installed_at: "2024-01-01T00:00:00Z".to_string(),
+                source: LockSource {
+                    repo: "bundled:sample".to_string(),
+                    path: "skills/sample".to_string(),
+                },
+                source_checksum: "sha256:different".to_string(),
+                installed_checksum: "sha256:different".to_string(),
+            },
+            InstallScope::Global,
+        );
+
+        let ctx = t.ctx();
+        let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
+        let report = installer("1.0.0").apply(&skill, &plan, &ctx).unwrap();
+
+        let skip = report.skipped().next().expect("expected a skipped target");
+        assert!(
+            matches!(skip.action, TargetAction::DriftedSkip { .. }),
+            "action must be DriftedSkip, not plain Skip"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Display tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn install_plan_display_contains_target_lines() {
+        let t = TestContext::new();
+        let skill = sample_skill("1.0.0");
+        let ctx = t.ctx();
+        let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
+        let rendered = plan.to_string();
+        assert!(rendered.contains("sample"), "plan display must include tool name");
+        assert!(rendered.contains("1.0.0"), "plan display must include version");
+        assert!(rendered.contains("install"), "plan display must include action");
+    }
+
+    #[test]
+    fn report_display_distinguishes_drifted_skip() {
+        let t = TestContext::new();
+        let skill = sample_skill("1.0.0");
+        let checksum = skill_fs::checksum_bundled(&skill.files);
+
+        // First apply: fresh install
+        let ctx = t.ctx();
+        let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
+        let up_to_date_report = installer("1.0.0").apply(&skill, &plan, &ctx).unwrap();
+        let up_to_date_text = up_to_date_report.to_string();
+
+        // Second apply (same version, same checksum) → Skip
+        let plan2 = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
+        let skip_report = installer("1.0.0").apply(&skill, &plan2, &ctx).unwrap();
+        let skip_text = skip_report.to_string();
+        assert!(skip_text.contains("up to date"), "up-to-date skip must say 'up to date'");
+
+        // Set up drifted scenario
+        let t2 = TestContext::new();
+        let claude_paths = t2.paths.with_platform(Platform::Claude);
+        let skill_dir = claude_paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("sample");
+        t2.fs
+            .add_file(skill_dir.join("SKILL.md"), "---\nversion: 1.0.0\n---\n# Modified\n");
+        crate::test_support::save_lock_with_entry(
+            &t2.fs,
+            &claude_paths,
+            "sample",
+            LockEntry {
+                artifact_type: ArtifactKind::Skill,
+                version: Some("1.0.0".to_string()),
+                installed_at: "2024-01-01T00:00:00Z".to_string(),
+                source: LockSource {
+                    repo: "bundled:sample".to_string(),
+                    path: "skills/sample".to_string(),
+                },
+                source_checksum: "sha256:different".to_string(),
+                installed_checksum: "sha256:different".to_string(),
+            },
+            InstallScope::Global,
+        );
+        let ctx2 = t2.ctx();
+        let drifted_plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx2).unwrap();
+        let drifted_report = installer("1.0.0").apply(&skill, &drifted_plan, &ctx2).unwrap();
+        let drifted_text = drifted_report.to_string();
+
+        // Drifted display must differ from up-to-date skip display
+        assert!(
+            drifted_text.contains("drifted"),
+            "drifted skip must mention 'drifted' in output, got: {drifted_text}"
+        );
+        assert_ne!(
+            skip_text, drifted_text,
+            "up-to-date skip and drifted skip must produce different display output"
+        );
+        // suppress unused warning
+        let _ = checksum;
+        let _ = up_to_date_text;
+    }
+
+    #[test]
+    fn remove_report_display_notes_lockfile_left() {
+        let t = TestContext::new();
+        let skill = sample_skill("1.0.0");
+        let ctx = t.ctx();
+        let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
+        installer("1.0.0").apply(&skill, &plan, &ctx).unwrap();
+
+        let report = installer("1.0.0").remove(Scope::Global, &ctx).unwrap();
+        let rendered = report.to_string();
+        assert!(
+            rendered.contains("cmx-lock.json"),
+            "remove report must note the lockfile is left on disk"
+        );
     }
 }

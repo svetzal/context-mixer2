@@ -23,13 +23,33 @@ pub struct ProductionContext {
 }
 
 impl ProductionContext {
-    /// Build a production context from the real environment.
+    /// Build a production context bound to the Claude platform.
     ///
-    /// `platform` is the active platform the embedding tool is binding to
-    /// (e.g. `Platform::Claude`). Path resolution is derived from the real
-    /// home directory.
-    pub fn from_env(platform: Platform) -> Result<Self> {
-        let paths = ConfigPaths::from_env(platform)?;
+    /// This is the one-call default for tools that target Claude Code. It is
+    /// equivalent to `from_env(Platform::Claude)`.
+    ///
+    /// The platform binding determines which lock file and install directory are
+    /// used as the *default* for path resolution. It does **not** determine
+    /// which platforms a skill installs to — installation targets are resolved
+    /// from the cmx config and existing lock files at plan time.
+    pub fn claude() -> Result<Self> {
+        Self::from_env(Platform::Claude)
+    }
+
+    /// Build a production context from the real environment for the given
+    /// platform binding.
+    ///
+    /// `default_platform` controls the default lock file name and install
+    /// directory used for path resolution (e.g. which `cmx-lock*.json` file is
+    /// the primary one). It does **not** set the config root directory — that is
+    /// always `$HOME/.config/context-mixer` — and it does **not** determine
+    /// which platforms a skill installs to. Installation targets come from
+    /// the plan (resolved from the cmx config and existing lock files).
+    ///
+    /// For Claude Code tools, prefer [`claude()`](Self::claude) over calling
+    /// this directly.
+    pub fn from_env(default_platform: Platform) -> Result<Self> {
+        let paths = ConfigPaths::from_env(default_platform)?;
         Ok(Self {
             fs: RealFilesystem,
             git: RealGitClient,

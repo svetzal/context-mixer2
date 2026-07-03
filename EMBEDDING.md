@@ -57,11 +57,18 @@ Gaps the extraction must close:
 ### The API surface (deliberately small)
 
 ```rust
-let installer = SkillInstaller::new(ToolIdentity { name: "parite", version: "1.4.0" });
-let plan = installer.plan(bundled_skill, Scope::Global)?;   // dry-run: renderable, precise
-let report = installer.apply(plan)?;                         // copy + lock entry
-installer.status(...)?;                                      // installed? version? drifted?
-installer.remove(...)?;                                      // uninstall + lock cleanup
+// One-call context for Claude Code tools (use from_env(Platform::X) for others)
+let prod_ctx = ProductionContext::claude()?;
+let ctx = prod_ctx.ctx();
+
+let skill = BundledSkill::single_md(include_str!("../skills/parite/SKILL.md"));
+let installer = SkillInstaller::new(ToolIdentity::new("parite", "1.4.0"));
+let plan = installer.plan(&skill, Scope::Global, false, &ctx)?; // dry-run: renderable, precise
+println!("{plan}");
+let report = installer.apply(&skill, &plan, &ctx)?;             // copy + lock entry
+println!("{report}");
+installer.status(Scope::Global, &ctx)?;                         // installed? version? drifted?
+installer.remove(Scope::Global, &ctx)?;                         // uninstall + lock cleanup
 ```
 
 Plan/apply as first-class API mirrors the `--apply` convention, so tools can expose `mytool init --dry-run` trivially. The version-guard semantics (older→update, same→skip, newer→refuse unless forced) are standardized once, matching what all five tools independently converged on.
