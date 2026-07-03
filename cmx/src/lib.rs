@@ -1,28 +1,17 @@
 pub mod adopt;
-pub mod artifact_status;
-pub mod checksum;
 pub mod cli;
 pub mod cmx_config;
 pub(crate) mod codex_agent;
-pub mod config;
-pub mod context;
 pub(crate) mod copy;
 #[cfg(feature = "llm")]
 pub mod diff;
 pub mod display;
 pub mod doctor;
-pub(crate) mod fs_util;
-pub mod gateway;
 pub mod info;
 pub mod install;
-pub mod json_file;
 pub mod list;
-pub mod lockfile;
 pub mod outdated;
 pub mod partition;
-pub mod paths;
-pub mod platform;
-pub mod platform_iter;
 pub mod plugin_types;
 pub mod promote;
 pub mod scan;
@@ -33,9 +22,24 @@ pub(crate) mod source_iter;
 pub mod source_update;
 pub mod sync;
 pub mod table;
-#[cfg(test)]
-mod test_support;
 #[cfg(feature = "llm")]
 pub(crate) mod text_diff;
-pub mod types;
 pub mod uninstall;
+
+// Modules extracted to cmx-core — re-exported here to preserve all existing
+// `crate::` paths used throughout this crate's modules and tests.
+pub use cmx_core::artifact_status;
+pub use cmx_core::checksum;
+pub use cmx_core::config;
+pub use cmx_core::context;
+pub use cmx_core::fs_util;
+pub use cmx_core::gateway;
+pub use cmx_core::json_file;
+pub use cmx_core::lockfile;
+pub use cmx_core::paths;
+pub use cmx_core::platform;
+pub use cmx_core::platform_iter;
+pub use cmx_core::types;
+
+#[cfg(test)]
+pub(crate) use cmx_core::test_support;

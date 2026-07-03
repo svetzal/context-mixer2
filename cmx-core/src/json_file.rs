@@ -21,7 +21,7 @@ where
 ///
 /// The temp path is `path` with `.tmp` appended to the file name, so it sits
 /// in the same directory and can be renamed atomically onto the target.
-pub(crate) fn tmp_path(path: &Path) -> PathBuf {
+pub fn tmp_path(path: &Path) -> PathBuf {
     let mut name = path.file_name().map(std::ffi::OsStr::to_os_string).unwrap_or_default();
     name.push(".tmp");
     path.with_file_name(name)

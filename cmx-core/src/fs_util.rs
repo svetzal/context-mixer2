@@ -15,14 +15,14 @@ const TRANSIENT_NAMES: &[&str] = &["node_modules", "__pycache__", ".git", ".DS_S
 /// Whether a directory entry name is transient and should be skipped when
 /// checksumming or copying a skill. Matches the [`TRANSIENT_NAMES`] set plus
 /// compiled-Python (`*.pyc`) files.
-pub(crate) fn is_transient(file_name: &str) -> bool {
+pub fn is_transient(file_name: &str) -> bool {
     TRANSIENT_NAMES.contains(&file_name)
         || Path::new(file_name).extension().is_some_and(|e| e.eq_ignore_ascii_case("pyc"))
 }
 
 /// Recursively collect all non-hidden, non-transient files under `dir` via the
 /// given filesystem.
-pub(crate) fn collect_files_recursive(dir: &Path, fs: &dyn Filesystem) -> Result<Vec<PathBuf>> {
+pub fn collect_files_recursive(dir: &Path, fs: &dyn Filesystem) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     let entries = fs.read_dir(dir)?;
 

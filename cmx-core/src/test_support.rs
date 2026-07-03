@@ -1,51 +1,44 @@
-#[cfg(test)]
-pub(crate) fn agent_content(name: &str, desc: &str) -> String {
+//! Test helpers shared across unit and integration tests.
+//!
+//! Available in two contexts:
+//! - Within `cmx-core` itself: via `#[cfg(test)]`
+//! - In downstream crates (e.g. `cmx`): via the `test-support` feature flag
+
+pub fn agent_content(name: &str, desc: &str) -> String {
     format!("---\nname: {name}\ndescription: {desc}\n---\n# {name}\n")
 }
 
-#[cfg(test)]
-pub(crate) fn skill_content(desc: &str) -> String {
+pub fn skill_content(desc: &str) -> String {
     format!("---\ndescription: {desc}\n---\n# skill\n")
 }
 
-#[cfg(test)]
-pub(crate) fn versioned_skill_content(desc: &str, version: &str) -> String {
+pub fn versioned_skill_content(desc: &str, version: &str) -> String {
     format!("---\ndescription: {desc}\nversion: {version}\n---\n# skill\n")
 }
 
-#[cfg(test)]
-pub(crate) fn versioned_agent_content(name: &str, desc: &str, version: &str) -> String {
+pub fn versioned_agent_content(name: &str, desc: &str, version: &str) -> String {
     format!("---\nname: {name}\ndescription: {desc}\nversion: {version}\n---\n# {name}\n")
 }
 
-#[cfg(test)]
-pub(crate) fn metadata_versioned_agent_content(name: &str, desc: &str, version: &str) -> String {
+pub fn metadata_versioned_agent_content(name: &str, desc: &str, version: &str) -> String {
     format!(
         "---\nname: {name}\ndescription: {desc}\nmetadata:\n  version: \"{version}\"\n  author: Test\n---\n# {name}\n"
     )
 }
 
-#[cfg(test)]
-pub(crate) fn metadata_versioned_skill_content(desc: &str, version: &str) -> String {
+pub fn metadata_versioned_skill_content(desc: &str, version: &str) -> String {
     format!(
         "---\ndescription: {desc}\nmetadata:\n  version: \"{version}\"\n  author: Test\n---\n# skill\n"
     )
 }
 
-#[cfg(test)]
-pub(crate) fn deprecated_agent_content(
-    name: &str,
-    desc: &str,
-    reason: &str,
-    replacement: &str,
-) -> String {
+pub fn deprecated_agent_content(name: &str, desc: &str, reason: &str, replacement: &str) -> String {
     format!(
         "---\nname: {name}\ndescription: {desc}\ndeprecated: true\ndeprecated_reason: {reason}\ndeprecated_replacement: {replacement}\n---\n"
     )
 }
 
-#[cfg(test)]
-pub(crate) fn make_local_entry(
+pub fn make_local_entry(
     path: impl Into<std::path::PathBuf>,
     last_updated: Option<String>,
 ) -> crate::types::SourceEntry {
@@ -60,8 +53,7 @@ pub(crate) fn make_local_entry(
     }
 }
 
-#[cfg(test)]
-pub(crate) fn make_git_entry(
+pub fn make_git_entry(
     url: &str,
     clone_path: impl Into<std::path::PathBuf>,
     branch: &str,
@@ -78,8 +70,7 @@ pub(crate) fn make_git_entry(
     }
 }
 
-#[cfg(test)]
-pub(crate) fn make_lock_entry_builder(
+pub fn make_lock_entry_builder(
     kind: crate::types::ArtifactKind,
     repo: &str,
     path: &str,
@@ -98,8 +89,7 @@ pub(crate) fn make_lock_entry_builder(
     }
 }
 
-#[cfg(test)]
-pub(crate) fn make_lock_entry_versioned(
+pub fn make_lock_entry_versioned(
     kind: crate::types::ArtifactKind,
     version: &str,
     repo: &str,
@@ -110,8 +100,7 @@ pub(crate) fn make_lock_entry_versioned(
     entry
 }
 
-#[cfg(test)]
-pub(crate) fn make_lock_entry_with_checksum(
+pub fn make_lock_entry_with_checksum(
     kind: crate::types::ArtifactKind,
     version: Option<&str>,
     repo: &str,
@@ -125,8 +114,7 @@ pub(crate) fn make_lock_entry_with_checksum(
     entry
 }
 
-#[cfg(test)]
-pub(crate) fn save_lock_with_entry(
+pub fn save_lock_with_entry(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
     name: &str,
@@ -144,8 +132,7 @@ pub(crate) fn save_lock_with_entry(
     crate::lockfile::save(&lock, scope, fs, paths).unwrap();
 }
 
-#[cfg(test)]
-pub(crate) fn setup_source(
+pub fn setup_source(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
     source_name: &str,
@@ -170,8 +157,7 @@ pub(crate) fn setup_source(
     fs.add_file(paths.sources_path(), sources_json);
 }
 
-#[cfg(test)]
-pub(crate) fn setup_sources(
+pub fn setup_sources(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
     entries: &[(&str, &str)],
@@ -194,8 +180,7 @@ pub(crate) fn setup_sources(
     fs.add_file(paths.sources_path(), sources_json);
 }
 
-#[cfg(test)]
-pub(crate) fn setup_source_with_versioned_agent(
+pub fn setup_source_with_versioned_agent(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
     source_name: &str,
@@ -210,8 +195,7 @@ pub(crate) fn setup_source_with_versioned_agent(
     );
 }
 
-#[cfg(test)]
-pub(crate) fn setup_source_with_skill(
+pub fn setup_source_with_skill(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
     source_name: &str,
@@ -226,8 +210,7 @@ pub(crate) fn setup_source_with_skill(
     );
 }
 
-#[cfg(test)]
-pub(crate) fn sample_lock_entry() -> crate::types::LockEntry {
+pub fn sample_lock_entry() -> crate::types::LockEntry {
     use crate::types::{ArtifactKind, LockEntry, LockSource};
     LockEntry {
         artifact_type: ArtifactKind::Agent,
@@ -242,8 +225,7 @@ pub(crate) fn sample_lock_entry() -> crate::types::LockEntry {
     }
 }
 
-#[cfg(test)]
-pub(crate) fn sample_lock_file() -> crate::types::LockFile {
+pub fn sample_lock_file() -> crate::types::LockFile {
     use crate::types::LockFile;
     use std::collections::BTreeMap;
     let mut packages = BTreeMap::new();
@@ -254,8 +236,7 @@ pub(crate) fn sample_lock_file() -> crate::types::LockFile {
     }
 }
 
-#[cfg(test)]
-pub(crate) fn install_agent_on_disk(
+pub fn install_agent_on_disk(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
     name: &str,
@@ -268,8 +249,7 @@ pub(crate) fn install_agent_on_disk(
     fs.add_file(path, content);
 }
 
-#[cfg(test)]
-pub(crate) fn install_skill_on_disk(
+pub fn install_skill_on_disk(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
     name: &str,
@@ -282,8 +262,7 @@ pub(crate) fn install_skill_on_disk(
     fs.add_file(dir.join("SKILL.md"), content);
 }
 
-#[cfg(test)]
-pub(crate) fn add_skill(
+pub fn add_skill(
     fs: &crate::gateway::fakes::FakeFilesystem,
     dir: impl AsRef<std::path::Path>,
     name: &str,
@@ -292,8 +271,7 @@ pub(crate) fn add_skill(
     fs.add_file(dir.as_ref().join(name).join("SKILL.md"), skill_content(desc));
 }
 
-#[cfg(test)]
-pub(crate) fn setup_source_with_agent(
+pub fn setup_source_with_agent(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
     source_name: &str,
@@ -307,8 +285,7 @@ pub(crate) fn setup_source_with_agent(
     );
 }
 
-#[cfg(test)]
-pub(crate) fn test_paths() -> crate::paths::ConfigPaths {
+pub fn test_paths() -> crate::paths::ConfigPaths {
     use std::path::PathBuf;
     crate::paths::ConfigPaths::for_test(
         PathBuf::from("/home/testuser"),
@@ -316,8 +293,7 @@ pub(crate) fn test_paths() -> crate::paths::ConfigPaths {
     )
 }
 
-#[cfg(test)]
-pub(crate) fn test_paths_for(platform: crate::platform::Platform) -> crate::paths::ConfigPaths {
+pub fn test_paths_for(platform: crate::platform::Platform) -> crate::paths::ConfigPaths {
     use std::path::PathBuf;
     crate::paths::ConfigPaths::for_test_with_platform(
         PathBuf::from("/home/testuser"),
@@ -326,8 +302,7 @@ pub(crate) fn test_paths_for(platform: crate::platform::Platform) -> crate::path
     )
 }
 
-#[cfg(test)]
-pub(crate) fn setup_empty_sources(
+pub fn setup_empty_sources(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
 ) {
@@ -335,8 +310,7 @@ pub(crate) fn setup_empty_sources(
     fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 }
 
-#[cfg(test)]
-pub(crate) fn setup_source_git(
+pub fn setup_source_git(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
     source_name: &str,
@@ -352,8 +326,7 @@ pub(crate) fn setup_source_git(
     fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 }
 
-#[cfg(test)]
-pub(crate) fn setup_sources_from_entries(
+pub fn setup_sources_from_entries(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
     entries: &[(&str, crate::types::SourceEntry)],
@@ -365,8 +338,7 @@ pub(crate) fn setup_sources_from_entries(
     fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 }
 
-#[cfg(test)]
-pub(crate) fn make_ctx<'a>(
+pub fn make_ctx<'a>(
     fs: &'a crate::gateway::fakes::FakeFilesystem,
     git: &'a crate::gateway::fakes::FakeGitClient,
     clock: &'a crate::gateway::fakes::FakeClock,
@@ -381,15 +353,13 @@ pub(crate) fn make_ctx<'a>(
     }
 }
 
-#[cfg(test)]
-pub(crate) struct TestContext {
+pub struct TestContext {
     pub fs: crate::gateway::fakes::FakeFilesystem,
     pub git: crate::gateway::fakes::FakeGitClient,
     pub clock: crate::gateway::fakes::FakeClock,
     pub paths: crate::paths::ConfigPaths,
 }
 
-#[cfg(test)]
 impl TestContext {
     pub fn new() -> Self {
         Self::build(test_paths(), crate::gateway::fakes::FakeClock::at(chrono::Utc::now()))
@@ -417,5 +387,11 @@ impl TestContext {
 
     pub fn ctx(&self) -> crate::context::AppContext<'_> {
         make_ctx(&self.fs, &self.git, &self.clock, &self.paths)
+    }
+}
+
+impl Default for TestContext {
+    fn default() -> Self {
+        Self::new()
     }
 }

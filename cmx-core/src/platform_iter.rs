@@ -8,9 +8,9 @@
 //! # Usage
 //!
 //! ```no_run
-//! # use cmx::platform_iter;
-//! # use cmx::types::ArtifactKind;
-//! # use cmx::context::AppContext;
+//! # use cmx_core::platform_iter;
+//! # use cmx_core::types::ArtifactKind;
+//! # use cmx_core::context::AppContext;
 //! // Iterate every platform that supports `kind`:
 //! // for view in platform_iter::views_for(ctx, platform_iter::all(), kind) { ... }
 //! //

@@ -316,11 +316,28 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "cmx-core",
  "dirs",
  "mojentic",
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "sha2",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "cmx-core"
+version = "2.10.2"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "dirs",
+ "mojentic",
+ "serde",
+ "serde_json",
  "sha2",
  "tempfile",
  "tokio",

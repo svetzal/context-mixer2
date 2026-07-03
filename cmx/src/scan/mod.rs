@@ -60,7 +60,7 @@ pub(crate) fn try_parse_artifact(
 ) -> Option<Artifact> {
     let content_path = kind.content_path(path);
     let content = fs.read_to_string(&content_path).ok()?;
-    let fm = kind.parse_frontmatter(&content)?;
+    let fm = parse_frontmatter_for_kind(kind, &content)?;
     let name = kind.artifact_name_from_path(path)?;
     Some(artifact_from_frontmatter(kind, name, path.to_path_buf(), fm))
 }
@@ -140,15 +140,13 @@ pub(crate) fn walk_dir_with(
 // ArtifactKind frontmatter parsing (scan-local, depends on local parsers)
 // ---------------------------------------------------------------------------
 
-impl ArtifactKind {
-    /// Parse frontmatter from content using the appropriate strategy for this
-    /// artifact kind.  Agents require `name` and `description` fields; skills
-    /// only require the standard frontmatter block.
-    pub(crate) fn parse_frontmatter(self, content: &str) -> Option<Frontmatter> {
-        match self {
-            ArtifactKind::Agent => parse_agent_frontmatter_str(content),
-            ArtifactKind::Skill => parse_frontmatter_str(content),
-        }
+/// Parse frontmatter from content using the appropriate strategy for the given
+/// artifact kind.  Agents require `name` and `description` fields; skills only
+/// require the standard frontmatter block.
+pub(crate) fn parse_frontmatter_for_kind(kind: ArtifactKind, content: &str) -> Option<Frontmatter> {
+    match kind {
+        ArtifactKind::Agent => parse_agent_frontmatter_str(content),
+        ArtifactKind::Skill => parse_frontmatter_str(content),
     }
 }
 
