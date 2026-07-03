@@ -41,6 +41,7 @@ The `--platform` flag is global — it applies to all subcommands.
 | Zed | `zed` | *(not supported)* ² | *(not supported)* ² | `.agents/skills/` | `~/.agents/skills/` |
 | OpenHands | `openhands` | *(not supported)* ² | *(not supported)* ² | `.agents/skills/` | `~/.agents/skills/` |
 | Hermes | `hermes` | *(not supported)* ² | *(not supported)* ² | `.agents/skills/` ⁴ | `~/.hermes/skills/` ⁴ |
+| Devin | `devin` | *(not supported)* ² | *(not supported)* ² | `.agents/skills/` ⁵ | `~/.agents/skills/` ⁵ |
 
 ¹ **Codex agents are TOML, not markdown.** cmx agents are markdown files with
 YAML frontmatter; the Codex CLI defines subagents as standalone TOML files. When
@@ -48,9 +49,9 @@ you install an agent with `--platform codex`, cmx transforms the source markdown
 into a Codex subagent document (`<name>.toml`) with `name`, `description`,
 `developer_instructions` (the markdown body), and an optional `model` field.
 
-² **Skills-only platforms.** Pi, Crush, Amp, Zed, OpenHands, and Hermes have no
-file-droppable agent concept (their "agents" are tool-gating profiles, runtime
-delegations, executable plugins, or trigger-activated skills), so
+² **Skills-only platforms.** Pi, Crush, Amp, Zed, OpenHands, Hermes, and Devin
+have no file-droppable agent concept (their "agents" are tool-gating profiles,
+runtime delegations, executable plugins, or trigger-activated skills), so
 `cmx agent install --platform <tool>` fails with a clear error. They support
 skills only.
 
@@ -62,12 +63,20 @@ rather than `~/.agents/skills/`. Project skills still use `.agents/skills/`.
 the shared `.agents/skills/`, which Hermes reads only if you add it to
 `skills.external_dirs` in `~/.hermes/config.yaml`.
 
+⁵ **Devin's skill discovery is repository-scoped.** Devin (Cognition's cloud
+software engineer) discovers `SKILL.md` files in the repositories connected to
+it, with `.agents/skills/` as its recommended location — so **project-scoped
+installs are the ones Devin actually reads**. It has no user-global discovery on
+your machine; a global install lands in the shared `~/.agents/skills/` for
+consistency with the cohort, but only reaches Devin once committed to a repo it
+can see.
+
 ## The shared `.agents` skills convention
 
 The `.agents/skills/` directory (project) and `~/.agents/skills/` (user) is an
 emerging cross-tool standard — the [agentskills.io](https://agentskills.io)
-`SKILL.md` format. opencode, Codex, Pi, Crush, Zed, and OpenHands all read it
-natively, so cmx installs skills there for the whole cohort. (Amp and Hermes read
+`SKILL.md` format. opencode, Codex, Pi, Crush, Zed, OpenHands, and Devin all read
+it natively, so cmx installs skills there for the whole cohort. (Amp and Hermes read
 the project `.agents/skills/` too but resolve user-scoped skills elsewhere — see
 notes ³ and ⁴.) This is a **shared directory**: a skill installed under one of
 these platforms is visible to the others.
@@ -97,6 +106,7 @@ do not interfere with each other.
 | Zed | `~/.config/context-mixer/cmx-lock-zed.json` | `.context-mixer/cmx-lock-zed.json` |
 | OpenHands | `~/.config/context-mixer/cmx-lock-openhands.json` | `.context-mixer/cmx-lock-openhands.json` |
 | Hermes | `~/.config/context-mixer/cmx-lock-hermes.json` | `.context-mixer/cmx-lock-hermes.json` |
+| Devin | `~/.config/context-mixer/cmx-lock-devin.json` | `.context-mixer/cmx-lock-devin.json` |
 
 Claude Code keeps `cmx-lock.json` (no suffix) for backward compatibility with
 installations made before platform selection was introduced.

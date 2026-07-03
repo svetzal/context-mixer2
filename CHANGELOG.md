@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Devin** (Cognition's cloud software engineer) joins the supported platforms (`--platform devin`), bringing the roster to fourteen. Devin is skills-only — it has no file-droppable agent concept (its knowledge base and playbooks live platform-side) — and follows the open Agent Skills standard, so it slots into the shared `.agents/skills` cohort alongside Pi, Crush, Zed, and OpenHands. Its skill discovery is repository-scoped (it scans repos connected to it, recommending `.agents/skills/`), so project-scoped installs are the ones Devin actually reads; a global install lands in the shared `~/.agents/skills/` for cohort consistency but reaches Devin only once committed to a repo it can see.
+
 ### Documentation
 
 - `CHARTER.md` is brought current with where the project actually went, correcting charter drift. It is now the **Context Mixer** charter covering both binaries — cmf (facets, recipes, plugin/marketplace tooling) previously wasn't chartered at all — with an explicit consumer (cmx) / publisher (cmf) split replacing the "single CLI" promise. Cross-platform curation and reconciliation (canonical home, `doctor`, `adopt`, `promote`, `sync`, drift detection) is elevated to a pillar of equal weight with marketplace distribution, and the hone non-goal now draws the line explicitly: recipe assembly is deterministic composition of hand-curated facets, not derivation from repository structure.

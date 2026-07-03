@@ -15,7 +15,7 @@ The project rests on two pillars of equal weight:
 ## Goals
 
 - Provide two focused CLIs — cmx to consume and manage artifacts, cmf to author and publish them
-- Install, update, and track agents and skills across Claude Code, GitHub Copilot, Cursor, Windsurf, Gemini CLI, opencode, Codex CLI, Pi, Crush, Amp, Zed, OpenHands, and Hermes
+- Install, update, and track agents and skills across Claude Code, GitHub Copilot, Cursor, Windsurf, Gemini CLI, opencode, Codex CLI, Pi, Crush, Amp, Zed, OpenHands, Hermes, and Devin
 - Support both global (user-wide) and local (project-scoped) installation with lock file tracking
 - Enable plugin marketplaces as git repositories with a standard manifest format
 - Track artifact integrity via SHA-256 checksums and optional semver versioning

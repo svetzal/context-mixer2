@@ -120,6 +120,7 @@ Project paths are relative to the repo root; user paths to `$HOME`.
 | zed | — | — | `.agents/skills/` | `~/.agents/skills/` | `zed` |
 | openhands | — | — | `.agents/skills/` | `~/.agents/skills/` | `openhands` |
 | hermes | — | — | `.agents/skills/` | `~/.hermes/skills/` | `hermes` |
+| devin | — | — | `.agents/skills/` | `~/.agents/skills/` | `devin` |
 
 Notes:
 
@@ -271,6 +272,15 @@ distinctive strengths, abstraction friction).
   Sources: <https://hermes-agent.nousresearch.com/docs/user-guide/features/skills>,
   <https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp>,
   <https://github.com/NousResearch/hermes-agent>.
+- **Devin** (Cognition) — cloud software engineer; skill discovery is
+  **repository-scoped** (indexed/connected repos), no user-global directory on
+  the local machine. Skills = agentskills.io `SKILL.md`; scans
+  `.agents/skills/` (recommended) plus `.github/`, `.claude/`, `.cursor/`,
+  `.codex/`, `.cognition/`, and `.windsurf/` `skills/` dirs. No file-droppable
+  agents (knowledge base + playbooks are platform-side, not files). Reads
+  AGENTS.md. cmx maps global scope to the shared `~/.agents/skills/` for cohort
+  consistency, but only project-scoped (committed) skills reach Devin.
+  Sources: <https://docs.devin.ai/product-guides/skills>.
 
 ### Researched, not implemented
 

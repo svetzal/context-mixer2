@@ -133,7 +133,7 @@ lock files. It mutates nothing — its job is to make a disorganized installatio
 visible before any command changes it. By default it surveys every supported
 platform; once you declare a managed set with `cmx config platforms`, it surveys
 only those, and the header reports the count it actually looked at (e.g. "2
-managed platform(s) surveyed") rather than always claiming all thirteen.
+managed platform(s) surveyed") rather than always claiming all fourteen.
 
 By default `doctor` shows **only what needs attention** — drifted, untracked,
 orphaned, missing, or diverged artifacts — because it's a doctor, for fixing
@@ -247,7 +247,7 @@ platforms already in use, while `uninstall` and `doctor` consider every supporte
 platform. Declaring a managed set makes that explicit and authoritative — when it
 is non-empty, a default (no `--platform`) `install`/`uninstall` acts on exactly
 those platforms and `doctor` surveys only those, so cmx ignores tools you don't
-use instead of scanning all thirteen:
+use instead of scanning all fourteen:
 
 ```bash
 cmx config platforms add claude

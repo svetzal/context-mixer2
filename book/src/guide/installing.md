@@ -58,7 +58,7 @@ cmx agent install python-craftsperson
 ```
 
 Supported platform values: `claude`, `copilot`, `cursor`, `windsurf`, `gemini`,
-`opencode`, `codex`, `pi`, `crush`, `amp`, `zed`, `openhands`, `hermes`.
+`opencode`, `codex`, `pi`, `crush`, `amp`, `zed`, `openhands`, `hermes`, `devin`.
 
 To make the in-use set explicit rather than inferred, declare a managed set with
 [`cmx config platforms`](../reference/commands.md#managed-platforms). See

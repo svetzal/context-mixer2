@@ -65,6 +65,9 @@ pub enum Platform {
     Openhands,
     /// Hermes — skills only; global-centric (~/.hermes/skills); no agent files.
     Hermes,
+    /// Devin — skills only; discovers `SKILL.md` in connected repos and reads
+    /// the shared .agents directory (its recommended location); no agent files.
+    Devin,
 }
 
 impl fmt::Display for Platform {
@@ -161,6 +164,12 @@ impl Platform {
                 manifest_dir: None,
                 agent_format: None,
             },
+            Self::Devin => PlatformSpec {
+                name: "devin",
+                slug: "devin",
+                manifest_dir: None,
+                agent_format: None,
+            },
         }
     }
 
@@ -224,7 +233,13 @@ impl Platform {
 
             // Skills-only tools have no droppable agent concept.
             (
-                Self::Pi | Self::Crush | Self::Amp | Self::Zed | Self::Openhands | Self::Hermes,
+                Self::Pi
+                | Self::Crush
+                | Self::Amp
+                | Self::Zed
+                | Self::Openhands
+                | Self::Hermes
+                | Self::Devin,
                 Agent,
             ) => None,
 
@@ -243,6 +258,7 @@ impl Platform {
                 | Self::Crush
                 | Self::Zed
                 | Self::Openhands
+                | Self::Devin
                 | Self::Amp
                 | Self::Hermes,
                 Skill,
@@ -303,7 +319,7 @@ impl Platform {
     ///
     /// Keep this in sync with the enum; the `all_contains_every_variant` test
     /// guards against a variant being added without being listed here.
-    pub const ALL: [Platform; 13] = [
+    pub const ALL: [Platform; 14] = [
         Self::Claude,
         Self::Copilot,
         Self::Cursor,
@@ -317,6 +333,7 @@ impl Platform {
         Self::Zed,
         Self::Openhands,
         Self::Hermes,
+        Self::Devin,
     ];
 
     /// All platforms that receive generated plugin manifests.
@@ -373,6 +390,7 @@ mod tests {
         assert_eq!(Platform::Zed.to_string(), "zed");
         assert_eq!(Platform::Openhands.to_string(), "openhands");
         assert_eq!(Platform::Hermes.to_string(), "hermes");
+        assert_eq!(Platform::Devin.to_string(), "devin");
     }
 
     #[test]
@@ -398,6 +416,7 @@ mod tests {
             Platform::Zed,
             Platform::Openhands,
             Platform::Hermes,
+            Platform::Devin,
         ] {
             assert!(
                 p.manifest_dir().is_none(),
@@ -465,6 +484,7 @@ mod tests {
             Platform::Zed,
             Platform::Openhands,
             Platform::Hermes,
+            Platform::Devin,
         ] {
             assert!(
                 !Platform::targets().contains(&p),
@@ -566,6 +586,7 @@ mod tests {
             Platform::Crush,
             Platform::Zed,
             Platform::Openhands,
+            Platform::Devin,
         ] {
             for scope in InstallScope::ALL {
                 assert_eq!(
@@ -616,6 +637,7 @@ mod tests {
             Platform::Zed,
             Platform::Openhands,
             Platform::Hermes,
+            Platform::Devin,
         ] {
             for scope in InstallScope::ALL {
                 assert!(
@@ -653,6 +675,7 @@ mod tests {
             Platform::Zed,
             Platform::Openhands,
             Platform::Hermes,
+            Platform::Devin,
         ] {
             assert!(p.supports(ArtifactKind::Skill), "{p} should support skills");
             assert!(!p.supports(ArtifactKind::Agent), "{p} should not support agents");
@@ -718,6 +741,7 @@ mod tests {
         assert_eq!(Platform::Zed.slug(), "zed");
         assert_eq!(Platform::Openhands.slug(), "openhands");
         assert_eq!(Platform::Hermes.slug(), "hermes");
+        assert_eq!(Platform::Devin.slug(), "devin");
     }
 
     // --- ALL ---
@@ -738,6 +762,7 @@ mod tests {
             Platform::Zed,
             Platform::Openhands,
             Platform::Hermes,
+            Platform::Devin,
         ];
         assert_eq!(Platform::ALL.len(), every.len(), "ALL must list every variant");
         for p in every {
@@ -770,5 +795,6 @@ mod tests {
         assert_eq!(Platform::from_str("zed", true).unwrap(), Platform::Zed);
         assert_eq!(Platform::from_str("openhands", true).unwrap(), Platform::Openhands);
         assert_eq!(Platform::from_str("hermes", true).unwrap(), Platform::Hermes);
+        assert_eq!(Platform::from_str("devin", true).unwrap(), Platform::Devin);
     }
 }

@@ -16,7 +16,7 @@ cmx manages the lifecycle of **agents** and **skills** for AI coding assistants 
 - **Status tracking** — see what's installed, what's outdated, what's deprecated; `cmx doctor` surveys the whole system
 - **Reconcile** — promote in-place edits back to a canonical home, and sync a skill that has diverged across tools
 - **LLM-powered diff** — use AI to analyze differences between installed and source versions, directionally
-- **Cross-platform** — works with Claude Code, GitHub Copilot, Cursor, Windsurf, Gemini CLI, opencode, Codex CLI, Pi, Crush, Amp, Zed, OpenHands, and Hermes
+- **Cross-platform** — works with Claude Code, GitHub Copilot, Cursor, Windsurf, Gemini CLI, opencode, Codex CLI, Pi, Crush, Amp, Zed, OpenHands, Hermes, and Devin
 
 ## Quick example
 
