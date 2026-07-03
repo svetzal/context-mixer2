@@ -1,6 +1,6 @@
 # EMBEDDING.md — the cmx-core library extraction
 
-**Status: REVIEWED 2026-07-03 — design decisions settled (see Decisions below). Extraction not yet started.**
+**Status: PHASE 1 SHIPPED 2026-07-03** — `cmx-core` crate extracted (`3e1924d`) and the embeddable `SkillInstaller` API added (`1004cdb`); decisions below are implemented. One deliberate deviation from the original sketch: `install`/`copy`/`adopt` stayed in the cmx crate, because they transitively depend on `scan → scan_marketplace → plugin_types` (excluded from core by decision 5) — cmx-core carries the clean lower layer (types, platform, paths, gateways, lockfile, checksum, config) plus its own self-contained `skill_fs`/`skill_install` path. Next: migrate parite's `init` to cmx-core, then spec + conformance fixtures, then Python/TypeScript ports.
 
 This document imagines the path from cmx-the-CLI to cmx-the-library: a reusable core that our other CLI tools embed to install their companion agent skills, instead of each hand-rolling its own mechanism.
 
