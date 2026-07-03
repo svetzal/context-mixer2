@@ -49,7 +49,7 @@ fn promote_copies_installed_into_home_and_refreshes_lock() {
     place_skill(&t, Platform::Claude, "pf", "edited in place");
     track_from_home(&t, Platform::Claude, "pf");
 
-    let r = promote("pf", ArtifactKind::Skill, &t.ctx()).unwrap();
+    let r = promote("pf", ArtifactKind::Skill, None, &t.ctx()).unwrap();
 
     assert!(!r.already_current);
     assert_eq!(r.retracked, vec![Platform::Claude]);
@@ -78,10 +78,10 @@ fn promote_is_a_noop_when_home_already_matches() {
     place_skill(&t, Platform::Claude, "pf", "same content");
     track_from_home(&t, Platform::Claude, "pf");
     // Pre-seed the home with identical content.
-    promote("pf", ArtifactKind::Skill, &t.ctx()).unwrap();
+    promote("pf", ArtifactKind::Skill, None, &t.ctx()).unwrap();
 
     // A second promote finds the home already current.
-    let r = promote("pf", ArtifactKind::Skill, &t.ctx()).unwrap();
+    let r = promote("pf", ArtifactKind::Skill, None, &t.ctx()).unwrap();
     assert!(r.already_current, "home already matches installed");
     assert!(r.retracked.is_empty());
 }
@@ -94,8 +94,8 @@ fn promote_flags_other_platforms_that_still_differ() {
     track_from_home(&t, Platform::Claude, "pf");
     track_from_home(&t, Platform::Codex, "pf");
 
-    // Promotes the Claude copy (active platform); Codex differs from it.
-    let r = promote("pf", ArtifactKind::Skill, &t.ctx()).unwrap();
+    // Explicitly promote the Claude copy; Codex differs from it and is flagged.
+    let r = promote("pf", ArtifactKind::Skill, Some(Platform::Claude), &t.ctx()).unwrap();
 
     assert!(r.retracked.contains(&Platform::Claude));
     assert!(r.retracked.contains(&Platform::Codex));
@@ -104,6 +104,58 @@ fn promote_flags_other_platforms_that_still_differ() {
         vec![Platform::Codex],
         "Codex still differs from the promoted copy"
     );
+    assert!(
+        t.fs.read_to_string(&home_skill_md(&t, "pf")).unwrap().contains("claude edits"),
+        "the selected (claude) copy became canonical"
+    );
+}
+
+// --- drift-aware default selection ---
+
+#[test]
+fn promote_auto_selects_the_single_drifted_copy() {
+    let t = TestContext::new();
+    // Claude was edited in place (drifted); Codex still matches its baseline.
+    place_skill(&t, Platform::Claude, "pf", "claude edits");
+    place_skill(&t, Platform::Codex, "pf", "pristine");
+    track_from_home(&t, Platform::Claude, "pf");
+    let mut entry = make_lock_entry_builder(ArtifactKind::Skill, HOME_SOURCE, "skills/x/SKILL.md");
+    // Codex's baseline matches its on-disk content → not drifted.
+    let pv = t.paths.with_platform(Platform::Codex);
+    let codex_path = pv
+        .installed_artifact_path(ArtifactKind::Skill, "pf", InstallScope::Global)
+        .unwrap();
+    let codex_cs =
+        crate::checksum::checksum_artifact(&codex_path, ArtifactKind::Skill, &t.fs).unwrap();
+    entry.installed_checksum = codex_cs.clone();
+    entry.source_checksum = codex_cs;
+    save_lock_with_entry(&t.fs, &pv, "pf", entry, InstallScope::Global);
+
+    // No --platform: cmx must pick the drifted Claude copy, not default-to-Claude
+    // by luck — Codex being pristine is what makes the choice unambiguous.
+    let r = promote("pf", ArtifactKind::Skill, None, &t.ctx()).unwrap();
+    assert!(!r.already_current);
+    assert!(
+        t.fs.read_to_string(&home_skill_md(&t, "pf")).unwrap().contains("claude edits"),
+        "the drifted copy was promoted"
+    );
+}
+
+#[test]
+fn promote_refuses_when_multiple_platforms_drift_differently() {
+    let t = TestContext::new();
+    place_skill(&t, Platform::Claude, "pf", "claude edits");
+    place_skill(&t, Platform::Codex, "pf", "different codex edits");
+    track_from_home(&t, Platform::Claude, "pf");
+    track_from_home(&t, Platform::Codex, "pf");
+
+    // Both copies were edited in place, differently → cmx can't guess.
+    let err = promote("pf", ArtifactKind::Skill, None, &t.ctx()).unwrap_err().to_string();
+    assert!(err.contains("Multiple platforms"), "explains the ambiguity: {err}");
+    assert!(err.contains("diff pf"), "points at diff to inspect: {err}");
+    assert!(err.contains("--platform"), "offers the tie-breaker flag: {err}");
+    // The home is untouched — nothing was promoted.
+    assert!(!t.fs.exists(&home_skill_md(&t, "pf")), "home not written on refusal");
 }
 
 // --- guard rails ---
@@ -115,7 +167,7 @@ fn promote_rejects_git_sourced_artifact_with_guidance() {
     let entry = make_lock_entry_builder(ArtifactKind::Skill, "guidelines", "slidev/SKILL.md");
     save_lock_with_entry(&t.fs, &t.paths, "slidev", entry, InstallScope::Global);
 
-    let err = promote("slidev", ArtifactKind::Skill, &t.ctx()).unwrap_err().to_string();
+    let err = promote("slidev", ArtifactKind::Skill, None, &t.ctx()).unwrap_err().to_string();
     assert!(err.contains("'guidelines' source"), "names the git source: {err}");
     assert!(err.contains("update slidev --force"), "offers the discard path: {err}");
 }
@@ -125,13 +177,13 @@ fn promote_rejects_untracked_artifact_with_guidance() {
     let t = TestContext::new();
     place_skill(&t, Platform::Claude, "loose", "hand authored");
 
-    let err = promote("loose", ArtifactKind::Skill, &t.ctx()).unwrap_err().to_string();
+    let err = promote("loose", ArtifactKind::Skill, None, &t.ctx()).unwrap_err().to_string();
     assert!(err.contains("adopt loose"), "steers a hand-authored artifact to adopt: {err}");
 }
 
 #[test]
 fn promote_errors_when_not_installed() {
     let t = TestContext::new();
-    let err = promote("ghost", ArtifactKind::Skill, &t.ctx()).unwrap_err().to_string();
+    let err = promote("ghost", ArtifactKind::Skill, None, &t.ctx()).unwrap_err().to_string();
     assert!(err.contains("No installed skill named 'ghost'"), "got: {err}");
 }

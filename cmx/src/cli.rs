@@ -179,8 +179,10 @@ pub enum ArtifactAction {
     },
     /// Promote in-place edits of an installed artifact back into the canonical
     /// home — the mirror of `update`. Use after editing a skill where it's
-    /// installed, to make those edits the canonical copy. Promotes the copy
-    /// `cmx diff` shows (global scope preferred, then project).
+    /// installed, to make those edits the canonical copy. By default cmx picks
+    /// the copy that was edited in place (the drifted one); if several platforms
+    /// diverge, pass `--platform <name>` to choose which copy wins. Inspect the
+    /// divergence first with `cmx <kind> diff <name>`.
     Promote {
         /// Artifact name to promote into the home
         name: String,

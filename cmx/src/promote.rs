@@ -17,7 +17,8 @@
 //! (e.g. Codex TOML) are rejected too: the installed copy is no longer the
 //! canonical markdown the home holds.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use crate::adopt::{HOME_SOURCE, ensure_home_source, resolve_home};
@@ -61,10 +62,19 @@ pub struct PromoteResult {
 
 /// Promote the installed copy of `name` into the canonical home.
 ///
-/// Operates on the copy `cmx diff` shows — global scope preferred, then local.
+/// When `selector` names a platform (`--platform`), that platform's copy is
+/// canonicalized. Otherwise the copy is chosen by **drift**: the one edited in
+/// place since install. No drifted copy is a no-op; several that disagree is
+/// ambiguous and asks the user to pick with `--platform`.
+///
 /// Rejects artifacts sourced from a registered git source (home-only for now)
 /// and agents whose active platform reformats them away from markdown.
-pub fn promote(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<PromoteResult> {
+pub fn promote(
+    name: &str,
+    kind: ArtifactKind,
+    selector: Option<Platform>,
+    ctx: &AppContext<'_>,
+) -> Result<PromoteResult> {
     if kind == ArtifactKind::Agent && ctx.paths.platform.transforms_agent_to_toml() {
         bail!(
             "Can't promote '{name}': the active platform stores agents as transformed TOML, not \
@@ -72,28 +82,27 @@ pub fn promote(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<P
         );
     }
 
-    // The installed copy to canonicalize — the same one `diff` compares.
-    let (installed_path, scope) = config::find_installed_path(name, kind, ctx.fs, ctx.paths)
-        .with_context(|| format!("No installed {kind} named '{name}' found on disk."))?;
-
-    // Promote targets the home, so the artifact must already be tracked from
-    // `home`. A git-sourced or untracked artifact is steered elsewhere.
-    let home_tracked = home_tracked_platforms(name, kind, scope, ctx)?;
-    if home_tracked.is_empty() {
-        bail!(non_home_guidance(name, kind, scope, ctx)?);
-    }
-
+    // Where the canonical copy lives (and its current bytes, if any), resolved up
+    // front so drift-aware selection can compare candidates against it.
     let home = resolve_home(ctx)?;
-    ensure_home_source(&home, ctx)?;
     let dest_dir = home.join(kind.subdir_name());
     let home_path = kind.installed_path(name, &dest_dir, ArtifactKind::HOME_AGENT_EXT);
-
-    let installed_cs = checksum::checksum_artifact(&installed_path, kind, ctx.fs)?;
     let home_cs = ctx
         .fs
         .exists(&home_path)
         .then(|| checksum::checksum_artifact(&home_path, kind, ctx.fs))
         .transpose()?;
+
+    // Choose the copy to canonicalize and the platforms whose baseline to refresh.
+    // Agents are reformatted per platform, so a cross-platform byte comparison is
+    // meaningless — they stay single-copy on the active platform. Skills can live
+    // on several platforms, so we choose by drift.
+    let (installed_path, scope, home_tracked) = match kind {
+        ArtifactKind::Agent => select_agent_copy(name, ctx)?,
+        ArtifactKind::Skill => select_skill_copy(name, selector, home_cs.as_deref(), ctx)?,
+    };
+
+    let installed_cs = checksum::checksum_artifact(&installed_path, kind, ctx.fs)?;
 
     let version = ctx
         .fs
@@ -112,6 +121,8 @@ pub fn promote(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<P
             still_divergent: Vec::new(),
         });
     }
+
+    ensure_home_source(&home, ctx)?;
 
     // Replace the home copy with the installed one (remove first so files
     // deleted from the installed copy don't linger in the home).
@@ -153,6 +164,185 @@ pub fn promote(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<P
         retracked: home_tracked,
         still_divergent,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Copy selection
+// ---------------------------------------------------------------------------
+
+/// One physical skill copy tracked from the home, shared by ≥1 platform.
+struct HomeCopy {
+    path: PathBuf,
+    checksum: String,
+    platforms: Vec<Platform>,
+    /// The installed bytes differ from the lock baseline — edited in place.
+    drifted: bool,
+}
+
+/// Single-copy selection for agents: the active platform's copy. Agents are
+/// reformatted per platform, so there is no meaningful cross-platform copy set.
+fn select_agent_copy(
+    name: &str,
+    ctx: &AppContext<'_>,
+) -> Result<(PathBuf, InstallScope, Vec<Platform>)> {
+    let (installed_path, scope) =
+        config::find_installed_path(name, ArtifactKind::Agent, ctx.fs, ctx.paths)
+            .with_context(|| format!("No installed agent named '{name}' found on disk."))?;
+    let home_tracked = home_tracked_platforms(name, ArtifactKind::Agent, scope, ctx)?;
+    if home_tracked.is_empty() {
+        bail!(non_home_guidance(name, ArtifactKind::Agent, scope, ctx)?);
+    }
+    Ok((installed_path, scope, home_tracked))
+}
+
+/// Drift-aware selection for skills across every home-tracked platform.
+fn select_skill_copy(
+    name: &str,
+    selector: Option<Platform>,
+    home_cs: Option<&str>,
+    ctx: &AppContext<'_>,
+) -> Result<(PathBuf, InstallScope, Vec<Platform>)> {
+    let (scope, copies) = resolve_home_copies(name, ctx)?;
+    if copies.is_empty() {
+        // Installed-but-not-home-tracked, or not installed at all: reuse the
+        // pointed guidance (git-sourced → edit clone / update --force; untracked
+        // → adopt; missing → not-installed).
+        let (_p, s) = config::find_installed_path(name, ArtifactKind::Skill, ctx.fs, ctx.paths)
+            .with_context(|| format!("No installed skill named '{name}' found on disk."))?;
+        bail!(non_home_guidance(name, ArtifactKind::Skill, s, ctx)?);
+    }
+    let path = choose_copy(name, selector, &copies, home_cs, ctx)?;
+    let home_tracked = copies.iter().flat_map(|c| c.platforms.iter().copied()).collect();
+    Ok((path, scope, home_tracked))
+}
+
+/// The scope the skill lives at, plus one [`HomeCopy`] per distinct install
+/// directory among the home-tracked platforms (the shared `.agents` dir
+/// collapses several platforms into one). Global scope wins over local.
+fn resolve_home_copies(name: &str, ctx: &AppContext<'_>) -> Result<(InstallScope, Vec<HomeCopy>)> {
+    for scope in InstallScope::ALL {
+        let mut by_dir: BTreeMap<PathBuf, HomeCopy> = BTreeMap::new();
+        for view in platform_iter::views_for(ctx.paths, platform_iter::all(), ArtifactKind::Skill) {
+            let lock = lockfile::load(scope, ctx.fs, &view.paths)?;
+            let Some(entry) = lock.packages.get(name) else {
+                continue;
+            };
+            if entry.source.repo != HOME_SOURCE {
+                continue;
+            }
+            let Some(path) = view.paths.installed_artifact_path(ArtifactKind::Skill, name, scope)
+            else {
+                continue;
+            };
+            if !ctx.fs.exists(&path) {
+                continue;
+            }
+            if let Some(existing) = by_dir.get_mut(&path) {
+                existing.platforms.push(view.platform);
+                existing.drifted |= existing.checksum != entry.installed_checksum;
+            } else {
+                let checksum = checksum::checksum_artifact(&path, ArtifactKind::Skill, ctx.fs)?;
+                let drifted = checksum != entry.installed_checksum;
+                by_dir.insert(
+                    path.clone(),
+                    HomeCopy {
+                        path,
+                        checksum,
+                        platforms: vec![view.platform],
+                        drifted,
+                    },
+                );
+            }
+        }
+        if !by_dir.is_empty() {
+            return Ok((scope, by_dir.into_values().collect()));
+        }
+    }
+    Ok((InstallScope::Global, Vec::new()))
+}
+
+/// Pick which copy to canonicalize. An explicit `--platform` wins; otherwise the
+/// single drifted (edited-in-place) copy is chosen. Zero drifted copies is a
+/// no-op — or a refusal when the home diverged elsewhere; two or more that
+/// disagree is ambiguous and asks the user to pick.
+fn choose_copy(
+    name: &str,
+    selector: Option<Platform>,
+    copies: &[HomeCopy],
+    home_cs: Option<&str>,
+    ctx: &AppContext<'_>,
+) -> Result<PathBuf> {
+    if let Some(p) = selector {
+        return copies
+            .iter()
+            .find(|c| c.platforms.contains(&p))
+            .map(|c| c.path.clone())
+            .ok_or_else(|| {
+                anyhow!(
+                    "'{name}' isn't installed and home-tracked on platform '{p}'. It's \
+                     home-tracked on: {}. Promote from one of those, or drop --platform to \
+                     auto-select the edited copy.",
+                    platform_list(copies)
+                )
+            });
+    }
+
+    let drifted: Vec<&HomeCopy> = copies.iter().filter(|c| c.drifted).collect();
+    let distinct: BTreeSet<&str> = drifted.iter().map(|c| c.checksum.as_str()).collect();
+    match distinct.len() {
+        0 => {
+            let rep = representative(copies, ctx.paths.platform);
+            if home_cs.is_none() || home_cs == Some(rep.checksum.as_str()) {
+                Ok(rep.path.clone())
+            } else {
+                bail!(
+                    "No in-place edits detected on any platform — nothing to promote. The home \
+                     already differs from the installed copies (it was changed elsewhere). Run \
+                     `cmx skill update {name} --force` to pull the home over the installs, or \
+                     `cmx skill promote {name} --platform <name>` to force a specific copy into \
+                     the home."
+                )
+            }
+        }
+        1 => Ok(drifted[0].path.clone()),
+        _ => bail!(
+            "Multiple platforms have diverging in-place edits: {}. cmx can't tell which should \
+             become the canonical home copy. Inspect them with `cmx skill diff {name}`, then \
+             promote the one you want with `cmx skill promote {name} --platform <name>`.",
+            drifted_labels(&drifted, ctx.paths.platform)
+        ),
+    }
+}
+
+/// The copy read by the active platform, else the first (deterministic by path).
+fn representative(copies: &[HomeCopy], active: Platform) -> &HomeCopy {
+    copies.iter().find(|c| c.platforms.contains(&active)).unwrap_or(&copies[0])
+}
+
+/// Comma-joined platform names across all copies, for guidance messages.
+fn platform_list(copies: &[HomeCopy]) -> String {
+    copies
+        .iter()
+        .flat_map(|c| c.platforms.iter())
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// One representative platform label per drifted copy, for the ambiguity message
+/// (the active platform when it reads a copy, else that copy's first platform).
+fn drifted_labels(drifted: &[&HomeCopy], active: Platform) -> String {
+    drifted
+        .iter()
+        .map(|c| {
+            if c.platforms.contains(&active) {
+                active.to_string()
+            } else {
+                c.platforms[0].to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 // ---------------------------------------------------------------------------

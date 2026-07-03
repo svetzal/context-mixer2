@@ -322,7 +322,7 @@ fn handle_artifact(
             Ok(ExitCode::SUCCESS)
         }
         ArtifactAction::Promote { name } => {
-            let result = cmx::promote::promote(&name, kind, ctx)?;
+            let result = cmx::promote::promote(&name, kind, selector, ctx)?;
             print!("{result}");
             Ok(ExitCode::SUCCESS)
         }
