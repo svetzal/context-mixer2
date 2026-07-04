@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-07-04
+
 ### Added
 
 - **`cmx init`** — cmx now installs its own companion agent skill through the shared `cmx-core` library, the same embeddable installer other fleet tools (parite, foundry) use. Global scope by default (a companion skill describes the tool, not the project); `--local` installs into the current project instead; `--force` overrides the newer-installed refusal; `--remove` uninstalls; `--json` emits a machine-readable report (the first `cmx` command to do so — every other command is human-text only); `--global` is a no-op alias kept for one release. cmx becomes a dogfooding consumer of its own embeddable installer.
