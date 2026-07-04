@@ -46,20 +46,35 @@ pub enum Commands {
         #[arg(long)]
         all: bool,
     },
-    /// Survey the whole system installation across every platform (read-only)
+    /// Survey the whole system installation across every platform
+    ///
+    /// The survey itself is read-only: it mutates nothing and exists purely to
+    /// make a disorganized installation visible. `--adopt-all` is a deprecated
+    /// mutating shortcut kept for one release (see its own help).
+    ///
+    /// Exit codes:
+    ///   0 - no issues found
+    ///   2 - actionable issues found (drifted, untracked, orphaned, missing, or
+    ///       diverged artifacts)
+    #[command(verbatim_doc_comment)]
     Doctor {
         /// Also survey project (local) scope, not just global
         #[arg(long)]
         local: bool,
-        /// Adopt every orphaned artifact into the canonical home (mutating)
+        /// Adopt every orphaned artifact into the canonical home (deprecated;
+        /// use `cmx <kind> adopt --all`)
         #[arg(long = "adopt-all")]
         adopt_all: bool,
         /// With --adopt-all, only adopt orphans under this install directory
+        /// (deprecated; use `--from` on `cmx <kind> adopt --all`)
         #[arg(long)]
         from: Option<PathBuf>,
         /// Show the full inventory, not just artifacts that need attention
         #[arg(long)]
         all: bool,
+        /// Emit machine-readable JSON instead of human-formatted output
+        #[arg(long)]
+        json: bool,
     },
     /// Manage the canonical home for hand-authored artifacts
     Home {

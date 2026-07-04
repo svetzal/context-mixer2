@@ -104,7 +104,8 @@ and pointed at `sync`.
 | `cmx doctor` | Survey every platform; show only what needs attention (read-only) |
 | `cmx doctor --all` | Show the full inventory, not just problems |
 | `cmx doctor --local` | Also include project (local) scope in the survey |
-| `cmx doctor --adopt-all` | Adopt every orphaned artifact into the canonical home |
+| `cmx doctor --json` | Emit the survey as machine-readable JSON to stdout |
+| `cmx doctor --adopt-all` | Adopt every orphaned artifact into the canonical home (deprecated; use `cmx <kind> adopt --all`) |
 | `cmx init` | Install cmx's own companion agent skill (global scope by default) |
 
 ### `cmx info`
@@ -174,17 +175,68 @@ summary names which copy is where:
   • hopper-coordinator diverges: ~/.agents/skills @ 3.2.0, ~/.claude/skills @ 3.3.0
 ```
 
-Re-sync a divergence with the tool that fits its provenance, which `doctor`'s
-hint names for you: `cmx skill sync <name>` (or `--from <platform>`) to reconcile
-copies **between install locations** — the right move for an `external` or
-source-less skill — or `cmx <kind> update <name> --force` / `cmx <kind> promote
-<name>` when the artifact is tracked from a source or the home. `cmx skill diff
-<name>` shows exactly which copy differs first.
+Re-sync a divergence with the tool that fits its provenance. Doctor's hint is
+case-directed so you can pick the right command by situation:
+
+- source- or home-backed, edited in place → `cmx skill promote <name>`
+- source-backed, restore from source → `cmx skill update <name> --force`
+- external / source-less → `cmx skill sync <name>` (or `--from <platform>`)
+- not sure? inspect first → `cmx skill diff <name>`
+
+#### Exit codes
 
 `doctor` exits non-zero (`2`) when it finds drift, untracked, orphaned, missing,
 or diverged artifacts, so it is usable in a pre-commit hook or CI check. A
 *consistent* `tracked` or `external` artifact never fails it — only a genuine
-anomaly does.
+anomaly does. This holds for both the human and `--json` output:
+
+| Exit code | Meaning |
+|-----------|---------|
+| `0` | no issues found |
+| `2` | actionable issues found (drifted, untracked, orphaned, missing, or diverged artifacts) |
+
+#### `cmx doctor --json`
+
+`--json` prints the survey as a single JSON document to **stdout only** — no
+human table, no prose. Any warnings (like the `--adopt-all` deprecation notice
+below) still go to stderr, so `cmx doctor --json | jq .` always sees clean JSON.
+The shape mirrors the human view:
+
+```json
+{
+  "scope": "global",
+  "platforms_surveyed": 13,
+  "showing": "needs_attention",
+  "summary": {
+    "tracked": 40, "drifted": 1, "untracked": 0,
+    "orphaned": 1, "external": 8, "missing": 0, "diverged": 4
+  },
+  "artifacts": [
+    {
+      "kind": "skill",
+      "name": "hopper-coordinator",
+      "scope": "global",
+      "state": "external",
+      "versions": ["3.2.0", "3.3.0"],
+      "source": null,
+      "tools": [],
+      "diverged": true,
+      "locations": [
+        { "path": "~/.agents/skills", "version": "3.2.0", "state": "external" },
+        { "path": "~/.claude/skills", "version": "3.3.0", "state": "external" }
+      ]
+    }
+  ]
+}
+```
+
+`showing` reflects the same selection the human table would use — `--all`
+switches it from `"needs_attention"` to `"all"` and includes healthy artifacts
+too. An artifact carries `version` when every copy agrees, or `versions` (an
+array) when they diverge — same rule as the human table's `Version` column.
+Every artifact's `locations` array replaces the human view's free-text
+"diverges: ..." line with structured `{path, version, state}` entries, so a
+script never has to parse prose to find where copies disagree.
 
 ### `cmx init`
 
@@ -221,7 +273,8 @@ named `home`.
 | `cmx skill adopt <name>...` | Adopt one or more named orphaned skills into the home |
 | `cmx agent adopt <name>...` | Adopt one or more named orphaned agents into the home |
 | `cmx skill adopt --all [--from <dir>]` | Adopt all orphaned skills, optionally only those under `<dir>` |
-| `cmx doctor --adopt-all [--from <dir>]` | Adopt every orphan the survey finds (both kinds), optionally scoped to `<dir>` |
+| `cmx agent adopt --all [--from <dir>]` | Adopt all orphaned agents, optionally only those under `<dir>` |
+| `cmx doctor --adopt-all [--from <dir>]` | **Deprecated** — adopt every orphan the survey finds (both kinds), optionally scoped to `<dir>`; prints a stderr warning and will be removed in the next major version. Use `cmx skill adopt --all` / `cmx agent adopt --all` instead. |
 
 Adoption acts **only on orphaned** artifacts. Naming an untracked
 (source-available) artifact steers you to `install`; an already-tracked or
@@ -240,7 +293,8 @@ The original file is left exactly where it was.
 
 ```text
 cmx doctor                 # see what's orphaned
-cmx doctor --adopt-all     # canonicalize the orphaned private artifacts
+cmx skill adopt --all      # canonicalize the orphaned private skills
+cmx agent adopt --all      # canonicalize the orphaned private agents
 cmx skill install --all --platform opencode   # project the home to a new tool
 ```
 

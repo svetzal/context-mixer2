@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`cmx doctor --json`** emits the full survey as machine-readable JSON to stdout (human table and prose suppressed; warnings still go to stderr). The schema mirrors the human output: `scope`, `platforms_surveyed`, `showing` (`"needs_attention"` or `"all"`, matching `--all`), a `summary` object with the same seven counts as the human "Summary:" line, and an `artifacts` array with structured `locations` (`path`/`version`/`state`) for diverged artifacts in place of the free-text "diverges: ..." prose. Exit codes are unchanged: `2` when there are actionable issues, `0` when clean.
+
+### Changed
+
+- **`cmx doctor`'s diverged-artifact guidance** is now scannable and case-directed — short branches by situation (source-/home-backed edited in place → `promote`; source-backed restore → `update --force`; external/source-less → `sync`; not sure → `diff`) instead of one dense paragraph. The underlying `promote`/`update`/`sync` commands are unchanged; this is wording only.
+
+### Deprecated
+
+- **`cmx doctor --adopt-all` / `--from`** are soft-deprecated: still functional this release, but now print a stderr warning steering to the canonical `cmx skill adopt --all` / `cmx agent adopt --all` (with `--from <dir>`), and will be removed in the next major version. `doctor`'s own orphaned-artifact hint no longer advertises `--adopt-all`.
+
 ## [2.11.0] - 2026-07-04
 
 ### Added

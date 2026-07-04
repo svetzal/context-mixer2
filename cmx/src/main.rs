@@ -55,17 +55,35 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             adopt_all,
             from,
             all,
+            json,
         } => {
             if adopt_all {
+                eprintln!("{}", cmx::display::doctor::adopt_all_deprecation_notice());
                 let outcome = cmx::adopt::adopt_all(None, from.as_deref(), local, ctx)?;
-                print!("{outcome}");
+                if json {
+                    let mut report = cmx::doctor::survey(local, ctx)?;
+                    report.show_all = all;
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&cmx::display::doctor::doctor_json(&report))?
+                    );
+                } else {
+                    print!("{outcome}");
+                }
                 Ok(ExitCode::SUCCESS)
             } else if from.is_some() {
                 bail!("--from only applies together with --adopt-all")
             } else {
                 let mut report = cmx::doctor::survey(local, ctx)?;
                 report.show_all = all;
-                print!("{report}");
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&cmx::display::doctor::doctor_json(&report))?
+                    );
+                } else {
+                    print!("{report}");
+                }
                 if report.has_issues() {
                     Ok(ExitCode::from(2))
                 } else {
@@ -808,6 +826,7 @@ mod tests {
                 adopt_all: false,
                 from: Some(PathBuf::from("/x")),
                 all: false,
+                json: false,
             },
         };
         assert!(run(cli, &ctx, &paths).is_err());
@@ -831,11 +850,37 @@ mod tests {
                 adopt_all: false,
                 from: None,
                 all: false,
+                json: false,
             },
         };
         let result = run(cli, &ctx, &paths);
         assert!(result.is_ok(), "expected Ok, not Err: {:?}", result.err());
         assert_eq!(result.unwrap(), ExitCode::from(2));
+    }
+
+    #[test]
+    fn run_doctor_adopt_all_still_adopts_despite_deprecation() {
+        // `--adopt-all` is soft-deprecated (prints a notice to stderr via
+        // `adopt_all_deprecation_notice`) but must keep working this release.
+        let (fs, git, clock, paths) = fake_trio();
+        fs.add_file(
+            "/home/testuser/.claude/agents/stray-agent.md",
+            "---\nname: stray-agent\ndescription: a stray agent\n---\n# stray-agent\n",
+        );
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let cli = Cli {
+            platform: Some(Platform::Claude),
+            command: Commands::Doctor {
+                local: false,
+                adopt_all: true,
+                from: None,
+                all: false,
+                json: false,
+            },
+        };
+        let result = run(cli, &ctx, &paths);
+        assert!(result.is_ok(), "expected Ok, not Err: {:?}", result.err());
+        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
     }
 
     #[test]

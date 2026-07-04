@@ -19,7 +19,7 @@ mod divergence;
 mod survey;
 mod types;
 
-pub use divergence::{DivergenceDetail, DivergenceMember, divergence_details};
+pub use divergence::{DivergenceDetail, DivergenceMember, divergence_details, location_members};
 pub use survey::survey;
 pub use types::{ArtifactState, DoctorArtifact, DoctorReport, DoctorRow, MissingRow, StateCounts};
 

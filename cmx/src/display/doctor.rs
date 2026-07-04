@@ -1,8 +1,84 @@
 use std::fmt;
 
-use crate::doctor::DoctorReport;
+use serde_json::{Value, json};
+
+use crate::doctor::{DoctorArtifact, DoctorReport};
 use crate::platform::platforms_label;
 use crate::table::Table;
+
+/// The artifacts this survey shows — the same selection whether rendered as
+/// the human table or projected to JSON. By default `doctor` shows only what
+/// needs attention (it's a doctor); `--all` shows the full inventory.
+fn shown_artifacts(report: &DoctorReport) -> Vec<&DoctorArtifact> {
+    if report.show_all {
+        report.artifacts.iter().collect()
+    } else {
+        report.artifacts.iter().filter(|a| DoctorReport::is_problem(a)).collect()
+    }
+}
+
+/// Message printed to stderr when `--adopt-all` is used: it is deprecated and
+/// will be removed in the next major release; the canonical replacement is the
+/// first-class `adopt` subcommand on each artifact kind.
+pub fn adopt_all_deprecation_notice() -> &'static str {
+    "warning: `cmx doctor --adopt-all` is deprecated and will be removed in the \
+     next major release. Use `cmx skill adopt --all` / `cmx agent adopt --all` \
+     instead (pass `--from <dir>` there in place of doctor's `--from`)."
+}
+
+/// Project the survey to the machine-readable schema documented for
+/// `cmx doctor --json`. Mirrors the human `Display` impl's content and
+/// selection (via [`shown_artifacts`]), but structures divergence as a
+/// `locations` array instead of free-text prose.
+pub fn doctor_json(report: &DoctorReport) -> Value {
+    let shown = shown_artifacts(report);
+    let c = report.counts();
+    let artifacts: Vec<Value> = shown
+        .iter()
+        .map(|a| {
+            let mut obj = json!({
+                "kind": a.kind.to_string(),
+                "name": a.name.clone(),
+                "scope": a.scope.label(),
+                "state": a.state.label(),
+                "source": a.source.clone(),
+                "tools": a.tools.iter().map(ToString::to_string).collect::<Vec<_>>(),
+                "diverged": a.diverged,
+                "locations": crate::doctor::location_members(a, &report.rows)
+                    .into_iter()
+                    .map(|m| json!({
+                        "path": m.location.display().to_string(),
+                        "version": m.version,
+                        "state": m.state_label,
+                    }))
+                    .collect::<Vec<_>>(),
+            });
+            let map = obj.as_object_mut().expect("json! object literal");
+            if let Some(version) = &a.version {
+                map.insert("version".to_string(), json!(version));
+            } else {
+                map.insert("versions".to_string(), json!(a.versions));
+            }
+            obj
+        })
+        .collect();
+
+    json!({
+        "scope": if report.included_local { "global+local" } else { "global" },
+        "platforms_surveyed": report.surveyed_platforms,
+        "showing": if report.show_all { "all" } else { "needs_attention" },
+        "summary": {
+            "tracked": c.tracked,
+            "drifted": c.drifted,
+            "untracked": c.untracked,
+            "orphaned": c.orphaned,
+            "external": c.external,
+            "missing": c.missing,
+            "diverged": c.diverged,
+        },
+        "artifacts": artifacts,
+    })
+}
 
 /// Build the artifact table from the given grouped logical artifacts — one row
 /// per skill, the Tools column listing every tool it's installed for.
@@ -73,7 +149,7 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
     let mut lines = Vec::new();
     if c.orphaned > 0 {
         lines.push(format!(
-            "  • {} orphaned artifact(s) have no source (hand-authored) — `cmx <kind> adopt <name>` (or `cmx doctor --adopt-all`) canonicalizes them into the home.",
+            "  • {} orphaned artifact(s) have no source (hand-authored) — `cmx <kind> adopt <name>` (or `cmx <kind> adopt --all`) canonicalizes them into the home.",
             c.orphaned
         ));
     }
@@ -97,7 +173,11 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
     }
     if c.diverged > 0 {
         lines.push(format!(
-            "  • {} artifact(s) diverge across their install locations (their content differs). For a skill tracked from a source or the home, make one copy canonical and re-project: `cmx skill promote <name>` (push in-place edits into the home) or `cmx skill update <name> --force` (restore from source). For source-less or external skills, reconcile between locations with `cmx skill sync <name>` (newest version wins, or `--from <platform>`). Inspect with `cmx skill diff <name>`.",
+            "  • {} artifact(s) diverge across their install locations (their content differs). Pick by your situation:\n\
+             \x20   - source- or home-backed, edited in place → `cmx skill promote <name>`\n\
+             \x20   - source-backed, restore from source      → `cmx skill update <name> --force`\n\
+             \x20   - external / source-less                  → `cmx skill sync <name>` (or `--from <platform>`)\n\
+             \x20   - not sure? inspect first                  → `cmx skill diff <name>`",
             c.diverged
         ));
     }
@@ -155,12 +235,8 @@ impl fmt::Display for DoctorReport {
         writeln!(f, "cmx doctor — {scope_desc}, {platform_note}.\n")?;
 
         // By default `doctor` shows only what needs attention — it's a doctor.
-        // `--all` shows the full inventory.
-        let shown: Vec<&crate::doctor::DoctorArtifact> = if self.show_all {
-            self.artifacts.iter().collect()
-        } else {
-            self.artifacts.iter().filter(|a| DoctorReport::is_problem(a)).collect()
-        };
+        // `--all` shows the full inventory. Same selection `doctor_json` uses.
+        let shown = shown_artifacts(self);
 
         if !shown.is_empty() {
             writeln!(
@@ -209,6 +285,7 @@ impl fmt::Display for DoctorReport {
 
 #[cfg(test)]
 mod tests {
+    use super::{adopt_all_deprecation_notice, doctor_json};
     use crate::doctor::{ArtifactState, DoctorArtifact, DoctorReport, MissingRow};
     use crate::platform::Platform;
     use crate::types::{ArtifactKind, InstallScope};
@@ -450,5 +527,115 @@ mod tests {
         assert!(!out.contains("clipboard"), "tracked artifact hidden by default: {out}");
         assert!(out.contains("everything cmx manages is healthy"), "healthy message: {out}");
         assert!(out.contains("1 tracked"), "summary still tallies it");
+    }
+
+    fn diverged_report_with_locations() -> DoctorReport {
+        use crate::doctor::DoctorRow;
+
+        let mk_row = |loc: &str, ver: &str, platform| DoctorRow {
+            kind: ArtifactKind::Skill,
+            name: "hopper-coordinator".to_string(),
+            scope: InstallScope::Global,
+            location: PathBuf::from(loc),
+            platforms: vec![platform],
+            tracked_for: vec![],
+            state: ArtifactState::External,
+            version: Some(ver.to_string()),
+            source: None,
+            content_checksum: format!("sha256:{ver}"),
+        };
+        let mut art = orphan_artifact("hopper-coordinator");
+        art.state = ArtifactState::External;
+        art.diverged = true;
+        art.version = None;
+        art.versions = vec!["3.2.0".to_string(), "3.3.0".to_string()];
+        art.locations = vec![
+            PathBuf::from("/u/.claude/skills"),
+            PathBuf::from("/u/.agents/skills"),
+        ];
+        DoctorReport {
+            rows: vec![
+                mk_row("/u/.claude/skills", "3.3.0", Platform::Claude),
+                mk_row("/u/.agents/skills", "3.2.0", Platform::Codex),
+            ],
+            artifacts: vec![art],
+            missing: vec![],
+            included_local: false,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
+            show_all: false,
+        }
+    }
+
+    #[test]
+    fn doctor_json_schema_pins_shape() {
+        let r = diverged_report_with_locations();
+        let value = doctor_json(&r);
+
+        assert_eq!(value["scope"], "global");
+        assert_eq!(value["platforms_surveyed"], 13);
+        assert_eq!(value["showing"], "needs_attention");
+
+        let summary = &value["summary"];
+        for key in [
+            "tracked",
+            "drifted",
+            "untracked",
+            "orphaned",
+            "external",
+            "missing",
+            "diverged",
+        ] {
+            assert!(summary.get(key).is_some(), "summary missing {key}: {value}");
+        }
+        assert_eq!(summary["diverged"], 1);
+
+        let artifacts = value["artifacts"].as_array().expect("artifacts array");
+        assert_eq!(artifacts.len(), 1);
+        let a = &artifacts[0];
+        assert_eq!(a["name"], "hopper-coordinator");
+        assert_eq!(a["diverged"], true);
+        assert_eq!(a["versions"], serde_json::json!(["3.2.0", "3.3.0"]));
+
+        let locations = a["locations"].as_array().expect("locations array");
+        assert_eq!(locations.len(), 2);
+        for loc in locations {
+            assert!(loc.get("path").is_some());
+            assert!(loc.get("version").is_some());
+            assert!(loc.get("state").is_some());
+        }
+    }
+
+    #[test]
+    fn doctor_json_showing_all() {
+        let mut r = diverged_report_with_locations();
+        r.artifacts.push(DoctorArtifact {
+            kind: ArtifactKind::Skill,
+            name: "clipboard".to_string(),
+            scope: InstallScope::Global,
+            state: ArtifactState::Tracked,
+            version: Some("1.0.0".to_string()),
+            versions: vec!["1.0.0".to_string()],
+            tools: vec![Platform::Claude],
+            source: Some("home".to_string()),
+            locations: vec![PathBuf::from("/a")],
+            diverged: false,
+        });
+        r.show_all = true;
+
+        let value = doctor_json(&r);
+        assert_eq!(value["showing"], "all");
+        let artifacts = value["artifacts"].as_array().expect("artifacts array");
+        assert_eq!(artifacts.len(), 2, "healthy tracked artifact included with --all: {value}");
+        assert!(artifacts.iter().any(|a| a["name"] == "clipboard"));
+    }
+
+    #[test]
+    fn adopt_all_deprecation_notice_steers_to_canonical() {
+        let notice = adopt_all_deprecation_notice();
+        assert!(notice.contains("deprecated"));
+        assert!(notice.contains("next major"));
+        assert!(notice.contains("cmx skill adopt --all"));
+        assert!(notice.contains("cmx agent adopt --all"));
     }
 }

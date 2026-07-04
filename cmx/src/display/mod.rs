@@ -2,7 +2,7 @@ mod adopt;
 mod config;
 #[cfg(feature = "llm")]
 mod diff;
-mod doctor;
+pub mod doctor;
 mod info;
 pub mod init;
 mod install;

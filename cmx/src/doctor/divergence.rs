@@ -20,6 +20,26 @@ pub struct DivergenceDetail {
     pub members: Vec<DivergenceMember>,
 }
 
+/// Build the per-location breakdown for one logical artifact — every row
+/// matching its `(kind, name, scope)`, sorted by location. Unfiltered by
+/// `diverged`: callers that only care about diverged artifacts filter before
+/// calling this; `doctor_json` wants the same shape for every artifact.
+pub fn location_members(artifact: &DoctorArtifact, rows: &[DoctorRow]) -> Vec<DivergenceMember> {
+    let mut members: Vec<&DoctorRow> = rows
+        .iter()
+        .filter(|r| r.kind == artifact.kind && r.name == artifact.name && r.scope == artifact.scope)
+        .collect();
+    members.sort_by(|x, y| x.location.cmp(&y.location));
+    members
+        .into_iter()
+        .map(|r| DivergenceMember {
+            location: r.location.clone(),
+            version: r.version.clone(),
+            state_label: r.state.label(),
+        })
+        .collect()
+}
+
 /// Build divergence details for every diverged artifact in `shown`.
 ///
 /// Pure function — no I/O. The display layer calls this to obtain the
@@ -29,28 +49,17 @@ pub fn divergence_details(shown: &[&DoctorArtifact], rows: &[DoctorRow]) -> Vec<
         .iter()
         .filter(|a| a.diverged)
         .map(|a| {
-            let mut members: Vec<&DoctorRow> = rows
-                .iter()
-                .filter(|r| r.kind == a.kind && r.name == a.name && r.scope == a.scope)
-                .collect();
-            members.sort_by(|x, y| x.location.cmp(&y.location));
+            let members = location_members(a, rows);
             let states_differ = members
                 .iter()
-                .map(|r| r.state.label())
+                .map(|m| m.state_label)
                 .collect::<std::collections::BTreeSet<_>>()
                 .len()
                 > 1;
             DivergenceDetail {
                 name: a.name.clone(),
                 states_differ,
-                members: members
-                    .into_iter()
-                    .map(|r| DivergenceMember {
-                        location: r.location.clone(),
-                        version: r.version.clone(),
-                        state_label: r.state.label(),
-                    })
-                    .collect(),
+                members,
             }
         })
         .collect()
