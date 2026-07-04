@@ -1,3 +1,6 @@
 /target
 /book/book
 /coverage
+
+# Coverage instrumentation runtime artifacts (tarpaulin/llvm-cov)
+*.profraw
