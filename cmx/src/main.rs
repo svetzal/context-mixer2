@@ -88,7 +88,53 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             Ok(ExitCode::SUCCESS)
         }
         Commands::Config { action } => handle_config(action, ctx).map(|()| ExitCode::SUCCESS),
+        Commands::Init {
+            local,
+            global: _,
+            force,
+            remove,
+            json,
+        } => handle_init(
+            InitArgs {
+                local,
+                force,
+                remove,
+                json,
+            },
+            ctx,
+        ),
     }
+}
+
+/// Flags for `cmx init`, grouped to keep `handle_init`'s signature under
+/// clippy's excessive-bool-parameters threshold. `--global` is destructured-
+/// and-ignored in `run` above: a no-op alias for one release, since global is
+/// already the default scope.
+///
+/// Four independent flags mirroring the clap `Init` variant 1:1 — not a state
+/// machine, so `clippy::struct_excessive_bools` is silenced deliberately here.
+#[derive(Clone, Copy)]
+#[allow(clippy::struct_excessive_bools)]
+struct InitArgs {
+    local: bool,
+    force: bool,
+    remove: bool,
+    json: bool,
+}
+
+/// `cmx init` — install/remove cmx's own companion skill via cmx-core.
+fn handle_init(args: InitArgs, ctx: &AppContext<'_>) -> Result<ExitCode> {
+    let outcome = if args.remove {
+        cmx::init::run_remove(args.local, ctx)?
+    } else {
+        cmx::init::run_init(args.local, args.force, ctx)?
+    };
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&cmx::display::init::init_json(&outcome))?);
+    } else {
+        print!("{outcome}");
+    }
+    Ok(outcome.exit_code())
 }
 
 fn handle_source(action: SourceAction, paths: &ConfigPaths, ctx: &AppContext<'_>) -> Result<()> {
@@ -790,5 +836,73 @@ mod tests {
         let result = run(cli, &ctx, &paths);
         assert!(result.is_ok(), "expected Ok, not Err: {:?}", result.err());
         assert_eq!(result.unwrap(), ExitCode::from(2));
+    }
+
+    #[test]
+    fn handle_init_installs_and_exits_success() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let args = InitArgs {
+            local: false,
+            force: false,
+            remove: false,
+            json: false,
+        };
+        let result = handle_init(args, &ctx);
+        assert!(result.is_ok(), "expected Ok, not Err: {:?}", result.err());
+        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+    }
+
+    #[test]
+    fn handle_init_json_flag_exits_success() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let args = InitArgs {
+            local: false,
+            force: false,
+            remove: false,
+            json: true,
+        };
+        let result = handle_init(args, &ctx);
+        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+    }
+
+    #[test]
+    fn handle_init_remove_after_install_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let install = InitArgs {
+            local: false,
+            force: false,
+            remove: false,
+            json: false,
+        };
+        assert!(handle_init(install, &ctx).is_ok());
+        let remove = InitArgs {
+            local: false,
+            force: false,
+            remove: true,
+            json: false,
+        };
+        let result = handle_init(remove, &ctx);
+        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+    }
+
+    #[test]
+    fn handle_init_global_force_exits_success() {
+        // Mirrors the fleet-wide registry contract: `<tool> init --global --force`
+        // must exit 0 (foundry's registry derives this invocation for
+        // skill-installing tools). `--global` is a no-op alias for `global`;
+        // `handle_init` never receives it (destructured-and-ignored in `run`).
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let args = InitArgs {
+            local: false,
+            force: true,
+            remove: false,
+            json: false,
+        };
+        let result = handle_init(args, &ctx);
+        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
     }
 }

@@ -4,6 +4,7 @@ mod config;
 mod diff;
 mod doctor;
 mod info;
+pub mod init;
 mod install;
 mod list;
 mod outdated;

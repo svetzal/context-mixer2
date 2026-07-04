@@ -105,6 +105,7 @@ and pointed at `sync`.
 | `cmx doctor --all` | Show the full inventory, not just problems |
 | `cmx doctor --local` | Also include project (local) scope in the survey |
 | `cmx doctor --adopt-all` | Adopt every orphaned artifact into the canonical home |
+| `cmx init` | Install cmx's own companion agent skill (global scope by default) |
 
 ### `cmx info`
 
@@ -184,6 +185,26 @@ source-less skill — or `cmx <kind> update <name> --force` / `cmx <kind> promot
 or diverged artifacts, so it is usable in a pre-commit hook or CI check. A
 *consistent* `tracked` or `external` artifact never fails it — only a genuine
 anomaly does.
+
+### `cmx init`
+
+`cmx init` installs cmx's own companion agent skill — the skill that teaches an
+agent to drive `cmx` itself — through the shared `cmx-core` library, the same
+embeddable installer other fleet tools (parite, foundry) use for their own
+companion skills.
+
+| Flag | Effect |
+|------|--------|
+| *(none)* | Install/update at **global scope** (`~/.claude/skills/cmx/`) — the default, since a companion skill describes the tool, not one project |
+| `--local` | Install into the current project (`.claude/skills/cmx/`) instead |
+| `--force` | Overwrite even if the installed copy is a *newer* version than the bundled one (otherwise refused) |
+| `--remove` | Uninstall — removes the skill directory and clears its lock entry (leaves the shared `cmx-lock.json` in place) |
+| `--json` | Emit a machine-readable report instead of human text — the only `cmx` command that does, today |
+| `--global` | Accepted as a no-op alias; global is already the default |
+
+Re-running `cmx init` when the installed copy is already current reports a
+skip. `cmx init --global --force` always exits `0`, matching the fleet-wide
+registry contract other tools' automation depends on.
 
 ## Canonical home & adoption
 

@@ -83,6 +83,27 @@ pub enum Commands {
         #[command(subcommand)]
         action: ConfigAction,
     },
+    /// Install cmx's own companion agent skill (global scope by default).
+    ///
+    /// Example: `cmx init` installs the `cmx` skill into `~/.claude/skills/`;
+    /// `cmx init --local` installs into `.claude/skills/` in the current project.
+    Init {
+        /// Install into .claude/skills/ in the current project instead of ~/.claude/skills/
+        #[arg(long)]
+        local: bool,
+        /// Deprecated: global is now the default. Accepted but ignored for one release.
+        #[arg(long, hide = true)]
+        global: bool,
+        /// Overwrite even if the installed version is newer than the bundled version
+        #[arg(long)]
+        force: bool,
+        /// Uninstall the cmx companion skill
+        #[arg(long)]
+        remove: bool,
+        /// Emit machine-readable JSON instead of human-formatted output
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -509,6 +530,64 @@ mod tests {
     fn parse_doctor() {
         let cli = Cli::try_parse_from(["cmx", "doctor"]).unwrap();
         assert!(matches!(cli.command, Commands::Doctor { .. }));
+    }
+
+    #[test]
+    fn parse_init_defaults() {
+        let cli = Cli::try_parse_from(["cmx", "init"]).unwrap();
+        match cli.command {
+            Commands::Init {
+                local,
+                global,
+                force,
+                remove,
+                json,
+            } => {
+                assert!(!local);
+                assert!(!global);
+                assert!(!force);
+                assert!(!remove);
+                assert!(!json);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_init_all_flags() {
+        let cli = Cli::try_parse_from([
+            "cmx", "init", "--local", "--global", "--force", "--remove", "--json",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Init {
+                local,
+                global,
+                force,
+                remove,
+                json,
+            } => {
+                assert!(local);
+                assert!(global);
+                assert!(force);
+                assert!(remove);
+                assert!(json);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_init_distinct_from_home_init() {
+        let init = Cli::try_parse_from(["cmx", "init"]).unwrap();
+        let home_init = Cli::try_parse_from(["cmx", "home", "init"]).unwrap();
+        assert!(matches!(init.command, Commands::Init { .. }));
+        assert!(matches!(
+            home_init.command,
+            Commands::Home {
+                action: HomeAction::Init
+            }
+        ));
     }
 
     #[test]
