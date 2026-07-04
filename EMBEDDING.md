@@ -1,29 +1,12 @@
-# EMBEDDING.md — the cmx-core library extraction
+# EMBEDDING.md — cmx-core, the embeddable skill-installation library
 
-**Status: cmx-core 0.1.0 PUBLISHED to crates.io 2026-07-03** — after two proving consumers (parite single-file, foundry multi-file) and an API-stabilization pass driven by their friction reports. Original phase-1 note follows.
+**Status: cmx-core 0.1.0 published to crates.io (2026-07-03), with two production consumers (parite, foundry) on the published release.** Remaining roadmap: behavioral spec + conformance fixtures, then Python and TypeScript ports. See "What remains" below.
 
-**PHASE 1 SHIPPED 2026-07-03** — `cmx-core` crate extracted (`3e1924d`) and the embeddable `SkillInstaller` API added (`1004cdb`); decisions below are implemented. One deliberate deviation from the original sketch: `install`/`copy`/`adopt` stayed in the cmx crate, because they transitively depend on `scan → scan_marketplace → plugin_types` (excluded from core by decision 5) — cmx-core carries the clean lower layer (types, platform, paths, gateways, lockfile, checksum, config) plus its own self-contained `skill_fs`/`skill_install` path. Next: migrate parite's `init` to cmx-core, then spec + conformance fixtures, then Python/TypeScript ports.
+## Why this exists
 
-This document imagines the path from cmx-the-CLI to cmx-the-library: a reusable core that our other CLI tools embed to install their companion agent skills, instead of each hand-rolling its own mechanism.
+Our CLI tools ship companion agent skills, and before this work every one of them had invented its own installation machinery (surveyed 2026-07-03): parite, gilt, hopper, hone, researcher, and foundry each hand-rolled the same idea — parse a frontmatter version, compare semver, copy files into a hard-wired `.claude/skills/<name>/` — while diverging on everything cosmetic (`skill-init` vs `init`; four different frontmatter version keys). None could uninstall, none knew any platform besides Claude, and none integrated with cmx: on a cmx-managed system, `cmx doctor` saw every one of these skills as an untracked orphan. evt had no skill at all.
 
-## The problem
-
-Our CLI tools ship companion agent skills, and every one of them has invented its own installation machinery (surveyed 2026-07-03):
-
-| Tool | Command | Embed method | Version guard | cmx-aware | Uninstall |
-| ---- | ------- | ------------ | ------------- | --------- | --------- |
-| parite (Rust) | `parite init` | `include_str!` | hand-rolled semver | no | none |
-| gilt (Python) | `gilt skill-init` | package paths | hand-rolled semver | no | none |
-| hopper (Bun/TS) | `hopper init` | Bun text import | hand-rolled semver | no | none |
-| hone (Bun/TS) | `hone init` | Bun text import | hand-rolled semver | no | none |
-| researcher (Python) | `researcher init` | importlib.resources | hand-rolled semver | no | none |
-| evt (Python) | *(no skill yet)* | — | — | — | — |
-
-Five independent implementations of the same idea: parse frontmatter version, compare semver, copy files into a hard-wired `.claude/skills/<name>/` under either `$HOME` or the project root. Each is subtly different (`skill-init` vs `init`; different frontmatter version keys: `hopper-version:`, `hone-version:`, `researcher-version:`, `metadata.version`). None can uninstall. None knows about any platform other than Claude. And none integrates with cmx — on a cmx-managed system, `cmx doctor` sees every one of these skills as an untracked orphan.
-
-## The vision
-
-A tool bundles its skill and makes one library call:
+cmx-core replaces all of that with one library call:
 
 ```text
 "Here is my skill (name, version, files). Install it at this scope.
@@ -33,65 +16,64 @@ A tool bundles its skill and makes one library call:
 The library:
 
 1. **Detects cmx management.** If the machine or project is cmx-managed (config/lockfiles present), it registers the bundled skill as a source and records a proper lock entry — the skill becomes a first-class tracked artifact that `cmx doctor`, `cmx update`, and `cmx list` all understand.
-2. **Falls back gracefully.** With no cmx present, it performs the platform-aware, version-guarded copy the tools each hand-roll today — but consistently, and it *still writes the lock entry*. The lockfile format, not the cmx binary, is the integration contract: a later `cmx` arrival finds everything already tracked instead of orphaned.
-3. **Plans before applying.** Consistent with our CLI UX conventions (guidelines repo, `conventions/cli-ux.md`): the install can be rendered as a dry-run plan, names each file and destination, and reports what changed in countable terms.
-4. **Uninstalls.** Tools finally get `<tool> init --remove` (or equivalent) for free, honoring "leave the machine as you found it."
+2. **Falls back gracefully.** With no cmx present, it performs the platform-aware, version-guarded copy consistently — and it *still writes the lock entry*. The lockfile format, not the cmx binary, is the integration contract: a later `cmx` arrival finds everything already tracked instead of orphaned.
+3. **Plans before applying.** Consistent with our CLI UX conventions (guidelines repo, `conventions/cli-ux.md`): the install renders as a dry-run plan naming each file and destination, and the report states what changed in countable terms. Plan, report, and remove-report all carry `Display` impls so every embedding tool prints identical-shaped output.
+4. **Uninstalls.** Tools get `<tool> init --remove` for free, honoring "leave the machine as you found it."
 
 This preserves the tools-stay-independent rule (Operations `AGENTS.md`): tools depend on a *library* and share state through a *schema'd lockfile* — a neutral artifact. No tool shells out to the `cmx` CLI; cmx could be deleted and every tool still installs its skill correctly.
 
-## What exists already
+## What shipped (2026-07-03)
 
-cmx is well-positioned for this (architecture reviewed 2026-07-03):
+### The crate
 
-- `cmx/src/lib.rs` already exports the needed modules publicly: `types` (Artifact, LockFile, LockEntry, InstallScope), `platform` (14 platforms with per-platform install paths), `paths` (ConfigPaths), `install`, `lockfile`, `copy`, `checksum`, `adopt`.
-- I/O is already behind gateway traits (`gateway::Filesystem`, `Clock`, `GitClient`) bundled in `AppContext` — the testability seam an embeddable library needs.
-- The lockfile format (`cmx-lock.json` / `cmx-lock-<platform>.json`) already carries provenance (source repo + path) and dual checksums (source vs installed) for drift detection.
+`cmx-core` is a workspace member of this repo and the reference implementation, published to crates.io. **It versions independently of the cmx CLI** (the CLI stays on the workspace version; the crate started at 0.1.0) because embedders pin the library's API, which stabilizes on its own schedule.
 
-Gaps the extraction must close:
+- **Extraction** (`3e1924d`): the clean lower layer moved out of the cmx binary — `types`, `platform` (14 platforms), `paths`, `gateway`/`context`, `lockfile`, `checksum`, `config`. One deliberate deviation from the original sketch: `install`/`copy`/`adopt` **stayed in the cmx crate**, because they transitively depend on `scan → scan_marketplace → plugin_types`, which decision 5 excludes from core. cmx-core instead carries its own self-contained `skill_fs`/`skill_install` path.
+- **Embeddable API** (`1004cdb`): `SkillInstaller` (`plan`/`apply`/`status`/`remove`), `ToolIdentity`, `BundledSkill`, `ProductionContext` factory, public managed-platform target resolution.
+- **API stabilization** (`e30003e`, breaking, pre-0.1.0): driven by the first consumer's friction report — one-call `ProductionContext::claude()`, `BundledSkill::single_md`, `ToolIdentity::new`, `Display` on plan/report/remove, unified `Vec<TargetOutcome>` report shape (destinations on skips; drift-detected skips rendered distinctly as "local edits preserved"), `#[non_exhaustive]` `TargetAction`.
+- **Final ergonomics** (`3bfd35b`): `SkillFile::text(rel_path, content)` for multi-file `include_str!` bundles; README sections on multi-file bundles and the `test-support` dev-dependency pattern.
 
-- **No high-level orchestrator** for "register bundled source → install to managed platforms → record lock entry." `install::install()` assumes a pre-registered source.
-- **No production `AppContext` factory** — only tests construct one conveniently.
-- **No public "is this platform managed here?" query** — the logic is internal to `resolve_targets()`.
-- **No uninstall path** at all.
+The canonical API documentation is [cmx-core/README.md](cmx-core/README.md) (rendered on crates.io). The API sketch that used to live here is retired — the README's example is compiled and tested.
 
-## Proposed shape
+### Publishing
 
-### The API surface (deliberately small)
+- Tag scheme: `cmx-core-v<version>` (distinct from the CLI's `v*` release tags).
+- Workflow: `.github/workflows/publish-cmx-core.yml` — full quality gate, tag-vs-crate-version consistency check, then `cargo publish` using the `CRATES_IO_TOKEN` repo secret (same pattern as mojentic-ru).
+- `cmx` and `cmf` are explicitly `publish = false`; only the library can reach crates.io.
 
-```rust
-// One-call context for Claude Code tools (use from_env(Platform::X) for others)
-let prod_ctx = ProductionContext::claude()?;
-let ctx = prod_ctx.ctx();
+### Proving consumers
 
-let skill = BundledSkill::single_md(include_str!("../skills/parite/SKILL.md"));
-let installer = SkillInstaller::new(ToolIdentity::new("parite", "1.4.0"));
-let plan = installer.plan(&skill, Scope::Global, false, &ctx)?; // dry-run: renderable, precise
-println!("{plan}");
-let report = installer.apply(&skill, &plan, &ctx)?;             // copy + lock entry
-println!("{report}");
-installer.status(Scope::Global, &ctx)?;                         // installed? version? drifted?
-installer.remove(Scope::Global, &ctx)?;                         // uninstall + lock cleanup
-```
+Both migrations ran as autonomous hopper engineering items, each required to file a candid "cmx-core API friction" report — those reports drove the stabilization pass, and **this consumer-files-friction-report pattern should be repeated for each port's first consumer**.
 
-Plan/apply as first-class API mirrors the `--apply` convention, so tools can expose `mytool init --dry-run` trivially. The version-guard semantics (older→update, same→skip, newer→refuse unless forced) are standardized once, matching what all five tools independently converged on.
+| Consumer | Exercised | Notes |
+| -------- | --------- | ----- |
+| parite (`parite init`) | single-file bundle, first contact with the raw API | friction report produced the `e30003e` stabilization; now on published 0.1.0 |
+| foundry (`foundry init`) | multi-file bundle (SKILL.md + 2 references), deletion of in-content version stamping | registry contract preserved: `{binary} init --global --force` (the invocation foundry's registry derives for skill-installing tools) still exits 0; `--json` schema unchanged; now on published 0.1.0 |
 
-### Packaging across ecosystems
+Both tools adopted the settled `init` conventions: **global scope by default**, `--local` for project scope, `--global` as a temporary no-op alias, `--force` to override the newer-installed refusal, `--remove` to uninstall. Both deleted their hand-rolled per-target rendering in favor of the crate's `Display` impls.
 
-Targets align with the mojentic framework's ports: **Rust, Python, TypeScript, Elixir, Swift, Kotlin**. Proposed approach:
+### Fleet status
 
-1. **`cmx-core` Rust crate** (crates.io) — extracted from cmx within this workspace; the reference implementation. The `cmx` binary becomes its first consumer.
-2. **A compact behavioral spec** — lockfile schema, path-resolution rules, version-guard semantics, cmx-detection rules — plus shared conformance fixtures (golden lockfiles, before/after directory trees). This is what makes ports *ports* rather than divergent cousins, the same discipline as mojentic's PARITY.md.
-3. **Native ports, demand-driven** — Python (`cmx-core` on PyPI: gilt, researcher, evt) and TypeScript (npm: hopper, hone) are needed immediately. Elixir/Swift/Kotlin follow when a tool in that ecosystem ships a skill, keeping parity with mojentic's target list without building ahead of need.
+| Tool | Skill install today | Status |
+| ---- | ------------------- | ------ |
+| parite (Rust) | cmx-core 0.1.0 (crates.io) | **migrated** |
+| foundry (Rust) | cmx-core 0.1.0 (crates.io) | **migrated** |
+| gilt (Python) | hand-rolled (`gilt skill-init`) | awaiting Python port |
+| researcher (Python) | hand-rolled (`researcher init`) | awaiting Python port |
+| hopper (Bun/TS) | hand-rolled (`hopper init`) | awaiting TypeScript port |
+| hone (Bun/TS) | hand-rolled (`hone init`) | awaiting TypeScript port |
+| evt (Python) | no skill yet | gains its first skill with the Python port |
 
-Native ports over FFI bindings: the domain is file copying, JSON lockfiles, and semver comparison — small enough that a port is cheaper than dragging a Rust toolchain into gilt's pure-Python build or complicating hopper's `bun build --compile` single-binary story. The conformance suite carries the correctness burden.
+## What remains
 
-### Migration path
+Targets align with the mojentic framework's ports: **Rust, Python, TypeScript, Elixir, Swift, Kotlin** — native ports over FFI bindings, because the domain (file copying, JSON lockfiles, semver comparison) is small enough that a port is cheaper than dragging a Rust toolchain into gilt's pure-Python build or complicating hopper's `bun build --compile` single-binary story. The conformance suite carries the correctness burden.
 
-1. **Extract** `cmx-core` as a workspace crate; move `types`, `paths`, `platform`, `install`, `lockfile`, `copy`, `checksum`, `gateway` into it; add the orchestrator API, context factory, managed-platform query, and uninstall. `cmx` CLI consumes it.
-2. **Prove it in-ecosystem**: migrate parite's `init` (Rust) to `cmx-core`. This validates the embeddable API against a real consumer before any porting begins.
-3. **Write the spec + conformance fixtures** from the now-stable Rust behavior.
-4. **Port** to Python and TypeScript; migrate gilt, researcher, hopper, hone. Standardize the command (`<tool> init`; gilt's `skill-init` folds into this) and the frontmatter version key (`metadata.version`, per the guidelines repo's baseline standards).
-5. **Close the gaps**: evt gains a skill; foundry's registry `installs_skill` keeps working unchanged (it just invokes each tool's `init`, which now runs through cmx-core underneath).
+1. **Behavioral spec + conformance fixtures** — distilled from the now-stable Rust behavior: lockfile schema, path-resolution rules, version-guard semantics, cmx-detection rules, plus golden fixtures (lockfiles, before/after directory trees). This is what makes ports *ports* rather than divergent cousins — the same discipline as mojentic's PARITY.md. Judgment-heavy (what is contract vs. implementation detail); review the spec before queueing ports against it.
+2. **Python port** (`cmx-core` on PyPI) — migrate gilt (folding `skill-init` into `init` per decision 3), researcher, and give evt its first skill. First consumer files a friction report before the PyPI publish, mirroring the Rust sequence.
+3. **TypeScript port** (npm) — migrate hopper and hone; same friction-report gate before the npm publish.
+4. **Elixir/Swift/Kotlin** — demand-driven: follow when a tool in that ecosystem ships a skill.
+5. **Retire the `--global` no-op aliases** in parite and foundry after one release cycle.
+6. **Optional, unscheduled**: unify cmx's own internal `install` path onto `skill_install` if it earns its keep.
 
 ## Decisions (reviewed with Stacey, 2026-07-03)
 
@@ -100,3 +82,18 @@ Native ports over FFI bindings: the domain is file copying, JSON lockfiles, and 
 3. **Command convention: `<tool> init`** — the standard companion-skill command across the fleet. gilt's `skill-init` folds into `init` during migration; codified in `conventions/cli-ux.md` §12.
 4. **Scope default: global** — skills install to the user's global platform directory (`~/.claude/skills/`, etc.) by default; `--local` opts into project scope. A tool's companion skill describes the tool, not the project.
 5. **cmf stays external for now** — the marketplace/manifest machinery (`plugin_types`) remains CLI-side; cmx-core carries only what embedding tools need.
+
+## Chronology
+
+| Commit | What |
+| ------ | ---- |
+| `477f7bc` | Design drafted |
+| `030ec9d` | Decisions reviewed and recorded |
+| `3e1924d` | cmx-core crate extracted (hopper `add773a7`) |
+| `1004cdb` | Embeddable API added (hopper `d4fcb146`) |
+| `524aa1c` | crates.io publishing established |
+| — | parite migrated, git-pinned (hopper `f9c7df3f`, parite `ea63f45` final) |
+| `e30003e` | API stabilized from parite friction report (hopper `77879e95`) |
+| — | foundry migrated, git-pinned (hopper `193942bc`, foundry `2616bd9` final) |
+| `3bfd35b` | `SkillFile::text` + docs; tagged `cmx-core-v0.1.0`, published |
+| — | Both consumers flipped to published 0.1.0 (hopper `c4827bc2`, `996da5fa`) |
