@@ -41,12 +41,12 @@ cmx source   {add,list,browse,update,remove}
 cmx set      {create,list,show,add,remove,activate,deactivate,delete,rename}
 cmx agent    {install,list,info,diff,update,sync,promote,uninstall,unadopt,adopt}
 cmx skill    {install,list,info,diff,update,sync,promote,uninstall,unadopt,adopt}
-cmx list     [--all]
+cmx list     [--all] [--json]
 cmx doctor   [--local] [--all] [--json]   (deprecated: --adopt-all, --from)
 cmx home     {init,path}
-cmx outdated
-cmx search   <query>
-cmx info     <name>
+cmx outdated [--json]
+cmx search   <query> [--json]
+cmx info     <name> [--json]
 cmx config   {show,gateway,model,external,platforms}
 cmx init     [--local] [--force] [--remove] [--json]
 ```
@@ -58,8 +58,8 @@ matches what you're managing.
 
 ```bash
 cmx source add <name> <path-or-url>   # register a local path or git URL
-cmx source list                       # show registered sources
-cmx source browse <name>              # list agents/skills available in a source
+cmx source list [--json]              # show registered sources
+cmx source browse <name> [--json]     # list agents/skills available in a source
 cmx source update [<name>]            # git pull registered sources (default: all)
 cmx source remove <name>              # unregister (does not delete installed artifacts)
 ```
@@ -75,8 +75,8 @@ hoarding installs or losing track of what you had.
 cmx set create <name> [--desc <text>] [--from <source>:<plugin>] [--local]
                                           # --from seeds membership from a marketplace
                                           # plugin's declared agents/skills (not installed yet)
-cmx set list                             # name, state, member count, context footprint
-cmx set show <name>                      # members + per-member source and install status
+cmx set list [--json]                    # name, state, member count, context footprint
+cmx set show <name> [--json]             # members + per-member source and install status
 cmx set add <name> <artifact>...         # snapshot already-installed artifacts into the set
 cmx set remove <name> <artifact>...      # drop from set (does NOT uninstall)
 cmx set activate <name>   [--dry-run]    # install every member = "turn this set on"
@@ -101,8 +101,8 @@ cmx skill install <name> [<name>...]     # install by name; `source:name` pins a
 cmx skill install --all                  # install everything available
 cmx skill install <name> --local         # install into the current project instead of globally
 cmx skill install <name> --force         # overwrite even if locally modified
-cmx skill list [--all]                   # installed skills (--all includes externally-managed ones)
-cmx skill info <name>                    # source, version, activation trigger; a generated
+cmx skill list [--all] [--json]          # installed skills (--all includes externally-managed ones)
+cmx skill info <name> [--json]           # source, version, activation trigger; a generated
                                           # "what it does" summary too, in an `llm`-feature build
 cmx skill uninstall <name> [<name>...] [--local]   # remove everywhere cmx tracks it
 ```
@@ -115,7 +115,7 @@ immediately. `cmx skill sync` is the one artifact subcommand with a
 ### Keeping things current
 
 ```bash
-cmx outdated                    # installed artifacts with a newer source version
+cmx outdated [--json]           # installed artifacts with a newer source version
 cmx skill update <name>         # pull the latest version from its source
 cmx skill update --all          # update every tracked skill
 cmx skill update <name> --force # overwrite even if locally modified
@@ -147,7 +147,7 @@ from any one assistant's install directory.
 
 ```bash
 cmx home init                   # create the canonical home, register it as the `home` source
-cmx home path                   # print the resolved canonical home directory
+cmx home path [--json]          # print the resolved canonical home directory
 cmx skill adopt <name> [<name>...] [--all] [--from <dir>] [--local]
                                  # bring an orphaned, hand-authored skill under the home
 cmx skill unadopt <name> [<name>...] [--external]
@@ -182,8 +182,8 @@ fix.
 ### Search and config
 
 ```bash
-cmx search <query>                       # keyword search across all sources
-cmx config show                          # current configuration
+cmx search <query> [--json]              # keyword search across all sources
+cmx config show [--json]                 # current configuration
 cmx config gateway <openai|ollama>       # set the LLM gateway (llm-feature build)
 cmx config model <name>                  # set the LLM model name
 cmx config external {list,add,remove}    # rules for artifacts another tool manages
@@ -194,12 +194,12 @@ cmx config platforms {list,add,remove}   # pin the managed platform set; when em
 
 ### `--json`
 
-`cmx init` and `cmx doctor` emit `--json`; every other command prints
-human-formatted text, so don't assume machine-readable output elsewhere.
-`cmx doctor --json` returns the full survey — `scope`, `platforms_surveyed`,
-`showing`, a `summary` counts object, and an `artifacts` array with structured
-`locations` for diverged artifacts — and still exits `2` when it finds
-actionable issues.
+Every read-only data-reporting command emits `--json`: `list`, kind-scoped
+`agent|skill list`, `outdated`, `search`, `info`, `source list`, `source
+browse`, `set list`, `set show`, `config show`, `home path`, plus `doctor`
+and `init`. Human-formatted output stays the default. JSON always goes to
+stdout, empty results stay valid JSON (`[]` or an object with empty arrays),
+and `cmx doctor --json` still exits `2` when it finds actionable issues.
 
 ### `cmx init` — cmx's own companion skill
 

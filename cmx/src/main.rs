@@ -1,10 +1,11 @@
 use anyhow::{Result, bail};
 use clap::Parser;
+use serde::Serialize;
 use std::process::ExitCode;
 
 use cmx::cli::{
-    ArtifactAction, Cli, Commands, ConfigAction, ExternalAction, HomeAction, PlatformsAction,
-    SetAction, SourceAction,
+    ArtifactAction, Cli, Commands, ConfigAction, ExternalAction, HomeAction, OutputArgs,
+    PlatformsAction, SetAction, SourceAction,
 };
 use cmx::context::AppContext;
 use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
@@ -46,9 +47,13 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
         Commands::Set { action } => handle_set(action, ctx),
         Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, selector, ctx),
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, selector, ctx),
-        Commands::List { all } => {
-            let output = cmx::list::list_all(all, ctx)?;
-            print!("{output}");
+        Commands::List { all, output } => {
+            let report = cmx::list::list_all(all, ctx)?;
+            if output.json {
+                print_json(&cmx::display::json::list_json(&report))?;
+            } else {
+                print!("{report}");
+            }
             Ok(ExitCode::SUCCESS)
         }
         Commands::Doctor {
@@ -56,18 +61,15 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             adopt_all,
             from,
             all,
-            json,
+            output,
         } => {
             if adopt_all {
                 eprintln!("{}", cmx::display::doctor::adopt_all_deprecation_notice());
                 let outcome = cmx::adopt::adopt_all(None, from.as_deref(), local, ctx)?;
-                if json {
+                if output.json {
                     let mut report = cmx::doctor::survey(local, ctx)?;
                     report.show_all = all;
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&cmx::display::doctor::doctor_json(&report))?
-                    );
+                    print_json(&cmx::display::doctor::doctor_json(&report))?;
                 } else {
                     print!("{outcome}");
                 }
@@ -77,11 +79,8 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             } else {
                 let mut report = cmx::doctor::survey(local, ctx)?;
                 report.show_all = all;
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&cmx::display::doctor::doctor_json(&report))?
-                    );
+                if output.json {
+                    print_json(&cmx::display::doctor::doctor_json(&report))?;
                 } else {
                     print!("{report}");
                 }
@@ -93,17 +92,27 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             }
         }
         Commands::Home { action } => handle_home(&action, ctx).map(|()| ExitCode::SUCCESS),
-        Commands::Info { name } => handle_info(&name, None, ctx).map(|()| ExitCode::SUCCESS),
-        Commands::Outdated => {
+        Commands::Info { name, output } => {
+            handle_info(&name, None, output.json, ctx).map(|()| ExitCode::SUCCESS)
+        }
+        Commands::Outdated { output } => {
             cmx::source_update::ensure_fresh(ctx)?;
             let report = cmx::outdated::outdated(ctx)?;
-            print!("{report}");
+            if output.json {
+                print_json(&cmx::display::json::outdated_json(&report))?;
+            } else {
+                print!("{report}");
+            }
             Ok(ExitCode::SUCCESS)
         }
-        Commands::Search { query } => {
+        Commands::Search { query, output } => {
             cmx::source_update::ensure_fresh(ctx)?;
-            let output = cmx::search::search(&query, ctx)?;
-            print!("{output}");
+            let results = cmx::search::search(&query, ctx)?;
+            if output.json {
+                print_json(&cmx::display::json::search_json(&results))?;
+            } else {
+                print!("{results}");
+            }
             Ok(ExitCode::SUCCESS)
         }
         Commands::Config { action } => handle_config(action, ctx).map(|()| ExitCode::SUCCESS),
@@ -112,17 +121,22 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             global: _,
             force,
             remove,
-            json,
+            output,
         } => handle_init(
             InitArgs {
                 local,
                 force,
                 remove,
-                json,
+                output,
             },
             ctx,
         ),
     }
+}
+
+fn print_json<T: Serialize>(value: &T) -> Result<()> {
+    println!("{}", serde_json::to_string_pretty(value)?);
+    Ok(())
 }
 
 /// Flags for `cmx init`, grouped to keep `handle_init`'s signature under
@@ -138,7 +152,7 @@ struct InitArgs {
     local: bool,
     force: bool,
     remove: bool,
-    json: bool,
+    output: OutputArgs,
 }
 
 /// `cmx init` — install/remove cmx's own companion skill via cmx-core.
@@ -148,8 +162,8 @@ fn handle_init(args: InitArgs, ctx: &AppContext<'_>) -> Result<ExitCode> {
     } else {
         cmx::init::run_init(args.local, args.force, ctx)?
     };
-    if args.json {
-        println!("{}", serde_json::to_string_pretty(&cmx::display::init::init_json(&outcome))?);
+    if args.output.json {
+        print_json(&cmx::display::init::init_json(&outcome))?;
     } else {
         print!("{outcome}");
     }
@@ -167,14 +181,22 @@ fn handle_source(action: SourceAction, paths: &ConfigPaths, ctx: &AppContext<'_>
             print!("{result}");
             Ok(())
         }
-        SourceAction::List => {
+        SourceAction::List { output } => {
             let result = cmx::source::list(ctx)?;
-            print!("{result}");
+            if output.json {
+                print_json(&cmx::display::json::source_list_json(&result))?;
+            } else {
+                print!("{result}");
+            }
             Ok(())
         }
-        SourceAction::Browse { name } => {
+        SourceAction::Browse { name, output } => {
             let result = cmx::source::browse(&name, ctx)?;
-            print!("{result}");
+            if output.json {
+                print_json(&cmx::display::json::source_browse_json(&result))?;
+            } else {
+                print!("{result}");
+            }
             Ok(())
         }
         SourceAction::Update { name } => {
@@ -197,93 +219,154 @@ fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
             desc,
             from,
             local,
-        } => {
-            let scope = scope_from(local);
-            let result = cmx::sets::create(&name, desc.as_deref(), from.as_deref(), scope, ctx)?;
-            print!("{result}");
-            Ok(ExitCode::SUCCESS)
-        }
-        SetAction::List { local } => {
-            let scope = scope_from(local);
-            let result = cmx::sets::list(scope, ctx)?;
-            print!("{result}");
-            Ok(ExitCode::SUCCESS)
-        }
-        SetAction::Show { name, local } => {
-            let scope = scope_from(local);
-            let result = cmx::sets::show(&name, scope, ctx)?;
-            print!("{result}");
-            Ok(ExitCode::SUCCESS)
-        }
+        } => handle_set_create(&name, desc.as_deref(), from.as_deref(), local, ctx),
+        SetAction::List { local, output } => handle_set_list(local, output, ctx),
+        SetAction::Show {
+            name,
+            local,
+            output,
+        } => handle_set_show(&name, local, output, ctx),
         SetAction::Add {
             name,
             artifacts,
             local,
-        } => {
-            let scope = scope_from(local);
-            let result = cmx::sets::add(&name, &artifacts, scope, ctx)?;
-            print!("{result}");
-            Ok(ExitCode::SUCCESS)
-        }
+        } => handle_set_add(&name, &artifacts, local, ctx),
         SetAction::Remove {
             name,
             artifacts,
             local,
-        } => {
-            let scope = scope_from(local);
-            let result = cmx::sets::remove(&name, &artifacts, scope, ctx)?;
-            print!("{result}");
-            Ok(ExitCode::SUCCESS)
-        }
+        } => handle_set_remove(&name, &artifacts, local, ctx),
         SetAction::Activate {
             name,
             dry_run,
             local,
-        } => {
-            let scope = scope_from(local);
-            let result = cmx::sets::activate(&name, dry_run, scope, ctx)?;
-            let any_failed = result.any_failed;
-            print!("{result}");
-            Ok(if any_failed {
-                ExitCode::FAILURE
-            } else {
-                ExitCode::SUCCESS
-            })
-        }
+        } => handle_set_activate(&name, dry_run, local, ctx),
         SetAction::Deactivate {
             name,
             dry_run,
             force,
             local,
-        } => {
-            let scope = scope_from(local);
-            let result = cmx::sets::deactivate(&name, force, dry_run, scope, ctx)?;
-            let any_blocked = result.any_blocked;
-            print!("{result}");
-            Ok(if any_blocked {
-                ExitCode::FAILURE
-            } else {
-                ExitCode::SUCCESS
-            })
-        }
+        } => handle_set_deactivate(&name, dry_run, force, local, ctx),
         SetAction::Delete {
             name,
             local,
             purge,
             force,
-        } => {
-            let scope = scope_from(local);
-            let result = cmx::sets::delete(&name, purge, force, scope, ctx)?;
-            print!("{result}");
-            Ok(ExitCode::SUCCESS)
-        }
-        SetAction::Rename { old, new, local } => {
-            let scope = scope_from(local);
-            let result = cmx::sets::rename(&old, &new, scope, ctx)?;
-            print!("{result}");
-            Ok(ExitCode::SUCCESS)
-        }
+        } => handle_set_delete(&name, local, purge, force, ctx),
+        SetAction::Rename { old, new, local } => handle_set_rename(&old, &new, local, ctx),
     }
+}
+
+fn handle_set_create(
+    name: &str,
+    desc: Option<&str>,
+    from: Option<&str>,
+    local: bool,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    let result = cmx::sets::create(name, desc, from, scope_from(local), ctx)?;
+    print!("{result}");
+    Ok(ExitCode::SUCCESS)
+}
+
+fn handle_set_list(local: bool, output: OutputArgs, ctx: &AppContext<'_>) -> Result<ExitCode> {
+    let scope = scope_from(local);
+    let result = cmx::sets::list(scope, ctx)?;
+    if output.json {
+        print_json(&cmx::display::json::set_list_json(&result, scope))?;
+    } else {
+        print!("{result}");
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn handle_set_show(
+    name: &str,
+    local: bool,
+    output: OutputArgs,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    let scope = scope_from(local);
+    let result = cmx::sets::show(name, scope, ctx)?;
+    if output.json {
+        print_json(&cmx::display::json::set_show_json(&result, scope))?;
+    } else {
+        print!("{result}");
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn handle_set_add(
+    name: &str,
+    artifacts: &[String],
+    local: bool,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    let result = cmx::sets::add(name, artifacts, scope_from(local), ctx)?;
+    print!("{result}");
+    Ok(ExitCode::SUCCESS)
+}
+
+fn handle_set_remove(
+    name: &str,
+    artifacts: &[String],
+    local: bool,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    let result = cmx::sets::remove(name, artifacts, scope_from(local), ctx)?;
+    print!("{result}");
+    Ok(ExitCode::SUCCESS)
+}
+
+fn handle_set_activate(
+    name: &str,
+    dry_run: bool,
+    local: bool,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    let result = cmx::sets::activate(name, dry_run, scope_from(local), ctx)?;
+    let any_failed = result.any_failed;
+    print!("{result}");
+    Ok(if any_failed {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    })
+}
+
+fn handle_set_deactivate(
+    name: &str,
+    dry_run: bool,
+    force: bool,
+    local: bool,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    let result = cmx::sets::deactivate(name, force, dry_run, scope_from(local), ctx)?;
+    let any_blocked = result.any_blocked;
+    print!("{result}");
+    Ok(if any_blocked {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    })
+}
+
+fn handle_set_delete(
+    name: &str,
+    local: bool,
+    purge: bool,
+    force: bool,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    let result = cmx::sets::delete(name, purge, force, scope_from(local), ctx)?;
+    print!("{result}");
+    Ok(ExitCode::SUCCESS)
+}
+
+fn handle_set_rename(old: &str, new: &str, local: bool, ctx: &AppContext<'_>) -> Result<ExitCode> {
+    let result = cmx::sets::rename(old, new, scope_from(local), ctx)?;
+    print!("{result}");
+    Ok(ExitCode::SUCCESS)
 }
 
 fn scope_from(local: bool) -> InstallScope {
@@ -302,9 +385,13 @@ fn handle_home(action: &HomeAction, ctx: &AppContext<'_>) -> Result<()> {
             println!("Registered as source '{}'.", cmx::adopt::HOME_SOURCE);
             Ok(())
         }
-        HomeAction::Path => {
+        HomeAction::Path { output } => {
             let home = cmx::adopt::home_path(ctx)?;
-            println!("{}", home.display());
+            if output.json {
+                print_json(&cmx::display::json::home_path_json(&home))?;
+            } else {
+                println!("{}", home.display());
+            }
             Ok(())
         }
     }
@@ -312,9 +399,13 @@ fn handle_home(action: &HomeAction, ctx: &AppContext<'_>) -> Result<()> {
 
 fn handle_config(action: ConfigAction, ctx: &AppContext<'_>) -> Result<()> {
     match action {
-        ConfigAction::Show => {
+        ConfigAction::Show { output } => {
             let result = cmx::cmx_config::show(ctx)?;
-            print!("{result}");
+            if output.json {
+                print_json(&cmx::display::json::config_show_json(&result))?;
+            } else {
+                print!("{result}");
+            }
             Ok(())
         }
         ConfigAction::Gateway { value } => {
@@ -355,7 +446,12 @@ fn handle_config(action: ConfigAction, ctx: &AppContext<'_>) -> Result<()> {
 /// In an `llm`-feature build with a configured gateway it also attaches a
 /// generated "what it does" summary, best-effort — a generation failure leaves
 /// the summary blank rather than failing the command.
-fn handle_info(name: &str, kind: Option<ArtifactKind>, ctx: &AppContext<'_>) -> Result<()> {
+fn handle_info(
+    name: &str,
+    kind: Option<ArtifactKind>,
+    json_output: bool,
+    ctx: &AppContext<'_>,
+) -> Result<()> {
     cmx::source_update::ensure_fresh(ctx)?;
     #[cfg_attr(not(feature = "llm"), allow(unused_mut))]
     let mut info = match kind {
@@ -375,7 +471,11 @@ fn handle_info(name: &str, kind: Option<ArtifactKind>, ctx: &AppContext<'_>) -> 
         }
     }
 
-    print!("{info}");
+    if json_output {
+        print_json(&cmx::display::json::info_json(&info))?;
+    } else {
+        print!("{info}");
+    }
     Ok(())
 }
 
@@ -486,13 +586,17 @@ fn handle_artifact(
             local,
             force,
         } => handle_install(&names, all, local, force, kind, selector, ctx),
-        ArtifactAction::List { all } => {
-            let output = cmx::list::list_kind(kind, all, ctx)?;
-            print!("{output}");
+        ArtifactAction::List { all, output } => {
+            let report = cmx::list::list_kind(kind, all, ctx)?;
+            if output.json {
+                print_json(&cmx::display::json::list_kind_json(&report))?;
+            } else {
+                print!("{report}");
+            }
             Ok(ExitCode::SUCCESS)
         }
-        ArtifactAction::Info { name } => {
-            handle_info(&name, Some(kind), ctx).map(|()| ExitCode::SUCCESS)
+        ArtifactAction::Info { name, output } => {
+            handle_info(&name, Some(kind), output.json, ctx).map(|()| ExitCode::SUCCESS)
         }
         ArtifactAction::Diff { name, full } => {
             cmx::source_update::ensure_fresh(ctx)?;
@@ -658,6 +762,10 @@ mod tests {
         (FakeFilesystem::new(), FakeGitClient::new(), FakeClock::at(Utc::now()), paths)
     }
 
+    fn no_json() -> OutputArgs {
+        OutputArgs { json: false }
+    }
+
     #[test]
     fn handle_artifact_install_empty_names_errors() {
         let (fs, git, clock, paths) = fake_trio();
@@ -751,7 +859,7 @@ mod tests {
     fn handle_config_show_default_config_ok() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        assert!(handle_config(ConfigAction::Show, &ctx).is_ok());
+        assert!(handle_config(ConfigAction::Show { output: no_json() }, &ctx).is_ok());
     }
 
     #[test]
@@ -837,7 +945,7 @@ mod tests {
     fn handle_home_path_ok() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        assert!(handle_home(&HomeAction::Path, &ctx).is_ok());
+        assert!(handle_home(&HomeAction::Path { output: no_json() }, &ctx).is_ok());
     }
 
     #[test]
@@ -851,14 +959,23 @@ mod tests {
     fn handle_source_list_ok() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        assert!(handle_source(SourceAction::List, &paths, &ctx).is_ok());
+        assert!(handle_source(SourceAction::List { output: no_json() }, &paths, &ctx).is_ok());
     }
 
     #[test]
     fn handle_set_list_ok() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        assert!(handle_set(SetAction::List { local: false }, &ctx).is_ok());
+        assert!(
+            handle_set(
+                SetAction::List {
+                    local: false,
+                    output: no_json(),
+                },
+                &ctx
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -882,6 +999,7 @@ mod tests {
                 SetAction::Show {
                     name: "rust-work".to_string(),
                     local: false,
+                    output: no_json(),
                 },
                 &ctx,
             )
@@ -1063,7 +1181,7 @@ mod tests {
     fn handle_info_unknown_errors() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        assert!(handle_info("nonexistent", None, &ctx).is_err());
+        assert!(handle_info("nonexistent", None, false, &ctx).is_err());
     }
 
     #[test]
@@ -1072,7 +1190,10 @@ mod tests {
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let cli = Cli {
             platform: Some(Platform::Claude),
-            command: Commands::List { all: false },
+            command: Commands::List {
+                all: false,
+                output: no_json(),
+            },
         };
         assert!(run(cli, &ctx, &paths).is_ok());
     }
@@ -1083,7 +1204,7 @@ mod tests {
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let cli = Cli {
             platform: Some(Platform::Claude),
-            command: Commands::Outdated,
+            command: Commands::Outdated { output: no_json() },
         };
         assert!(run(cli, &ctx, &paths).is_ok());
     }
@@ -1123,7 +1244,7 @@ mod tests {
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let cli = Cli {
             platform: Some(Platform::Claude),
-            command: Commands::Outdated,
+            command: Commands::Outdated { output: no_json() },
         };
         run(cli, &ctx, &paths).unwrap();
 
@@ -1159,6 +1280,7 @@ mod tests {
             platform: Some(Platform::Claude),
             command: Commands::Search {
                 query: "foo".to_string(),
+                output: no_json(),
             },
         };
         assert!(run(cli, &ctx, &paths).is_ok());
@@ -1175,7 +1297,7 @@ mod tests {
                 adopt_all: false,
                 from: Some(PathBuf::from("/x")),
                 all: false,
-                json: false,
+                output: no_json(),
             },
         };
         assert!(run(cli, &ctx, &paths).is_err());
@@ -1199,7 +1321,7 @@ mod tests {
                 adopt_all: false,
                 from: None,
                 all: false,
-                json: false,
+                output: no_json(),
             },
         };
         let result = run(cli, &ctx, &paths);
@@ -1237,7 +1359,7 @@ mod tests {
                 adopt_all: false,
                 from: None,
                 all: false,
-                json: false,
+                output: no_json(),
             },
         };
         let result = run(cli, &ctx, &paths);
@@ -1256,7 +1378,7 @@ mod tests {
                 adopt_all: false,
                 from: None,
                 all: false,
-                json: false,
+                output: no_json(),
             },
         };
         let result = run(cli, &ctx, &paths);
@@ -1281,7 +1403,7 @@ mod tests {
                 adopt_all: true,
                 from: None,
                 all: false,
-                json: false,
+                output: no_json(),
             },
         };
         let result = run(cli, &ctx, &paths);
@@ -1297,7 +1419,7 @@ mod tests {
             local: false,
             force: false,
             remove: false,
-            json: false,
+            output: no_json(),
         };
         let result = handle_init(args, &ctx);
         assert!(result.is_ok(), "expected Ok, not Err: {:?}", result.err());
@@ -1312,7 +1434,7 @@ mod tests {
             local: false,
             force: false,
             remove: false,
-            json: true,
+            output: OutputArgs { json: true },
         };
         let result = handle_init(args, &ctx);
         assert_eq!(result.unwrap(), ExitCode::SUCCESS);
@@ -1326,14 +1448,14 @@ mod tests {
             local: false,
             force: false,
             remove: false,
-            json: false,
+            output: no_json(),
         };
         assert!(handle_init(install, &ctx).is_ok());
         let remove = InitArgs {
             local: false,
             force: false,
             remove: true,
-            json: false,
+            output: no_json(),
         };
         let result = handle_init(remove, &ctx);
         assert_eq!(result.unwrap(), ExitCode::SUCCESS);
@@ -1351,7 +1473,7 @@ mod tests {
             local: false,
             force: true,
             remove: false,
-            json: false,
+            output: no_json(),
         };
         let result = handle_init(args, &ctx);
         assert_eq!(result.unwrap(), ExitCode::SUCCESS);

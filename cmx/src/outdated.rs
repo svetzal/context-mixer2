@@ -1,4 +1,5 @@
 use anyhow::Result;
+use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::artifact_status::source_outdated;
@@ -14,15 +15,18 @@ use crate::types::{ArtifactKind, InstallScope, LockFile, display_version};
 // Result types
 // ---------------------------------------------------------------------------
 
+#[derive(Clone, Debug, Serialize)]
 pub struct OutdatedRow {
     pub name: String,
     pub kind: ArtifactKind,
+    pub scope: InstallScope,
     pub installed_version: String,
     pub available_version: String,
     pub source: String,
     pub status: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
 pub struct OutdatedReport(pub Vec<OutdatedRow>);
 
 // ---------------------------------------------------------------------------
@@ -94,7 +98,7 @@ fn collect_outdated_for_scope_with(
         config::match_installed_to_sources(kind, scope, lock, source_artifacts, ctx.fs, ctx.paths)?;
     let names: Vec<&str> = pairs.iter().map(|(ia, _)| ia.name.as_str()).collect();
     let modifications = compute_modification_status(kind, scope, &names, lock, ctx)?;
-    rows.extend(compare_versions(kind, pairs, &modifications));
+    rows.extend(compare_versions(kind, scope, pairs, &modifications));
     Ok(())
 }
 
@@ -120,6 +124,7 @@ fn compute_modification_status(
 /// pre-loaded modification status.
 fn compare_versions(
     kind: ArtifactKind,
+    scope: InstallScope,
     pairs: Vec<InstalledWithSources<'_, SourceArtifactInfo>>,
     modifications: &HashMap<String, bool>,
 ) -> Vec<OutdatedRow> {
@@ -152,6 +157,7 @@ fn compare_versions(
             rows.push(OutdatedRow {
                 name: ia.name.clone(),
                 kind,
+                scope,
                 installed_version: display_version(installed_v.as_deref()).to_string(),
                 available_version: display_version(available_v.as_deref()).to_string(),
                 source: source_info.source_name.clone(),
@@ -213,9 +219,11 @@ mod tests {
         let pairs = vec![(ia, Some(&source_infos))];
         let modifications = HashMap::from([("my-agent".to_string(), false)]);
 
-        let rows = compare_versions(ArtifactKind::Agent, pairs, &modifications);
+        let rows =
+            compare_versions(ArtifactKind::Agent, InstallScope::Global, pairs, &modifications);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "my-agent");
+        assert_eq!(rows[0].scope, InstallScope::Global);
         assert_eq!(rows[0].available_version, "2.0.0");
         assert_eq!(rows[0].status, "update");
     }
@@ -252,7 +260,8 @@ mod tests {
         let pairs = vec![(ia, Some(&source_infos))];
         let modifications = HashMap::from([("my-agent".to_string(), true)]);
 
-        let rows = compare_versions(ArtifactKind::Agent, pairs, &modifications);
+        let rows =
+            compare_versions(ArtifactKind::Agent, InstallScope::Global, pairs, &modifications);
         assert_eq!(rows.len(), 1);
         assert!(
             rows[0].status.contains("modified"),
@@ -272,7 +281,8 @@ mod tests {
         let pairs: Vec<_> = vec![(ia, None)];
         let modifications = HashMap::new();
 
-        let rows = compare_versions(ArtifactKind::Agent, pairs, &modifications);
+        let rows =
+            compare_versions(ArtifactKind::Agent, InstallScope::Global, pairs, &modifications);
         assert!(rows.is_empty(), "orphan with no source should produce no rows");
         let _ = lock;
     }

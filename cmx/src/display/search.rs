@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::search::SearchOutput;
+use crate::search::truncate_description;
 
 use super::util;
 
@@ -17,7 +18,7 @@ impl fmt::Display for SearchOutput {
                     r.kind.clone(),
                     r.version.clone(),
                     r.source.clone(),
-                    r.description.clone(),
+                    truncate_description(&r.description, 80),
                 ]
             })
             .collect();

@@ -5,6 +5,7 @@ pub mod doctor;
 mod info;
 pub mod init;
 mod install;
+pub mod json;
 mod list;
 mod outdated;
 mod promote;

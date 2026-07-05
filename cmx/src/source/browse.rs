@@ -1,22 +1,31 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::gateway::DirEntry;
-use crate::types::{Artifact, ArtifactKind};
+use serde::Serialize;
 
+use crate::gateway::DirEntry;
+use crate::types::{Artifact, ArtifactKind, Deprecation};
+
+#[derive(Clone, Debug, Serialize)]
 pub struct BrowseArtifact {
     pub name: String,
     pub version: Option<String>,
+    pub description: String,
+    pub deprecation: Option<Deprecation>,
     pub deprecation_display: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
 pub struct BrowseSkill {
     pub name: String,
     pub version: Option<String>,
+    pub description: String,
+    pub deprecation: Option<Deprecation>,
     pub deprecation_display: String,
     pub files: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize)]
 pub struct SourceBrowseResult {
     pub source_name: String,
     pub agents: Vec<BrowseArtifact>,
@@ -33,6 +42,8 @@ pub(crate) fn build_browse_result(
         .map(|a| BrowseArtifact {
             name: a.name.clone(),
             version: a.version.clone(),
+            description: a.description.clone(),
+            deprecation: a.deprecation.clone(),
             deprecation_display: format_deprecation(a),
         })
         .collect();
@@ -78,6 +89,8 @@ fn build_browse_skill(artifact: &Artifact, files: Vec<String>) -> BrowseSkill {
     BrowseSkill {
         name: artifact.name.clone(),
         version: artifact.version.clone(),
+        description: artifact.description.clone(),
+        deprecation: artifact.deprecation.clone(),
         deprecation_display: format_deprecation(artifact),
         files,
     }

@@ -151,6 +151,8 @@ mod tests {
             agents: vec![BrowseArtifact {
                 name: "my-agent".to_string(),
                 version: Some("1.0.0".to_string()),
+                description: "desc".to_string(),
+                deprecation: None,
                 deprecation_display: String::new(),
             }],
             skills: vec![],
@@ -168,11 +170,15 @@ mod tests {
             agents: vec![BrowseArtifact {
                 name: "agent-x".to_string(),
                 version: None,
+                description: "desc".to_string(),
+                deprecation: None,
                 deprecation_display: String::new(),
             }],
             skills: vec![BrowseSkill {
                 name: "skill-y".to_string(),
                 version: None,
+                description: "desc".to_string(),
+                deprecation: None,
                 deprecation_display: String::new(),
                 files: vec!["tool.md".to_string()],
             }],

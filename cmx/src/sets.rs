@@ -9,6 +9,7 @@
 //! integration are Phase 3.
 
 use anyhow::{Result, bail};
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
@@ -33,7 +34,7 @@ pub struct SetCreateResult {
     pub seeded_from: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct SetListEntry {
     pub name: String,
     pub state: SetState,
@@ -45,12 +46,12 @@ pub struct SetListEntry {
     pub footprint_chars: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct SetListResult {
     pub entries: Vec<SetListEntry>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct SetMemberStatus {
     pub kind: ArtifactKind,
     pub name: String,
@@ -61,7 +62,7 @@ pub struct SetMemberStatus {
     pub footprint_chars: Option<usize>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct SetShowResult {
     pub name: String,
     pub description: Option<String>,

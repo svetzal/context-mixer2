@@ -1,10 +1,12 @@
 use anyhow::{Result, bail};
+use serde::Serialize;
 
 use crate::config;
 use crate::context::AppContext;
 use crate::platform::Platform;
 use crate::types::LlmGatewayType;
 
+#[derive(Clone, Debug, Serialize)]
 pub struct ConfigShowResult {
     pub gateway: String,
     pub model: String,

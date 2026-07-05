@@ -69,7 +69,7 @@ mod tests {
             installed: "1.0.0".to_string(),
             available: "1.0.0".to_string(),
             source: "src".to_string(),
-            tools: "claude".to_string(),
+            tools: vec!["claude".to_string()],
             status: "✅",
         }
     }

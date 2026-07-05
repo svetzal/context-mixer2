@@ -37,7 +37,7 @@ impl fmt::Display for OutdatedReport {
 mod tests {
     use super::*;
     use crate::outdated::OutdatedRow;
-    use crate::types::ArtifactKind;
+    use crate::types::{ArtifactKind, InstallScope};
 
     // --- Step 8: OutdatedReport ---
 
@@ -52,6 +52,7 @@ mod tests {
         let r = OutdatedReport(vec![OutdatedRow {
             name: "my-agent".to_string(),
             kind: ArtifactKind::Agent,
+            scope: InstallScope::Global,
             installed_version: "1.0.0".to_string(),
             available_version: "2.0.0".to_string(),
             source: "guidelines".to_string(),

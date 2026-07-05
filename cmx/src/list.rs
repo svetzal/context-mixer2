@@ -1,4 +1,5 @@
 use anyhow::Result;
+use serde::Serialize;
 use std::collections::BTreeMap;
 
 use crate::context::AppContext;
@@ -9,22 +10,25 @@ use crate::types::{ArtifactKind, InstallScope, display_version};
 
 /// One row in the listing — a logical artifact (grouped across the tools it's
 /// installed for, via [`crate::doctor`]).
+#[derive(Clone, Debug, Serialize)]
 pub struct Row {
     pub name: String,
     pub installed: String,
     pub available: String,
     /// The source it came from (repo name only, no path).
     pub source: String,
-    /// The tools cmx tracks it for, joined (e.g. `claude, codex`), or `-`.
-    pub tools: String,
+    /// The tools cmx tracks it for.
+    pub tools: Vec<String>,
     pub status: &'static str,
 }
 
+#[derive(Clone, Debug, Serialize)]
 pub struct ListKindOutput {
     pub kind: ArtifactKind,
     pub rows: BTreeMap<InstallScope, Vec<Row>>,
 }
 
+#[derive(Clone, Debug, Serialize)]
 pub struct ListOutput {
     pub agents: BTreeMap<InstallScope, Vec<Row>>,
     pub skills: BTreeMap<InstallScope, Vec<Row>>,
@@ -45,13 +49,21 @@ pub(crate) fn table_str(rows: &[Row]) -> String {
                     r.installed.clone(),
                     r.available.clone(),
                     r.source.clone(),
-                    r.tools.clone(),
+                    display_tools(&r.tools),
                     r.status.to_string(),
                 ]
             })
             .collect(),
     }
     .render()
+}
+
+pub(crate) fn display_tools(tools: &[String]) -> String {
+    if tools.is_empty() {
+        "-".to_string()
+    } else {
+        tools.join(", ")
+    }
 }
 
 pub(crate) fn section_str(label: &str, rows: &[Row]) -> String {
@@ -123,11 +135,7 @@ fn rows_by_scope(
         let deprecated = infos.is_some_and(|v| v.iter().any(|i| i.deprecated));
 
         let installed = a.version.as_deref();
-        let tools = if a.tools.is_empty() {
-            "-".to_string()
-        } else {
-            a.tools.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
-        };
+        let tools = a.tools.iter().map(ToString::to_string).collect::<Vec<_>>();
         by_scope.entry(a.scope).or_default().push(Row {
             name: a.name.clone(),
             installed: display_version(installed).to_string(),
@@ -169,7 +177,7 @@ mod tests {
             installed: "1.0.0".to_string(),
             available: "1.0.0".to_string(),
             source: "guidelines".to_string(),
-            tools: "claude".to_string(),
+            tools: vec!["claude".to_string()],
             status: "✅",
         }
     }
@@ -262,8 +270,9 @@ mod tests {
         let row = rows.iter().find(|r| r.name == "shared").expect("listed");
         assert_eq!(row.source, "guidelines", "source is the bare repo name, no path");
         assert!(
-            row.tools.contains("codex") && row.tools.contains("pi"),
-            "tools listed: {}",
+            row.tools.iter().any(|tool| tool == "codex")
+                && row.tools.iter().any(|tool| tool == "pi"),
+            "tools listed: {:?}",
             row.tools
         );
         assert_eq!(row.installed, "1.0.0");

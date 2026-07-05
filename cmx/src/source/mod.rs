@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -20,6 +21,7 @@ pub(crate) use browse::{build_browse_result, count_artifacts, dir_entry_names};
 
 pub use crate::scan::ScanWarning;
 
+#[derive(Clone, Debug)]
 pub struct SourceScanResult {
     pub name: String,
     pub agents_found: usize,
@@ -27,16 +29,19 @@ pub struct SourceScanResult {
     pub warnings: Vec<ScanWarning>,
 }
 
+#[derive(Clone, Debug, Serialize)]
 pub struct SourceListEntry {
     pub name: String,
     pub kind: &'static str,
     pub location: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
 pub struct SourceListResult {
     pub entries: Vec<SourceListEntry>,
 }
 
+#[derive(Clone, Debug)]
 pub struct SourceRemoveResult {
     pub name: String,
     pub clone_deleted: bool,

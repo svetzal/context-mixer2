@@ -113,7 +113,7 @@ pub enum SourceType {
     Git,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Artifact {
     pub kind: ArtifactKind,
     pub name: String,
@@ -123,7 +123,7 @@ pub struct Artifact {
     pub deprecation: Option<Deprecation>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Deprecation {
     pub reason: Option<String>,
     pub replacement: Option<String>,
@@ -168,7 +168,8 @@ pub struct LockSource {
     pub path: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum InstallScope {
     Global,
     Local,

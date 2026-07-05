@@ -1,4 +1,5 @@
 use anyhow::Result;
+use serde::Serialize;
 
 use crate::context::AppContext;
 use crate::source_iter;
@@ -8,6 +9,7 @@ use crate::types::display_version;
 // Result types
 // ---------------------------------------------------------------------------
 
+#[derive(Clone, Debug, Serialize)]
 pub struct SearchResult {
     pub name: String,
     pub kind: String,
@@ -16,6 +18,7 @@ pub struct SearchResult {
     pub description: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
 pub struct SearchOutput {
     pub results: Vec<SearchResult>,
     pub query: String,
@@ -34,14 +37,12 @@ pub fn search(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
         let desc_lower = sa.artifact.description.to_lowercase();
 
         if name_lower.contains(&query_lower) || desc_lower.contains(&query_lower) {
-            let short_desc = truncate_description(&sa.artifact.description, 80);
-
             results.push(SearchResult {
                 name: sa.artifact.name,
                 kind: sa.artifact.kind.to_string(),
                 version: display_version(sa.artifact.version.as_deref()).to_string(),
                 source: sa.source_name,
-                description: short_desc,
+                description: sa.artifact.description,
             });
         }
     }
@@ -56,7 +57,7 @@ pub fn search(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
 // Pure helpers
 // ---------------------------------------------------------------------------
 
-fn truncate_description(desc: &str, max_len: usize) -> String {
+pub(crate) fn truncate_description(desc: &str, max_len: usize) -> String {
     // Take the first line or sentence, handling escaped \n
     let first_part = desc
         .split("\\n")

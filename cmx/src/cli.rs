@@ -1,8 +1,15 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 use crate::platform::Platform;
+
+#[derive(Args, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct OutputArgs {
+    /// Emit machine-readable JSON instead of human-formatted output
+    #[arg(long)]
+    pub json: bool,
+}
 
 #[derive(Parser)]
 #[command(
@@ -51,6 +58,8 @@ pub enum Commands {
         /// Include external artifacts (managed by another tool)
         #[arg(long)]
         all: bool,
+        #[command(flatten)]
+        output: OutputArgs,
     },
     /// Survey the whole system installation across every platform
     ///
@@ -78,9 +87,8 @@ pub enum Commands {
         /// Show the full inventory, not just artifacts that need attention
         #[arg(long)]
         all: bool,
-        /// Emit machine-readable JSON instead of human-formatted output
-        #[arg(long)]
-        json: bool,
+        #[command(flatten)]
+        output: OutputArgs,
     },
     /// Manage the canonical home for hand-authored artifacts
     Home {
@@ -88,16 +96,23 @@ pub enum Commands {
         action: HomeAction,
     },
     /// Show installed artifacts that have updates available
-    Outdated,
+    Outdated {
+        #[command(flatten)]
+        output: OutputArgs,
+    },
     /// Search all sources for agents and skills by keyword
     Search {
         /// Keyword to search for in artifact names and descriptions
         query: String,
+        #[command(flatten)]
+        output: OutputArgs,
     },
     /// Show detailed metadata for an installed artifact
     Info {
         /// Artifact name
         name: String,
+        #[command(flatten)]
+        output: OutputArgs,
     },
     /// View or modify cmx configuration
     Config {
@@ -121,9 +136,8 @@ pub enum Commands {
         /// Uninstall the cmx companion skill
         #[arg(long)]
         remove: bool,
-        /// Emit machine-readable JSON instead of human-formatted output
-        #[arg(long)]
-        json: bool,
+        #[command(flatten)]
+        output: OutputArgs,
     },
 }
 
@@ -137,11 +151,16 @@ pub enum SourceAction {
         path_or_url: String,
     },
     /// List registered sources
-    List,
+    List {
+        #[command(flatten)]
+        output: OutputArgs,
+    },
     /// Show available agents and skills in a source
     Browse {
         /// Name of the source to browse
         name: String,
+        #[command(flatten)]
+        output: OutputArgs,
     },
     /// Fetch latest changes for git-backed sources
     Update {
@@ -176,6 +195,8 @@ pub enum SetAction {
         /// List project-scoped sets instead of global
         #[arg(long)]
         local: bool,
+        #[command(flatten)]
+        output: OutputArgs,
     },
     /// Show a set's description, state, and members
     Show {
@@ -184,6 +205,8 @@ pub enum SetAction {
         /// Look up the set in project scope instead of global
         #[arg(long)]
         local: bool,
+        #[command(flatten)]
+        output: OutputArgs,
     },
     /// Add installed artifact(s) to a set, resolving kind and source from the
     /// lockfile. Use `skill:name` / `agent:name` to disambiguate a name that
@@ -283,12 +306,16 @@ pub enum ArtifactAction {
         /// Include external artifacts (managed by another tool)
         #[arg(long)]
         all: bool,
+        #[command(flatten)]
+        output: OutputArgs,
     },
     /// Show key details for an installed artifact: source, version, when it
     /// activates, and (in an `llm`-feature build) a summary of what it does
     Info {
         /// Artifact name
         name: String,
+        #[command(flatten)]
+        output: OutputArgs,
     },
     /// Compare an installed artifact against its source and other installed
     /// copies (an `llm`-feature build additionally summarizes the diff)
@@ -373,13 +400,19 @@ pub enum HomeAction {
     /// Create the canonical home directory and register it as the `home` source
     Init,
     /// Print the resolved canonical home directory
-    Path,
+    Path {
+        #[command(flatten)]
+        output: OutputArgs,
+    },
 }
 
 #[derive(Subcommand)]
 pub enum ConfigAction {
     /// Show current configuration
-    Show,
+    Show {
+        #[command(flatten)]
+        output: OutputArgs,
+    },
     /// Set LLM gateway (openai or ollama)
     Gateway {
         /// Gateway type: openai or ollama
@@ -464,7 +497,9 @@ mod tests {
         assert!(matches!(
             cli.command,
             Commands::Source {
-                action: SourceAction::List
+                action: SourceAction::List {
+                    output: OutputArgs { json: false }
+                }
             }
         ));
     }
@@ -555,7 +590,10 @@ mod tests {
         assert!(matches!(
             cli.command,
             Commands::Set {
-                action: SetAction::List { local: false }
+                action: SetAction::List {
+                    local: false,
+                    output: OutputArgs { json: false }
+                }
             }
         ));
     }
@@ -565,10 +603,16 @@ mod tests {
         let cli = Cli::try_parse_from(["cmx", "set", "show", "rust-work"]).unwrap();
         match cli.command {
             Commands::Set {
-                action: SetAction::Show { name, local },
+                action:
+                    SetAction::Show {
+                        name,
+                        local,
+                        output,
+                    },
             } => {
                 assert_eq!(name, "rust-work");
                 assert!(!local);
+                assert!(!output.json);
             }
             _ => panic!("expected Set Show"),
         }
@@ -739,9 +783,10 @@ mod tests {
         let cli = Cli::try_parse_from(["cmx", "skill", "info", "my-skill"]).unwrap();
         match cli.command {
             Commands::Skill {
-                action: ArtifactAction::Info { name },
+                action: ArtifactAction::Info { name, output },
             } => {
                 assert_eq!(name, "my-skill");
+                assert!(!output.json);
             }
             _ => panic!("unexpected command"),
         }
@@ -753,7 +798,9 @@ mod tests {
         assert!(matches!(
             cli.command,
             Commands::Config {
-                action: ConfigAction::Show
+                action: ConfigAction::Show {
+                    output: OutputArgs { json: false }
+                }
             }
         ));
     }
@@ -806,14 +853,22 @@ mod tests {
     #[test]
     fn parse_outdated() {
         let cli = Cli::try_parse_from(["cmx", "outdated"]).unwrap();
-        assert!(matches!(cli.command, Commands::Outdated));
+        assert!(matches!(
+            cli.command,
+            Commands::Outdated {
+                output: OutputArgs { json: false }
+            }
+        ));
     }
 
     #[test]
     fn parse_search() {
         let cli = Cli::try_parse_from(["cmx", "search", "foo"]).unwrap();
         match cli.command {
-            Commands::Search { query } => assert_eq!(query, "foo"),
+            Commands::Search { query, output } => {
+                assert_eq!(query, "foo");
+                assert!(!output.json);
+            }
             _ => panic!("unexpected command"),
         }
     }
@@ -822,7 +877,10 @@ mod tests {
     fn parse_info() {
         let cli = Cli::try_parse_from(["cmx", "info", "myagent"]).unwrap();
         match cli.command {
-            Commands::Info { name } => assert_eq!(name, "myagent"),
+            Commands::Info { name, output } => {
+                assert_eq!(name, "myagent");
+                assert!(!output.json);
+            }
             _ => panic!("unexpected command"),
         }
     }
@@ -844,7 +902,9 @@ mod tests {
         assert!(matches!(
             cli.command,
             Commands::Home {
-                action: HomeAction::Path
+                action: HomeAction::Path {
+                    output: OutputArgs { json: false }
+                }
             }
         ));
     }
@@ -864,13 +924,13 @@ mod tests {
                 global,
                 force,
                 remove,
-                json,
+                output,
             } => {
                 assert!(!local);
                 assert!(!global);
                 assert!(!force);
                 assert!(!remove);
-                assert!(!json);
+                assert!(!output.json);
             }
             _ => panic!("unexpected command"),
         }
@@ -888,13 +948,13 @@ mod tests {
                 global,
                 force,
                 remove,
-                json,
+                output,
             } => {
                 assert!(local);
                 assert!(global);
                 assert!(force);
                 assert!(remove);
-                assert!(json);
+                assert!(output.json);
             }
             _ => panic!("unexpected command"),
         }

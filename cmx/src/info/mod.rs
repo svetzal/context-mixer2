@@ -1,4 +1,5 @@
 use anyhow::{Result, bail};
+use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 use crate::artifact_status;
@@ -48,7 +49,7 @@ pub struct ArtifactInfo {
     pub summary_error: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct SkillFileEntry {
     pub name: String,
     pub is_dir: bool,
