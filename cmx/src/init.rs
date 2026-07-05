@@ -10,7 +10,9 @@ use cmx_core::skill_install::{
     BundledSkill, RemoveReport, Report, Scope, SkillInstaller, TargetAction, ToolIdentity,
 };
 
-/// The companion skill bundled into the `cmx` binary.
+/// The companion skill bundled into the `cmx` binary. Its frontmatter carries a
+/// placeholder `metadata.version` that is stamped to the cmx binary version at
+/// install time — see [`stamp_version`].
 const SKILL_CONTENT: &str = include_str!("../skill/SKILL.md");
 
 /// Map the `--local` flag onto a `cmx-core` [`Scope`]. Global is the default.
@@ -18,8 +20,46 @@ fn scope_from_flags(local: bool) -> Scope {
     if local { Scope::Local } else { Scope::Global }
 }
 
+/// Stamp the cmx binary version (`CARGO_PKG_VERSION`, the workspace version)
+/// into the bundled skill's frontmatter `metadata.version`, locking the skill's
+/// declared version to the cmx release rather than hand-maintaining it.
+///
+/// cmx-core already tracks the install by the same `CARGO_PKG_VERSION` (via
+/// [`ToolIdentity`]); the frontmatter is *also* read when the installed skill is
+/// scanned as a source artifact (`scan::frontmatter`), so leaving it out of step
+/// produces an internal version inconsistency, not merely a cosmetic one. This
+/// keeps the single source of truth the workspace `Cargo.toml` version.
+///
+/// Replaces the first indented `version:` line inside the leading `---` fenced
+/// frontmatter block, preserving its indentation.
+fn stamp_version(content: &str) -> String {
+    let version = env!("CARGO_PKG_VERSION");
+    let mut out = String::with_capacity(content.len() + 8);
+    let mut fences = 0u8;
+    let mut stamped = false;
+    for line in content.lines() {
+        if line.trim() == "---" {
+            fences += 1;
+        } else if fences == 1 && !stamped {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("version:") {
+                let indent = &line[..line.len() - trimmed.len()];
+                out.push_str(indent);
+                out.push_str("version: \"");
+                out.push_str(version);
+                out.push_str("\"\n");
+                stamped = true;
+                continue;
+            }
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
 fn bundled_skill() -> BundledSkill {
-    BundledSkill::single_md(SKILL_CONTENT)
+    BundledSkill::single_md(&stamp_version(SKILL_CONTENT))
 }
 
 fn make_installer() -> SkillInstaller {
@@ -91,6 +131,35 @@ mod tests {
     use cmx_core::platform::Platform;
     use cmx_core::test_support::{TestContext, make_lock_entry_versioned, save_lock_with_entry};
     use cmx_core::types::{ArtifactKind, InstallScope};
+
+    #[test]
+    fn stamp_version_locks_frontmatter_to_cmx_version() {
+        // The bundled source carries a placeholder; stamping must replace it
+        // with the cmx binary version and leave no placeholder behind.
+        let stamped = stamp_version(SKILL_CONTENT);
+        let expected = format!("version: \"{}\"", env!("CARGO_PKG_VERSION"));
+        assert!(
+            stamped.contains(&expected),
+            "stamped skill should declare the cmx version ({expected})"
+        );
+        assert!(
+            !stamped.contains("version: \"0.0.0\""),
+            "placeholder version must not survive stamping"
+        );
+    }
+
+    #[test]
+    fn stamp_version_only_touches_frontmatter_version() {
+        // Body prose mentioning "version" and the frontmatter `author` line must
+        // be preserved; only the single frontmatter version line changes.
+        let stamped = stamp_version(SKILL_CONTENT);
+        assert!(stamped.contains("author: Stacey Vetzal"));
+        assert_eq!(
+            stamped.matches(&format!("version: \"{}\"", env!("CARGO_PKG_VERSION"))).count(),
+            1,
+            "exactly one version line should be stamped"
+        );
+    }
 
     #[test]
     fn scope_from_flags_maps_local_and_global() {

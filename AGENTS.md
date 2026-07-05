@@ -60,9 +60,12 @@ Releasing is three distinct steps:
      against the skill: `git log <last-vX.Y.Z-tag>..HEAD -- cmx/src/cli.rs
      'cmx/src/**'` shows what moved. For any command whose grammar, flags,
      defaults, deprecations, `--json` coverage, exit codes, or examples changed,
-     rebuild and run `cmx --help` / `cmx <sub> --help`, update the matching
-     sections of `SKILL.md`, and bump its `metadata.version`. **A release that
-     changed the surface but not the skill is not ready to tag.**
+     rebuild and run `cmx --help` / `cmx <sub> --help`, and update the matching
+     sections of `SKILL.md`. Do **not** hand-edit the skill's
+     `metadata.version` — it is a `"0.0.0"` placeholder that `cmx init` stamps
+     to the cmx binary version at install (`init::stamp_version`), so the skill
+     version is locked to the workspace version automatically. **A release that
+     changed the surface but not the skill's content is not ready to tag.**
    - Bump `version` in the root `Cargo.toml` (workspace version; `cmx`/`cmf`
      inherit it via `version.workspace = true`). `cmx-core` versions
      independently — do not touch it here.
