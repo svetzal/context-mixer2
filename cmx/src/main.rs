@@ -142,6 +142,10 @@ fn print_json<T: Serialize>(value: &T) -> Result<()> {
     Ok(())
 }
 
+fn usage_error(message: &str, example: &str) -> anyhow::Error {
+    anyhow::anyhow!("{message}\ntry: {example}")
+}
+
 /// Flags for `cmx init`, grouped to keep `handle_init`'s signature under
 /// clippy's excessive-bool-parameters threshold. `--global` is destructured-
 /// and-ignored in `run` above: a no-op alias for one release, since global is
@@ -339,6 +343,12 @@ fn handle_set_add(
     local: bool,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
+    if artifacts.is_empty() {
+        return Err(usage_error(
+            "Provide artifact name(s) to add to the set",
+            &format!("cmx set add {name} <artifact>"),
+        ));
+    }
     let result = cmx::sets::add(name, artifacts, scope_from(local), ctx)?;
     print!("{result}");
     Ok(ExitCode::SUCCESS)
@@ -350,6 +360,12 @@ fn handle_set_remove(
     local: bool,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
+    if artifacts.is_empty() {
+        return Err(usage_error(
+            "Provide artifact name(s) to remove from the set",
+            &format!("cmx set remove {name} <artifact>"),
+        ));
+    }
     let result = cmx::sets::remove(name, artifacts, scope_from(local), ctx)?;
     print!("{result}");
     Ok(ExitCode::SUCCESS)
@@ -492,7 +508,7 @@ fn handle_info(
             Ok(summary) => info.summary = Some(summary),
             // Best-effort: record *why* so the display reports the real reason
             // rather than always blaming the provider; never fail the command.
-            Err(e) => info.summary_error = Some(cmx::info::condense_error(&e)),
+            Err(e) => info.summary_error = Some(cmx::info::summary_unavailable_message(&e)),
         }
     }
 
@@ -585,7 +601,10 @@ fn handle_install(
         print!("{result}");
         Ok(ExitCode::SUCCESS)
     } else if names.is_empty() {
-        bail!("Provide artifact name(s) or use --all")
+        Err(usage_error(
+            "Provide artifact name(s) or use --all",
+            &format!("cmx {kind} install <name>"),
+        ))
     } else {
         let result = cmx::install::install_many(names, kind, scope, force, &targets, ctx)?;
         let any_failed = !result.failed.is_empty();
@@ -698,7 +717,10 @@ fn handle_update(
         print!("{result}");
         Ok(ExitCode::SUCCESS)
     } else {
-        bail!("Provide an artifact name or use --all")
+        Err(usage_error(
+            "Provide an artifact name or use --all",
+            &format!("cmx {kind} update <name>"),
+        ))
     }
 }
 
@@ -710,7 +732,10 @@ fn handle_uninstall(
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
     if names.is_empty() {
-        bail!("Provide artifact name(s) to uninstall")
+        return Err(usage_error(
+            "Provide artifact name(s) to uninstall",
+            &format!("cmx {kind} uninstall <name>"),
+        ));
     }
     let scope = if local {
         InstallScope::Local
@@ -734,7 +759,10 @@ fn handle_unadopt(
     ctx: &AppContext<'_>,
 ) -> Result<()> {
     if names.is_empty() {
-        bail!("Provide artifact name(s) to unadopt")
+        return Err(usage_error(
+            "Provide artifact name(s) to unadopt",
+            &format!("cmx {kind} unadopt <name>"),
+        ));
     }
     let outcome = cmx::adopt::unadopt_many(names, kind, ctx)?;
     print!("{outcome}");
@@ -758,7 +786,10 @@ fn handle_adopt(
     let outcome = if all {
         cmx::adopt::adopt_all(Some(kind), from, local, ctx)?
     } else if names.is_empty() {
-        bail!("Provide artifact name(s) to adopt, or use --all")
+        return Err(usage_error(
+            "Provide artifact name(s) to adopt, or use --all",
+            &format!("cmx {kind} adopt <name>"),
+        ));
     } else {
         cmx::adopt::adopt_named(kind, names, local, ctx)?
     };
@@ -822,7 +853,9 @@ mod tests {
             &ctx,
         );
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("all"));
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("all"));
+        assert!(err.contains("try: cmx agent install <name>"), "{err}");
     }
 
     #[test]
@@ -861,6 +894,10 @@ mod tests {
             &ctx,
         );
         assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("try: cmx agent update <name>"),
+            "missing update hint"
+        );
     }
 
     #[test]
@@ -877,6 +914,10 @@ mod tests {
             &ctx,
         );
         assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("try: cmx agent uninstall <name>"),
+            "missing uninstall hint"
+        );
     }
 
     #[test]
@@ -885,6 +926,10 @@ mod tests {
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let result = handle_unadopt(&[], ArtifactKind::Agent, false, &ctx);
         assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("try: cmx agent unadopt <name>"),
+            "missing unadopt hint"
+        );
     }
 
     #[test]
@@ -893,6 +938,34 @@ mod tests {
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let result = handle_adopt(&[], ArtifactKind::Agent, false, None, false, &ctx);
         assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("try: cmx agent adopt <name>"),
+            "missing adopt hint"
+        );
+    }
+
+    #[test]
+    fn handle_set_add_empty_artifacts_errors_with_try_line() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let result = handle_set_add("daily", &[], false, &ctx);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("try: cmx set add daily <artifact>"),
+            "missing set add hint"
+        );
+    }
+
+    #[test]
+    fn handle_set_remove_empty_artifacts_errors_with_try_line() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let result = handle_set_remove("daily", &[], false, &ctx);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("try: cmx set remove daily <artifact>"),
+            "missing set remove hint"
+        );
     }
 
     #[test]

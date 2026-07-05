@@ -750,6 +750,26 @@ fn adopt_deprecated_from_warns_on_stderr_only() {
 }
 
 #[test]
+fn uninstall_without_args_prints_try_line_on_stderr() {
+    let fixture = populated_fixture();
+    let output = fixture.run(&["skill", "uninstall"]);
+    assert!(!output.status.success(), "command should fail without args");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Provide artifact name(s) to uninstall"), "{stderr}");
+    assert!(stderr.contains("try: cmx skill uninstall <name>"), "{stderr}");
+}
+
+#[test]
+fn info_near_miss_suggests_closest_artifact() {
+    let fixture = populated_fixture();
+    let output = fixture.run(&["info", "focus-skll"]);
+    assert!(!output.status.success(), "unknown artifact should fail");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("focus-skll"), "{stderr}");
+    assert!(stderr.contains("Did you mean 'focus-skill'?"), "{stderr}");
+}
+
+#[test]
 fn set_create_from_plugin_succeeds_without_deprecation_warning() {
     let fixture = populated_fixture();
     let source_root = fixture.home.parent().unwrap().join("guidelines");

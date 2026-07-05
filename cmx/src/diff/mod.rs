@@ -157,7 +157,10 @@ pub(crate) fn gather_diff_with(
     // matching source on one platform says nothing about the others).
     let (raw_copies, scope) = discover_copies(name, kind, ctx)?;
     if raw_copies.is_empty() {
-        bail!("No installed {kind} named '{name}' found on disk.");
+        bail!(
+            "No installed {kind} named '{name}' found on disk. {}",
+            crate::suggestions::installed_artifact_hint(name, Some(kind), ctx)
+        );
     }
 
     // Compare each copy to the source; build the per-copy diff for differing ones.
@@ -302,7 +305,7 @@ pub fn llm_unavailable_note(e: &anyhow::Error) -> String {
     format!(
         "note: LLM summary unavailable ({}). Fix the gateway (`cmx config gateway`, \
          `cmx config model`, or set OPENAI_API_KEY), or use --full for the plain diff.",
-        crate::info::condense_error(e)
+        crate::error_summary::summarize_gateway_error(e)
     )
 }
 
@@ -322,7 +325,10 @@ fn find_in_sources_with(
     if let Some(sa) = source_iter::find_by_name_and_kind(name, kind, ctx)?.into_iter().next() {
         return Ok((sa.artifact.path, sa.source_name, sa.artifact.version));
     }
-    bail!("No {kind} named '{name}' found in any registered source.");
+    bail!(
+        "No {kind} named '{name}' found in any registered source. {}",
+        crate::suggestions::source_artifact_hint(name, kind, ctx)
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -597,5 +603,20 @@ mod tests {
         assert!(note.contains("--full"), "{note}");
         assert!(note.contains("configured to fail"), "condensed reason present: {note}");
         assert!(!note.contains('\n'), "no raw multi-line error body: {note}");
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn llm_unavailable_note_strips_provider_json() {
+        let error = anyhow::anyhow!(
+            "LLM analysis failed: LLM gateway error: OpenAI API error: 401 Unauthorized - {{ \
+             \"error\": {{ \"message\": \"missing key\" }} }}"
+        );
+        let note = llm_unavailable_note(&error);
+        assert!(note.contains("OpenAI API error: 401 Unauthorized"), "{note}");
+        assert!(note.contains("Fix the gateway"), "{note}");
+        assert!(!note.contains('{'), "{note}");
+        assert!(!note.contains("\"error\""), "{note}");
+        assert!(!note.contains('\n'), "{note}");
     }
 }

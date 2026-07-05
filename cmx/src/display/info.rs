@@ -69,16 +69,14 @@ impl fmt::Display for ArtifactInfo {
             writeln!(f, "  {desc}")?;
         }
 
-        writeln!(f, "\nWhat it does:")?;
+        write!(f, "\nWhat it does:  ")?;
         if let Some(summary) = &self.summary {
-            writeln!(f, "  {summary}")?;
+            writeln!(f, "{summary}")?;
         } else if let Some(err) = &self.summary_error {
-            // A summary was attempted (an `llm` build) but failed — name the real
-            // reason (content unreadable, provider error, …), not a guess.
-            writeln!(f, "  (no summary — {err})")?;
+            writeln!(f, "({err})")?;
         } else {
             // No attempt was made — a lean build with no `llm` feature.
-            writeln!(f, "  (build cmx with `--features llm` for an LLM-generated summary)")?;
+            writeln!(f, "(build cmx with `--features llm` for an LLM-generated summary)")?;
         }
 
         Ok(())
@@ -206,9 +204,26 @@ mod tests {
         // A summary was attempted but failed — show the real reason verbatim,
         // not a generic "provider unavailable".
         let mut r = minimal_artifact_info("productivity");
-        r.summary_error = Some("no readable content to summarize at /x".to_string());
+        r.summary_error =
+            Some("summary unavailable — no readable content to summarize at /x.".to_string());
         let out = r.to_string();
         assert!(out.contains("no readable content to summarize"), "names real reason: {out}");
         assert!(!out.contains("--features llm"), "not the lean hint: {out}");
+    }
+
+    #[test]
+    fn display_summary_gateway_failure_is_one_line_and_sanitized() {
+        let mut r = minimal_artifact_info("focus-skill");
+        r.summary_error = Some(
+            "summary unavailable — OpenAI API error: 401 Unauthorized. Fix with 'cmx config gateway'/'cmx config model' or set OPENAI_API_KEY.".to_string(),
+        );
+        let out = r.to_string();
+        assert!(
+            out.contains(
+                "What it does:  (summary unavailable — OpenAI API error: 401 Unauthorized."
+            ),
+            "{out}"
+        );
+        assert!(!out.contains("\"error\""), "{out}");
     }
 }

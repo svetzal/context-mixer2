@@ -35,7 +35,7 @@ pub struct BatchUninstallResult {
     pub kind: ArtifactKind,
     pub removed: Vec<UninstallResult>,
     /// Names that were not installed anywhere (nothing to remove).
-    pub not_found: Vec<String>,
+    pub not_found: Vec<(String, String)>,
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,11 @@ pub fn uninstall(
     };
     let candidates = candidate_platforms(only, ctx)?;
     uninstall_one(name, kind, scope, &candidates, ctx)?.ok_or_else(|| {
-        anyhow::anyhow!("No {kind} named '{name}' found in {} scope on {where_}.", scope.label())
+        anyhow::anyhow!(
+            "No {kind} named '{name}' found in {} scope on {where_}. {}",
+            scope.label(),
+            crate::suggestions::installed_artifact_hint(name, Some(kind), ctx)
+        )
     })
 }
 
@@ -158,7 +162,10 @@ pub fn uninstall_many(
     let (removed, not_found) = partition_by(names, |name| {
         Ok(match uninstall_one(name, kind, scope, &candidates, ctx)? {
             Some(r) => Partitioned::Kept(r),
-            None => Partitioned::Excluded(name.to_string()),
+            None => Partitioned::Excluded((
+                name.to_string(),
+                crate::suggestions::installed_artifact_hint(name, Some(kind), ctx),
+            )),
         })
     })?;
     Ok(BatchUninstallResult {
@@ -435,7 +442,9 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.removed.len(), 2, "both installed skills removed");
-        assert_eq!(result.not_found, vec!["nope".to_string()], "missing one reported, not fatal");
+        assert_eq!(result.not_found.len(), 1, "missing one reported, not fatal");
+        assert_eq!(result.not_found[0].0, "nope");
+        assert!(result.not_found[0].1.contains("cmx skill list"), "got: {:?}", result.not_found);
         assert!(!t.fs.file_exists(&skills_dir.join("webapp-testing").join("SKILL.md")));
         assert!(!t.fs.file_exists(&skills_dir.join("web-artifacts-builder").join("SKILL.md")));
     }

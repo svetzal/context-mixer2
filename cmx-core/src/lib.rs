@@ -2,6 +2,7 @@ pub mod artifact_status;
 pub mod checksum;
 pub mod config;
 pub mod context;
+pub mod error_summary;
 pub mod fs_util;
 pub mod gateway;
 pub mod json_file;

@@ -342,7 +342,10 @@ pub fn sync(
 
     let copies = gather_copies(name, kind, scope, ctx)?;
     if copies.is_empty() {
-        bail!("Skill '{name}' is not installed on any managed platform.");
+        bail!(
+            "Skill '{name}' is not installed on any managed platform. {}",
+            crate::suggestions::installed_artifact_hint(name, Some(ArtifactKind::Skill), ctx)
+        );
     }
 
     let external = is_external(name, &copies, ctx)?;

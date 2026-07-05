@@ -68,7 +68,10 @@ pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
         }
     }
 
-    bail!("No installed artifact named '{name}' found.");
+    bail!(
+        "No installed artifact named '{name}' found. {}",
+        crate::suggestions::installed_artifact_hint(name, None, ctx)
+    );
 }
 
 /// Like [`info`], but scoped to a single kind — backs `cmx skill info` /
@@ -76,7 +79,10 @@ pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
 pub fn info_for_kind(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
     match find_and_gather(name, kind, ctx)? {
         Some(info) => Ok(info),
-        None => bail!("No installed {kind} named '{name}' found."),
+        None => bail!(
+            "No installed {kind} named '{name}' found. {}",
+            crate::suggestions::installed_artifact_hint(name, Some(kind), ctx)
+        ),
     }
 }
 
@@ -246,19 +252,38 @@ pub(crate) fn collect_skill_files_with(
     Ok(result)
 }
 
-/// Render an error as a single, length-capped line for the `summary_error`
-/// field. `{:#}` gives anyhow's full context chain, then we flatten whitespace
-/// (provider errors often embed a multi-line JSON body) and truncate.
 #[cfg(feature = "llm")]
-pub fn condense_error(e: &anyhow::Error) -> String {
+pub fn summary_unavailable_message(e: &anyhow::Error) -> String {
     const MAX: usize = 200;
+
+    if is_gateway_failure(e) {
+        return format!(
+            "summary unavailable — {}. Fix with 'cmx config gateway'/'cmx config model' or set OPENAI_API_KEY.",
+            crate::error_summary::summarize_gateway_error(e)
+        );
+    }
+
     let flattened = format!("{e:#}").split_whitespace().collect::<Vec<_>>().join(" ");
-    if flattened.chars().count() > MAX {
+    let detail = if flattened.chars().count() > MAX {
         let head: String = flattened.chars().take(MAX).collect();
         format!("{head}…")
     } else {
         flattened
+    };
+    if detail.ends_with(['.', '!', '?', '…']) {
+        format!("summary unavailable — {detail}")
+    } else {
+        format!("summary unavailable — {detail}.")
     }
+}
+
+#[cfg(feature = "llm")]
+fn is_gateway_failure(e: &anyhow::Error) -> bool {
+    let rendered = format!("{e:#}");
+    rendered.contains("LLM gateway error")
+        || rendered.contains("OpenAI API error")
+        || rendered.contains("localhost:11434")
+        || rendered.contains("Ollama")
 }
 
 // ---------------------------------------------------------------------------
@@ -719,20 +744,37 @@ mod tests {
         assert!(!skill_md.is_dir, "SKILL.md should not be marked as a directory");
     }
 
-    // --- condense_error ---
+    // --- summary_unavailable_message ---
 
     #[cfg(feature = "llm")]
     #[test]
-    fn condense_error_short_message_unchanged() {
-        assert_eq!(condense_error(&anyhow::anyhow!("short error")), "short error");
+    fn summary_unavailable_message_keeps_non_gateway_detail() {
+        assert_eq!(
+            summary_unavailable_message(&anyhow::anyhow!("short error")),
+            "summary unavailable — short error."
+        );
     }
 
     #[cfg(feature = "llm")]
     #[test]
-    fn condense_error_long_message_truncated() {
+    fn summary_unavailable_message_truncates_long_non_gateway_detail() {
         let long_msg: String = "x".repeat(300);
-        let result = condense_error(&anyhow::anyhow!("{long_msg}"));
+        let result = summary_unavailable_message(&anyhow::anyhow!("{long_msg}"));
         assert!(result.ends_with('…'));
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn summary_unavailable_message_sanitizes_gateway_failures() {
+        let error = anyhow::anyhow!(
+            "LLM analysis failed: LLM gateway error: OpenAI API error: 401 Unauthorized - {{ \
+             \"error\": {{ \"message\": \"missing key\" }} }}"
+        );
+        let result = summary_unavailable_message(&error);
+        assert!(result.contains("OpenAI API error: 401 Unauthorized"), "{result}");
+        assert!(result.contains("cmx config gateway"), "{result}");
+        assert!(!result.contains('{'), "{result}");
+        assert!(!result.contains("\"error\""), "{result}");
     }
 
     // --- Deprecation struct accessible from tests ---

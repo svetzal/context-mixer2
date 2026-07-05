@@ -182,7 +182,8 @@ pub fn update(
 ) -> Result<InstallResult> {
     let Some((entry, scope)) = lockfile::find_entry(name, ctx.fs, ctx.paths)? else {
         bail!(
-            "No installed {kind} named '{name}' found. Install it first with 'cmx {kind} install {name}'."
+            "No installed {kind} named '{name}' found. {}",
+            crate::suggestions::installed_artifact_hint(name, Some(kind), ctx)
         );
     };
     let pinned = format!("{}:{}", entry.source.repo, name);

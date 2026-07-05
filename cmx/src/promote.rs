@@ -182,9 +182,18 @@ fn select_agent_copy(
     name: &str,
     ctx: &AppContext<'_>,
 ) -> Result<(PathBuf, Vec<Platform>, InstallScope, Vec<Platform>)> {
-    let (installed_path, scope) =
-        config::find_installed_path(name, ArtifactKind::Agent, ctx.fs, ctx.paths)
-            .with_context(|| format!("No installed agent named '{name}' found on disk."))?;
+    let (installed_path, scope) = config::find_installed_path(
+        name,
+        ArtifactKind::Agent,
+        ctx.fs,
+        ctx.paths,
+    )
+    .with_context(|| {
+        format!(
+            "No installed agent named '{name}' found on disk. {}",
+            crate::suggestions::installed_artifact_hint(name, Some(ArtifactKind::Agent), ctx)
+        )
+    })?;
     let home_tracked = home_tracked_platforms(name, ArtifactKind::Agent, scope, ctx)?;
     if home_tracked.is_empty() {
         bail!(non_home_guidance(name, ArtifactKind::Agent, scope, ctx)?);
@@ -205,7 +214,16 @@ fn select_skill_copy(
         // pointed guidance (git-sourced → edit clone / update --force; untracked
         // → adopt; missing → not-installed).
         let (_p, s) = config::find_installed_path(name, ArtifactKind::Skill, ctx.fs, ctx.paths)
-            .with_context(|| format!("No installed skill named '{name}' found on disk."))?;
+            .with_context(|| {
+                format!(
+                    "No installed skill named '{name}' found on disk. {}",
+                    crate::suggestions::installed_artifact_hint(
+                        name,
+                        Some(ArtifactKind::Skill),
+                        ctx
+                    )
+                )
+            })?;
         bail!(non_home_guidance(name, ArtifactKind::Skill, s, ctx)?);
     }
     let selected = choose_copy(name, selector, &copies, home_cs, ctx)?;

@@ -721,7 +721,9 @@ fn resolve_member(arg: &str, ctx: &AppContext<'_>) -> Result<SetMember> {
 
     if candidates.is_empty() {
         bail!(
-            "Artifact '{name}' is not installed (no lockfile entry); cannot resolve its kind/source."
+            "Artifact '{name}' is not installed (no lockfile entry); cannot resolve its \
+             kind/source. {}",
+            crate::suggestions::installed_artifact_hint(name, hint, ctx)
         );
     }
 

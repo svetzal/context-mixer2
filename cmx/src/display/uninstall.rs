@@ -30,8 +30,8 @@ impl fmt::Display for UninstallResult {
 impl fmt::Display for BatchUninstallResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         util::write_each(f, &self.removed)?;
-        if !self.not_found.is_empty() {
-            writeln!(f, "Not found (nothing to uninstall): {}", self.not_found.join(", "))?;
+        for (name, hint) in &self.not_found {
+            writeln!(f, "Not found (nothing to uninstall): {name}. {hint}")?;
         }
         if self.removed.is_empty() && self.not_found.is_empty() {
             writeln!(f, "No {}s given to uninstall.", self.kind)?;
@@ -90,5 +90,17 @@ mod tests {
         assert!(out.contains("Cleared stale lock entry for skill-writing"), "got: {out}");
         assert!(out.contains("already absent from disk"));
         assert!(!out.contains("Uninstalled"), "should not claim a real uninstall");
+    }
+
+    #[test]
+    fn batch_uninstall_result_includes_hint_for_near_miss() {
+        let out = BatchUninstallResult {
+            kind: ArtifactKind::Skill,
+            removed: vec![],
+            not_found: vec![("focus-skll".to_string(), "Did you mean 'focus-skill'?".to_string())],
+        }
+        .to_string();
+        assert!(out.contains("focus-skll"), "{out}");
+        assert!(out.contains("Did you mean 'focus-skill'?"), "{out}");
     }
 }

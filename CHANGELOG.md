@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cmx skill sync --dry-run`, `cmx set activate --dry-run`, and `cmx set deactivate --dry-run` still work for one release as hidden aliases, but now print a one-line stderr warning steering to the default preview plus `--apply`.
 - `cmx set create --from <source>:<plugin>` and `cmx {skill,agent} adopt --all --from <dir>` still work for one release as hidden aliases, but now print a one-line stderr warning steering to `--from-plugin` and `--from-dir` respectively.
 
+### Fixed
+
+- LLM-backed degradation paths (`cmx info` summaries and compact `cmx diff`) now collapse provider failures to one-line, action-oriented notes instead of leaking raw upstream JSON payloads.
+- Argument-validation failures now include a `try:` line with the next command to run, and unknown-artifact failures now suggest a close match when one exists or point at the relevant discovery command.
+
 ## [3.0.0] - 2026-07-05
 
 ### Added
