@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-07-04
+
 ### Added
 
 - **`cmx doctor --json`** emits the full survey as machine-readable JSON to stdout (human table and prose suppressed; warnings still go to stderr). The schema mirrors the human output: `scope`, `platforms_surveyed`, `showing` (`"needs_attention"` or `"all"`, matching `--all`), a `summary` object with the same seven counts as the human "Summary:" line, and an `artifacts` array with structured `locations` (`path`/`version`/`state`) for diverged artifacts in place of the free-text "diverges: ..." prose. Exit codes are unchanged: `2` when there are actionable issues, `0` when clean.
