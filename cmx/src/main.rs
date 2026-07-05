@@ -43,7 +43,7 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
         Commands::Source { action } => {
             handle_source(action, paths, ctx).map(|()| ExitCode::SUCCESS)
         }
-        Commands::Set { action } => handle_set(action, ctx).map(|()| ExitCode::SUCCESS),
+        Commands::Set { action } => handle_set(action, ctx),
         Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, selector, ctx),
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, selector, ctx),
         Commands::List { all } => {
@@ -190,25 +190,25 @@ fn handle_source(action: SourceAction, paths: &ConfigPaths, ctx: &AppContext<'_>
     }
 }
 
-fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<()> {
+fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
     match action {
         SetAction::Create { name, desc, local } => {
             let scope = scope_from(local);
             let result = cmx::sets::create(&name, desc.as_deref(), scope, ctx)?;
             print!("{result}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
         SetAction::List { local } => {
             let scope = scope_from(local);
             let result = cmx::sets::list(scope, ctx)?;
             print!("{result}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
         SetAction::Show { name, local } => {
             let scope = scope_from(local);
             let result = cmx::sets::show(&name, scope, ctx)?;
             print!("{result}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
         SetAction::Add {
             name,
@@ -218,7 +218,7 @@ fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<()> {
             let scope = scope_from(local);
             let result = cmx::sets::add(&name, &artifacts, scope, ctx)?;
             print!("{result}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
         SetAction::Remove {
             name,
@@ -228,22 +228,55 @@ fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<()> {
             let scope = scope_from(local);
             let result = cmx::sets::remove(&name, &artifacts, scope, ctx)?;
             print!("{result}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
-        SetAction::Delete { name, local, purge } => {
-            if purge {
-                bail!("--purge is not yet implemented (Phase 2)");
-            }
+        SetAction::Activate {
+            name,
+            dry_run,
+            local,
+        } => {
             let scope = scope_from(local);
-            let result = cmx::sets::delete(&name, scope, ctx)?;
+            let result = cmx::sets::activate(&name, dry_run, scope, ctx)?;
+            let any_failed = result.any_failed;
             print!("{result}");
-            Ok(())
+            Ok(if any_failed {
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            })
+        }
+        SetAction::Deactivate {
+            name,
+            dry_run,
+            force,
+            local,
+        } => {
+            let scope = scope_from(local);
+            let result = cmx::sets::deactivate(&name, force, dry_run, scope, ctx)?;
+            let any_blocked = result.any_blocked;
+            print!("{result}");
+            Ok(if any_blocked {
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            })
+        }
+        SetAction::Delete {
+            name,
+            local,
+            purge,
+            force,
+        } => {
+            let scope = scope_from(local);
+            let result = cmx::sets::delete(&name, purge, force, scope, ctx)?;
+            print!("{result}");
+            Ok(ExitCode::SUCCESS)
         }
         SetAction::Rename { old, new, local } => {
             let scope = scope_from(local);
             let result = cmx::sets::rename(&old, &new, scope, ctx)?;
             print!("{result}");
-            Ok(())
+            Ok(ExitCode::SUCCESS)
         }
     }
 }
@@ -812,19 +845,169 @@ mod tests {
     }
 
     #[test]
-    fn handle_set_delete_with_purge_errors() {
+    fn handle_set_delete_with_purge_deactivates_then_deletes() {
         let (fs, git, clock, paths) = fake_trio();
+        cmx_core::test_support::setup_source_with_agent(
+            &fs,
+            &paths,
+            "guidelines",
+            "/src",
+            "rust-craftsperson",
+        );
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        handle_set(
+            SetAction::Create {
+                name: "rust-work".to_string(),
+                desc: None,
+                local: false,
+            },
+            &ctx,
+        )
+        .unwrap();
+        cmx::config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| {
+            sets.sets.get_mut("rust-work").unwrap().members.push(cmx::types::SetMember {
+                kind: ArtifactKind::Agent,
+                name: "rust-craftsperson".to_string(),
+                source: Some("guidelines".to_string()),
+            });
+            Ok(())
+        })
+        .unwrap();
+        handle_set(
+            SetAction::Activate {
+                name: "rust-work".to_string(),
+                dry_run: false,
+                local: false,
+            },
+            &ctx,
+        )
+        .unwrap();
+
         let result = handle_set(
             SetAction::Delete {
                 name: "rust-work".to_string(),
                 local: false,
                 purge: true,
+                force: false,
             },
             &ctx,
         );
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not yet implemented"));
+        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+        let sets = cmx::config::load_sets(InstallScope::Global, &fs, &paths).unwrap();
+        assert!(!sets.sets.contains_key("rust-work"));
+    }
+
+    #[test]
+    fn handle_set_activate_unresolvable_source_returns_failure_exit_code() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        handle_set(
+            SetAction::Create {
+                name: "rust-work".to_string(),
+                desc: None,
+                local: false,
+            },
+            &ctx,
+        )
+        .unwrap();
+        cmx::config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| {
+            sets.sets.get_mut("rust-work").unwrap().members.push(cmx::types::SetMember {
+                kind: ArtifactKind::Skill,
+                name: "ghost".to_string(),
+                source: Some("gone".to_string()),
+            });
+            Ok(())
+        })
+        .unwrap();
+
+        let result = handle_set(
+            SetAction::Activate {
+                name: "rust-work".to_string(),
+                dry_run: false,
+                local: false,
+            },
+            &ctx,
+        );
+        assert_eq!(result.unwrap(), ExitCode::FAILURE);
+    }
+
+    #[test]
+    fn handle_set_deactivate_drift_blocked_returns_failure_exit_code() {
+        let (fs, git, clock, paths) = fake_trio();
+        cmx_core::test_support::setup_source_with_agent(
+            &fs,
+            &paths,
+            "guidelines",
+            "/src",
+            "rust-craftsperson",
+        );
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        handle_set(
+            SetAction::Create {
+                name: "rust-work".to_string(),
+                desc: None,
+                local: false,
+            },
+            &ctx,
+        )
+        .unwrap();
+        cmx::config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| {
+            sets.sets.get_mut("rust-work").unwrap().members.push(cmx::types::SetMember {
+                kind: ArtifactKind::Agent,
+                name: "rust-craftsperson".to_string(),
+                source: Some("guidelines".to_string()),
+            });
+            Ok(())
+        })
+        .unwrap();
+        handle_set(
+            SetAction::Activate {
+                name: "rust-work".to_string(),
+                dry_run: false,
+                local: false,
+            },
+            &ctx,
+        )
+        .unwrap();
+        let installed_path = paths
+            .installed_artifact_path(ArtifactKind::Agent, "rust-craftsperson", InstallScope::Global)
+            .unwrap();
+        fs.add_file(installed_path, "edited by hand");
+
+        let result = handle_set(
+            SetAction::Deactivate {
+                name: "rust-work".to_string(),
+                dry_run: false,
+                force: false,
+                local: false,
+            },
+            &ctx,
+        );
+        assert_eq!(result.unwrap(), ExitCode::FAILURE);
+    }
+
+    #[test]
+    fn handle_set_activate_dry_run_returns_success() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        handle_set(
+            SetAction::Create {
+                name: "rust-work".to_string(),
+                desc: None,
+                local: false,
+            },
+            &ctx,
+        )
+        .unwrap();
+        let result = handle_set(
+            SetAction::Activate {
+                name: "rust-work".to_string(),
+                dry_run: true,
+                local: false,
+            },
+            &ctx,
+        );
+        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
     }
 
     #[test]

@@ -31,8 +31,7 @@ pub enum Commands {
         action: SourceAction,
     },
     /// Manage sets — named groups of installed artifacts with a desired
-    /// activation state. Phase 1: definitions and curation only; `activate`/
-    /// `deactivate` are not yet implemented.
+    /// activation state, activated/deactivated together
     Set {
         #[command(subcommand)]
         action: SetAction,
@@ -205,6 +204,35 @@ pub enum SetAction {
         #[arg(long)]
         local: bool,
     },
+    /// Install every member from its pinned source into the normally
+    /// resolved install targets, and mark the set active. Idempotent — safe
+    /// to re-run to repair a partially-installed set.
+    Activate {
+        /// Name of the set to activate
+        name: String,
+        /// Preview which members would install, without making any changes
+        #[arg(long)]
+        dry_run: bool,
+        /// Act on a project-scoped set instead of global
+        #[arg(long)]
+        local: bool,
+    },
+    /// Uninstall every member not held by another active set, and mark the
+    /// set inactive. A member with local edits blocks its own uninstall
+    /// unless `--force` is passed.
+    Deactivate {
+        /// Name of the set to deactivate
+        name: String,
+        /// Preview what would be uninstalled/retained/blocked, without making any changes
+        #[arg(long)]
+        dry_run: bool,
+        /// Discard local edits on drifted members instead of blocking on them
+        #[arg(long)]
+        force: bool,
+        /// Act on a project-scoped set instead of global
+        #[arg(long)]
+        local: bool,
+    },
     /// Delete a set's definition
     Delete {
         /// Name of the set to delete
@@ -212,9 +240,12 @@ pub enum SetAction {
         /// Modify a project-scoped set instead of global
         #[arg(long)]
         local: bool,
-        /// Also uninstall members not held by another active set (Phase 2 — not yet implemented)
+        /// Also deactivate (uninstall members not held by another active set) before deleting
         #[arg(long)]
         purge: bool,
+        /// With --purge, discard local edits on drifted members instead of blocking on them
+        #[arg(long)]
+        force: bool,
     },
     /// Rename a set
     Rename {
@@ -555,15 +586,67 @@ mod tests {
     }
 
     #[test]
-    fn parse_set_delete() {
-        let cli = Cli::try_parse_from(["cmx", "set", "delete", "rust-work", "--purge"]).unwrap();
+    fn parse_set_activate() {
+        let cli =
+            Cli::try_parse_from(["cmx", "set", "activate", "rust-work", "--dry-run"]).unwrap();
         match cli.command {
             Commands::Set {
-                action: SetAction::Delete { name, local, purge },
+                action:
+                    SetAction::Activate {
+                        name,
+                        dry_run,
+                        local,
+                    },
+            } => {
+                assert_eq!(name, "rust-work");
+                assert!(dry_run);
+                assert!(!local);
+            }
+            _ => panic!("expected Set Activate"),
+        }
+    }
+
+    #[test]
+    fn parse_set_deactivate() {
+        let cli =
+            Cli::try_parse_from(["cmx", "set", "deactivate", "rust-work", "--force"]).unwrap();
+        match cli.command {
+            Commands::Set {
+                action:
+                    SetAction::Deactivate {
+                        name,
+                        dry_run,
+                        force,
+                        local,
+                    },
+            } => {
+                assert_eq!(name, "rust-work");
+                assert!(!dry_run);
+                assert!(force);
+                assert!(!local);
+            }
+            _ => panic!("expected Set Deactivate"),
+        }
+    }
+
+    #[test]
+    fn parse_set_delete() {
+        let cli = Cli::try_parse_from(["cmx", "set", "delete", "rust-work", "--purge", "--force"])
+            .unwrap();
+        match cli.command {
+            Commands::Set {
+                action:
+                    SetAction::Delete {
+                        name,
+                        local,
+                        purge,
+                        force,
+                    },
             } => {
                 assert_eq!(name, "rust-work");
                 assert!(!local);
                 assert!(purge);
+                assert!(force);
             }
             _ => panic!("expected Set Delete"),
         }

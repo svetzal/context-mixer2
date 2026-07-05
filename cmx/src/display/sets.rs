@@ -1,7 +1,8 @@
 use std::fmt;
 
 use crate::sets::{
-    SetAddResult, SetCreateResult, SetDeleteResult, SetListResult, SetRemoveResult,
+    MemberActivateOutcome, MemberDeactivateOutcome, SetActivateResult, SetAddResult,
+    SetCreateResult, SetDeactivateResult, SetDeleteResult, SetListResult, SetRemoveResult,
     SetRenameResult, SetShowResult,
 };
 use crate::table::render_table;
@@ -85,6 +86,66 @@ impl fmt::Display for SetRemoveResult {
     }
 }
 
+impl fmt::Display for SetActivateResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.dry_run {
+            writeln!(f, "Would activate set '{}':", self.name)?;
+        } else if self.any_failed {
+            writeln!(f, "Set '{}' partially activated:", self.name)?;
+        } else {
+            writeln!(f, "Set '{}' activated.", self.name)?;
+        }
+        if self.members.is_empty() {
+            writeln!(f, "  (no members)")?;
+            return Ok(());
+        }
+        for m in &self.members {
+            let line = match &m.outcome {
+                MemberActivateOutcome::Installed if self.dry_run => "would install".to_string(),
+                MemberActivateOutcome::Installed => "installed".to_string(),
+                MemberActivateOutcome::AlreadyInstalled => "already installed".to_string(),
+                MemberActivateOutcome::Unresolvable(reason) => format!("unresolvable ({reason})"),
+                MemberActivateOutcome::Failed(reason) => format!("failed ({reason})"),
+            };
+            writeln!(f, "  {} {}: {line}", m.kind, m.name)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for SetDeactivateResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.dry_run {
+            writeln!(f, "Would deactivate set '{}':", self.name)?;
+        } else if self.any_blocked {
+            writeln!(f, "Set '{}' partially deactivated:", self.name)?;
+        } else {
+            writeln!(f, "Set '{}' deactivated.", self.name)?;
+        }
+        if self.members.is_empty() {
+            writeln!(f, "  (no members)")?;
+            return Ok(());
+        }
+        for m in &self.members {
+            let line = match &m.outcome {
+                MemberDeactivateOutcome::Uninstalled if self.dry_run => {
+                    "would uninstall".to_string()
+                }
+                MemberDeactivateOutcome::Uninstalled => "uninstalled".to_string(),
+                MemberDeactivateOutcome::NotInstalled => "not installed".to_string(),
+                MemberDeactivateOutcome::Retained(holder) => {
+                    format!("retained (held by set '{holder}')")
+                }
+                MemberDeactivateOutcome::DriftBlocked => {
+                    "blocked: local edits — pass --force to discard them".to_string()
+                }
+            };
+            writeln!(f, "  {} {}: {line}", m.kind, m.name)?;
+        }
+        Ok(())
+    }
+}
+
 impl fmt::Display for SetDeleteResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Set '{}' deleted.", self.name)
@@ -100,7 +161,9 @@ impl fmt::Display for SetRenameResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sets::{SetListEntry, SetMemberStatus};
+    use crate::sets::{
+        MemberActivateStatus, MemberDeactivateStatus, SetListEntry, SetMemberStatus,
+    };
     use crate::types::{ArtifactKind, SetState};
 
     #[test]
@@ -200,6 +263,127 @@ mod tests {
         let out = r.to_string();
         assert!(out.contains("Removed from 'rust-work': foundry"));
         assert!(out.contains("Not in 'rust-work': ghost"));
+    }
+
+    #[test]
+    fn set_activate_result_shows_installed_and_already_installed() {
+        let r = SetActivateResult {
+            name: "rust-work".to_string(),
+            members: vec![
+                MemberActivateStatus {
+                    kind: ArtifactKind::Agent,
+                    name: "rust-craftsperson".to_string(),
+                    outcome: MemberActivateOutcome::Installed,
+                },
+                MemberActivateStatus {
+                    kind: ArtifactKind::Skill,
+                    name: "foundry".to_string(),
+                    outcome: MemberActivateOutcome::AlreadyInstalled,
+                },
+            ],
+            any_failed: false,
+            dry_run: false,
+        };
+        let out = r.to_string();
+        assert!(out.contains("Set 'rust-work' activated."));
+        assert!(out.contains("rust-craftsperson: installed"));
+        assert!(out.contains("foundry: already installed"));
+    }
+
+    #[test]
+    fn set_activate_result_shows_unresolvable_and_partial_failure() {
+        let r = SetActivateResult {
+            name: "rust-work".to_string(),
+            members: vec![MemberActivateStatus {
+                kind: ArtifactKind::Skill,
+                name: "ghost".to_string(),
+                outcome: MemberActivateOutcome::Unresolvable(
+                    "source 'gone' is not registered".to_string(),
+                ),
+            }],
+            any_failed: true,
+            dry_run: false,
+        };
+        let out = r.to_string();
+        assert!(out.contains("partially activated"));
+        assert!(out.contains("ghost: unresolvable (source 'gone' is not registered)"));
+    }
+
+    #[test]
+    fn set_activate_result_dry_run_says_would_install() {
+        let r = SetActivateResult {
+            name: "rust-work".to_string(),
+            members: vec![MemberActivateStatus {
+                kind: ArtifactKind::Agent,
+                name: "rust-craftsperson".to_string(),
+                outcome: MemberActivateOutcome::Installed,
+            }],
+            any_failed: false,
+            dry_run: true,
+        };
+        let out = r.to_string();
+        assert!(out.contains("Would activate set 'rust-work'"));
+        assert!(out.contains("rust-craftsperson: would install"));
+    }
+
+    #[test]
+    fn set_deactivate_result_shows_uninstalled_and_retained() {
+        let r = SetDeactivateResult {
+            name: "rust-work".to_string(),
+            members: vec![
+                MemberDeactivateStatus {
+                    kind: ArtifactKind::Agent,
+                    name: "rust-craftsperson".to_string(),
+                    outcome: MemberDeactivateOutcome::Uninstalled,
+                },
+                MemberDeactivateStatus {
+                    kind: ArtifactKind::Skill,
+                    name: "foundry".to_string(),
+                    outcome: MemberDeactivateOutcome::Retained("blog".to_string()),
+                },
+            ],
+            any_blocked: false,
+            dry_run: false,
+        };
+        let out = r.to_string();
+        assert!(out.contains("Set 'rust-work' deactivated."));
+        assert!(out.contains("rust-craftsperson: uninstalled"));
+        assert!(out.contains("foundry: retained (held by set 'blog')"));
+    }
+
+    #[test]
+    fn set_deactivate_result_shows_drift_blocked_and_partial() {
+        let r = SetDeactivateResult {
+            name: "rust-work".to_string(),
+            members: vec![MemberDeactivateStatus {
+                kind: ArtifactKind::Agent,
+                name: "rust-craftsperson".to_string(),
+                outcome: MemberDeactivateOutcome::DriftBlocked,
+            }],
+            any_blocked: true,
+            dry_run: false,
+        };
+        let out = r.to_string();
+        assert!(out.contains("partially deactivated"));
+        assert!(out.contains("blocked: local edits"));
+        assert!(out.contains("--force"));
+    }
+
+    #[test]
+    fn set_deactivate_result_dry_run_says_would_uninstall() {
+        let r = SetDeactivateResult {
+            name: "rust-work".to_string(),
+            members: vec![MemberDeactivateStatus {
+                kind: ArtifactKind::Agent,
+                name: "rust-craftsperson".to_string(),
+                outcome: MemberDeactivateOutcome::Uninstalled,
+            }],
+            any_blocked: false,
+            dry_run: true,
+        };
+        let out = r.to_string();
+        assert!(out.contains("Would deactivate set 'rust-work'"));
+        assert!(out.contains("rust-craftsperson: would uninstall"));
     }
 
     #[test]

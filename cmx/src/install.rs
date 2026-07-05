@@ -281,15 +281,19 @@ pub fn update_all(
 // ---------------------------------------------------------------------------
 
 /// I/O facts gathered before the pure install decision is made.
-struct InstallFacts {
-    locally_modified: bool,
-    already_installed: bool,
+///
+/// `pub(crate)` so `cmx set activate`/`deactivate` (see `sets.rs`) can reuse the
+/// same drift/already-installed detection install itself uses, rather than
+/// reimplementing it.
+pub(crate) struct InstallFacts {
+    pub(crate) locally_modified: bool,
+    pub(crate) already_installed: bool,
 }
 
 /// Gather the I/O facts needed to decide whether an install should proceed.
 /// All filesystem access for the decision lives here; the caller passes the
 /// result to the pure [`decide_install`].
-fn gather_install_facts(
+pub(crate) fn gather_install_facts(
     artifact_name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
