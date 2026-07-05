@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `--json` now covers every read-only data-reporting `cmx` command, not just `doctor` and `init`: `list`, kind-scoped `agent|skill list`, `outdated`, `search`, `info`, `source list`, `source browse`, `set list`, `set show`, `config show`, and `home path` all emit machine-readable JSON to stdout while preserving their existing human output as the default.
+- `cmx completions <shell>` now generates shell completion scripts for `bash`, `zsh`, `fish`, `elvish`, and `powershell`, writing the script to stdout so it can be redirected into the target shell's completion directory.
 
 ### Changed
 
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cmx {skill,agent} adopt --all` now uses `--from-dir <dir>` for install-directory filtering, replacing the overloaded `--from`.
 - `cmx list`, `cmx {skill,agent} list`, and `cmx outdated` now use explicit human table labels: the `Tools` header is now `Platforms`, version gaps read as `unversioned` or `source missing` instead of `-`, list rows include a named `Status` column, and `cmx outdated` ends with an update hint while still printing `Everything is up to date.` on an empty result.
 - JSON for `cmx list`, `cmx {skill,agent} list`, `cmx outdated`, and `cmx search` now emits semantic machine values instead of human placeholders: absent versions are `null` instead of `"-"`, list rows use `platforms` instead of `tools`, and status fields are enum strings such as `outdated`, `unversioned`, or `source_missing`.
+- `install.sh` now refreshes zsh completions at `~/.zfunc/_cmx` when `~/.zfunc/` exists, and otherwise prints a manual `cmx completions zsh` hint without failing the install.
 
 ### Deprecated
 

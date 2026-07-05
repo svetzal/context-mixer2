@@ -1,6 +1,7 @@
 use anyhow::{Result, bail};
 use clap::Parser;
 use serde::Serialize;
+use std::io;
 use std::process::ExitCode;
 
 use cmx::cli::{
@@ -21,6 +22,10 @@ const DRY_RUN_DEPRECATED_WARNING: &str =
 
 fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
+    if let Commands::Completions { shell } = &cli.command {
+        return handle_completions(*shell);
+    }
+
     // Path resolution needs one concrete "active" platform; absent `--platform`,
     // Claude is the canonical base (config_dir/home are platform-independent, so
     // this only affects single-platform commands like info/update/adopt).
@@ -98,6 +103,7 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
         Commands::Info { name, output } => {
             handle_info(&name, None, output.json, ctx).map(|()| ExitCode::SUCCESS)
         }
+        Commands::Completions { shell } => handle_completions(shell),
         Commands::Outdated { output } => {
             cmx::source_update::ensure_fresh(ctx)?;
             let report = cmx::outdated::outdated(ctx)?;
@@ -135,6 +141,12 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             ctx,
         ),
     }
+}
+
+fn handle_completions(shell: clap_complete::Shell) -> Result<ExitCode> {
+    let mut stdout = io::stdout().lock();
+    cmx::completions::generate_to(shell, &mut stdout)?;
+    Ok(ExitCode::SUCCESS)
 }
 
 fn print_json<T: Serialize>(value: &T) -> Result<()> {

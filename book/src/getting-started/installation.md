@@ -29,7 +29,30 @@ sudo mv cmx /usr/local/bin/
 ```bash
 git clone https://github.com/svetzal/context-mixer2.git
 cd context-mixer2
-cargo install --path .
+./install.sh
+```
+
+`install.sh` installs `cmx` with the `llm` feature, installs `cmf` lean, and
+refreshes zsh completions at `~/.zfunc/_cmx` when `~/.zfunc/` already exists.
+
+## Shell completions
+
+`cmx completions <shell>` writes the generated completion script to stdout.
+Supported shells are `bash`, `zsh`, `fish`, `elvish`, and `powershell`.
+
+Zsh:
+
+```bash
+mkdir -p ~/.zfunc
+cmx completions zsh > ~/.zfunc/_cmx
+```
+
+Then add `~/.zfunc` to `fpath` and run `autoload -Uz compinit && compinit`.
+
+Bash:
+
+```bash
+cmx completions bash | sudo tee /etc/bash_completion.d/cmx >/dev/null
 ```
 
 ## Verify installation

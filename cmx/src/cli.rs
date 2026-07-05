@@ -1,8 +1,21 @@
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
+use clap_complete::Shell;
 
 use crate::platform::{PLATFORM_HELP_VALUES, Platform};
+
+const COMPLETIONS_LONG_HELP: &str = "\
+Generate a shell completion script to stdout.
+
+Supported shells: bash, zsh, fish, elvish, powershell
+
+Examples:
+  cmx completions zsh > ~/.zfunc/_cmx
+    Then add `~/.zfunc` to `fpath` and run `autoload -Uz compinit && compinit`.
+
+  cmx completions bash | sudo tee /etc/bash_completion.d/cmx >/dev/null
+";
 
 #[derive(Args, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OutputArgs {
@@ -117,6 +130,14 @@ pub enum Commands {
         name: String,
         #[command(flatten)]
         output: OutputArgs,
+    },
+    #[command(
+        about = "Generate shell completion script",
+        long_about = COMPLETIONS_LONG_HELP
+    )]
+    Completions {
+        /// Shell to generate completions for
+        shell: Shell,
     },
     /// View or modify cmx configuration
     Config {
@@ -559,6 +580,26 @@ mod tests {
         assert!(err.contains("claude"), "{err}");
         assert!(err.contains("codex"), "{err}");
         assert!(err.contains("devin"), "{err}");
+    }
+
+    #[test]
+    fn invalid_completion_shell_values_list_possible_values() {
+        let err = Cli::try_parse_from(["cmx", "completions", "bogus"])
+            .err()
+            .expect("invalid shell should be rejected")
+            .to_string();
+        assert!(err.contains("possible values"), "{err}");
+        assert!(err.contains("bash"), "{err}");
+        assert!(err.contains("zsh"), "{err}");
+        assert!(err.contains("fish"), "{err}");
+        assert!(err.contains("elvish"), "{err}");
+        assert!(err.contains("powershell"), "{err}");
+    }
+
+    #[test]
+    fn parse_completions() {
+        let cli = Cli::try_parse_from(["cmx", "completions", "zsh"]).unwrap();
+        assert!(matches!(cli.command, Commands::Completions { shell: Shell::Zsh }));
     }
 
     #[test]

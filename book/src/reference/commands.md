@@ -101,12 +101,27 @@ and pointed at `sync`.
 | `cmx outdated` | Show artifacts needing attention |
 | `cmx search <keyword>` | Search all sources by name and description |
 | `cmx info <name>` | Show detailed metadata for an installed artifact (searches both kinds) |
+| `cmx completions <shell>` | Generate a shell completion script to stdout |
 | `cmx doctor` | Survey every platform; show only what needs attention (read-only) |
 | `cmx doctor --all` | Show the full inventory, not just problems |
 | `cmx doctor --local` | Also include project (local) scope in the survey |
 | `cmx doctor --json` | Emit the survey as machine-readable JSON to stdout |
 | `cmx doctor --adopt-all` | Adopt every orphaned artifact into the canonical home (deprecated; use `cmx <kind> adopt --all`) |
 | `cmx init` | Install cmx's own companion agent skill (global scope by default) |
+
+### `cmx completions`
+
+`cmx completions <shell>` generates a completion script to **stdout** only, so
+you can pipe or redirect it wherever your shell expects it. Supported values
+are `bash`, `zsh`, `fish`, `elvish`, and `powershell`. This command is
+read-only and does not support `--json`.
+
+Examples:
+
+```bash
+cmx completions zsh > ~/.zfunc/_cmx
+cmx completions bash | sudo tee /etc/bash_completion.d/cmx >/dev/null
+```
 
 ### `cmx info`
 

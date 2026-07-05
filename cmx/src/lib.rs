@@ -2,6 +2,7 @@ pub mod adopt;
 pub mod cli;
 pub mod cmx_config;
 pub(crate) mod codex_agent;
+pub mod completions;
 pub(crate) mod copy;
 pub mod diff;
 pub mod display;

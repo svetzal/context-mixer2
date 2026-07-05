@@ -47,6 +47,7 @@ cmx home     {init,path}
 cmx outdated [--json]
 cmx search   <query> [--json]
 cmx info     <name> [--json]
+cmx completions <bash|zsh|fish|elvish|powershell>
 cmx config   {show,gateway,model,external,platforms}
 cmx init     [--local] [--force] [--remove] [--json]
 ```
@@ -191,6 +192,17 @@ cmx config external {list,add,remove}    # rules for artifacts another tool mana
 cmx config platforms {list,add,remove}   # pin the managed platform set; when empty,
                                           # cmx infers it from platforms already in use
 ```
+
+### Shell completions
+
+```bash
+cmx completions zsh                       # writes the zsh completion script to stdout
+cmx completions bash                      # same for bash
+```
+
+Supported shells are `bash`, `zsh`, `fish`, `elvish`, and `powershell`.
+Completions are plain script output to stdout, not JSON, so pipe or redirect
+them into the shell-specific location you want to manage.
 
 ### `--json`
 
