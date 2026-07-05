@@ -16,7 +16,7 @@ description: >
 license: MIT
 compatibility: Rust binary `cmx`; the `llm`-feature build additionally requires a configured LLM gateway for `info` summaries and `diff`
 metadata:
-  version: "0.2.0"
+  version: "0.3.0"
   author: Stacey Vetzal
 ---
 
@@ -35,8 +35,9 @@ every platform already in use, and other commands default to Claude.
 
 ## Command grammar (verified against `--help`)
 
-```
+```text
 cmx source   {add,list,browse,update,remove}
+cmx set      {create,list,show,add,remove,activate,deactivate,delete,rename}
 cmx agent    {install,list,info,diff,update,sync,promote,uninstall,unadopt,adopt}
 cmx skill    {install,list,info,diff,update,sync,promote,uninstall,unadopt,adopt}
 cmx list     [--all]
@@ -61,6 +62,36 @@ cmx source browse <name>              # list agents/skills available in a source
 cmx source update [<name>]            # git pull registered sources (default: all)
 cmx source remove <name>              # unregister (does not delete installed artifacts)
 ```
+
+### `cmx set` — activation groups for managing context cost
+
+Every *installed* artifact is standing context (its trigger description loads
+every turn). A **set** is a named group of artifacts you can install/uninstall
+together as a unit, without losing the grouping — the cheaper alternative to
+hoarding installs or losing track of what you had.
+
+```bash
+cmx set create <name> [--desc <text>] [--from <source>:<plugin>] [--local]
+                                          # --from seeds membership from a marketplace
+                                          # plugin's declared agents/skills (not installed yet)
+cmx set list                             # name, state, member count, context footprint
+cmx set show <name>                      # members + per-member source and install status
+cmx set add <name> <artifact>...         # snapshot already-installed artifacts into the set
+cmx set remove <name> <artifact>...      # drop from set (does NOT uninstall)
+cmx set activate <name>   [--dry-run]    # install every member = "turn this set on"
+cmx set deactivate <name> [--dry-run] [--force]
+                                          # uninstall every member not held by another
+                                          # active set = "turn this set off"; remembers
+                                          # membership so re-activating reinstalls fresh
+cmx set delete <name> [--purge]          # --purge also deactivates first
+cmx set rename <old> <new>
+```
+
+`activate`/`deactivate` is install/uninstall with remembered membership, not a
+separate on-disk state — deactivating an unused set reclaims its context cost
+entirely. `cmx doctor` reports set-consistency issues (an active set with
+missing members, or an inactive set with lingering installs) alongside its
+other checks.
 
 ### Install, list, and inspect artifacts
 
@@ -190,6 +221,7 @@ scripts written before this alias existed keep working.
 ## Typical workflows
 
 **Set up a new machine:**
+
 ```bash
 cmx source add guidelines https://github.com/svetzal/guidelines
 cmx skill install --all
@@ -197,6 +229,7 @@ cmx doctor
 ```
 
 **Find and fix problems across every assistant on a machine:**
+
 ```bash
 cmx doctor --local --all      # full inventory, both scopes
 cmx skill adopt --all         # bring orphaned skills under management
@@ -204,6 +237,7 @@ cmx agent adopt --all         # ...and orphaned agents
 ```
 
 **A skill drifted after an agent edited it in Cursor but not Claude:**
+
 ```bash
 cmx skill diff <name>                 # see what changed (llm build)
 cmx skill sync <name> --dry-run       # preview which copy would win
@@ -211,6 +245,7 @@ cmx skill promote <name> --platform cursor   # or: make the Cursor edit canonica
 ```
 
 **Stay current:**
+
 ```bash
 cmx source update
 cmx outdated

@@ -192,9 +192,14 @@ fn handle_source(action: SourceAction, paths: &ConfigPaths, ctx: &AppContext<'_>
 
 fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
     match action {
-        SetAction::Create { name, desc, local } => {
+        SetAction::Create {
+            name,
+            desc,
+            from,
+            local,
+        } => {
             let scope = scope_from(local);
-            let result = cmx::sets::create(&name, desc.as_deref(), scope, ctx)?;
+            let result = cmx::sets::create(&name, desc.as_deref(), from.as_deref(), scope, ctx)?;
             print!("{result}");
             Ok(ExitCode::SUCCESS)
         }
@@ -826,6 +831,7 @@ mod tests {
                 SetAction::Create {
                     name: "rust-work".to_string(),
                     desc: None,
+                    from: None,
                     local: false,
                 },
                 &ctx,
@@ -859,6 +865,7 @@ mod tests {
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
+                from: None,
                 local: false,
             },
             &ctx,
@@ -905,6 +912,7 @@ mod tests {
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
+                from: None,
                 local: false,
             },
             &ctx,
@@ -946,6 +954,7 @@ mod tests {
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
+                from: None,
                 local: false,
             },
             &ctx,
@@ -994,6 +1003,7 @@ mod tests {
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
+                from: None,
                 local: false,
             },
             &ctx,

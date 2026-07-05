@@ -16,6 +16,7 @@ use crate::context::AppContext;
 use crate::install;
 use crate::lockfile;
 use crate::platform_iter;
+use crate::scan_marketplace::{PluginScan, scan_marketplace_plugin};
 use crate::source_iter;
 use crate::types::{ArtifactKind, InstallScope, SetDef, SetMember, SetState, SetsFile};
 use crate::uninstall;
@@ -27,6 +28,9 @@ use crate::uninstall;
 #[derive(Debug)]
 pub struct SetCreateResult {
     pub name: String,
+    pub member_count: usize,
+    /// The `<source>:<plugin>` spec the set was seeded from, if `--from` was used.
+    pub seeded_from: Option<String>,
 }
 
 #[derive(Debug)]
@@ -159,9 +163,18 @@ pub struct SetDeactivateResult {
 pub fn create(
     name: &str,
     description: Option<&str>,
+    from: Option<&str>,
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<SetCreateResult> {
+    // Resolve-then-mutate: fail fast, before writing anything, if `--from`
+    // can't be resolved to a known source/plugin.
+    let members = match from {
+        Some(spec) => seed_from_plugin(spec, ctx)?,
+        None => Vec::new(),
+    };
+    let member_count = members.len();
+
     config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
         if sets.sets.contains_key(name) {
             bail!("Set '{name}' already exists.");
@@ -171,14 +184,67 @@ pub fn create(
             SetDef {
                 description: description.map(str::to_string),
                 state: SetState::Inactive,
-                members: Vec::new(),
+                members,
             },
         );
         Ok(())
     })?;
     Ok(SetCreateResult {
         name: name.to_string(),
+        member_count,
+        seeded_from: from.map(str::to_string),
     })
+}
+
+/// Resolve a `<source>:<plugin>` spec to the plugin's declared `agents`/
+/// `skills`, pinning each resulting member's `source` to the given source
+/// name (see `SETS.md`, "Relationship to the existing 'plugin' concept").
+/// Unlike [`resolve_member`], which resolves from the *lockfile* (the
+/// artifact must already be installed), this resolves from the *source's*
+/// marketplace — the whole point of seeding is that members need not be
+/// installed yet.
+fn seed_from_plugin(spec: &str, ctx: &AppContext<'_>) -> Result<Vec<SetMember>> {
+    let Some((source_name, plugin_name)) = spec.split_once(':') else {
+        bail!("Invalid --from value '{spec}'; expected <source>:<plugin>.");
+    };
+    if source_name.is_empty() || plugin_name.is_empty() {
+        bail!("Invalid --from value '{spec}'; expected <source>:<plugin>.");
+    }
+
+    let sources = config::load_sources(ctx.fs, ctx.paths)?;
+    let entry = sources.get_source(source_name)?;
+    let root = config::resolve_local_path(entry)?;
+
+    let marketplace_path = root.join(".claude-plugin").join("marketplace.json");
+    if !ctx.fs.exists(&marketplace_path) {
+        bail!(
+            "Source '{source_name}' has no marketplace (.claude-plugin/marketplace.json not found)."
+        );
+    }
+
+    let mut warnings = Vec::new();
+    let scan =
+        scan_marketplace_plugin(&root, &marketplace_path, plugin_name, ctx.fs, &mut warnings)?;
+
+    match scan {
+        PluginScan::NotFound => {
+            bail!("Plugin '{plugin_name}' not found in marketplace of source '{source_name}'.");
+        }
+        PluginScan::RemoteUnsupported(source_type) => {
+            bail!(
+                "Plugin '{plugin_name}' uses remote source '{source_type}' which is not yet \
+                 supported; cannot seed a set from it."
+            );
+        }
+        PluginScan::Found(artifacts) => Ok(artifacts
+            .into_iter()
+            .map(|a| SetMember {
+                kind: a.kind,
+                name: a.name,
+                source: Some(source_name.to_string()),
+            })
+            .collect()),
+    }
 }
 
 pub fn list(scope: InstallScope, ctx: &AppContext<'_>) -> Result<SetListResult> {
@@ -723,8 +789,8 @@ mod tests {
     fn create_errors_when_name_exists() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
-        let result = create("rust-work", None, InstallScope::Global, &ctx);
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
+        let result = create("rust-work", None, None, InstallScope::Global, &ctx);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("already exists"));
     }
@@ -733,7 +799,7 @@ mod tests {
     fn create_inserts_inactive_empty_set() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        create("blog", Some("blog work"), InstallScope::Global, &ctx).unwrap();
+        create("blog", Some("blog work"), None, InstallScope::Global, &ctx).unwrap();
 
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
         let def = sets.sets.get("blog").unwrap();
@@ -742,13 +808,126 @@ mod tests {
         assert_eq!(def.description.as_deref(), Some("blog work"));
     }
 
+    // --- create --from (plugin seeding) ---
+
+    fn marketplace_json(plugins_json: &str) -> String {
+        format!(r#"{{"name":"test","plugins":[{plugins_json}]}}"#)
+    }
+
+    #[test]
+    fn create_from_seeds_members_inactive() {
+        let t = TestContext::new();
+        crate::test_support::setup_source(&t.fs, &t.paths, "guidelines", "/src");
+        t.fs.add_file(
+            "/src/.claude-plugin/marketplace.json",
+            marketplace_json(
+                r#"{"name":"my-plugin","agents":["./agents/my-agent.md"],"skills":["./skills/my-skill"]}"#,
+            ),
+        );
+        t.fs.add_file(
+            "/src/agents/my-agent.md",
+            crate::test_support::agent_content("my-agent", "An agent"),
+        );
+        t.fs.add_file(
+            "/src/skills/my-skill/SKILL.md",
+            crate::test_support::skill_content("A skill"),
+        );
+
+        let ctx = t.ctx();
+        let result =
+            create("rust-work", None, Some("guidelines:my-plugin"), InstallScope::Global, &ctx)
+                .unwrap();
+        assert_eq!(result.member_count, 2);
+        assert_eq!(result.seeded_from.as_deref(), Some("guidelines:my-plugin"));
+
+        let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
+        let def = sets.sets.get("rust-work").unwrap();
+        assert_eq!(def.state, SetState::Inactive);
+        assert_eq!(def.members.len(), 2);
+        assert!(def.members.iter().all(|m| m.source.as_deref() == Some("guidelines")));
+        let kinds: HashSet<ArtifactKind> = def.members.iter().map(|m| m.kind).collect();
+        assert!(kinds.contains(&ArtifactKind::Agent));
+        assert!(kinds.contains(&ArtifactKind::Skill));
+    }
+
+    #[test]
+    fn create_from_unknown_plugin_errors_and_creates_nothing() {
+        let t = TestContext::new();
+        crate::test_support::setup_source(&t.fs, &t.paths, "guidelines", "/src");
+        t.fs.add_file(
+            "/src/.claude-plugin/marketplace.json",
+            marketplace_json(r#"{"name":"my-plugin","agents":["./agents/my-agent.md"]}"#),
+        );
+
+        let ctx = t.ctx();
+        let result =
+            create("rust-work", None, Some("guidelines:ghost"), InstallScope::Global, &ctx);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+
+        let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
+        assert!(!sets.sets.contains_key("rust-work"));
+    }
+
+    #[test]
+    fn create_from_remote_plugin_reports_unsupported() {
+        let t = TestContext::new();
+        crate::test_support::setup_source(&t.fs, &t.paths, "guidelines", "/src");
+        t.fs.add_file(
+            "/src/.claude-plugin/marketplace.json",
+            marketplace_json(
+                r#"{"name":"remote-plugin","source":{"source":"url","url":"https://example.com"}}"#,
+            ),
+        );
+
+        let ctx = t.ctx();
+        let result =
+            create("rust-work", None, Some("guidelines:remote-plugin"), InstallScope::Global, &ctx);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not yet supported"));
+
+        let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
+        assert!(!sets.sets.contains_key("rust-work"));
+    }
+
+    #[test]
+    fn create_from_unknown_source_errors_and_creates_nothing() {
+        let t = TestContext::new();
+        let ctx = t.ctx();
+        let result =
+            create("rust-work", None, Some("ghost-source:my-plugin"), InstallScope::Global, &ctx);
+        assert!(result.is_err());
+        let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
+        assert!(!sets.sets.contains_key("rust-work"));
+    }
+
+    #[test]
+    fn create_from_source_without_marketplace_errors() {
+        let t = TestContext::new();
+        crate::test_support::setup_source(&t.fs, &t.paths, "guidelines", "/src");
+        let ctx = t.ctx();
+        let result =
+            create("rust-work", None, Some("guidelines:my-plugin"), InstallScope::Global, &ctx);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("no marketplace"));
+    }
+
+    #[test]
+    fn create_from_malformed_spec_errors() {
+        let t = TestContext::new();
+        let ctx = t.ctx();
+        let result = create("rust-work", None, Some("no-colon-here"), InstallScope::Global, &ctx);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("expected <source>:<plugin>"));
+    }
+
     // --- list ---
 
     #[test]
     fn list_reports_state_and_member_count() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
 
         let result = list(InstallScope::Global, &ctx).unwrap();
         assert_eq!(result.entries.len(), 1);
@@ -771,7 +950,7 @@ mod tests {
             InstallScope::Global,
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_agent("my-agent", "guidelines")],
@@ -794,7 +973,7 @@ mod tests {
             "rust-craftsperson",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_agent("rust-craftsperson", "guidelines")],
@@ -812,7 +991,7 @@ mod tests {
     fn footprint_unresolvable_member_counts_as_zero_and_none() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_agent("ghost", "gone-source")],
@@ -857,7 +1036,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         let result =
             add("rust-work", &["rust-craftsperson".to_string()], InstallScope::Global, &ctx)
                 .unwrap();
@@ -875,7 +1054,7 @@ mod tests {
     fn add_errors_when_artifact_not_installed() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         let result = add("rust-work", &["ghost".to_string()], InstallScope::Global, &ctx);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not installed"));
@@ -892,7 +1071,7 @@ mod tests {
             InstallScope::Global,
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         let result = add(
             "rust-work",
             &["known".to_string(), "ghost".to_string()],
@@ -916,7 +1095,7 @@ mod tests {
             InstallScope::Global,
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         add("rust-work", &["known".to_string()], InstallScope::Global, &ctx).unwrap();
         let result = add("rust-work", &["known".to_string()], InstallScope::Global, &ctx).unwrap();
         assert!(result.added.is_empty());
@@ -961,7 +1140,7 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        create("mixed", None, InstallScope::Global, &ctx).unwrap();
+        create("mixed", None, None, InstallScope::Global, &ctx).unwrap();
 
         let bare = add("mixed", &["dual".to_string()], InstallScope::Global, &ctx);
         assert!(bare.is_err());
@@ -985,7 +1164,7 @@ mod tests {
             InstallScope::Global,
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         add("rust-work", &["known".to_string()], InstallScope::Global, &ctx).unwrap();
 
         let result =
@@ -1004,7 +1183,7 @@ mod tests {
     fn remove_reports_not_found_for_missing_member() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         let result =
             remove("rust-work", &["ghost".to_string()], InstallScope::Global, &ctx).unwrap();
         assert!(result.removed.is_empty());
@@ -1017,7 +1196,7 @@ mod tests {
     fn delete_removes_definition() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         delete("rust-work", false, false, InstallScope::Global, &ctx).unwrap();
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert!(!sets.sets.contains_key("rust-work"));
@@ -1046,8 +1225,8 @@ mod tests {
     fn rename_errors_when_new_exists() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        create("old", None, InstallScope::Global, &ctx).unwrap();
-        create("new", None, InstallScope::Global, &ctx).unwrap();
+        create("old", None, None, InstallScope::Global, &ctx).unwrap();
+        create("new", None, None, InstallScope::Global, &ctx).unwrap();
         let result = rename("old", "new", InstallScope::Global, &ctx);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("already exists"));
@@ -1057,7 +1236,7 @@ mod tests {
     fn rename_moves_definition_to_new_key() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        create("old", Some("desc"), InstallScope::Global, &ctx).unwrap();
+        create("old", Some("desc"), None, InstallScope::Global, &ctx).unwrap();
         rename("old", "new", InstallScope::Global, &ctx).unwrap();
 
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
@@ -1119,7 +1298,7 @@ mod tests {
             "1.0.0",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![
@@ -1158,7 +1337,7 @@ mod tests {
             "rust-craftsperson",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_agent("rust-craftsperson", "guidelines")],
@@ -1186,7 +1365,7 @@ mod tests {
             "rust-craftsperson",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![
@@ -1227,7 +1406,7 @@ mod tests {
             "rust-craftsperson",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_agent("rust-craftsperson", "guidelines")],
@@ -1261,7 +1440,7 @@ mod tests {
             "rust-craftsperson",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_agent("rust-craftsperson", "guidelines")],
@@ -1295,8 +1474,8 @@ mod tests {
             "1.0.0",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
-        create("blog", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
+        create("blog", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_skill("foundry", "guidelines")],
@@ -1336,7 +1515,7 @@ mod tests {
             "rust-craftsperson",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_agent("rust-craftsperson", "guidelines")],
@@ -1385,7 +1564,7 @@ mod tests {
             "rust-craftsperson",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_agent("rust-craftsperson", "guidelines")],
@@ -1420,7 +1599,7 @@ mod tests {
             "rust-craftsperson",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_agent("rust-craftsperson", "guidelines")],
@@ -1452,7 +1631,7 @@ mod tests {
             "rust-craftsperson",
         );
         let ctx = t.ctx();
-        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         seed_members(
             "rust-work",
             vec![pinned_agent("rust-craftsperson", "guidelines")],

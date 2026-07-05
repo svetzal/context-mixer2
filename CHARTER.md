@@ -10,7 +10,7 @@ Context Mixer manages the lifecycle of curated agentic context — portable agen
 The project rests on two pillars of equal weight:
 
 1. **Marketplace distribution.** Git-backed plugin marketplaces with a standard manifest format are the distribution mechanism for published, shareable artifacts — versioned, checksummed, and tracked through install, update, and deprecation.
-2. **Cross-platform curation and reconciliation.** A tool-neutral canonical home holds hand-authored private artifacts; cmx projects them to every platform in use and keeps the copies honest — detecting drift, promoting in-place edits back to the canonical copy, and syncing diverged copies across platforms. This lifecycle matters because assistants edit their own installed skills: curate once, project to many, reconcile what drifts.
+2. **Cross-platform curation and reconciliation.** A tool-neutral canonical home holds hand-authored private artifacts; cmx projects them to every platform in use and keeps the copies honest — detecting drift, promoting in-place edits back to the canonical copy, and syncing diverged copies across platforms. This lifecycle matters because assistants edit their own installed skills: curate once, project to many, reconcile what drifts. Consumer-side **sets** extend this pillar: named, user-composed groups of installed artifacts that can be activated and deactivated together, so the standing context cost of an installation can be managed without losing track of what belongs together.
 
 ## Goals
 

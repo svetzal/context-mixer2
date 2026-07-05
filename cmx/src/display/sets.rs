@@ -25,7 +25,14 @@ fn format_footprint(chars: usize) -> String {
 
 impl fmt::Display for SetCreateResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Set '{}' created.", self.name)
+        match &self.seeded_from {
+            Some(spec) => writeln!(
+                f,
+                "Set '{}' created, seeded with {} member(s) from {spec}.",
+                self.name, self.member_count
+            ),
+            None => writeln!(f, "Set '{}' created.", self.name),
+        }
     }
 }
 
@@ -197,8 +204,23 @@ mod tests {
     fn set_create_result_display() {
         let r = SetCreateResult {
             name: "rust-work".to_string(),
+            member_count: 0,
+            seeded_from: None,
         };
         assert_eq!(r.to_string(), "Set 'rust-work' created.\n");
+    }
+
+    #[test]
+    fn set_create_result_display_seeded() {
+        let r = SetCreateResult {
+            name: "rust-work".to_string(),
+            member_count: 2,
+            seeded_from: Some("guidelines:my-plugin".to_string()),
+        };
+        assert_eq!(
+            r.to_string(),
+            "Set 'rust-work' created, seeded with 2 member(s) from guidelines:my-plugin.\n"
+        );
     }
 
     #[test]

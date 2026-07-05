@@ -35,7 +35,7 @@ Optional cmx fields (backward compatible with Claude Code): `version`, `deprecat
 
 Follows the [Agent Skills specification](https://agentskills.io/specification):
 
-```
+```text
 my-skill/
 ├── SKILL.md              # Required: frontmatter + instructions
 ├── scripts/              # Optional: deterministic automation
@@ -61,7 +61,7 @@ The primary distribution mechanism is the **plugin marketplace** — a git repos
 
 ### Marketplace structure
 
-```
+```text
 my-marketplace/
 ├── .claude-plugin/
 │   └── marketplace.json      # Required: marketplace manifest
@@ -160,7 +160,7 @@ cmx recognizes these entries and emits a warning that remote sources are not yet
 
 This format is compatible with Claude Code's native plugin system. A marketplace registered with cmx can also be used directly via:
 
-```
+```text
 /plugin marketplace add <repo-url>
 ```
 
@@ -221,6 +221,57 @@ One lock file per scope tracks installed state:
 - `source_checksum` — checksum of the artifact in the source at install time
 - `installed_checksum` — checksum of what was written to disk (initially matches source)
 
+## Sets
+
+A **set** is a locally-defined, named group of installed artifacts with a
+desired activation state — the consumer-side counterpart to a marketplace
+plugin (see "Source repositories (marketplaces)"). A plugin groups artifacts
+*at the source*, for distribution; a set groups artifacts *for the user*, so
+the standing context cost of an unrelated body of work can be switched on
+(`activate`) and off (`deactivate`) as a unit, without losing the record of
+what belongs together. `activate`/`deactivate` compose the existing
+install/uninstall machinery — there is no separate on-disk "parked" state.
+
+Sets live in a dedicated state file, mirroring the source/lock-file split by
+scope:
+
+- **Global**: `~/.config/context-mixer/sets.json`
+- **Local**: `.context-mixer/sets.json` — can be committed for team sharing.
+
+```json
+{
+  "version": 1,
+  "sets": {
+    "rust-work": {
+      "description": "Rust craftsmanship + foundry",
+      "state": "active",
+      "members": [
+        { "type": "agent", "name": "rust-craftsperson", "source": "guidelines" },
+        { "type": "skill", "name": "foundry", "source": "home" }
+      ]
+    },
+    "client-ort": {
+      "state": "inactive",
+      "members": [
+        { "type": "skill", "name": "ubiquity-router", "source": "home" }
+      ]
+    }
+  }
+}
+```
+
+- `state` — `active` or `inactive`; `activate` installs every member and
+  flips this to `active`, `deactivate` uninstalls (unless another active set
+  still holds a member) and flips it back.
+- `members[].source` — the source repo each member was pinned to at add-time
+  (from the lock file, or from `--from <source>:<plugin>` seeding), so
+  `activate` can reinstall deterministically even after `deactivate` clears
+  the lock entry.
+
+`cmx doctor` reports set-consistency issues alongside its other checks: an
+active set with a missing member, or an inactive set with a member still
+installed solely on that set's behalf.
+
 ## Versioning and checksums
 
 Artifact identity is tracked with two complementary mechanisms: **checksums** (automatic) and **versions** (optional frontmatter).
@@ -275,7 +326,7 @@ An optional `version` field in the artifact frontmatter gives the author a way t
 
 All commands accept a `--platform` flag (also settable via `CMX_PLATFORM` env var):
 
-```
+```text
 cmx --platform <platform> <command>
 ```
 
@@ -286,7 +337,7 @@ install, uninstall, update, list, outdated, info, and search operations.
 
 ### `cmx source` — Manage marketplace sources
 
-```
+```text
 cmx source add <name> <path-or-url>    # Register a marketplace
 cmx source list                         # List registered sources
 cmx source browse <name>                # Show available artifacts
@@ -294,9 +345,27 @@ cmx source update [name]                # Fetch latest (all if no name)
 cmx source remove <name>                # Unregister and clean up
 ```
 
+### `cmx set` — Activation groups
+
+```text
+cmx set create <name> [--desc <text>] [--from <source>:<plugin>] [--local]
+                                         # --from seeds membership from a plugin's
+                                         # declared agents/skills (need not be installed)
+cmx set list                            # State, member count, context footprint
+cmx set show <name>                     # Members + per-member source and install status
+cmx set add <name> <artifact>...        # Snapshot installed artifacts into the set
+cmx set remove <name> <artifact>...     # Drop from set (does not uninstall)
+cmx set activate <name> [--dry-run]     # Install every member
+cmx set deactivate <name> [--dry-run] [--force]  # Uninstall members not held elsewhere
+cmx set delete <name> [--purge]         # --purge also deactivates first
+cmx set rename <old> <new>
+```
+
+See "Sets" above for the `sets.json` state file this reads and writes.
+
 ### `cmx agent` / `cmx skill` — Manage artifacts
 
-```
+```text
 cmx agent install <name>                # Install from sources
 cmx agent install <source>:<name>       # From a specific source
 cmx agent install --all                 # Install all available
@@ -314,7 +383,7 @@ cmx skill install/update/list/diff      # Same for skills
 
 ### `cmx list` — Aggregate view
 
-```
+```text
 cmx list                                # All installed artifacts
 ```
 
@@ -322,13 +391,13 @@ Shows Name, Installed version, Source, Available version, and status indicators 
 
 ### `cmx outdated` — What needs attention
 
-```
+```text
 cmx outdated                            # Show outdated/untracked/deprecated
 ```
 
 ### `cmx config` — LLM configuration
 
-```
+```text
 cmx config show                         # Current settings
 cmx config gateway <openai|ollama>      # Set LLM provider
 cmx config model <name>                 # Set model (default: gpt-5.4)

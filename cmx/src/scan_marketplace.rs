@@ -19,43 +19,103 @@ pub(crate) fn scan_marketplace_with(
     let mut artifacts = Vec::new();
 
     for plugin in &manifest.plugins {
-        // If explicit agents/skills arrays are present, use them directly
-        if !plugin.agents.is_empty() || !plugin.skills.is_empty() {
-            scan_marketplace_explicit_arrays(root, plugin, &mut artifacts, fs, warnings);
-            continue;
-        }
-
-        // Otherwise, resolve the source field and walk the directory
-        match &plugin.source {
-            Some(PluginSource::Local(source_path)) => {
-                let resolved = root.join(source_path);
-                if fs.exists(&resolved) {
-                    walk_dir_with(&resolved, &mut artifacts, fs)?;
-                } else {
-                    warnings.push(ScanWarning {
-                        message: format!(
-                            "plugin '{}' source path '{}' does not exist",
-                            plugin.name, source_path
-                        ),
-                    });
-                }
-            }
-            Some(PluginSource::Remote(v)) => {
-                let source_type = v.get("source").and_then(|s| s.as_str()).unwrap_or("unknown");
-                warnings.push(ScanWarning {
-                    message: format!(
-                        "plugin '{}' uses remote source type '{}' which is not yet supported",
-                        plugin.name, source_type
-                    ),
-                });
-            }
-            None => {
-                // No source and no explicit arrays — nothing to scan
-            }
-        }
+        scan_marketplace_entry(root, plugin, &mut artifacts, fs, warnings)?;
     }
 
     Ok(artifacts)
+}
+
+/// Scans a single marketplace plugin entry, appending its resolved artifacts.
+///
+/// Shared by [`scan_marketplace_with`] (which flattens every plugin in a
+/// marketplace) and [`scan_marketplace_plugin`] (which resolves a single named
+/// plugin for set seeding).
+fn scan_marketplace_entry(
+    root: &Path,
+    plugin: &MarketplaceEntry,
+    artifacts: &mut Vec<Artifact>,
+    fs: &dyn Filesystem,
+    warnings: &mut Vec<ScanWarning>,
+) -> Result<()> {
+    // If explicit agents/skills arrays are present, use them directly
+    if !plugin.agents.is_empty() || !plugin.skills.is_empty() {
+        scan_marketplace_explicit_arrays(root, plugin, artifacts, fs, warnings);
+        return Ok(());
+    }
+
+    // Otherwise, resolve the source field and walk the directory
+    match &plugin.source {
+        Some(PluginSource::Local(source_path)) => {
+            let resolved = root.join(source_path);
+            if fs.exists(&resolved) {
+                walk_dir_with(&resolved, artifacts, fs)?;
+            } else {
+                warnings.push(ScanWarning {
+                    message: format!(
+                        "plugin '{}' source path '{}' does not exist",
+                        plugin.name, source_path
+                    ),
+                });
+            }
+        }
+        Some(PluginSource::Remote(v)) => {
+            let source_type = v.get("source").and_then(|s| s.as_str()).unwrap_or("unknown");
+            warnings.push(ScanWarning {
+                message: format!(
+                    "plugin '{}' uses remote source type '{}' which is not yet supported",
+                    plugin.name, source_type
+                ),
+            });
+        }
+        None => {
+            // No source and no explicit arrays — nothing to scan
+        }
+    }
+
+    Ok(())
+}
+
+/// Result of resolving a single named plugin from a marketplace, for set seeding.
+pub(crate) enum PluginScan {
+    /// The plugin was found and its artifacts resolved (possibly empty, if the
+    /// declared paths don't exist — see accumulated warnings).
+    Found(Vec<Artifact>),
+    /// No plugin with the given name exists in the marketplace.
+    NotFound,
+    /// The plugin has no explicit `agents`/`skills` arrays and its `source` is
+    /// a remote source type that cmx cannot yet expand.
+    RemoteUnsupported(String),
+}
+
+/// Resolves a single named plugin from a marketplace file, for `cmx set create --from`.
+///
+/// Unlike [`scan_marketplace_with`], which flattens every plugin in the
+/// marketplace, this looks up one [`MarketplaceEntry`] by name so a set can be
+/// seeded from it without requiring the artifacts to already be installed.
+pub(crate) fn scan_marketplace_plugin(
+    root: &Path,
+    marketplace_path: &Path,
+    plugin_name: &str,
+    fs: &dyn Filesystem,
+    warnings: &mut Vec<ScanWarning>,
+) -> Result<PluginScan> {
+    let content = fs.read_to_string(marketplace_path)?;
+    let manifest: Marketplace = serde_json::from_str(&content)?;
+
+    let Some(plugin) = manifest.plugins.iter().find(|p| p.name == plugin_name) else {
+        return Ok(PluginScan::NotFound);
+    };
+
+    if plugin.agents.is_empty() && plugin.skills.is_empty() {
+        if let Some(PluginSource::Remote(v)) = &plugin.source {
+            let source_type = v.get("source").and_then(|s| s.as_str()).unwrap_or("unknown");
+            return Ok(PluginScan::RemoteUnsupported(source_type.to_string()));
+        }
+    }
+
+    let mut artifacts = Vec::new();
+    scan_marketplace_entry(root, plugin, &mut artifacts, fs, warnings)?;
+    Ok(PluginScan::Found(artifacts))
 }
 
 fn scan_marketplace_explicit_arrays(
@@ -296,5 +356,72 @@ mod tests {
         let kinds: Vec<_> = artifacts.iter().map(|a| a.kind).collect();
         assert!(kinds.contains(&ArtifactKind::Agent));
         assert!(kinds.contains(&ArtifactKind::Skill));
+    }
+
+    fn run_plugin(
+        fs: &FakeFilesystem,
+        root: &str,
+        marketplace: &str,
+        plugin_name: &str,
+    ) -> (PluginScan, Vec<ScanWarning>) {
+        let mut warnings = Vec::new();
+        let scan = scan_marketplace_plugin(
+            Path::new(root),
+            Path::new(marketplace),
+            plugin_name,
+            fs,
+            &mut warnings,
+        )
+        .unwrap();
+        (scan, warnings)
+    }
+
+    #[test]
+    fn scan_marketplace_plugin_finds_named_plugin_with_agent_and_skill() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            marketplace_json(
+                r#"{"name":"my-plugin","agents":["./agents/my-agent.md"],"skills":["./skills/my-skill"]}"#,
+            ),
+        );
+        fs.add_file("/repo/agents/my-agent.md", agent_content("my-agent", "An agent"));
+        fs.add_file("/repo/skills/my-skill/SKILL.md", skill_content("A skill"));
+        let (scan, warnings) =
+            run_plugin(&fs, "/repo", "/repo/.claude-plugin/marketplace.json", "my-plugin");
+        let PluginScan::Found(artifacts) = scan else {
+            panic!("expected Found");
+        };
+        assert_eq!(artifacts.len(), 2);
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn scan_marketplace_plugin_returns_not_found_for_unknown_name() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            marketplace_json(r#"{"name":"my-plugin","agents":["./agents/my-agent.md"]}"#),
+        );
+        let (scan, _warnings) =
+            run_plugin(&fs, "/repo", "/repo/.claude-plugin/marketplace.json", "ghost-plugin");
+        assert!(matches!(scan, PluginScan::NotFound));
+    }
+
+    #[test]
+    fn scan_marketplace_plugin_reports_remote_source_as_unsupported() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(
+            "/repo/.claude-plugin/marketplace.json",
+            marketplace_json(
+                r#"{"name":"remote-plugin","source":{"source":"url","url":"https://example.com"}}"#,
+            ),
+        );
+        let (scan, _warnings) =
+            run_plugin(&fs, "/repo", "/repo/.claude-plugin/marketplace.json", "remote-plugin");
+        match scan {
+            PluginScan::RemoteUnsupported(t) => assert_eq!(t, "url"),
+            _ => panic!("expected RemoteUnsupported"),
+        }
     }
 }

@@ -164,6 +164,9 @@ pub enum SetAction {
         /// Human-readable description
         #[arg(long = "desc")]
         desc: Option<String>,
+        /// Seed membership from a marketplace plugin's declared agents/skills
+        #[arg(long, value_name = "source>:<plugin")]
+        from: Option<String>,
         /// Create in project scope instead of global
         #[arg(long)]
         local: bool,
@@ -507,11 +510,40 @@ mod tests {
             Cli::try_parse_from(["cmx", "set", "create", "rust-work", "--desc", "desc"]).unwrap();
         match cli.command {
             Commands::Set {
-                action: SetAction::Create { name, desc, local },
+                action:
+                    SetAction::Create {
+                        name,
+                        desc,
+                        from,
+                        local,
+                    },
             } => {
                 assert_eq!(name, "rust-work");
                 assert_eq!(desc.as_deref(), Some("desc"));
+                assert!(from.is_none());
                 assert!(!local);
+            }
+            _ => panic!("expected Set Create"),
+        }
+    }
+
+    #[test]
+    fn parse_set_create_from() {
+        let cli = Cli::try_parse_from([
+            "cmx",
+            "set",
+            "create",
+            "rust-work",
+            "--from",
+            "guidelines:my-plugin",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Set {
+                action: SetAction::Create { name, from, .. },
+            } => {
+                assert_eq!(name, "rust-work");
+                assert_eq!(from.as_deref(), Some("guidelines:my-plugin"));
             }
             _ => panic!("expected Set Create"),
         }
