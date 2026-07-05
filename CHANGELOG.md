@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-05
+
 ### Added
 
 - `--json` now covers every read-only data-reporting `cmx` command, not just `doctor` and `init`: `list`, kind-scoped `agent|skill list`, `outdated`, `search`, `info`, `source list`, `source browse`, `set list`, `set show`, `config show`, and `home path` all emit machine-readable JSON to stdout while preserving their existing human output as the default.
