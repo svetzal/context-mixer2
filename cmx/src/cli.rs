@@ -30,6 +30,13 @@ pub enum Commands {
         #[command(subcommand)]
         action: SourceAction,
     },
+    /// Manage sets — named groups of installed artifacts with a desired
+    /// activation state. Phase 1: definitions and curation only; `activate`/
+    /// `deactivate` are not yet implemented.
+    Set {
+        #[command(subcommand)]
+        action: SetAction,
+    },
     /// Manage agents
     Agent {
         #[command(subcommand)]
@@ -146,6 +153,78 @@ pub enum SourceAction {
     Remove {
         /// Name of the source to remove
         name: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum SetAction {
+    /// Create an empty, inactive set
+    Create {
+        /// Name to identify this set
+        name: String,
+        /// Human-readable description
+        #[arg(long = "desc")]
+        desc: Option<String>,
+        /// Create in project scope instead of global
+        #[arg(long)]
+        local: bool,
+    },
+    /// List defined sets
+    List {
+        /// List project-scoped sets instead of global
+        #[arg(long)]
+        local: bool,
+    },
+    /// Show a set's description, state, and members
+    Show {
+        /// Name of the set to show
+        name: String,
+        /// Look up the set in project scope instead of global
+        #[arg(long)]
+        local: bool,
+    },
+    /// Add installed artifact(s) to a set, resolving kind and source from the
+    /// lockfile. Use `skill:name` / `agent:name` to disambiguate a name that
+    /// is ambiguous across kinds.
+    Add {
+        /// Name of the set to add to
+        name: String,
+        /// Artifact name(s), optionally prefixed with `skill:` or `agent:`
+        artifacts: Vec<String>,
+        /// Modify a project-scoped set instead of global
+        #[arg(long)]
+        local: bool,
+    },
+    /// Remove artifact(s) from a set (does NOT uninstall them)
+    Remove {
+        /// Name of the set to remove from
+        name: String,
+        /// Artifact name(s), optionally prefixed with `skill:` or `agent:`
+        artifacts: Vec<String>,
+        /// Modify a project-scoped set instead of global
+        #[arg(long)]
+        local: bool,
+    },
+    /// Delete a set's definition
+    Delete {
+        /// Name of the set to delete
+        name: String,
+        /// Modify a project-scoped set instead of global
+        #[arg(long)]
+        local: bool,
+        /// Also uninstall members not held by another active set (Phase 2 — not yet implemented)
+        #[arg(long)]
+        purge: bool,
+    },
+    /// Rename a set
+    Rename {
+        /// Current name
+        old: String,
+        /// New name
+        new: String,
+        /// Modify a project-scoped set instead of global
+        #[arg(long)]
+        local: bool,
     },
 }
 
@@ -389,6 +468,120 @@ mod tests {
                 action: SourceAction::Remove { .. }
             }
         ));
+    }
+
+    #[test]
+    fn parse_set_create() {
+        let cli =
+            Cli::try_parse_from(["cmx", "set", "create", "rust-work", "--desc", "desc"]).unwrap();
+        match cli.command {
+            Commands::Set {
+                action: SetAction::Create { name, desc, local },
+            } => {
+                assert_eq!(name, "rust-work");
+                assert_eq!(desc.as_deref(), Some("desc"));
+                assert!(!local);
+            }
+            _ => panic!("expected Set Create"),
+        }
+    }
+
+    #[test]
+    fn parse_set_list() {
+        let cli = Cli::try_parse_from(["cmx", "set", "list"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Set {
+                action: SetAction::List { local: false }
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_set_show() {
+        let cli = Cli::try_parse_from(["cmx", "set", "show", "rust-work"]).unwrap();
+        match cli.command {
+            Commands::Set {
+                action: SetAction::Show { name, local },
+            } => {
+                assert_eq!(name, "rust-work");
+                assert!(!local);
+            }
+            _ => panic!("expected Set Show"),
+        }
+    }
+
+    #[test]
+    fn parse_set_add() {
+        let cli =
+            Cli::try_parse_from(["cmx", "set", "add", "rust-work", "skill:foundry", "agent-x"])
+                .unwrap();
+        match cli.command {
+            Commands::Set {
+                action:
+                    SetAction::Add {
+                        name,
+                        artifacts,
+                        local,
+                    },
+            } => {
+                assert_eq!(name, "rust-work");
+                assert_eq!(artifacts, vec!["skill:foundry".to_string(), "agent-x".to_string()]);
+                assert!(!local);
+            }
+            _ => panic!("expected Set Add"),
+        }
+    }
+
+    #[test]
+    fn parse_set_remove() {
+        let cli = Cli::try_parse_from(["cmx", "set", "remove", "rust-work", "foundry", "--local"])
+            .unwrap();
+        match cli.command {
+            Commands::Set {
+                action:
+                    SetAction::Remove {
+                        name,
+                        artifacts,
+                        local,
+                    },
+            } => {
+                assert_eq!(name, "rust-work");
+                assert_eq!(artifacts, vec!["foundry".to_string()]);
+                assert!(local);
+            }
+            _ => panic!("expected Set Remove"),
+        }
+    }
+
+    #[test]
+    fn parse_set_delete() {
+        let cli = Cli::try_parse_from(["cmx", "set", "delete", "rust-work", "--purge"]).unwrap();
+        match cli.command {
+            Commands::Set {
+                action: SetAction::Delete { name, local, purge },
+            } => {
+                assert_eq!(name, "rust-work");
+                assert!(!local);
+                assert!(purge);
+            }
+            _ => panic!("expected Set Delete"),
+        }
+    }
+
+    #[test]
+    fn parse_set_rename() {
+        let cli = Cli::try_parse_from(["cmx", "set", "rename", "old", "new"]).unwrap();
+        match cli.command {
+            Commands::Set {
+                action: SetAction::Rename { old, new, local },
+            } => {
+                assert_eq!(old, "old");
+                assert_eq!(new, "new");
+                assert!(!local);
+            }
+            _ => panic!("expected Set Rename"),
+        }
     }
 
     #[test]

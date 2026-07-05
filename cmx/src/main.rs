@@ -4,7 +4,7 @@ use std::process::ExitCode;
 
 use cmx::cli::{
     ArtifactAction, Cli, Commands, ConfigAction, ExternalAction, HomeAction, PlatformsAction,
-    SourceAction,
+    SetAction, SourceAction,
 };
 use cmx::context::AppContext;
 use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
@@ -43,6 +43,7 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
         Commands::Source { action } => {
             handle_source(action, paths, ctx).map(|()| ExitCode::SUCCESS)
         }
+        Commands::Set { action } => handle_set(action, ctx).map(|()| ExitCode::SUCCESS),
         Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, selector, ctx),
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, selector, ctx),
         Commands::List { all } => {
@@ -186,6 +187,72 @@ fn handle_source(action: SourceAction, paths: &ConfigPaths, ctx: &AppContext<'_>
             print!("{result}");
             Ok(())
         }
+    }
+}
+
+fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<()> {
+    match action {
+        SetAction::Create { name, desc, local } => {
+            let scope = scope_from(local);
+            let result = cmx::sets::create(&name, desc.as_deref(), scope, ctx)?;
+            print!("{result}");
+            Ok(())
+        }
+        SetAction::List { local } => {
+            let scope = scope_from(local);
+            let result = cmx::sets::list(scope, ctx)?;
+            print!("{result}");
+            Ok(())
+        }
+        SetAction::Show { name, local } => {
+            let scope = scope_from(local);
+            let result = cmx::sets::show(&name, scope, ctx)?;
+            print!("{result}");
+            Ok(())
+        }
+        SetAction::Add {
+            name,
+            artifacts,
+            local,
+        } => {
+            let scope = scope_from(local);
+            let result = cmx::sets::add(&name, &artifacts, scope, ctx)?;
+            print!("{result}");
+            Ok(())
+        }
+        SetAction::Remove {
+            name,
+            artifacts,
+            local,
+        } => {
+            let scope = scope_from(local);
+            let result = cmx::sets::remove(&name, &artifacts, scope, ctx)?;
+            print!("{result}");
+            Ok(())
+        }
+        SetAction::Delete { name, local, purge } => {
+            if purge {
+                bail!("--purge is not yet implemented (Phase 2)");
+            }
+            let scope = scope_from(local);
+            let result = cmx::sets::delete(&name, scope, ctx)?;
+            print!("{result}");
+            Ok(())
+        }
+        SetAction::Rename { old, new, local } => {
+            let scope = scope_from(local);
+            let result = cmx::sets::rename(&old, &new, scope, ctx)?;
+            print!("{result}");
+            Ok(())
+        }
+    }
+}
+
+fn scope_from(local: bool) -> InstallScope {
+    if local {
+        InstallScope::Local
+    } else {
+        InstallScope::Global
     }
 }
 
@@ -708,6 +775,56 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         assert!(handle_source(SourceAction::List, &paths, &ctx).is_ok());
+    }
+
+    #[test]
+    fn handle_set_list_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(handle_set(SetAction::List { local: false }, &ctx).is_ok());
+    }
+
+    #[test]
+    fn handle_set_create_then_show_ok() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        assert!(
+            handle_set(
+                SetAction::Create {
+                    name: "rust-work".to_string(),
+                    desc: None,
+                    local: false,
+                },
+                &ctx,
+            )
+            .is_ok()
+        );
+        assert!(
+            handle_set(
+                SetAction::Show {
+                    name: "rust-work".to_string(),
+                    local: false,
+                },
+                &ctx,
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn handle_set_delete_with_purge_errors() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let result = handle_set(
+            SetAction::Delete {
+                name: "rust-work".to_string(),
+                local: false,
+                purge: true,
+            },
+            &ctx,
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not yet implemented"));
     }
 
     #[test]

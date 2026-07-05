@@ -72,6 +72,18 @@ impl ConfigPaths {
         self.config_dir.join("sources")
     }
 
+    /// Path to `sets.json` for the given scope.
+    ///
+    /// Sets are platform-independent — a single file per scope, unlike
+    /// [`lock_path`](Self::lock_path) which carries a per-platform slug.
+    pub fn sets_path(&self, scope: InstallScope) -> PathBuf {
+        if scope.is_local() {
+            PathBuf::from(".context-mixer").join("sets.json")
+        } else {
+            self.config_dir.join("sets.json")
+        }
+    }
+
     /// Path to `config.json` (LLM gateway settings).
     pub fn config_path(&self) -> PathBuf {
         self.config_dir.join("config.json")
@@ -279,6 +291,21 @@ mod tests {
             paths.git_clones_dir(),
             PathBuf::from("/home/testuser/.config/context-mixer/sources")
         );
+    }
+
+    #[test]
+    fn sets_path_global_returns_config_dir_sets_json() {
+        let paths = test_paths();
+        assert_eq!(
+            paths.sets_path(InstallScope::Global),
+            PathBuf::from("/home/testuser/.config/context-mixer/sets.json")
+        );
+    }
+
+    #[test]
+    fn sets_path_local_returns_relative_path() {
+        let paths = test_paths();
+        assert_eq!(paths.sets_path(InstallScope::Local), PathBuf::from(".context-mixer/sets.json"));
     }
 
     #[test]

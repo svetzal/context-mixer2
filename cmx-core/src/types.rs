@@ -310,6 +310,62 @@ impl SourcesFile {
     }
 }
 
+/// Sets state file (`sets.json`) — a locally-defined, named group of installed
+/// artifacts with a desired activation state. See `SETS.md` for the full design.
+/// Phase 1 covers definitions and curation only; `activate`/`deactivate` are
+/// Phase 2.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct SetsFile {
+    pub version: u32,
+    pub sets: BTreeMap<String, SetDef>,
+}
+
+impl Default for SetsFile {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            sets: BTreeMap::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct SetDef {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub state: SetState,
+    pub members: Vec<SetMember>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SetState {
+    Active,
+    Inactive,
+}
+
+impl std::fmt::Display for SetState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SetState::Active => write!(f, "active"),
+            SetState::Inactive => write!(f, "inactive"),
+        }
+    }
+}
+
+/// A single artifact tracked as a member of a set. `source` is the source
+/// repo name, snapshotted from the lockfile at `set add` time (see
+/// `SETS.md`, "The source pin") so `activate` (Phase 2) can re-install
+/// deterministically even after the lock entry is gone.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct SetMember {
+    #[serde(rename = "type")]
+    pub kind: ArtifactKind,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -559,5 +615,108 @@ mod tests {
         assert_eq!(entry.version.as_deref(), Some("3.1.0"));
         assert_eq!(entry.source.repo, "guidelines");
         assert_eq!(entry.source_checksum, "sha256:aabbcc");
+    }
+
+    // --- SetsFile golden JSON round-trip ---
+
+    const SETS_EXAMPLE_JSON: &str = r#"{
+        "version": 1,
+        "sets": {
+            "rust-work": {
+                "description": "Rust craftsmanship + foundry",
+                "state": "active",
+                "members": [
+                    { "type": "agent", "name": "rust-craftsperson", "source": "guidelines" },
+                    { "type": "skill", "name": "foundry", "source": "home" }
+                ]
+            },
+            "client-ort": {
+                "state": "inactive",
+                "members": [
+                    { "type": "skill", "name": "ubiquity-router", "source": "home" }
+                ]
+            }
+        }
+    }"#;
+
+    #[test]
+    fn sets_file_golden_json_round_trips_exactly() {
+        let parsed: SetsFile =
+            serde_json::from_str(SETS_EXAMPLE_JSON).expect("golden JSON must parse");
+        assert_eq!(parsed.version, 1);
+        assert_eq!(parsed.sets.len(), 2);
+
+        let rust_work = parsed.sets.get("rust-work").expect("rust-work present");
+        assert_eq!(rust_work.description.as_deref(), Some("Rust craftsmanship + foundry"));
+        assert_eq!(rust_work.state, SetState::Active);
+        assert_eq!(rust_work.members.len(), 2);
+        assert_eq!(rust_work.members[0].kind, ArtifactKind::Agent);
+        assert_eq!(rust_work.members[0].name, "rust-craftsperson");
+        assert_eq!(rust_work.members[0].source.as_deref(), Some("guidelines"));
+
+        let client_ort = parsed.sets.get("client-ort").expect("client-ort present");
+        assert!(client_ort.description.is_none());
+        assert_eq!(client_ort.state, SetState::Inactive);
+
+        // Round-trip via Value comparison: order/whitespace-independent, but
+        // proves the exact key set (version/sets/description/state/members/
+        // type/name/source) matches the SETS.md example.
+        let expected: serde_json::Value =
+            serde_json::from_str(SETS_EXAMPLE_JSON).expect("expected JSON parses");
+        let actual = serde_json::to_value(&parsed).expect("serialize");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn set_state_serializes_lowercase() {
+        let json = serde_json::to_string(&SetState::Active).unwrap();
+        assert_eq!(json, "\"active\"");
+        let json = serde_json::to_string(&SetState::Inactive).unwrap();
+        assert_eq!(json, "\"inactive\"");
+    }
+
+    #[test]
+    fn set_member_kind_serializes_under_type_key() {
+        let member = SetMember {
+            kind: ArtifactKind::Agent,
+            name: "rust-craftsperson".to_string(),
+            source: Some("guidelines".to_string()),
+        };
+        let json = serde_json::to_string(&member).unwrap();
+        assert!(json.contains("\"type\":\"agent\""), "expected type key: {json}");
+        assert!(!json.contains("\"kind\""), "kind should not appear literally: {json}");
+    }
+
+    #[test]
+    fn set_def_omits_description_when_none() {
+        let def = SetDef {
+            description: None,
+            state: SetState::Inactive,
+            members: vec![],
+        };
+        let json = serde_json::to_string(&def).unwrap();
+        assert!(!json.contains("description"), "description should be omitted: {json}");
+        assert!(
+            json.contains("\"members\":[]"),
+            "members should serialize even when empty: {json}"
+        );
+    }
+
+    #[test]
+    fn set_member_omits_source_when_none() {
+        let member = SetMember {
+            kind: ArtifactKind::Skill,
+            name: "foo".to_string(),
+            source: None,
+        };
+        let json = serde_json::to_string(&member).unwrap();
+        assert!(!json.contains("source"), "source should be omitted: {json}");
+    }
+
+    #[test]
+    fn sets_file_default_is_empty_version_one() {
+        let sets = SetsFile::default();
+        assert_eq!(sets.version, 1);
+        assert!(sets.sets.is_empty());
     }
 }

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::gateway::filesystem::Filesystem;
 use crate::paths::ConfigPaths;
-use crate::types::{CmxConfig, SourceEntry, SourceType, SourcesFile};
+use crate::types::{CmxConfig, InstallScope, SetsFile, SourceEntry, SourceType, SourcesFile};
 
 mod installed;
 pub use installed::*;
@@ -32,6 +32,43 @@ where
     let mut sources = load_sources(fs, paths)?;
     let result = f(&mut sources)?;
     save_sources(&sources, fs, paths)?;
+    Ok(result)
+}
+
+pub fn load_sets(
+    scope: InstallScope,
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+) -> Result<SetsFile> {
+    crate::json_file::load_json(&paths.sets_path(scope), fs)
+}
+
+pub fn save_sets(
+    sets: &SetsFile,
+    scope: InstallScope,
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+) -> Result<()> {
+    crate::json_file::save_json(sets, &paths.sets_path(scope), fs)
+}
+
+/// Load, mutate via `f`, and save the `SetsFile` for the given scope in one step.
+///
+/// `f` is called with a mutable reference to the in-memory sets and may
+/// return `Err` to abort without writing; on success the file is saved and
+/// the value returned by `f` is propagated.
+pub fn mutate_sets<F, T>(
+    scope: InstallScope,
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+    f: F,
+) -> Result<T>
+where
+    F: FnOnce(&mut SetsFile) -> Result<T>,
+{
+    let mut sets = load_sets(scope, fs, paths)?;
+    let result = f(&mut sets)?;
+    save_sets(&sets, scope, fs, paths)?;
     Ok(result)
 }
 
@@ -197,6 +234,78 @@ mod tests {
         let loaded = load_sources(&fs, &paths).unwrap();
         assert_eq!(loaded.sources.len(), 1);
         assert!(loaded.sources.contains_key("test-source"));
+    }
+
+    // --- load_sets / save_sets / mutate_sets ---
+
+    #[test]
+    fn load_sets_returns_default_when_file_absent() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let sets = load_sets(InstallScope::Global, &fs, &paths).unwrap();
+        assert!(sets.sets.is_empty());
+        assert_eq!(sets.version, 1);
+    }
+
+    #[test]
+    fn mutate_sets_create_modify_save() {
+        use crate::types::{SetDef, SetState};
+
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+
+        mutate_sets(InstallScope::Global, &fs, &paths, |sets| {
+            sets.sets.insert(
+                "rust-work".to_string(),
+                SetDef {
+                    description: Some("desc".to_string()),
+                    state: SetState::Inactive,
+                    members: vec![],
+                },
+            );
+            Ok(())
+        })
+        .unwrap();
+
+        let loaded = load_sets(InstallScope::Global, &fs, &paths).unwrap();
+        assert!(loaded.sets.contains_key("rust-work"));
+    }
+
+    #[test]
+    fn mutate_sets_does_not_save_on_closure_error() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+
+        let result: Result<()> = mutate_sets(InstallScope::Global, &fs, &paths, |_sets| {
+            Err(anyhow::anyhow!("closure error"))
+        });
+        assert!(result.is_err());
+
+        let loaded = load_sets(InstallScope::Global, &fs, &paths).unwrap();
+        assert!(loaded.sets.is_empty(), "sets should not be saved after closure error");
+    }
+
+    #[test]
+    fn load_and_save_sets_round_trip_local_scope() {
+        use crate::types::{SetDef, SetState};
+
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let mut sets = SetsFile::default();
+        sets.sets.insert(
+            "blog".to_string(),
+            SetDef {
+                description: None,
+                state: SetState::Active,
+                members: vec![],
+            },
+        );
+        save_sets(&sets, InstallScope::Local, &fs, &paths).unwrap();
+        let loaded = load_sets(InstallScope::Local, &fs, &paths).unwrap();
+        assert_eq!(loaded.sets.len(), 1);
+        assert!(loaded.sets.contains_key("blog"));
+        // Global scope remains unaffected
+        assert!(load_sets(InstallScope::Global, &fs, &paths).unwrap().sets.is_empty());
     }
 
     // --- load_config_with / save_config_with ---

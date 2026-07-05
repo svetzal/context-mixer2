@@ -10,6 +10,7 @@ mod list;
 mod outdated;
 mod promote;
 mod search;
+mod sets;
 mod source;
 mod sync;
 mod uninstall;

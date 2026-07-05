@@ -18,6 +18,7 @@ pub mod promote;
 pub mod scan;
 pub(crate) mod scan_marketplace;
 pub mod search;
+pub mod sets;
 pub mod source;
 pub(crate) mod source_iter;
 pub mod source_update;
