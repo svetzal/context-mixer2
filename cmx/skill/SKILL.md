@@ -14,7 +14,7 @@ description: >
   whenever the task is installing, updating, listing, searching, or auditing
   agent/skill files that AI coding assistants read from disk.
 license: MIT
-compatibility: Rust binary `cmx`; the `llm`-feature build additionally requires a configured LLM gateway for `info` summaries and `diff`
+compatibility: Rust binary `cmx`. All commands work in every build; an `llm`-feature build with a configured gateway additionally generates `info` summaries and `diff` analyses (both degrade gracefully without one).
 metadata:
   # Placeholder — stamped to the cmx binary version at install by `cmx init`.
   version: "0.0.0"
@@ -33,6 +33,81 @@ what's installed, from where, and at what version.
 Every command accepts a global `--platform <name>` flag to constrain the
 operation to one assistant; when omitted, `install`/`uninstall` act across
 every platform already in use, and other commands default to Claude.
+
+## Agent contract 1 — read state with `--json`, not tables
+
+Every data-reporting command accepts `--json`. When *you* (an agent) are
+reading cmx state to reason about it, always pass `--json` and parse with
+`jq`. The human tables are lossy on purpose (truncated descriptions,
+presentation words, aligned columns); the JSON is the source of truth and
+carries full descriptions, `null` for absent values, and stable enum strings.
+Use the bare human form only when displaying output to the user verbatim.
+
+Shapes you can rely on (JSON to stdout; empty results are valid JSON):
+
+```text
+cmx list --json / cmx skill|agent list --json / cmx outdated --json
+  {"artifacts": [{"name", "kind": "skill"|"agent", "scope": "global"|"local",
+                  "source", "platforms": [..],
+                  "installed_version": str|null, "available_version": str|null,
+                  "status": "ok"|"unversioned"|"outdated"|..,
+                  "locally_modified": bool (outdated only)}]}
+  (version null = no version metadata in frontmatter, not "not installed")
+
+cmx search <q> --json   → results with full untruncated "description"
+cmx info <name> --json  → flat object: path, version, installed_at, source,
+                          installed_checksum/source_checksum/disk_checksum,
+                          locally_modified, activation_description,
+                          summary (str|null — null when no LLM available)
+cmx doctor --json       → {"artifacts": [{name, kind, scope, state, diverged,
+                            locations: [{path, state, version}], ..}],
+                           "summary": {tracked, drifted, untracked, orphaned,
+                                       external, missing, diverged,
+                                       set_inconsistent},
+                           "showing": "needs_attention"|"all",
+                           "scope", "platforms_surveyed", "set_inconsistencies"}
+cmx config show --json  → {gateway, model, external: [..], platforms: [..],
+                           platforms_inferred}
+cmx home path --json    → {"path": ..}
+cmx set list --json     → {"scope", "sets": [..]};  set show --json analogous
+```
+
+Idioms:
+
+```bash
+cmx outdated --json | jq -r '.artifacts[].name'                  # what needs updating
+cmx doctor --json | jq -r '.artifacts[] | select(.diverged) | .name'   # cross-platform drift
+cmx doctor --json | jq -e '.summary.orphaned == 0' >/dev/null    # assert clean adoption
+cmx list --json | jq -e '.artifacts[] | select(.name=="foo")'    # is foo installed?
+cmx info foo --json | jq -r '.locally_modified'                  # safe to update?
+```
+
+**Exit codes are API:** `cmx doctor` exits `2` when it finds actionable
+issues, `0` when clean (both human and `--json` forms). Any other non-zero
+exit means the command itself failed.
+
+## Agent contract 2 — mutations plan by default
+
+The reconciliation commands — `skill|agent sync`, `skill|agent promote`,
+`set activate`, `set deactivate` (and `set delete --purge`) — are
+**plan/apply**: run bare, they print a concrete plan (exact files, paths,
+versions, per-file +/− counts), write **nothing**, and exit 0. Re-run the
+identical command with `--apply` to execute exactly that plan. Read the plan
+before applying. (`--dry-run` survives one release as a deprecated alias for
+the default plan mode and warns on stderr.)
+
+`install`, `uninstall`, and `update` execute immediately (package-manager
+convention) — but when `--force` overwrites local edits on install/update,
+cmx first prints the exact file paths whose changes are being discarded.
+`--force` always means "override a safety refusal", never "skip confirmation".
+
+Help text marks the boundary: `[Mutates]` = writes immediately,
+`[Mutates with --apply]` = plans by default. Unmarked commands are read-only.
+
+Errors teach the next step — argument mistakes print a `try: <exact command>`
+line, unknown artifact names suggest near-matches (`Did you mean 'cli-ux'?`),
+and LLM/gateway failures degrade to a one-line note (never a hard failure of
+the surrounding command). Trust stderr guidance; don't guess flags.
 
 ## Command grammar (verified against `--help`)
 
@@ -80,12 +155,12 @@ cmx set list [--json]                    # name, state, member count, context fo
 cmx set show <name> [--json]             # members + per-member source and install status
 cmx set add <name> <artifact>...         # snapshot already-installed artifacts into the set
 cmx set remove <name> <artifact>...      # drop from set (does NOT uninstall)
-cmx set activate <name>   [--apply]      # shows the install plan first; add --apply to execute
+cmx set activate <name>   [--apply]      # plan by default; --apply executes
 cmx set deactivate <name> [--apply] [--force]
                                           # uninstall every member not held by another
                                           # active set = "turn this set off"; remembers
                                           # membership so re-activating reinstalls fresh
-cmx set delete <name> [--purge] [--apply]  # --purge previews first, then deactivates + deletes
+cmx set delete <name> [--purge] [--apply]  # --purge plans the deactivate+delete; --apply executes
 cmx set rename <old> <new>
 ```
 
@@ -93,9 +168,7 @@ cmx set rename <old> <new>
 separate on-disk state — deactivating an unused set reclaims its context cost
 entirely. `cmx doctor` reports set-consistency issues (an active set with
 missing members, or an inactive set with lingering installs) alongside its
-other checks. `--dry-run` on `activate`/`deactivate` is accepted as a hidden,
-deprecated alias for one release: it shows the same default plan and prints a
-stderr warning steering to `--apply`.
+other checks.
 
 ### Install, list, and inspect artifacts
 
@@ -103,26 +176,27 @@ stderr warning steering to `--apply`.
 cmx skill install <name> [<name>...]     # install by name; `source:name` pins a source
 cmx skill install --all                  # install everything available
 cmx skill install <name> --local         # install into the current project instead of globally
-cmx skill install <name> --force         # overwrite even if locally modified
+cmx skill install <name> --force         # overwrite even if locally modified (lists discarded files)
 cmx skill list [--all] [--json]          # installed skills (--all includes externally-managed ones)
 cmx skill info <name> [--json]           # source, version, activation trigger; a generated
                                           # "what it does" summary too, in an `llm`-feature build
 cmx skill uninstall <name> [<name>...] [--local]   # remove everywhere cmx tracks it
 ```
 
-`cmx agent install/list/info/uninstall` work the same way for agents. There is
-no separate plan/apply step for these — `install`/`uninstall` write
-immediately. When `--force` overwrites local edits on `install` or `update`,
-cmx first lists the exact file paths whose changes are being discarded.
+`cmx agent install/list/info/uninstall` work the same way for agents.
 
 ### Keeping things current
 
 ```bash
-cmx outdated [--json]           # installed artifacts with a newer source version
+cmx outdated --json | jq -r '.artifacts[].name'   # what has a newer source version
 cmx skill update <name>         # pull the latest version from its source
 cmx skill update --all          # update every tracked skill
-cmx skill update <name> --force # overwrite even if locally modified
+cmx skill update <name> --force # overwrite even if locally modified (lists discarded files)
 ```
+
+Check `cmx info <name> --json | jq .locally_modified` before updating a
+single artifact — a `true` means plain `update` will refuse and you must
+decide between `--force` (discard edits) and `promote` (keep them; below).
 
 ### Reconciling drift across tools and canonical homes
 
@@ -130,16 +204,20 @@ Skills installed in more than one assistant's directory can diverge (an agent
 edits the Claude copy but not the Cursor copy). Three commands handle this:
 
 ```bash
-cmx skill diff <name> [--full]         # LLM-analyzed comparison, installed vs source
-                                        # (requires an `llm`-feature build)
-cmx skill sync <name> [--from <tool>] [--apply] [--local]
-                                        # shows the cross-platform reconcile plan;
-                                        # add --apply to copy one platform's copy
-                                        # over the others (works for "external" skills too)
-cmx skill promote <name> [--from <tool>] [--apply]
-                                        # shows the promote plan; add --apply to push
-                                        # in-place edits back into the canonical home
+cmx skill diff <name>                  # structural diff + change summary, always available;
+                                        # an `llm`-feature build adds an LLM-written analysis
+cmx skill diff <name> --full           # full line-by-line unified diff (never needs an LLM)
+cmx skill sync <name> [--from <platform>] [--apply] [--local]
+                                        # plan: copy one platform's copy over the others
+                                        # (works for "external" skills too); --apply executes
+cmx skill promote <name> [--from <platform>] [--apply]
+                                        # plan: push in-place edits back into the canonical
+                                        # home (the mirror of update); --apply executes
 ```
+
+Decision rule (doctor prints the same guidance): edited in place and want to
+keep it → `promote`; want the source version back → `update --force`;
+external/source-less divergence → `sync`; unsure → `diff` first.
 
 ### Canonical home and adoption
 
@@ -158,16 +236,15 @@ cmx skill unadopt <name> [<name>...] [--external]
 
 ### `cmx doctor` — the system-wide survey
 
-`cmx doctor` is **read-only by default**: it walks every platform's install
-directories and cross-references lock files, reporting artifacts that are
-missing, untracked (orphaned), diverged across tools, or otherwise need
-attention.
+`cmx doctor` is **read-only**: it walks every platform's install directories
+and cross-references lock files, reporting artifacts that are missing,
+untracked (orphaned), drifted, diverged across tools, or external.
 
 ```bash
-cmx doctor                      # global scope only, issues only
+cmx doctor --json                # machine-readable survey — the agent default
+cmx doctor                       # human table, issues only
 cmx doctor --local               # also survey project (local) scope
-cmx doctor --all                 # show the full inventory, not just issues
-cmx doctor --json                # machine-readable survey (structured; suppresses the table)
+cmx doctor --all                 # full inventory, not just issues
 
 # To adopt orphans, use the canonical adopt commands — `cmx doctor --adopt-all`
 # is deprecated (still works this release, removed next major):
@@ -175,10 +252,8 @@ cmx skill adopt --all            # canonicalize every orphaned skill into the ho
 cmx agent adopt --all            # ...and every orphaned agent
 ```
 
-**Exit code contract:** `cmx doctor` exits `2` when it finds actionable
-issues, `0` when the system is clean. Script against this — a non-zero,
-non-2 exit means the command itself failed, not that it found something to
-fix.
+**Exit code contract:** `2` = actionable issues found, `0` = clean, anything
+else = the command itself failed. Script against this.
 
 ### Search and config
 
@@ -196,22 +271,9 @@ cmx config platforms {list,add,remove}   # pin the managed platform set; when em
 ### Shell completions
 
 ```bash
-cmx completions zsh                       # writes the zsh completion script to stdout
-cmx completions bash                      # same for bash
+cmx completions zsh                       # completion script to stdout (also: bash, fish,
+                                          # elvish, powershell); pipe/redirect to install
 ```
-
-Supported shells are `bash`, `zsh`, `fish`, `elvish`, and `powershell`.
-Completions are plain script output to stdout, not JSON, so pipe or redirect
-them into the shell-specific location you want to manage.
-
-### `--json`
-
-Every read-only data-reporting command emits `--json`: `list`, kind-scoped
-`agent|skill list`, `outdated`, `search`, `info`, `source list`, `source
-browse`, `set list`, `set show`, `config show`, `home path`, plus `doctor`
-and `init`. Human-formatted output stays the default. JSON always goes to
-stdout, empty results stay valid JSON (`[]` or an object with empty arrays),
-and `cmx doctor --json` still exits `2` when it finds actionable issues.
 
 ### `cmx init` — cmx's own companion skill
 
@@ -231,49 +293,51 @@ bundled one unless `--force` is passed; that refusal exits non-zero.
 `--global` is accepted as a no-op alias (global is already the default) so
 scripts written before this alias existed keep working.
 
-## Typical workflows
+## Typical workflows (agent-shaped)
 
 **Set up a new machine:**
 
 ```bash
 cmx source add guidelines https://github.com/svetzal/guidelines
 cmx skill install --all
-cmx doctor
+cmx doctor --json | jq .summary        # expect zeros; exit 2 = something to fix
 ```
 
-**Find and fix problems across every assistant on a machine:**
+**Survey and fix a messy multi-tool setup:**
 
 ```bash
-cmx doctor --local --all      # full inventory, both scopes
-cmx skill adopt --all         # bring orphaned skills under management
-cmx agent adopt --all         # ...and orphaned agents
+cmx doctor --local --all --json > /tmp/survey.json
+jq -r '.artifacts[] | select(.state=="orphaned") | .name' /tmp/survey.json
+cmx skill adopt --all && cmx agent adopt --all
+jq -r '.artifacts[] | select(.diverged) | .name' /tmp/survey.json
+# then per name: diff → promote / update --force / sync (decision rule above)
 ```
 
 **A skill drifted after an agent edited it in Cursor but not Claude:**
 
 ```bash
-cmx skill diff <name>                 # see what changed (llm build)
-cmx skill sync <name>                 # preview which copy would win
-cmx skill sync <name> --apply         # execute that plan
-cmx skill promote <name> --from cursor       # or: make the Cursor edit canonical
-cmx skill promote <name> --from cursor --apply
+cmx skill diff <name>                        # inspect (works without an LLM)
+cmx skill promote <name> --from cursor       # plan: make the Cursor edit canonical
+cmx skill promote <name> --from cursor --apply   # execute that exact plan
 ```
 
 **Stay current:**
 
 ```bash
 cmx source update
-cmx outdated
-cmx skill update --all
+cmx outdated --json | jq -r '.artifacts[] | select(.locally_modified | not) | .name' \
+  | xargs -n1 cmx skill update
 ```
 
 ## Tips
 
 - Prefer `--all` for bulk install/update over enumerating names by hand.
-- `cmx skill sync` is the reconciliation tool for divergence *between install
-  locations*; `cmx skill update` is for pulling a newer version *from the
-  source*. Use `diff`/`promote` to inspect and resolve, not raw file edits.
+- `sync` reconciles *between install locations*; `update` pulls *from the
+  source*; `promote` pushes in-place edits *back to the canonical home*. Use
+  `diff` to inspect — never resolve drift with raw file edits.
 - `source:name` (e.g. `guidelines:code-review`) pins an install to one source
   when the same artifact name exists in more than one.
 - Global scope is the default everywhere `--local` is offered; pass `--local`
   only when you specifically want a project-scoped install.
+- Plans are cheap and read-only — when unsure what a reconcile command will
+  do, run it bare and read the plan; nothing happens until `--apply`.
