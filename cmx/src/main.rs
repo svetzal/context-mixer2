@@ -397,6 +397,48 @@ fn build_llm_runtime(ctx: &AppContext<'_>) -> Result<LlmRuntime> {
     })
 }
 
+/// `cmx {agent,skill} diff` — the structural diff always runs (no LLM
+/// involved on `--full`); compact mode additionally attempts an LLM summary,
+/// degrading to a one-line note on any failure (unconfigured gateway, auth
+/// error, network error, or — in a lean build — no `llm` feature at all).
+/// Only a genuine diff-compute error (artifact not found, unreadable files)
+/// propagates as an `Err`.
+#[cfg(feature = "llm")]
+fn handle_diff(
+    name: &str,
+    kind: ArtifactKind,
+    full: bool,
+    ctx: &AppContext<'_>,
+) -> Result<cmx::diff::DiffOutput> {
+    match build_llm_runtime(ctx) {
+        Ok(runner) => {
+            let diff_ctx = ctx.with_llm(&runner.llm);
+            runner.rt.block_on(cmx::diff::diff_with_analysis(name, kind, full, &diff_ctx))
+        }
+        Err(e) => {
+            let mut output = cmx::diff::diff(name, kind, full, ctx)?;
+            if !output.show_full && !output.is_up_to_date {
+                output.analysis_note = Some(cmx::diff::llm_unavailable_note(&e));
+            }
+            Ok(output)
+        }
+    }
+}
+
+#[cfg(not(feature = "llm"))]
+fn handle_diff(
+    name: &str,
+    kind: ArtifactKind,
+    full: bool,
+    ctx: &AppContext<'_>,
+) -> Result<cmx::diff::DiffOutput> {
+    let mut output = cmx::diff::diff(name, kind, full, ctx)?;
+    if !output.show_full && !output.is_up_to_date {
+        output.analysis_note = Some(cmx::diff::llm_lean_note());
+    }
+    Ok(output)
+}
+
 fn handle_install(
     names: &[String],
     all: bool,
@@ -452,12 +494,9 @@ fn handle_artifact(
         ArtifactAction::Info { name } => {
             handle_info(&name, Some(kind), ctx).map(|()| ExitCode::SUCCESS)
         }
-        #[cfg(feature = "llm")]
         ArtifactAction::Diff { name, full } => {
             cmx::source_update::ensure_fresh(ctx)?;
-            let runner = build_llm_runtime(ctx)?;
-            let diff_ctx = ctx.with_llm(&runner.llm);
-            let output = runner.rt.block_on(cmx::diff::diff(&name, kind, full, &diff_ctx))?;
+            let output = handle_diff(&name, kind, full, ctx)?;
             print!("{output}");
             Ok(ExitCode::SUCCESS)
         }

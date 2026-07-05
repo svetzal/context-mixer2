@@ -1,6 +1,5 @@
 mod adopt;
 mod config;
-#[cfg(feature = "llm")]
 mod diff;
 pub mod doctor;
 mod info;

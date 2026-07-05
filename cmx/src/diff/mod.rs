@@ -8,6 +8,7 @@ use crate::platform::Platform;
 use crate::source_iter;
 use crate::types::ArtifactKind;
 
+#[cfg(feature = "llm")]
 mod analyze;
 mod discovery;
 mod reconcile;
@@ -40,6 +41,10 @@ pub struct DiffOutput {
     pub file_changes: Vec<FileChange>,
     pub diff_text: Option<String>,
     pub analysis: Option<String>,
+    /// A one-line note shown in place of `analysis` when the LLM summary is
+    /// unavailable (gateway not configured, LLM error, or a lean build without
+    /// the `llm` feature). Mutually exclusive with `analysis`.
+    pub analysis_note: Option<String>,
     /// The reconciliation directions to offer — both ways, since `diff` can't
     /// know which side is authoritative.
     pub reconciliations: Vec<Reconciliation>,
@@ -109,7 +114,13 @@ pub(crate) struct FocusedComparison<'a> {
     pub(crate) kind: ArtifactKind,
     pub(crate) source_name: &'a str,
     pub(crate) changed_label: &'a str,
+    /// Read only by the LLM prompt (`analyze::analyze_focus`); unused in lean
+    /// builds, which never construct a prompt.
+    #[cfg_attr(not(feature = "llm"), allow(dead_code))]
     pub(crate) source_version: Option<&'a str>,
+    /// Read only by the LLM prompt (`analyze::analyze_focus`); unused in lean
+    /// builds, which never construct a prompt.
+    #[cfg_attr(not(feature = "llm"), allow(dead_code))]
     pub(crate) changed_version: Option<&'a str>,
 }
 
@@ -117,13 +128,13 @@ pub(crate) struct FocusedComparison<'a> {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-pub async fn diff(
+pub fn diff(
     name: &str,
     kind: ArtifactKind,
     full: bool,
     ctx: &AppContext<'_>,
 ) -> Result<DiffOutput> {
-    let mut output = gather_diff_with(name, kind, ctx).await?;
+    let mut output = gather_diff_with(name, kind, ctx)?;
     output.show_full = full;
     Ok(output)
 }
@@ -132,7 +143,7 @@ pub async fn diff(
 // Gather (no println!)
 // ---------------------------------------------------------------------------
 
-pub(crate) async fn gather_diff_with(
+pub(crate) fn gather_diff_with(
     name: &str,
     kind: ArtifactKind,
     ctx: &AppContext<'_>,
@@ -188,6 +199,7 @@ pub(crate) async fn gather_diff_with(
             file_changes: Vec::new(),
             diff_text: None,
             analysis: None,
+            analysis_note: None,
             reconciliations: Vec::new(),
             show_full: false,
             copies,
@@ -219,8 +231,6 @@ pub(crate) async fn gather_diff_with(
 
     let reconciliations = reconciliations(&cmp, locally_modified, multi.then_some(focus_platform));
 
-    let analysis = analyze::analyze_focus(&cmp, &evals[focus_idx].dir_diff.unified, ctx).await?;
-
     let focus_eval = &evals[focus_idx];
     Ok(DiffOutput {
         artifact_name: name.to_string(),
@@ -234,12 +244,73 @@ pub(crate) async fn gather_diff_with(
         source_name,
         file_changes: focus_eval.dir_diff.changes.clone(),
         diff_text: Some(focus_eval.dir_diff.unified.clone()),
-        analysis: Some(analysis),
+        analysis: None,
+        analysis_note: None,
         reconciliations,
         show_full: false,
         copies,
         changed_label,
     })
+}
+
+// ---------------------------------------------------------------------------
+// LLM-backed analysis (optional, `llm`-feature only) — layered on top of the
+// synchronous, LLM-free structural diff above.
+// ---------------------------------------------------------------------------
+
+/// Rebuild the [`FocusedComparison`] the diverged `output` was computed from
+/// and ask the LLM to summarize its unified diff.
+#[cfg(feature = "llm")]
+async fn analyze(output: &DiffOutput, ctx: &AppContext<'_>) -> Result<String> {
+    let cmp = FocusedComparison {
+        name: &output.artifact_name,
+        kind: output.kind,
+        source_name: &output.source_name,
+        changed_label: &output.changed_label,
+        source_version: output.source_version.as_deref(),
+        changed_version: output.installed_version.as_deref(),
+    };
+    analyze::analyze_focus(&cmp, output.diff_text.as_deref().unwrap_or(""), ctx).await
+}
+
+/// Like [`diff`], but also attempts an LLM summary of a diverged, compact-mode
+/// diff. LLM failures degrade to [`DiffOutput::analysis_note`] rather than
+/// failing the command — only a genuine diff-compute error propagates.
+#[cfg(feature = "llm")]
+pub async fn diff_with_analysis(
+    name: &str,
+    kind: ArtifactKind,
+    full: bool,
+    ctx: &AppContext<'_>,
+) -> Result<DiffOutput> {
+    let mut output = diff(name, kind, full, ctx)?;
+    if !output.show_full && !output.is_up_to_date {
+        match analyze(&output, ctx).await {
+            Ok(prose) => output.analysis = Some(prose),
+            Err(e) => output.analysis_note = Some(llm_unavailable_note(&e)),
+        }
+    }
+    Ok(output)
+}
+
+/// One-line note shown in place of the analysis when the LLM summary failed
+/// (gateway not configured, auth error, network error, ...). Never surfaces
+/// the raw upstream error body.
+#[cfg(feature = "llm")]
+pub fn llm_unavailable_note(e: &anyhow::Error) -> String {
+    format!(
+        "note: LLM summary unavailable ({}). Fix the gateway (`cmx config gateway`, \
+         `cmx config model`, or set OPENAI_API_KEY), or use --full for the plain diff.",
+        crate::info::condense_error(e)
+    )
+}
+
+/// One-line note shown in place of the analysis in a lean build (no `llm`
+/// feature), so compact mode never claims LLM analysis it can't perform.
+pub fn llm_lean_note() -> String {
+    "note: LLM summary unavailable — this build lacks the llm feature. Use --full for the plain \
+     line-by-line diff."
+        .to_string()
 }
 
 fn find_in_sources_with(
@@ -261,7 +332,7 @@ fn find_in_sources_with(
 mod tests {
     use super::*;
     use crate::context::AppContext;
-    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient, FakeLlmClient};
+    use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use crate::test_support::{
         TestContext, agent_content, install_agent_on_disk, make_lock_entry_versioned,
         save_lock_with_entry, setup_source_with_agent, test_paths,
@@ -291,10 +362,10 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // --- diff_with (top-level async) ---
+    // --- diff (top-level, synchronous, LLM-free) ---
 
-    #[tokio::test]
-    async fn diff_with_reports_up_to_date_when_checksums_match() {
+    #[test]
+    fn diff_with_reports_up_to_date_when_checksums_match() {
         let t = TestContext::new();
         let content = agent_content("my-agent", "A test agent");
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
@@ -309,13 +380,13 @@ mod tests {
         );
 
         let ctx = t.ctx();
-        let output = diff("my-agent", ArtifactKind::Agent, false, &ctx).await.unwrap();
+        let output = diff("my-agent", ArtifactKind::Agent, false, &ctx).unwrap();
         assert!(output.is_up_to_date);
         assert!(output.reconciliations.is_empty(), "nothing to reconcile when in sync");
     }
 
-    #[tokio::test]
-    async fn diff_with_errors_without_llm_when_checksums_differ() {
+    #[test]
+    fn diff_succeeds_without_llm_when_checksums_differ() {
         let t = TestContext::new();
         setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
         install_agent_on_disk(
@@ -333,19 +404,24 @@ mod tests {
             InstallScope::Global,
         );
 
+        // `t.ctx()` carries `llm: None` — the plain, LLM-free diff must still
+        // succeed and simply leave the analysis unset.
         let ctx = t.ctx();
-        let result = diff("my-agent", ArtifactKind::Agent, false, &ctx).await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("LLM"));
+        let result = diff("my-agent", ArtifactKind::Agent, false, &ctx);
+        let output = result.expect("structural diff must not require an LLM");
+        assert!(!output.is_up_to_date);
+        assert!(output.analysis.is_none(), "plain diff() never attempts LLM analysis");
+        assert!(output.analysis_note.is_none(), "plain diff() never sets a note either");
+        assert!(output.diff_text.is_some(), "unified diff present");
+        assert!(!output.file_changes.is_empty(), "file change recorded");
     }
 
-    #[tokio::test]
-    async fn gather_diff_populates_paths_changes_and_reconciliations() {
+    #[test]
+    fn gather_diff_populates_paths_changes_and_reconciliations() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
         let clock = FakeClock::at(Utc::now());
         let paths = test_paths();
-        let llm = FakeLlmClient::new("LLM analysis result");
 
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
         install_agent_on_disk(
@@ -368,12 +444,12 @@ mod tests {
             git: &git,
             clock: &clock,
             paths: &paths,
-            llm: Some(&llm),
+            llm: None,
         };
-        let output = gather_diff_with("my-agent", ArtifactKind::Agent, &ctx).await.unwrap();
+        let output = gather_diff_with("my-agent", ArtifactKind::Agent, &ctx).unwrap();
 
         assert!(!output.is_up_to_date);
-        assert_eq!(output.analysis.as_deref(), Some("LLM analysis result"));
+        assert!(output.analysis.is_none(), "gather never invokes the LLM itself");
         assert!(!output.file_changes.is_empty(), "file change recorded");
         assert!(output.diff_text.is_some(), "unified diff present");
         assert!(output.installed_path.ends_with("my-agent.md"), "installed path set");
@@ -381,15 +457,14 @@ mod tests {
         assert!(output.installed_locally_edited, "edited after install (checksum mismatch)");
     }
 
-    #[tokio::test]
-    async fn gather_diff_skill_focuses_the_differing_platform() {
+    #[test]
+    fn gather_diff_skill_focuses_the_differing_platform() {
         use crate::test_support::{setup_source, skill_content};
 
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
         let clock = FakeClock::at(Utc::now());
         let paths = test_paths();
-        let llm = FakeLlmClient::new("analysis");
 
         // Source is the home; the Claude copy matches it, the Codex copy differs.
         let source = skill_content("the canonical skill");
@@ -426,11 +501,11 @@ mod tests {
             git: &git,
             clock: &clock,
             paths: &paths,
-            llm: Some(&llm),
+            llm: None,
         };
         // Active platform is Claude (the matching copy), yet diff must surface the
         // Codex divergence rather than report "matches".
-        let output = gather_diff_with("pf", ArtifactKind::Skill, &ctx).await.unwrap();
+        let output = gather_diff_with("pf", ArtifactKind::Skill, &ctx).unwrap();
 
         assert!(!output.is_up_to_date, "must not claim up-to-date while a copy differs");
         assert_eq!(output.copies.len(), 2, "both platform copies surveyed");
@@ -449,5 +524,77 @@ mod tests {
             "reconcile qualified to the diverging platform: {:?}",
             output.reconciliations[0]
         );
+    }
+
+    // --- diff_with_analysis (llm-feature only) ---
+
+    #[cfg(feature = "llm")]
+    #[tokio::test]
+    async fn full_mode_never_invokes_llm() {
+        use crate::gateway::fakes::FakeLlmClient;
+
+        let t = TestContext::new();
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
+        install_agent_on_disk(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            "different installed content",
+            InstallScope::Global,
+        );
+        save_lock_with_entry(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
+            InstallScope::Global,
+        );
+
+        let llm = FakeLlmClient::new("x");
+        let ctx = t.ctx().with_llm(&llm);
+        let output = diff_with_analysis("my-agent", ArtifactKind::Agent, true, &ctx)
+            .await
+            .expect("full diff must succeed");
+
+        assert!(llm.all_calls().is_empty(), "--full must never touch the LLM");
+        assert!(output.analysis.is_none());
+        assert!(output.analysis_note.is_none());
+    }
+
+    #[cfg(feature = "llm")]
+    #[tokio::test]
+    async fn failing_llm_degrades_to_note_not_error() {
+        use crate::gateway::fakes::FakeLlmClient;
+
+        let t = TestContext::new();
+        setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
+        install_agent_on_disk(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            "different installed content",
+            InstallScope::Global,
+        );
+        save_lock_with_entry(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            make_lock_entry_versioned(ArtifactKind::Agent, "1.0.0", "my-source", "my-agent.md"),
+            InstallScope::Global,
+        );
+
+        let mut llm = FakeLlmClient::new("x");
+        llm.should_fail = true;
+        let ctx = t.ctx().with_llm(&llm);
+        let output = diff_with_analysis("my-agent", ArtifactKind::Agent, false, &ctx)
+            .await
+            .expect("a failing LLM must not fail the command");
+
+        assert!(output.analysis.is_none());
+        let note = output.analysis_note.expect("a note must be set when the LLM fails");
+        assert!(note.contains("LLM summary unavailable"), "{note}");
+        assert!(note.contains("--full"), "{note}");
+        assert!(note.contains("configured to fail"), "condensed reason present: {note}");
+        assert!(!note.contains('\n'), "no raw multi-line error body: {note}");
     }
 }

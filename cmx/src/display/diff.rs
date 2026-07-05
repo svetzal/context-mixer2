@@ -1,11 +1,7 @@
-#[cfg(feature = "llm")]
 use crate::diff::{DiffOutput, FileStatus};
-#[cfg(feature = "llm")]
 use crate::platform::platforms_label;
-#[cfg(feature = "llm")]
 use std::fmt;
 
-#[cfg(feature = "llm")]
 impl DiffOutput {
     /// Render the "which copy" header: a per-platform matrix when several copies
     /// exist (so a match on one platform can't mask a drift on another), or the
@@ -67,7 +63,6 @@ impl DiffOutput {
     }
 }
 
-#[cfg(feature = "llm")]
 impl fmt::Display for DiffOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_up_to_date {
@@ -104,6 +99,9 @@ impl fmt::Display for DiffOutput {
         if let Some(analysis) = &self.analysis {
             writeln!(f, "Summary:")?;
             writeln!(f, "{analysis}")?;
+            writeln!(f)?;
+        } else if let Some(note) = &self.analysis_note {
+            writeln!(f, "{note}")?;
             writeln!(f)?;
         }
 
@@ -143,7 +141,7 @@ impl fmt::Display for DiffOutput {
     }
 }
 
-#[cfg(all(test, feature = "llm"))]
+#[cfg(test)]
 mod tests {
     use crate::diff::{CopyStatus, DiffOutput, FileChange, FileStatus, Reconciliation};
     use crate::platform::Platform;
@@ -181,6 +179,7 @@ mod tests {
             analysis: Some(
                 "The installed copy is the newer, more authoritative rule set.".to_string(),
             ),
+            analysis_note: None,
             reconciliations: vec![
                 Reconciliation {
                     description: "keep the installed edits, update the home".to_string(),
@@ -272,6 +271,16 @@ mod tests {
         assert!(out.contains("+124"), "added count: {out}");
         assert!(out.contains("A  references/new.md"), "added-file flag: {out}");
         assert!(out.contains("only in claude"), "names the platform copy: {out}");
+    }
+
+    #[test]
+    fn shows_analysis_note_instead_of_summary_when_analysis_unavailable() {
+        let mut r = diverged();
+        r.analysis = None;
+        r.analysis_note = Some("note: LLM summary unavailable (auth error).".to_string());
+        let out = r.to_string();
+        assert!(out.contains("note: LLM summary unavailable (auth error)."), "{out}");
+        assert!(!out.contains("Summary:"), "no Summary: heading without an analysis: {out}");
     }
 
     #[test]

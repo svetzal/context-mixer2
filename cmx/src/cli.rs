@@ -290,8 +290,8 @@ pub enum ArtifactAction {
         /// Artifact name
         name: String,
     },
-    #[cfg(feature = "llm")]
-    /// Compare installed artifact with source version using LLM analysis
+    /// Compare an installed artifact against its source and other installed
+    /// copies (an `llm`-feature build additionally summarizes the diff)
     Diff {
         /// Artifact name
         name: String,

@@ -3,7 +3,6 @@ pub mod cli;
 pub mod cmx_config;
 pub(crate) mod codex_agent;
 pub(crate) mod copy;
-#[cfg(feature = "llm")]
 pub mod diff;
 pub mod display;
 pub mod doctor;
@@ -24,7 +23,6 @@ pub(crate) mod source_iter;
 pub mod source_update;
 pub mod sync;
 pub mod table;
-#[cfg(feature = "llm")]
 pub(crate) mod text_diff;
 pub mod uninstall;
 
