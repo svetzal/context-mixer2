@@ -16,7 +16,7 @@ description: >
 license: MIT
 compatibility: Rust binary `cmx`; the `llm`-feature build additionally requires a configured LLM gateway for `info` summaries and `diff`
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   author: Stacey Vetzal
 ---
 
@@ -40,7 +40,7 @@ cmx source   {add,list,browse,update,remove}
 cmx agent    {install,list,info,diff,update,sync,promote,uninstall,unadopt,adopt}
 cmx skill    {install,list,info,diff,update,sync,promote,uninstall,unadopt,adopt}
 cmx list     [--all]
-cmx doctor   [--local] [--adopt-all] [--from <dir>] [--all]
+cmx doctor   [--local] [--all] [--json]   (deprecated: --adopt-all, --from)
 cmx home     {init,path}
 cmx outdated
 cmx search   <query>
@@ -134,8 +134,12 @@ attention.
 cmx doctor                      # global scope only, issues only
 cmx doctor --local               # also survey project (local) scope
 cmx doctor --all                 # show the full inventory, not just issues
-cmx doctor --adopt-all [--from <dir>]   # the one MUTATING doctor flag: adopt every
-                                        # orphan into the canonical home
+cmx doctor --json                # machine-readable survey (structured; suppresses the table)
+
+# To adopt orphans, use the canonical adopt commands — `cmx doctor --adopt-all`
+# is deprecated (still works this release, removed next major):
+cmx skill adopt --all            # canonicalize every orphaned skill into the home
+cmx agent adopt --all            # ...and every orphaned agent
 ```
 
 **Exit code contract:** `cmx doctor` exits `2` when it finds actionable
@@ -158,8 +162,12 @@ cmx config platforms {list,add,remove}   # pin the managed platform set; when em
 
 ### `--json`
 
-As of this version, **only `cmx init` emits `--json`**. Every other command
-prints human-formatted text; do not assume machine-readable output elsewhere.
+`cmx init` and `cmx doctor` emit `--json`; every other command prints
+human-formatted text, so don't assume machine-readable output elsewhere.
+`cmx doctor --json` returns the full survey — `scope`, `platforms_surveyed`,
+`showing`, a `summary` counts object, and an `artifacts` array with structured
+`locations` for diverged artifacts — and still exits `2` when it finds
+actionable issues.
 
 ### `cmx init` — cmx's own companion skill
 
@@ -191,7 +199,8 @@ cmx doctor
 **Find and fix problems across every assistant on a machine:**
 ```bash
 cmx doctor --local --all      # full inventory, both scopes
-cmx doctor --adopt-all        # bring orphans under management
+cmx skill adopt --all         # bring orphaned skills under management
+cmx agent adopt --all         # ...and orphaned agents
 ```
 
 **A skill drifted after an agent edited it in Cursor but not Claude:**

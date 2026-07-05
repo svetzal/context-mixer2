@@ -50,12 +50,25 @@ release, refresh the local install as an explicit extra step (see step 3).
 
 Releasing is three distinct steps:
 
-1. **Prep** (a normal commit on `main`): bump `version` in the root
-   `Cargo.toml` (workspace version; `cmx`/`cmf` inherit it via
-   `version.workspace = true`), run a build so `Cargo.lock` picks up the new
-   `cmx`/`cmf` versions, finalize `CHANGELOG.md` (date the new section, open a
-   fresh `## [Unreleased]`), and commit as `chore(release): prepare X.Y.Z`.
-   This does **not** tag — nothing publishes yet.
+1. **Prep** (a normal commit on `main`). Do all of the following, then make one
+   `chore(release): prepare X.Y.Z` commit — this does **not** tag, nothing
+   publishes yet:
+   - **Reconcile the embedded companion skill.** `cmx/skill/SKILL.md` is
+     `include_str!`-embedded into the binary and installed to every user (and
+     every driving agent) by `cmx init`, so a skill that lags the CLI ships
+     wrong instructions to every consumer of the release. Diff the surface
+     against the skill: `git log <last-vX.Y.Z-tag>..HEAD -- cmx/src/cli.rs
+     'cmx/src/**'` shows what moved. For any command whose grammar, flags,
+     defaults, deprecations, `--json` coverage, exit codes, or examples changed,
+     rebuild and run `cmx --help` / `cmx <sub> --help`, update the matching
+     sections of `SKILL.md`, and bump its `metadata.version`. **A release that
+     changed the surface but not the skill is not ready to tag.**
+   - Bump `version` in the root `Cargo.toml` (workspace version; `cmx`/`cmf`
+     inherit it via `version.workspace = true`). `cmx-core` versions
+     independently — do not touch it here.
+   - Run a build so `Cargo.lock` picks up the new `cmx`/`cmf` versions.
+   - Finalize `CHANGELOG.md` (date the new section, open a fresh
+     `## [Unreleased]`).
 2. **Tag** (the publish trigger): create a **lightweight** tag `vX.Y.Z` (match
    existing tag style — `git tag vX.Y.Z`, not `-a`) and push it. The push fires
    `release.yml`.
