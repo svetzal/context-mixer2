@@ -79,12 +79,12 @@ cmx set list [--json]                    # name, state, member count, context fo
 cmx set show <name> [--json]             # members + per-member source and install status
 cmx set add <name> <artifact>...         # snapshot already-installed artifacts into the set
 cmx set remove <name> <artifact>...      # drop from set (does NOT uninstall)
-cmx set activate <name>   [--dry-run]    # install every member = "turn this set on"
-cmx set deactivate <name> [--dry-run] [--force]
+cmx set activate <name>   [--apply]      # shows the install plan first; add --apply to execute
+cmx set deactivate <name> [--apply] [--force]
                                           # uninstall every member not held by another
                                           # active set = "turn this set off"; remembers
                                           # membership so re-activating reinstalls fresh
-cmx set delete <name> [--purge]          # --purge also deactivates first
+cmx set delete <name> [--purge] [--apply]  # --purge previews first, then deactivates + deletes
 cmx set rename <old> <new>
 ```
 
@@ -92,7 +92,9 @@ cmx set rename <old> <new>
 separate on-disk state — deactivating an unused set reclaims its context cost
 entirely. `cmx doctor` reports set-consistency issues (an active set with
 missing members, or an inactive set with lingering installs) alongside its
-other checks.
+other checks. `--dry-run` on `activate`/`deactivate` is accepted as a hidden,
+deprecated alias for one release: it shows the same default plan and prints a
+stderr warning steering to `--apply`.
 
 ### Install, list, and inspect artifacts
 
@@ -108,9 +110,9 @@ cmx skill uninstall <name> [<name>...] [--local]   # remove everywhere cmx track
 ```
 
 `cmx agent install/list/info/uninstall` work the same way for agents. There is
-no separate plan/dry-run step for these — `install`/`uninstall` write
-immediately. `cmx skill sync` is the one artifact subcommand with a
-`--dry-run` preview (see below).
+no separate plan/apply step for these — `install`/`uninstall` write
+immediately. When `--force` overwrites local edits on `install` or `update`,
+cmx first lists the exact file paths whose changes are being discarded.
 
 ### Keeping things current
 
@@ -129,15 +131,13 @@ edits the Claude copy but not the Cursor copy). Three commands handle this:
 ```bash
 cmx skill diff <name> [--full]         # LLM-analyzed comparison, installed vs source
                                         # (requires an `llm`-feature build)
-cmx skill sync <name> [--from <tool>] [--dry-run] [--local]
-                                        # copy one platform's copy over the others;
-                                        # works even for skills cmx doesn't track a
-                                        # source for ("external" skills)
-cmx skill promote <name> [--from <tool>]
-                                        # push in-place edits back into the canonical
-                                        # home — the mirror of `update`; if several
-                                        # platforms diverge, pick the winner with
-                                        # --from
+cmx skill sync <name> [--from <tool>] [--apply] [--local]
+                                        # shows the cross-platform reconcile plan;
+                                        # add --apply to copy one platform's copy
+                                        # over the others (works for "external" skills too)
+cmx skill promote <name> [--from <tool>] [--apply]
+                                        # shows the promote plan; add --apply to push
+                                        # in-place edits back into the canonical home
 ```
 
 ### Canonical home and adoption
@@ -241,8 +241,10 @@ cmx agent adopt --all         # ...and orphaned agents
 
 ```bash
 cmx skill diff <name>                 # see what changed (llm build)
-cmx skill sync <name> --dry-run       # preview which copy would win
+cmx skill sync <name>                 # preview which copy would win
+cmx skill sync <name> --apply         # execute that plan
 cmx skill promote <name> --from cursor       # or: make the Cursor edit canonical
+cmx skill promote <name> --from cursor --apply
 ```
 
 **Stay current:**

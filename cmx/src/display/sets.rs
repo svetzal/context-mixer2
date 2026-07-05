@@ -23,6 +23,24 @@ fn format_footprint(chars: usize) -> String {
     }
 }
 
+fn activation_targets_line(targets: &[crate::sets::MemberActivateTarget]) -> String {
+    targets
+        .iter()
+        .map(|target| {
+            format!("{} -> {}", target.source_path.display(), target.target_path.display())
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn deactivate_targets_line(targets: &[crate::sets::MemberDeactivateTarget]) -> String {
+    targets
+        .iter()
+        .map(|target| target.artifact_path.display().to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 impl fmt::Display for SetCreateResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.seeded_from {
@@ -122,8 +140,8 @@ impl fmt::Display for SetRemoveResult {
 
 impl fmt::Display for SetActivateResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.dry_run {
-            writeln!(f, "Would activate set '{}':", self.name)?;
+        if !self.apply {
+            writeln!(f, "Plan to activate set '{}':", self.name)?;
         } else if self.any_failed {
             writeln!(f, "Set '{}' partially activated:", self.name)?;
         } else {
@@ -135,13 +153,19 @@ impl fmt::Display for SetActivateResult {
         }
         for m in &self.members {
             let line = match &m.outcome {
-                MemberActivateOutcome::Installed if self.dry_run => "would install".to_string(),
+                MemberActivateOutcome::Installed if !self.apply => "install".to_string(),
                 MemberActivateOutcome::Installed => "installed".to_string(),
                 MemberActivateOutcome::AlreadyInstalled => "already installed".to_string(),
                 MemberActivateOutcome::Unresolvable(reason) => format!("unresolvable ({reason})"),
                 MemberActivateOutcome::Failed(reason) => format!("failed ({reason})"),
             };
             writeln!(f, "  {} {}: {line}", m.kind, m.name)?;
+            if !m.targets.is_empty() {
+                writeln!(f, "    {}", activation_targets_line(&m.targets))?;
+            }
+        }
+        if !self.apply {
+            writeln!(f, "Re-run with --apply to make these changes.")?;
         }
         Ok(())
     }
@@ -149,8 +173,8 @@ impl fmt::Display for SetActivateResult {
 
 impl fmt::Display for SetDeactivateResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.dry_run {
-            writeln!(f, "Would deactivate set '{}':", self.name)?;
+        if !self.apply {
+            writeln!(f, "Plan to deactivate set '{}':", self.name)?;
         } else if self.any_blocked {
             writeln!(f, "Set '{}' partially deactivated:", self.name)?;
         } else {
@@ -161,10 +185,13 @@ impl fmt::Display for SetDeactivateResult {
             return Ok(());
         }
         for m in &self.members {
+            let has_discarded_paths =
+                m.targets.iter().any(|target| !target.discarded_paths.is_empty());
             let line = match &m.outcome {
-                MemberDeactivateOutcome::Uninstalled if self.dry_run => {
-                    "would uninstall".to_string()
+                MemberDeactivateOutcome::Uninstalled if !self.apply && has_discarded_paths => {
+                    "uninstall (--force will discard local edits)".to_string()
                 }
+                MemberDeactivateOutcome::Uninstalled if !self.apply => "uninstall".to_string(),
                 MemberDeactivateOutcome::Uninstalled => "uninstalled".to_string(),
                 MemberDeactivateOutcome::NotInstalled => "not installed".to_string(),
                 MemberDeactivateOutcome::Retained(holder) => {
@@ -175,6 +202,19 @@ impl fmt::Display for SetDeactivateResult {
                 }
             };
             writeln!(f, "  {} {}: {line}", m.kind, m.name)?;
+            if !m.targets.is_empty() {
+                writeln!(f, "    {}", deactivate_targets_line(&m.targets))?;
+            }
+            if has_discarded_paths {
+                for target in &m.targets {
+                    for path in &target.discarded_paths {
+                        writeln!(f, "    would discard {}", path.display())?;
+                    }
+                }
+            }
+        }
+        if !self.apply {
+            writeln!(f, "Re-run with --apply to make these changes.")?;
         }
         Ok(())
     }
@@ -182,7 +222,23 @@ impl fmt::Display for SetDeactivateResult {
 
 impl fmt::Display for SetDeleteResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Set '{}' deleted.", self.name)
+        if !self.purge {
+            return writeln!(f, "Set '{}' deleted.", self.name);
+        }
+        if let Some(deactivate) = &self.deactivate {
+            write!(f, "{deactivate}")?;
+        }
+        if self.deleted {
+            writeln!(f, "Set '{}' deleted.", self.name)
+        } else if !self.apply {
+            writeln!(f, "Set '{}' would be deleted after the purge plan above.", self.name)
+        } else {
+            writeln!(
+                f,
+                "Set '{}' was not deleted because the purge was blocked by local edits.",
+                self.name
+            )
+        }
     }
 }
 
@@ -351,15 +407,17 @@ mod tests {
                     kind: ArtifactKind::Agent,
                     name: "rust-craftsperson".to_string(),
                     outcome: MemberActivateOutcome::Installed,
+                    targets: Vec::new(),
                 },
                 MemberActivateStatus {
                     kind: ArtifactKind::Skill,
                     name: "foundry".to_string(),
                     outcome: MemberActivateOutcome::AlreadyInstalled,
+                    targets: Vec::new(),
                 },
             ],
             any_failed: false,
-            dry_run: false,
+            apply: true,
         };
         let out = r.to_string();
         assert!(out.contains("Set 'rust-work' activated."));
@@ -377,9 +435,10 @@ mod tests {
                 outcome: MemberActivateOutcome::Unresolvable(
                     "source 'gone' is not registered".to_string(),
                 ),
+                targets: Vec::new(),
             }],
             any_failed: true,
-            dry_run: false,
+            apply: true,
         };
         let out = r.to_string();
         assert!(out.contains("partially activated"));
@@ -394,13 +453,15 @@ mod tests {
                 kind: ArtifactKind::Agent,
                 name: "rust-craftsperson".to_string(),
                 outcome: MemberActivateOutcome::Installed,
+                targets: Vec::new(),
             }],
             any_failed: false,
-            dry_run: true,
+            apply: false,
         };
         let out = r.to_string();
-        assert!(out.contains("Would activate set 'rust-work'"));
-        assert!(out.contains("rust-craftsperson: would install"));
+        assert!(out.contains("Plan to activate set 'rust-work'"));
+        assert!(out.contains("rust-craftsperson: install"));
+        assert!(out.contains("Re-run with --apply"));
     }
 
     #[test]
@@ -412,15 +473,17 @@ mod tests {
                     kind: ArtifactKind::Agent,
                     name: "rust-craftsperson".to_string(),
                     outcome: MemberDeactivateOutcome::Uninstalled,
+                    targets: Vec::new(),
                 },
                 MemberDeactivateStatus {
                     kind: ArtifactKind::Skill,
                     name: "foundry".to_string(),
                     outcome: MemberDeactivateOutcome::Retained("blog".to_string()),
+                    targets: Vec::new(),
                 },
             ],
             any_blocked: false,
-            dry_run: false,
+            apply: true,
         };
         let out = r.to_string();
         assert!(out.contains("Set 'rust-work' deactivated."));
@@ -436,9 +499,10 @@ mod tests {
                 kind: ArtifactKind::Agent,
                 name: "rust-craftsperson".to_string(),
                 outcome: MemberDeactivateOutcome::DriftBlocked,
+                targets: Vec::new(),
             }],
             any_blocked: true,
-            dry_run: false,
+            apply: true,
         };
         let out = r.to_string();
         assert!(out.contains("partially deactivated"));
@@ -454,19 +518,25 @@ mod tests {
                 kind: ArtifactKind::Agent,
                 name: "rust-craftsperson".to_string(),
                 outcome: MemberDeactivateOutcome::Uninstalled,
+                targets: Vec::new(),
             }],
             any_blocked: false,
-            dry_run: true,
+            apply: false,
         };
         let out = r.to_string();
-        assert!(out.contains("Would deactivate set 'rust-work'"));
-        assert!(out.contains("rust-craftsperson: would uninstall"));
+        assert!(out.contains("Plan to deactivate set 'rust-work'"));
+        assert!(out.contains("rust-craftsperson: uninstall"));
+        assert!(out.contains("Re-run with --apply"));
     }
 
     #[test]
     fn set_delete_result_display() {
         let r = SetDeleteResult {
             name: "blog".to_string(),
+            purge: false,
+            apply: true,
+            deleted: true,
+            deactivate: None,
         };
         assert_eq!(r.to_string(), "Set 'blog' deleted.\n");
     }

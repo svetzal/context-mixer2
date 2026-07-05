@@ -32,6 +32,72 @@ pub(super) fn diff_artifact(
     }
 }
 
+pub(crate) fn file_changes_between(
+    kind: ArtifactKind,
+    current: &Path,
+    desired: &Path,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<FileChange>> {
+    Ok(match kind {
+        ArtifactKind::Agent => {
+            if ctx.fs.exists(current) && ctx.fs.exists(desired) {
+                diff_files(current, desired, "desired", ctx)?.changes
+            } else if ctx.fs.exists(current) {
+                single_agent_changes(current, FileStatus::OnlyInInstalled, ctx)?
+            } else if ctx.fs.exists(desired) {
+                single_agent_changes(desired, FileStatus::OnlyInSource, ctx)?
+            } else {
+                Vec::new()
+            }
+        }
+        ArtifactKind::Skill => {
+            if ctx.fs.exists(current) && ctx.fs.exists(desired) {
+                diff_dirs(current, desired, "desired", ctx)?.changes
+            } else if ctx.fs.exists(current) {
+                single_dir_changes(current, FileStatus::OnlyInInstalled, ctx)?
+            } else if ctx.fs.exists(desired) {
+                single_dir_changes(desired, FileStatus::OnlyInSource, ctx)?
+            } else {
+                Vec::new()
+            }
+        }
+    })
+}
+
+fn single_agent_changes(
+    path: &Path,
+    status: FileStatus,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<FileChange>> {
+    let content = ctx.fs.read_to_string(path)?;
+    let lines = split_lines(&content);
+    Ok(vec![FileChange {
+        path: path.file_name().and_then(|n| n.to_str()).unwrap_or("file").to_string(),
+        status,
+        added: usize::from(matches!(status, FileStatus::OnlyInInstalled)) * lines.len(),
+        removed: usize::from(matches!(status, FileStatus::OnlyInSource)) * lines.len(),
+    }])
+}
+
+fn single_dir_changes(
+    dir: &Path,
+    status: FileStatus,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<FileChange>> {
+    let mut changes = Vec::new();
+    for path in collect_relative_files_with(dir, ctx)? {
+        let content = ctx.fs.read_to_string(&dir.join(&path))?;
+        let lines = split_lines(&content);
+        changes.push(FileChange {
+            path,
+            status,
+            added: usize::from(matches!(status, FileStatus::OnlyInInstalled)) * lines.len(),
+            removed: usize::from(matches!(status, FileStatus::OnlyInSource)) * lines.len(),
+        });
+    }
+    Ok(changes)
+}
+
 pub(super) fn diff_files(
     installed: &Path,
     source: &Path,

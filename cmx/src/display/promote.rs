@@ -1,7 +1,38 @@
 use std::fmt;
 
+use crate::diff::{FileChange, FileStatus};
 use crate::platform::platforms_label;
 use crate::promote::PromoteResult;
+
+fn version_label(version: Option<&str>) -> &str {
+    version.unwrap_or("unversioned")
+}
+
+fn change_counts(changes: &[FileChange]) -> (usize, usize, usize) {
+    changes
+        .iter()
+        .fold((0, 0, 0), |(modified, added, deleted), change| match change.status {
+            FileStatus::Modified => (modified + 1, added, deleted),
+            FileStatus::OnlyInInstalled => (modified, added, deleted + 1),
+            FileStatus::OnlyInSource => (modified, added + 1, deleted),
+        })
+}
+
+fn write_change_lines(
+    f: &mut fmt::Formatter<'_>,
+    target_root: &std::path::Path,
+    changes: &[FileChange],
+) -> fmt::Result {
+    for change in changes {
+        let detail = match change.status {
+            FileStatus::Modified => format!("modified (+{} -{})", change.added, change.removed),
+            FileStatus::OnlyInInstalled => format!("deleted (-{})", change.added),
+            FileStatus::OnlyInSource => format!("added (+{})", change.removed),
+        };
+        writeln!(f, "    {}  {}", target_root.join(&change.path).display(), detail)?;
+    }
+    Ok(())
+}
 
 impl fmt::Display for PromoteResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -9,15 +40,41 @@ impl fmt::Display for PromoteResult {
             return writeln!(f, "'{}' already matches the home — nothing to promote.", self.name);
         }
 
-        let version = self.version.as_deref().unwrap_or("unversioned");
+        let source_platforms = platforms_label(&self.source_platforms);
+        let version = version_label(self.version.as_deref());
+        let (modified, added, deleted) = change_counts(&self.file_changes);
+
+        if !self.apply {
+            writeln!(f, "Plan to promote '{}' from {source_platforms} ({version}):", self.name)?;
+            writeln!(f, "  source: {}", self.source_path.display())?;
+            writeln!(f, "  target: {}", self.home_path.display())?;
+            writeln!(f, "  files: {modified} modified, {added} added, {deleted} deleted")?;
+            write_change_lines(f, &self.home_path, &self.file_changes)?;
+            if !self.retracked.is_empty() {
+                writeln!(f, "  re-track: {}", platforms_label(&self.retracked))?;
+            }
+            if !self.still_divergent.is_empty() {
+                writeln!(
+                    f,
+                    "  still divergent after promote: {}",
+                    platforms_label(&self.still_divergent)
+                )?;
+            }
+            return writeln!(f, "Re-run with --apply to make these changes.");
+        }
+
+        let changed_files = self.file_changes.len();
         writeln!(
             f,
-            "Promoted '{}' ({version}) into the home: {}",
+            "Promoted {source_platforms} copy of '{}' into home; {changed_files} file{} changed.",
             self.name,
-            self.home_path.display()
+            if changed_files == 1 { "" } else { "s" }
         )?;
-        writeln!(f, "  re-tracked for: {}", platforms_label(&self.retracked))?;
-
+        writeln!(f, "  source: {}", self.source_path.display())?;
+        writeln!(f, "  target: {}", self.home_path.display())?;
+        if !self.retracked.is_empty() {
+            writeln!(f, "  re-tracked for: {}", platforms_label(&self.retracked))?;
+        }
         if !self.still_divergent.is_empty() {
             writeln!(
                 f,
@@ -34,56 +91,92 @@ impl fmt::Display for PromoteResult {
 
 #[cfg(test)]
 mod tests {
+    use crate::diff::{FileChange, FileStatus};
     use crate::platform::Platform;
     use crate::promote::PromoteResult;
     use crate::types::ArtifactKind;
     use std::path::PathBuf;
 
+    fn base_result() -> PromoteResult {
+        PromoteResult {
+            name: "personal-finance".to_string(),
+            kind: ArtifactKind::Skill,
+            source_path: PathBuf::from("/Users/me/.claude/skills/personal-finance"),
+            source_platforms: vec![Platform::Claude],
+            home_path: PathBuf::from("/home/skills/personal-finance"),
+            apply: false,
+            already_current: false,
+            version: Some("1.2.0".to_string()),
+            file_changes: vec![
+                FileChange {
+                    path: "SKILL.md".to_string(),
+                    status: FileStatus::Modified,
+                    added: 1,
+                    removed: 1,
+                },
+                FileChange {
+                    path: "obsolete.md".to_string(),
+                    status: FileStatus::OnlyInInstalled,
+                    added: 2,
+                    removed: 0,
+                },
+                FileChange {
+                    path: "fresh.md".to_string(),
+                    status: FileStatus::OnlyInSource,
+                    added: 0,
+                    removed: 4,
+                },
+            ],
+            retracked: vec![Platform::Claude, Platform::Codex],
+            still_divergent: vec![],
+        }
+    }
+
     #[test]
     fn promote_already_current_message() {
         let r = PromoteResult {
-            name: "personal-finance".to_string(),
-            kind: ArtifactKind::Skill,
-            home_path: PathBuf::from("/home/skills/personal-finance"),
             already_current: true,
-            version: None,
-            retracked: vec![],
-            still_divergent: vec![],
+            ..base_result()
         };
         let out = r.to_string();
         assert!(out.contains("already matches the home"), "got: {out}");
     }
 
     #[test]
-    fn promote_reports_home_path_and_retracked_platforms() {
-        let r = PromoteResult {
-            name: "personal-finance".to_string(),
-            kind: ArtifactKind::Skill,
-            home_path: PathBuf::from("/home/skills/personal-finance"),
-            already_current: false,
-            version: Some("1.2.0".to_string()),
-            retracked: vec![Platform::Claude, Platform::Codex],
-            still_divergent: vec![],
-        };
-        let out = r.to_string();
-        assert!(out.contains("Promoted 'personal-finance' (1.2.0)"), "got: {out}");
-        assert!(out.contains("/home/skills/personal-finance"), "shows home path: {out}");
+    fn promote_plan_ends_with_apply_hint_and_lists_files() {
+        let out = base_result().to_string();
+        assert!(out.contains("Plan to promote"), "got: {out}");
+        assert!(out.contains("/home/skills/personal-finance/SKILL.md"), "lists file path: {out}");
+        assert!(out.contains("files: 1 modified, 1 added, 1 deleted"), "got: {out}");
+        assert!(
+            out.contains("/home/skills/personal-finance/obsolete.md  deleted (-2)"),
+            "got: {out}"
+        );
+        assert!(out.contains("/home/skills/personal-finance/fresh.md  added (+4)"), "got: {out}");
+        assert!(out.trim_end().ends_with("Re-run with --apply to make these changes."));
+    }
+
+    #[test]
+    fn promote_apply_reports_countable_change() {
+        let out = PromoteResult {
+            apply: true,
+            ..base_result()
+        }
+        .to_string();
+        assert!(
+            out.contains("Promoted claude copy of 'personal-finance' into home; 3 files changed.")
+        );
         assert!(out.contains("claude, codex"), "lists re-tracked platforms: {out}");
-        assert!(!out.contains("still differ"), "no divergence note when all agree: {out}");
     }
 
     #[test]
     fn promote_warns_about_still_divergent_platforms() {
-        let r = PromoteResult {
-            name: "personal-finance".to_string(),
-            kind: ArtifactKind::Skill,
-            home_path: PathBuf::from("/home/skills/personal-finance"),
-            already_current: false,
-            version: None,
-            retracked: vec![Platform::Claude, Platform::Codex],
+        let out = PromoteResult {
+            apply: true,
             still_divergent: vec![Platform::Codex],
-        };
-        let out = r.to_string();
+            ..base_result()
+        }
+        .to_string();
         assert!(out.contains("still differ"), "warns about divergence: {out}");
         assert!(out.contains("cmx skill sync personal-finance"), "points at sync: {out}");
     }

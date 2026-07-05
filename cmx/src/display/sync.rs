@@ -1,10 +1,21 @@
 use std::fmt;
 
+use crate::diff::{FileChange, FileStatus};
 use crate::platform::platforms_label;
 use crate::sync::SyncResult;
 
-fn version_label(version: Option<&str>) -> String {
-    version.map_or_else(|| "unversioned".to_string(), |v| format!("v{v}"))
+fn version_label(version: Option<&str>) -> &str {
+    version.unwrap_or("unversioned")
+}
+
+fn change_counts(changes: &[FileChange]) -> (usize, usize, usize) {
+    changes
+        .iter()
+        .fold((0, 0, 0), |(modified, added, deleted), change| match change.status {
+            FileStatus::Modified => (modified + 1, added, deleted),
+            FileStatus::OnlyInInstalled => (modified, added, deleted + 1),
+            FileStatus::OnlyInSource => (modified, added + 1, deleted),
+        })
 }
 
 impl fmt::Display for SyncResult {
@@ -23,28 +34,54 @@ impl fmt::Display for SyncResult {
 
         let winner = platforms_label(&self.winner_platforms);
         let winner_v = version_label(self.winner_version.as_deref());
-        let verb = if self.dry_run {
-            "Would reconcile"
-        } else {
-            "Reconciled"
-        };
-        writeln!(f, "{verb} '{}' from {winner} ({winner_v}):", self.name)?;
-        for t in &self.targets {
-            let arrow = if self.dry_run {
-                "would update"
-            } else {
-                "updated"
-            };
+        if !self.apply {
+            writeln!(f, "Plan to reconcile '{}' from {winner} ({winner_v}):", self.name)?;
+            writeln!(f, "  source: {}", self.winner_path.display())?;
+            for target in &self.targets {
+                let (modified, added, deleted) = change_counts(&target.file_changes);
+                writeln!(
+                    f,
+                    "  {} -> {}  [{}]  ({} -> {})",
+                    self.winner_path.display(),
+                    target.artifact_path.display(),
+                    platforms_label(&target.platforms),
+                    version_label(target.from_version.as_deref()),
+                    winner_v,
+                )?;
+                writeln!(f, "    files: {modified} modified, {added} added, {deleted} deleted")?;
+                for change in &target.file_changes {
+                    let detail = match change.status {
+                        FileStatus::Modified => {
+                            format!("modified (+{} -{})", change.added, change.removed)
+                        }
+                        FileStatus::OnlyInInstalled => format!("deleted (-{})", change.added),
+                        FileStatus::OnlyInSource => format!("added (+{})", change.removed),
+                    };
+                    writeln!(
+                        f,
+                        "    {}  {detail}",
+                        target.artifact_path.join(&change.path).display()
+                    )?;
+                }
+            }
+            return writeln!(f, "Re-run with --apply to make these changes.");
+        }
+
+        writeln!(
+            f,
+            "Reconciled '{}' from {winner} ({winner_v}); {} target{} changed.",
+            self.name,
+            self.targets.len(),
+            if self.targets.len() == 1 { "" } else { "s" }
+        )?;
+        writeln!(f, "  source: {}", self.winner_path.display())?;
+        for target in &self.targets {
             writeln!(
                 f,
-                "  {arrow} {} ({} → {winner_v})  [{}]",
-                t.location.display(),
-                version_label(t.from_version.as_deref()),
-                platforms_label(&t.platforms),
+                "  updated {} [{}]",
+                target.artifact_path.display(),
+                platforms_label(&target.platforms),
             )?;
-        }
-        if self.dry_run {
-            writeln!(f, "(dry run — nothing was written)")?;
         }
         Ok(())
     }
@@ -52,6 +89,7 @@ impl fmt::Display for SyncResult {
 
 #[cfg(test)]
 mod tests {
+    use crate::diff::{FileChange, FileStatus};
     use crate::platform::Platform;
     use crate::sync::{SyncResult, SyncTarget};
     use std::path::PathBuf;
@@ -59,12 +97,38 @@ mod tests {
     fn base_result() -> SyncResult {
         SyncResult {
             name: "my-skill".to_string(),
-            dry_run: false,
+            apply: false,
             external: false,
             winner_platforms: vec![Platform::Claude],
-            winner_version: None,
+            winner_path: PathBuf::from("/claude/my-skill"),
+            winner_version: Some("2.0.0".to_string()),
             already_synced: false,
-            targets: Vec::new(),
+            targets: vec![SyncTarget {
+                platforms: vec![Platform::Copilot],
+                location: PathBuf::from("/copilot"),
+                artifact_path: PathBuf::from("/copilot/my-skill"),
+                from_version: Some("1.0.0".to_string()),
+                file_changes: vec![
+                    FileChange {
+                        path: "SKILL.md".to_string(),
+                        status: FileStatus::Modified,
+                        added: 1,
+                        removed: 1,
+                    },
+                    FileChange {
+                        path: "extra.md".to_string(),
+                        status: FileStatus::OnlyInInstalled,
+                        added: 2,
+                        removed: 0,
+                    },
+                    FileChange {
+                        path: "new.md".to_string(),
+                        status: FileStatus::OnlyInSource,
+                        added: 0,
+                        removed: 3,
+                    },
+                ],
+            }],
         }
     }
 
@@ -76,89 +140,37 @@ mod tests {
         };
         let out = r.to_string();
         assert!(out.contains("is already in sync across its install locations"), "got: {out}");
-        assert!(!out.contains("Reconciled"), "got: {out}");
-        assert!(!out.contains("Would reconcile"), "got: {out}");
     }
 
     #[test]
     fn external_note_branch() {
-        let r = SyncResult {
+        let out = SyncResult {
             external: true,
-            already_synced: false,
-            targets: vec![SyncTarget {
-                platforms: vec![Platform::Copilot],
-                location: PathBuf::from("/some/dir"),
-                from_version: None,
-            }],
             ..base_result()
-        };
-        let out = r.to_string();
+        }
+        .to_string();
         assert!(out.contains("is external (managed by another tool)"), "got: {out}");
     }
 
     #[test]
-    fn live_reconcile_path() {
-        let r = SyncResult {
-            dry_run: false,
-            targets: vec![SyncTarget {
-                platforms: vec![Platform::Copilot],
-                location: PathBuf::from("/copilot/dir"),
-                from_version: Some("1.0.0".to_string()),
-            }],
-            winner_version: Some("2.0.0".to_string()),
-            ..base_result()
-        };
-        let out = r.to_string();
-        assert!(out.contains("Reconciled 'my-skill' from"), "got: {out}");
-        assert!(out.contains("updated"), "got: {out}");
-        assert!(!out.contains("dry run"), "got: {out}");
+    fn plan_mode_ends_with_apply_hint() {
+        let out = base_result().to_string();
+        assert!(out.contains("Plan to reconcile"), "got: {out}");
+        assert!(out.contains("/copilot/my-skill/SKILL.md"), "lists changed file: {out}");
+        assert!(out.contains("files: 1 modified, 1 added, 1 deleted"), "got: {out}");
+        assert!(out.contains("/copilot/my-skill/extra.md  deleted (-2)"), "got: {out}");
+        assert!(out.contains("/copilot/my-skill/new.md  added (+3)"), "got: {out}");
+        assert!(out.trim_end().ends_with("Re-run with --apply to make these changes."));
     }
 
     #[test]
-    fn dry_run_path() {
-        let r = SyncResult {
-            dry_run: true,
-            targets: vec![SyncTarget {
-                platforms: vec![Platform::Copilot],
-                location: PathBuf::from("/copilot/dir"),
-                from_version: Some("1.0.0".to_string()),
-            }],
-            winner_version: Some("2.0.0".to_string()),
+    fn apply_mode_reports_changed_targets() {
+        let out = SyncResult {
+            apply: true,
             ..base_result()
-        };
-        let out = r.to_string();
-        assert!(out.contains("Would reconcile"), "got: {out}");
-        assert!(out.contains("would update"), "got: {out}");
-        assert!(out.contains("(dry run — nothing was written)"), "got: {out}");
-    }
-
-    #[test]
-    fn version_label_some() {
-        let r = SyncResult {
-            winner_version: Some("1.2.0".to_string()),
-            targets: vec![SyncTarget {
-                platforms: vec![Platform::Copilot],
-                location: PathBuf::from("/dir"),
-                from_version: None,
-            }],
-            ..base_result()
-        };
-        let out = r.to_string();
-        assert!(out.contains("v1.2.0"), "got: {out}");
-    }
-
-    #[test]
-    fn version_label_none() {
-        let r = SyncResult {
-            winner_version: None,
-            targets: vec![SyncTarget {
-                platforms: vec![Platform::Copilot],
-                location: PathBuf::from("/dir"),
-                from_version: None,
-            }],
-            ..base_result()
-        };
-        let out = r.to_string();
-        assert!(out.contains("unversioned"), "got: {out}");
+        }
+        .to_string();
+        assert!(out.contains("Reconciled 'my-skill' from claude (2.0.0); 1 target changed."));
+        assert!(out.contains("updated /copilot/my-skill [copilot]"), "got: {out}");
     }
 }

@@ -16,6 +16,9 @@ use cmx::types::{ArtifactKind, InstallScope};
 #[cfg(feature = "llm")]
 use cmx::gateway::real::MojenticLlmClient;
 
+const DRY_RUN_DEPRECATED_WARNING: &str =
+    "--dry-run is deprecated; the plan is now shown by default — pass --apply to execute";
+
 fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
     // Path resolution needs one concrete "active" platform; absent `--platform`,
@@ -250,22 +253,44 @@ fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
         } => handle_set_remove(&name, &artifacts, local, ctx),
         SetAction::Activate {
             name,
+            apply,
             dry_run,
             local,
-        } => handle_set_activate(&name, dry_run, local, ctx),
+        } => handle_set_activate(&name, apply_from_flags(apply, dry_run), local, ctx),
         SetAction::Deactivate {
             name,
+            apply,
             dry_run,
             force,
             local,
-        } => handle_set_deactivate(&name, dry_run, force, local, ctx),
+        } => handle_set_deactivate(&name, apply_from_flags(apply, dry_run), force, local, ctx),
         SetAction::Delete {
             name,
             local,
             purge,
+            apply,
             force,
-        } => handle_set_delete(&name, local, purge, force, ctx),
+        } => {
+            let result = cmx::sets::delete(&name, purge, force, apply, scope_from(local), ctx)?;
+            let deleted = result.deleted;
+            let preview = result.purge && !result.apply;
+            print!("{result}");
+            Ok(if deleted || preview {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            })
+        }
         SetAction::Rename { old, new, local } => handle_set_rename(&old, &new, local, ctx),
+    }
+}
+
+fn apply_from_flags(apply: bool, dry_run: bool) -> bool {
+    if dry_run {
+        eprintln!("{DRY_RUN_DEPRECATED_WARNING}");
+        false
+    } else {
+        apply
     }
 }
 
@@ -332,11 +357,11 @@ fn handle_set_remove(
 
 fn handle_set_activate(
     name: &str,
-    dry_run: bool,
+    apply: bool,
     local: bool,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
-    let result = cmx::sets::activate(name, dry_run, scope_from(local), ctx)?;
+    let result = cmx::sets::activate(name, apply, scope_from(local), ctx)?;
     let any_failed = result.any_failed;
     print!("{result}");
     Ok(if any_failed {
@@ -348,12 +373,12 @@ fn handle_set_activate(
 
 fn handle_set_deactivate(
     name: &str,
-    dry_run: bool,
+    apply: bool,
     force: bool,
     local: bool,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
-    let result = cmx::sets::deactivate(name, force, dry_run, scope_from(local), ctx)?;
+    let result = cmx::sets::deactivate(name, force, apply, scope_from(local), ctx)?;
     let any_blocked = result.any_blocked;
     print!("{result}");
     Ok(if any_blocked {
@@ -361,18 +386,6 @@ fn handle_set_deactivate(
     } else {
         ExitCode::SUCCESS
     })
-}
-
-fn handle_set_delete(
-    name: &str,
-    local: bool,
-    purge: bool,
-    force: bool,
-    ctx: &AppContext<'_>,
-) -> Result<ExitCode> {
-    let result = cmx::sets::delete(name, purge, force, scope_from(local), ctx)?;
-    print!("{result}");
-    Ok(ExitCode::SUCCESS)
 }
 
 fn handle_set_rename(old: &str, new: &str, local: bool, ctx: &AppContext<'_>) -> Result<ExitCode> {
@@ -620,6 +633,7 @@ fn handle_artifact(
         ArtifactAction::Sync {
             name,
             from,
+            apply,
             dry_run,
             local,
         } => {
@@ -628,12 +642,13 @@ fn handle_artifact(
             } else {
                 InstallScope::Global
             };
-            let result = cmx::sync::sync(&name, kind, scope, from, dry_run, ctx)?;
+            let result =
+                cmx::sync::sync(&name, kind, scope, from, apply_from_flags(apply, dry_run), ctx)?;
             print!("{result}");
             Ok(ExitCode::SUCCESS)
         }
-        ArtifactAction::Promote { name, from } => {
-            let result = cmx::promote::promote(&name, kind, from.or(selector), ctx)?;
+        ArtifactAction::Promote { name, from, apply } => {
+            let result = cmx::promote::promote(&name, kind, from.or(selector), apply, ctx)?;
             print!("{result}");
             Ok(ExitCode::SUCCESS)
         }
@@ -1067,6 +1082,7 @@ mod tests {
         handle_set(
             SetAction::Activate {
                 name: "rust-work".to_string(),
+                apply: true,
                 dry_run: false,
                 local: false,
             },
@@ -1079,6 +1095,7 @@ mod tests {
                 name: "rust-work".to_string(),
                 local: false,
                 purge: true,
+                apply: true,
                 force: false,
             },
             &ctx,
@@ -1086,6 +1103,38 @@ mod tests {
         assert_eq!(result.unwrap(), ExitCode::SUCCESS);
         let sets = cmx::config::load_sets(InstallScope::Global, &fs, &paths).unwrap();
         assert!(!sets.sets.contains_key("rust-work"));
+    }
+
+    #[test]
+    fn handle_set_delete_with_purge_plan_returns_success_without_deleting() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        handle_set(
+            SetAction::Create {
+                name: "rust-work".to_string(),
+                desc: None,
+                from_plugin: None,
+                deprecated_from: None,
+                local: false,
+            },
+            &ctx,
+        )
+        .unwrap();
+
+        let result = handle_set(
+            SetAction::Delete {
+                name: "rust-work".to_string(),
+                local: false,
+                purge: true,
+                apply: false,
+                force: false,
+            },
+            &ctx,
+        );
+
+        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+        let sets = cmx::config::load_sets(InstallScope::Global, &fs, &paths).unwrap();
+        assert!(sets.sets.contains_key("rust-work"));
     }
 
     #[test]
@@ -1116,6 +1165,7 @@ mod tests {
         let result = handle_set(
             SetAction::Activate {
                 name: "rust-work".to_string(),
+                apply: true,
                 dry_run: false,
                 local: false,
             },
@@ -1158,6 +1208,7 @@ mod tests {
         handle_set(
             SetAction::Activate {
                 name: "rust-work".to_string(),
+                apply: true,
                 dry_run: false,
                 local: false,
             },
@@ -1172,6 +1223,7 @@ mod tests {
         let result = handle_set(
             SetAction::Deactivate {
                 name: "rust-work".to_string(),
+                apply: true,
                 dry_run: false,
                 force: false,
                 local: false,
@@ -1199,6 +1251,7 @@ mod tests {
         let result = handle_set(
             SetAction::Activate {
                 name: "rust-work".to_string(),
+                apply: false,
                 dry_run: true,
                 local: false,
             },
@@ -1262,6 +1315,7 @@ mod tests {
             ArtifactAction::Promote {
                 name: "pf".to_string(),
                 from: Some(Platform::Claude),
+                apply: true,
             },
             ArtifactKind::Skill,
             Some(Platform::Codex),

@@ -26,6 +26,7 @@ use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
 use crate::copy;
+use crate::diff::{FileChange, file_changes_between};
 use crate::lockfile;
 use crate::platform::Platform;
 use crate::platform_iter;
@@ -40,13 +41,21 @@ use crate::types::{ArtifactKind, InstallScope};
 pub struct PromoteResult {
     pub name: String,
     pub kind: ArtifactKind,
+    /// The installed copy selected as the source of truth.
+    pub source_path: PathBuf,
+    /// Platforms whose install directory resolves to `source_path`.
+    pub source_platforms: Vec<Platform>,
     /// Where the canonical copy now lives in the home.
     pub home_path: PathBuf,
+    /// `true` when `--apply` was passed and the plan was executed.
+    pub apply: bool,
     /// `true` when the home copy already matched the installed copy — nothing
     /// was written.
     pub already_current: bool,
     /// The version recorded for the promoted copy (from its frontmatter).
     pub version: Option<String>,
+    /// Per-file changes the home will receive (or received).
+    pub file_changes: Vec<FileChange>,
     /// Platforms whose `home`-provenance lock baseline was refreshed to the
     /// promoted content.
     pub retracked: Vec<Platform>,
@@ -73,6 +82,7 @@ pub fn promote(
     name: &str,
     kind: ArtifactKind,
     selector: Option<Platform>,
+    apply: bool,
     ctx: &AppContext<'_>,
 ) -> Result<PromoteResult> {
     if kind == ArtifactKind::Agent && ctx.paths.platform.transforms_agent_to_toml() {
@@ -97,7 +107,7 @@ pub fn promote(
     // Agents are reformatted per platform, so a cross-platform byte comparison is
     // meaningless — they stay single-copy on the active platform. Skills can live
     // on several platforms, so we choose by drift.
-    let (installed_path, scope, home_tracked) = match kind {
+    let (installed_path, source_platforms, scope, home_tracked) = match kind {
         ArtifactKind::Agent => select_agent_copy(name, ctx)?,
         ArtifactKind::Skill => select_skill_copy(name, selector, home_cs.as_deref(), ctx)?,
     };
@@ -109,37 +119,44 @@ pub fn promote(
         .read_to_string(&kind.content_path(&installed_path))
         .ok()
         .and_then(|c| scan::extract_version_from_content(&c));
+    let file_changes = file_changes_between(kind, &home_path, &installed_path, ctx)?;
 
     if home_cs.as_deref() == Some(installed_cs.as_str()) {
         return Ok(PromoteResult {
             name: name.to_string(),
             kind,
+            source_path: installed_path,
+            source_platforms,
             home_path,
+            apply,
             already_current: true,
             version,
+            file_changes,
             retracked: Vec::new(),
             still_divergent: Vec::new(),
         });
     }
 
-    write_home_copy(kind, &home, &home_path, &dest_dir, &installed_path, ctx)?;
+    if apply {
+        write_home_copy(kind, &home, &home_path, &dest_dir, &installed_path, ctx)?;
+    }
 
-    let still_divergent = refresh_home_baselines(
-        name,
-        kind,
-        scope,
-        &home_tracked,
-        &installed_cs,
-        version.as_deref(),
-        ctx,
-    )?;
+    let still_divergent =
+        planned_still_divergent(name, kind, scope, &home_tracked, &installed_cs, ctx)?;
+    if apply {
+        refresh_home_baselines(name, scope, &home_tracked, &installed_cs, version.as_deref(), ctx)?;
+    }
 
     Ok(PromoteResult {
         name: name.to_string(),
         kind,
+        source_path: installed_path,
+        source_platforms,
         home_path,
+        apply,
         already_current: false,
         version,
+        file_changes,
         retracked: home_tracked,
         still_divergent,
     })
@@ -150,6 +167,7 @@ pub fn promote(
 // ---------------------------------------------------------------------------
 
 /// One physical skill copy tracked from the home, shared by ≥1 platform.
+#[derive(Clone)]
 struct HomeCopy {
     path: PathBuf,
     checksum: String,
@@ -163,7 +181,7 @@ struct HomeCopy {
 fn select_agent_copy(
     name: &str,
     ctx: &AppContext<'_>,
-) -> Result<(PathBuf, InstallScope, Vec<Platform>)> {
+) -> Result<(PathBuf, Vec<Platform>, InstallScope, Vec<Platform>)> {
     let (installed_path, scope) =
         config::find_installed_path(name, ArtifactKind::Agent, ctx.fs, ctx.paths)
             .with_context(|| format!("No installed agent named '{name}' found on disk."))?;
@@ -171,7 +189,7 @@ fn select_agent_copy(
     if home_tracked.is_empty() {
         bail!(non_home_guidance(name, ArtifactKind::Agent, scope, ctx)?);
     }
-    Ok((installed_path, scope, home_tracked))
+    Ok((installed_path, vec![ctx.paths.platform], scope, home_tracked))
 }
 
 /// Drift-aware selection for skills across every home-tracked platform.
@@ -180,7 +198,7 @@ fn select_skill_copy(
     selector: Option<Platform>,
     home_cs: Option<&str>,
     ctx: &AppContext<'_>,
-) -> Result<(PathBuf, InstallScope, Vec<Platform>)> {
+) -> Result<(PathBuf, Vec<Platform>, InstallScope, Vec<Platform>)> {
     let (scope, copies) = resolve_home_copies(name, ctx)?;
     if copies.is_empty() {
         // Installed-but-not-home-tracked, or not installed at all: reuse the
@@ -190,9 +208,9 @@ fn select_skill_copy(
             .with_context(|| format!("No installed skill named '{name}' found on disk."))?;
         bail!(non_home_guidance(name, ArtifactKind::Skill, s, ctx)?);
     }
-    let path = choose_copy(name, selector, &copies, home_cs, ctx)?;
+    let selected = choose_copy(name, selector, &copies, home_cs, ctx)?;
     let home_tracked = copies.iter().flat_map(|c| c.platforms.iter().copied()).collect();
-    Ok((path, scope, home_tracked))
+    Ok((selected.path, selected.platforms, scope, home_tracked))
 }
 
 /// The scope the skill lives at, plus one [`HomeCopy`] per distinct install
@@ -250,20 +268,16 @@ fn choose_copy(
     copies: &[HomeCopy],
     home_cs: Option<&str>,
     ctx: &AppContext<'_>,
-) -> Result<PathBuf> {
+) -> Result<HomeCopy> {
     if let Some(p) = selector {
-        return copies
-            .iter()
-            .find(|c| c.platforms.contains(&p))
-            .map(|c| c.path.clone())
-            .ok_or_else(|| {
-                anyhow!(
-                    "'{name}' isn't installed and home-tracked on platform '{p}'. It's \
+        return copies.iter().find(|c| c.platforms.contains(&p)).cloned().ok_or_else(|| {
+            anyhow!(
+                "'{name}' isn't installed and home-tracked on platform '{p}'. It's \
                      home-tracked on: {}. Promote from one of those, or drop --from to \
                      auto-select the edited copy.",
-                    platform_list(copies)
-                )
-            });
+                platform_list(copies)
+            )
+        });
     }
 
     let drifted: Vec<&HomeCopy> = copies.iter().filter(|c| c.drifted).collect();
@@ -272,7 +286,7 @@ fn choose_copy(
         0 => {
             let rep = representative(copies, ctx.paths.platform);
             if home_cs.is_none() || home_cs == Some(rep.checksum.as_str()) {
-                Ok(rep.path.clone())
+                Ok(rep.clone())
             } else {
                 bail!(
                     "No in-place edits detected on any platform — nothing to promote. The home \
@@ -283,7 +297,7 @@ fn choose_copy(
                 )
             }
         }
-        1 => Ok(drifted[0].path.clone()),
+        1 => Ok((*drifted[0]).clone()),
         _ => bail!(
             "Multiple platforms have diverging in-place edits: {}. cmx can't tell which should \
              become the canonical home copy. Inspect them with `cmx skill diff {name}`, then \
@@ -347,29 +361,41 @@ fn write_home_copy(
     Ok(())
 }
 
-/// Refresh every home-provenance lock baseline to the promoted content.
-///
-/// A platform whose installed copy matches becomes tracked; one that still
-/// differs reads as drifted afterwards (truthfully — it diverges from the
-/// freshly promoted home). Returns the platforms that are still divergent.
-fn refresh_home_baselines(
+/// Platforms that would still differ from the promoted content after the home
+/// baselines are refreshed.
+fn planned_still_divergent(
     name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
     home_tracked: &[Platform],
     installed_cs: &str,
-    version: Option<&str>,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Platform>> {
-    let now = ctx.clock.now().to_rfc3339();
     let mut still_divergent = Vec::new();
     for &platform in home_tracked {
         let pv = ctx.paths.with_platform(platform);
-        if let Some(p) = pv.installed_artifact_path(kind, name, scope) {
-            if ctx.fs.exists(&p) && checksum::checksum_artifact(&p, kind, ctx.fs)? != installed_cs {
-                still_divergent.push(platform);
-            }
+        if let Some(p) = pv.installed_artifact_path(kind, name, scope)
+            && ctx.fs.exists(&p)
+            && checksum::checksum_artifact(&p, kind, ctx.fs)? != installed_cs
+        {
+            still_divergent.push(platform);
         }
+    }
+    Ok(still_divergent)
+}
+
+/// Refresh every home-provenance lock baseline to the promoted content.
+fn refresh_home_baselines(
+    name: &str,
+    scope: InstallScope,
+    home_tracked: &[Platform],
+    installed_cs: &str,
+    version: Option<&str>,
+    ctx: &AppContext<'_>,
+) -> Result<()> {
+    let now = ctx.clock.now().to_rfc3339();
+    for &platform in home_tracked {
+        let pv = ctx.paths.with_platform(platform);
         lockfile::mutate(scope, ctx.fs, &pv, |lock| {
             if let Some(entry) = lock.packages.get_mut(name) {
                 entry.source_checksum = installed_cs.to_string();
@@ -379,7 +405,7 @@ fn refresh_home_baselines(
             }
         })?;
     }
-    Ok(still_divergent)
+    Ok(())
 }
 
 /// Platforms whose lock entry for `name` (at `scope`) records `home` provenance.

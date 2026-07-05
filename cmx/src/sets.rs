@@ -11,11 +11,14 @@
 use anyhow::{Result, bail};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use crate::config;
 use crate::context::AppContext;
+use crate::diff::file_changes_between;
 use crate::install;
 use crate::lockfile;
+use crate::platform::Platform;
 use crate::platform_iter;
 use crate::scan_marketplace::{PluginScan, scan_marketplace_plugin};
 use crate::source_iter;
@@ -87,17 +90,12 @@ pub struct SetRemoveResult {
 }
 
 #[derive(Debug)]
-pub struct SetDeleteResult {
-    pub name: String,
-}
-
-#[derive(Debug)]
 pub struct SetRenameResult {
     pub old: String,
     pub new: String,
 }
 
-/// Per-member outcome of an `activate` (or `activate --dry-run`) run.
+/// Per-member outcome of an `activate` plan or apply run.
 #[derive(Debug, PartialEq, Eq)]
 pub enum MemberActivateOutcome {
     /// Freshly installed this run.
@@ -111,10 +109,19 @@ pub enum MemberActivateOutcome {
 }
 
 #[derive(Debug)]
+pub struct MemberActivateTarget {
+    pub platform: Platform,
+    pub source_path: PathBuf,
+    pub target_path: PathBuf,
+    pub version: Option<String>,
+}
+
+#[derive(Debug)]
 pub struct MemberActivateStatus {
     pub kind: ArtifactKind,
     pub name: String,
     pub outcome: MemberActivateOutcome,
+    pub targets: Vec<MemberActivateTarget>,
 }
 
 #[derive(Debug)]
@@ -123,11 +130,11 @@ pub struct SetActivateResult {
     pub members: Vec<MemberActivateStatus>,
     /// True when any member was unresolvable or failed to install everywhere.
     pub any_failed: bool,
-    /// True when this was a `--dry-run` preview — no disk or state changes were made.
-    pub dry_run: bool,
+    /// True when `--apply` was passed and the plan was executed.
+    pub apply: bool,
 }
 
-/// Per-member outcome of a `deactivate` (or `deactivate --dry-run`) run.
+/// Per-member outcome of a `deactivate` plan or apply run.
 #[derive(Debug, PartialEq, Eq)]
 pub enum MemberDeactivateOutcome {
     /// Physically uninstalled this run.
@@ -141,10 +148,18 @@ pub enum MemberDeactivateOutcome {
 }
 
 #[derive(Debug)]
+pub struct MemberDeactivateTarget {
+    pub platform: Platform,
+    pub artifact_path: PathBuf,
+    pub discarded_paths: Vec<PathBuf>,
+}
+
+#[derive(Debug)]
 pub struct MemberDeactivateStatus {
     pub kind: ArtifactKind,
     pub name: String,
     pub outcome: MemberDeactivateOutcome,
+    pub targets: Vec<MemberDeactivateTarget>,
 }
 
 #[derive(Debug)]
@@ -153,8 +168,17 @@ pub struct SetDeactivateResult {
     pub members: Vec<MemberDeactivateStatus>,
     /// True when a drift-blocked member (no `--force`) prevented a full deactivation.
     pub any_blocked: bool,
-    /// True when this was a `--dry-run` preview — no disk or state changes were made.
-    pub dry_run: bool,
+    /// True when `--apply` was passed and the plan was executed.
+    pub apply: bool,
+}
+
+#[derive(Debug)]
+pub struct SetDeleteResult {
+    pub name: String,
+    pub purge: bool,
+    pub apply: bool,
+    pub deleted: bool,
+    pub deactivate: Option<SetDeactivateResult>,
 }
 
 // ---------------------------------------------------------------------------
@@ -390,17 +414,30 @@ pub fn delete(
     name: &str,
     purge: bool,
     force: bool,
+    apply: bool,
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<SetDeleteResult> {
     if purge {
-        let outcome = deactivate(name, force, false, scope, ctx)?;
-        if outcome.any_blocked {
-            bail!(
-                "Cannot purge set '{name}': some members have local edits. \
-                 Pass --force to discard them, or resolve the edits first."
-            );
-        }
+        let outcome = deactivate(name, force, apply, scope, ctx)?;
+        let deleted = if apply && !outcome.any_blocked {
+            config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+                sets.sets
+                    .remove(name)
+                    .ok_or_else(|| anyhow::anyhow!("Set '{name}' not found."))?;
+                Ok(())
+            })?;
+            true
+        } else {
+            false
+        };
+        return Ok(SetDeleteResult {
+            name: name.to_string(),
+            purge: true,
+            apply,
+            deleted,
+            deactivate: Some(outcome),
+        });
     }
 
     config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
@@ -411,6 +448,10 @@ pub fn delete(
     })?;
     Ok(SetDeleteResult {
         name: name.to_string(),
+        purge: false,
+        apply: true,
+        deleted: true,
+        deactivate: None,
     })
 }
 
@@ -425,11 +466,11 @@ pub fn delete(
 ///
 /// The set's state is persisted as `Active` once at least one resolvable
 /// member installed (or immediately, for an empty set) — never on a run where
-/// every member was unresolvable/failed. `--dry-run` performs no install
-/// calls and no state write; it only classifies what would happen.
+/// every member was unresolvable/failed. Without `--apply`, no install calls
+/// or state writes occur; the command only describes the concrete plan.
 pub fn activate(
     name: &str,
-    dry_run: bool,
+    apply: bool,
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<SetActivateResult> {
@@ -448,11 +489,13 @@ pub fn activate(
                 outcome: MemberActivateOutcome::Unresolvable(format!(
                     "source '{src}' is not registered"
                 )),
+                targets: Vec::new(),
             }),
             None => statuses.push(MemberActivateStatus {
                 kind: m.kind,
                 name: m.name.clone(),
                 outcome: MemberActivateOutcome::Unresolvable("no source pin recorded".to_string()),
+                targets: Vec::new(),
             }),
         }
     }
@@ -475,18 +518,19 @@ pub fn activate(
             .map(|m| m.name.as_str())
             .collect();
 
-        let failed: HashMap<String, String> = if dry_run {
-            HashMap::new()
-        } else {
+        let failed: HashMap<String, String> = if apply {
             let pinned: Vec<String> = members
                 .iter()
                 .map(|m| format!("{}:{}", m.source.as_deref().unwrap_or_default(), m.name))
                 .collect();
             let result = install::install_many(&pinned, kind, scope, false, &targets, ctx)?;
             result.failed.into_iter().collect()
+        } else {
+            HashMap::new()
         };
 
         for m in members {
+            let targets = build_activation_targets(m, scope, &targets, ctx)?;
             let pin = format!("{}:{}", m.source.as_deref().unwrap_or_default(), m.name);
             let outcome = if let Some(reason) = failed.get(&pin) {
                 MemberActivateOutcome::Failed(reason.clone())
@@ -499,6 +543,7 @@ pub fn activate(
                 kind,
                 name: m.name.clone(),
                 outcome,
+                targets,
             });
         }
     }
@@ -510,7 +555,7 @@ pub fn activate(
         )
     });
 
-    if !dry_run {
+    if apply {
         let any_installed_ok = statuses.iter().any(|s| {
             matches!(
                 s.outcome,
@@ -531,7 +576,7 @@ pub fn activate(
         name: name.to_string(),
         members: statuses,
         any_failed,
-        dry_run,
+        apply,
     })
 }
 
@@ -544,12 +589,12 @@ pub fn activate(
 /// member's uninstall unless `force` is passed. The set's state is persisted
 /// as `Inactive` only when no member was drift-blocked — a partially
 /// deactivated set stays `Active` so `set show`/`doctor` can surface the gap
-/// (see `SETS.md`, "Drift is surfaced, not auto-corrected"). `--dry-run`
-/// performs no uninstall calls and no state write.
+/// (see `SETS.md`, "Drift is surfaced, not auto-corrected"). Without
+/// `--apply`, no uninstall calls or state writes occur.
 pub fn deactivate(
     name: &str,
     force: bool,
-    dry_run: bool,
+    apply: bool,
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<SetDeactivateResult> {
@@ -564,12 +609,15 @@ pub fn deactivate(
     let mut any_blocked = false;
 
     for m in &def.members {
-        let (installed, drifted) = member_activation_facts(m.kind, &m.name, scope, ctx)?;
+        let targets = member_deactivate_targets(m, scope, ctx)?;
+        let installed = !targets.is_empty();
+        let drifted = targets.iter().any(|target| !target.discarded_paths.is_empty());
         if !installed {
             statuses.push(MemberDeactivateStatus {
                 kind: m.kind,
                 name: m.name.clone(),
                 outcome: MemberDeactivateOutcome::NotInstalled,
+                targets,
             });
             continue;
         }
@@ -578,6 +626,7 @@ pub fn deactivate(
                 kind: m.kind,
                 name: m.name.clone(),
                 outcome: MemberDeactivateOutcome::Retained(holder),
+                targets,
             });
             continue;
         }
@@ -587,20 +636,22 @@ pub fn deactivate(
                 kind: m.kind,
                 name: m.name.clone(),
                 outcome: MemberDeactivateOutcome::DriftBlocked,
+                targets,
             });
             continue;
         }
-        if !dry_run {
+        if apply {
             uninstall::uninstall(&m.name, m.kind, scope, None, ctx)?;
         }
         statuses.push(MemberDeactivateStatus {
             kind: m.kind,
             name: m.name.clone(),
             outcome: MemberDeactivateOutcome::Uninstalled,
+            targets,
         });
     }
 
-    if !dry_run && !any_blocked {
+    if apply && !any_blocked {
         config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
             if let Some(d) = sets.sets.get_mut(name) {
                 d.state = SetState::Inactive;
@@ -613,7 +664,7 @@ pub fn deactivate(
         name: name.to_string(),
         members: statuses,
         any_blocked,
-        dry_run,
+        apply,
     })
 }
 
@@ -698,26 +749,79 @@ fn resolve_member(arg: &str, ctx: &AppContext<'_>) -> Result<SetMember> {
     })
 }
 
-/// Sweep every candidate platform (the same "managed-or-all" set `uninstall`
-/// sweeps) gathering the same drift/already-installed facts `install` itself
-/// uses, so `deactivate` blocks on local edits and skips already-absent
-/// members exactly as install/uninstall would.
-fn member_activation_facts(
-    kind: ArtifactKind,
-    member_name: &str,
+fn build_activation_targets(
+    member: &SetMember,
+    scope: InstallScope,
+    targets: &[Platform],
+    ctx: &AppContext<'_>,
+) -> Result<Vec<MemberActivateTarget>> {
+    let found = source_iter::find_unique(&member.name, member.kind, member.source.as_deref(), ctx)?;
+    let mut plans = Vec::new();
+    for &platform in targets {
+        let pv = ctx.paths.with_platform(platform);
+        let plan = install::plan_install(&member.name, member.kind, scope, &found, &pv)?;
+        let target_path =
+            member
+                .kind
+                .installed_path(&member.name, &plan.dest_dir, ArtifactKind::HOME_AGENT_EXT);
+        plans.push(MemberActivateTarget {
+            platform,
+            source_path: found.artifact.path.clone(),
+            target_path,
+            version: found.artifact.version.clone(),
+        });
+    }
+    Ok(plans)
+}
+
+fn member_deactivate_targets(
+    member: &SetMember,
     scope: InstallScope,
     ctx: &AppContext<'_>,
-) -> Result<(bool, bool)> {
+) -> Result<Vec<MemberDeactivateTarget>> {
     let candidates = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
-    let mut installed = false;
-    let mut modified = false;
-    for view in platform_iter::views_for(ctx.paths, candidates, kind) {
+    let source_artifact = member.source.as_deref().and_then(|source| {
+        source_iter::find_unique(&member.name, member.kind, Some(source), ctx).ok()
+    });
+    let mut targets = Vec::new();
+    for view in platform_iter::views_for(ctx.paths, candidates, member.kind) {
         let pctx = ctx.with_paths(&view.paths);
-        let facts = install::gather_install_facts(member_name, kind, scope, false, &pctx)?;
-        installed |= facts.already_installed;
-        modified |= facts.locally_modified;
+        let facts = install::gather_install_facts(&member.name, member.kind, scope, false, &pctx)?;
+        if !facts.already_installed {
+            continue;
+        }
+        let artifact_path =
+            view.paths.require_installed_artifact_path(member.kind, &member.name, scope)?;
+        let discarded_paths = if facts.locally_modified {
+            if let Some(source_artifact) = &source_artifact {
+                file_changes_between(
+                    member.kind,
+                    &artifact_path,
+                    &source_artifact.artifact.path,
+                    &pctx,
+                )?
+                .into_iter()
+                .map(|change| {
+                    if artifact_path.is_file() {
+                        artifact_path.clone()
+                    } else {
+                        artifact_path.join(change.path)
+                    }
+                })
+                .collect()
+            } else {
+                vec![artifact_path.clone()]
+            }
+        } else {
+            Vec::new()
+        };
+        targets.push(MemberDeactivateTarget {
+            platform: view.platform,
+            artifact_path,
+            discarded_paths,
+        });
     }
-    Ok((installed, modified))
+    Ok(targets)
 }
 
 /// Resolve a member's trigger-description character count (see `SETS.md`,
@@ -1198,7 +1302,7 @@ mod tests {
         let t = TestContext::new();
         let ctx = t.ctx();
         create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
-        delete("rust-work", false, false, InstallScope::Global, &ctx).unwrap();
+        delete("rust-work", false, false, false, InstallScope::Global, &ctx).unwrap();
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert!(!sets.sets.contains_key("rust-work"));
     }
@@ -1207,7 +1311,7 @@ mod tests {
     fn delete_errors_when_missing() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        let result = delete("nope", false, false, InstallScope::Global, &ctx);
+        let result = delete("nope", false, false, false, InstallScope::Global, &ctx);
         assert!(result.is_err());
     }
 
@@ -1310,7 +1414,7 @@ mod tests {
             &ctx,
         );
 
-        let result = activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
+        let result = activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
         assert!(!result.any_failed);
         assert!(t.paths.is_installed(
             ArtifactKind::Agent,
@@ -1346,8 +1450,8 @@ mod tests {
             &ctx,
         );
 
-        activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
-        let second = activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
+        let second = activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
 
         assert!(!second.any_failed);
         assert!(matches!(second.members[0].outcome, MemberActivateOutcome::AlreadyInstalled));
@@ -1377,7 +1481,7 @@ mod tests {
             &ctx,
         );
 
-        let result = activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
+        let result = activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
         assert!(result.any_failed);
         assert!(
             t.paths.is_installed(
@@ -1415,8 +1519,8 @@ mod tests {
             &ctx,
         );
 
-        let result = activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
-        assert!(result.dry_run);
+        let result = activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
+        assert!(!result.apply);
         assert!(
             !t.paths.is_installed(
                 ArtifactKind::Agent,
@@ -1448,9 +1552,9 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
 
-        let result = deactivate("rust-work", false, false, InstallScope::Global, &ctx).unwrap();
+        let result = deactivate("rust-work", false, true, InstallScope::Global, &ctx).unwrap();
         assert!(!result.any_blocked);
         assert!(matches!(result.members[0].outcome, MemberDeactivateOutcome::Uninstalled));
         assert!(!t.paths.is_installed(
@@ -1489,10 +1593,10 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
-        activate("blog", false, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
+        activate("blog", true, InstallScope::Global, &ctx).unwrap();
 
-        let result = deactivate("rust-work", false, false, InstallScope::Global, &ctx).unwrap();
+        let result = deactivate("rust-work", false, true, InstallScope::Global, &ctx).unwrap();
         assert!(!result.any_blocked);
         assert!(matches!(
             result.members[0].outcome,
@@ -1523,7 +1627,7 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
 
         // Simulate a local hand-edit of the installed copy.
         let installed_path = t
@@ -1535,7 +1639,7 @@ mod tests {
             "---\nname: rust-craftsperson\n---\nedited by hand\n",
         );
 
-        let blocked = deactivate("rust-work", false, false, InstallScope::Global, &ctx).unwrap();
+        let blocked = deactivate("rust-work", false, true, InstallScope::Global, &ctx).unwrap();
         assert!(blocked.any_blocked);
         assert!(matches!(blocked.members[0].outcome, MemberDeactivateOutcome::DriftBlocked));
         assert!(t.fs.file_exists(&installed_path), "drifted copy must be left in place");
@@ -1546,7 +1650,7 @@ mod tests {
             "partial deactivation leaves the set Active"
         );
 
-        let forced = deactivate("rust-work", true, false, InstallScope::Global, &ctx).unwrap();
+        let forced = deactivate("rust-work", true, true, InstallScope::Global, &ctx).unwrap();
         assert!(!forced.any_blocked);
         assert!(matches!(forced.members[0].outcome, MemberDeactivateOutcome::Uninstalled));
         assert!(!t.fs.file_exists(&installed_path), "--force discards the edits and uninstalls");
@@ -1572,10 +1676,10 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
 
-        let result = deactivate("rust-work", false, true, InstallScope::Global, &ctx).unwrap();
-        assert!(result.dry_run);
+        let result = deactivate("rust-work", false, false, InstallScope::Global, &ctx).unwrap();
+        assert!(!result.apply);
         assert!(
             t.paths.is_installed(
                 ArtifactKind::Agent,
@@ -1607,9 +1711,9 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
 
-        delete("rust-work", true, false, InstallScope::Global, &ctx).unwrap();
+        delete("rust-work", true, false, true, InstallScope::Global, &ctx).unwrap();
 
         assert!(!t.paths.is_installed(
             ArtifactKind::Agent,
@@ -1639,15 +1743,15 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
         let installed_path = t
             .paths
             .installed_artifact_path(ArtifactKind::Agent, "rust-craftsperson", InstallScope::Global)
             .unwrap();
         t.fs.add_file(installed_path.clone(), "edited by hand");
 
-        let result = delete("rust-work", true, false, InstallScope::Global, &ctx);
-        assert!(result.is_err());
+        let result = delete("rust-work", true, false, true, InstallScope::Global, &ctx).unwrap();
+        assert!(!result.deleted);
         assert!(t.fs.file_exists(&installed_path));
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert!(
@@ -1656,7 +1760,7 @@ mod tests {
         );
 
         // --force forwards through and completes the purge.
-        delete("rust-work", true, true, InstallScope::Global, &ctx).unwrap();
+        delete("rust-work", true, true, true, InstallScope::Global, &ctx).unwrap();
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert!(!sets.sets.contains_key("rust-work"));
     }

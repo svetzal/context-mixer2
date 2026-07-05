@@ -636,3 +636,75 @@ fn set_create_deprecated_from_warns_on_stderr_only() {
     let seeded = sets.sets.get("seeded").expect("set created");
     assert_eq!(seeded.members.len(), 2);
 }
+
+#[test]
+fn set_activate_deprecated_dry_run_warns_on_stderr_only() {
+    let fixture = populated_fixture();
+    let mut sets = BTreeMap::new();
+    sets.insert(
+        "focus".to_string(),
+        SetDef {
+            description: None,
+            state: SetState::Inactive,
+            members: vec![SetMember {
+                kind: ArtifactKind::Skill,
+                name: "focus-skill".to_string(),
+                source: Some("guidelines".to_string()),
+            }],
+        },
+    );
+    write_json(&fixture.config_dir.join("sets.json"), &SetsFile { version: 1, sets });
+
+    let output = fixture.run(&["set", "activate", "focus", "--dry-run"]);
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let warning =
+        "--dry-run is deprecated; the plan is now shown by default — pass --apply to execute";
+    assert!(!stdout.contains(warning), "{stdout}");
+    assert!(stderr.contains(warning), "{stderr}");
+    assert!(stdout.contains("Re-run with --apply to make these changes."), "{stdout}");
+
+    let sets: SetsFile =
+        serde_json::from_slice(&fs::read(fixture.config_dir.join("sets.json")).unwrap()).unwrap();
+    assert_eq!(sets.sets.get("focus").unwrap().state, SetState::Inactive);
+}
+
+#[test]
+fn update_force_lists_discarded_file_paths() {
+    let fixture = populated_fixture();
+    let skill_dir = fixture.home.join(".claude").join("skills").join("focus-skill");
+    let skill_md = skill_dir.join("SKILL.md");
+    let extra = skill_dir.join("local-only.md");
+    fs::write(
+        &skill_md,
+        concat!(
+            "---\n",
+            "description: Locally edited.\n",
+            "version: 2.0.0\n",
+            "---\n",
+            "# locally edited\n"
+        ),
+    )
+    .unwrap();
+    fs::write(&extra, "local notes\n").unwrap();
+
+    let output = fixture.run(&["skill", "update", "focus-skill", "--force"]);
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains(&skill_md.display().to_string()), "{stdout}");
+    assert!(stdout.contains(&extra.display().to_string()), "{stdout}");
+    assert!(!extra.exists(), "local-only file should be discarded on forced update");
+}

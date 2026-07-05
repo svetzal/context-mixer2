@@ -13,12 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `cmx {skill,agent} promote`, `cmx skill sync`, `cmx set activate`, and `cmx set deactivate` now show a concrete reconciliation plan by default and only mutate when re-run with `--apply`. The plan names the source and target paths and ends with `Re-run with --apply to make these changes.` `cmx set delete --purge` now follows the same preview/apply flow for its deactivation step.
+- `cmx {skill,agent} install --force` and `cmx {skill,agent} update --force` still execute immediately, but now print the exact local file paths whose edits are being discarded before the normal success output.
 - `cmx {skill,agent} promote <name>` now accepts `--from <platform>` to choose which installed copy wins, matching `sync`. The global `--platform` selector still works as a fallback, but `promote` now documents and prefers `--from` for winner selection.
 - `cmx set create <name>` now uses `--from-plugin <source>:<plugin>` for marketplace-plugin seeding, replacing the overloaded `--from`.
 - `cmx {skill,agent} adopt --all` now uses `--from-dir <dir>` for install-directory filtering, replacing the overloaded `--from`.
 
 ### Deprecated
 
+- `cmx skill sync --dry-run`, `cmx set activate --dry-run`, and `cmx set deactivate --dry-run` still work for one release as hidden aliases, but now print a one-line stderr warning steering to the default preview plus `--apply`.
 - `cmx set create --from <source>:<plugin>` and `cmx {skill,agent} adopt --all --from <dir>` still work for one release as hidden aliases, but now print a one-line stderr warning steering to `--from-plugin` and `--from-dir` respectively.
 
 ## [3.0.0] - 2026-07-05

@@ -119,7 +119,7 @@ pub enum Commands {
         #[command(subcommand)]
         action: ConfigAction,
     },
-    /// Install cmx's own companion agent skill (global scope by default).
+    /// [Mutates] Install cmx's own companion agent skill (global scope by default).
     ///
     /// Example: `cmx init` installs the `cmx` skill into `~/.claude/skills/`;
     /// `cmx init --local` installs into `.claude/skills/` in the current project.
@@ -143,7 +143,7 @@ pub enum Commands {
 
 #[derive(Subcommand)]
 pub enum SourceAction {
-    /// Register a source repository (local path or git URL)
+    /// [Mutates] Register a source repository (local path or git URL)
     Add {
         /// Name to identify this source
         name: String,
@@ -162,12 +162,12 @@ pub enum SourceAction {
         #[command(flatten)]
         output: OutputArgs,
     },
-    /// Fetch latest changes for git-backed sources
+    /// [Mutates] Fetch latest changes for git-backed sources
     Update {
         /// Name of a specific source to update (default: all)
         name: Option<String>,
     },
-    /// Unregister a source (does not delete artifacts)
+    /// [Mutates] Unregister a source (does not delete artifacts)
     Remove {
         /// Name of the source to remove
         name: String,
@@ -176,7 +176,7 @@ pub enum SourceAction {
 
 #[derive(Subcommand)]
 pub enum SetAction {
-    /// Create an empty, inactive set
+    /// [Mutates] Create an empty, inactive set
     Create {
         /// Name to identify this set
         name: String,
@@ -215,7 +215,7 @@ pub enum SetAction {
         #[command(flatten)]
         output: OutputArgs,
     },
-    /// Add installed artifact(s) to a set, resolving kind and source from the
+    /// [Mutates] Add installed artifact(s) to a set, resolving kind and source from the
     /// lockfile. Use `skill:name` / `agent:name` to disambiguate a name that
     /// is ambiguous across kinds.
     Add {
@@ -227,7 +227,7 @@ pub enum SetAction {
         #[arg(long)]
         local: bool,
     },
-    /// Remove artifact(s) from a set (does NOT uninstall them)
+    /// [Mutates] Remove artifact(s) from a set (does NOT uninstall them)
     Remove {
         /// Name of the set to remove from
         name: String,
@@ -237,27 +237,33 @@ pub enum SetAction {
         #[arg(long)]
         local: bool,
     },
-    /// Install every member from its pinned source into the normally
+    /// [Mutates with --apply] Install every member from its pinned source into the normally
     /// resolved install targets, and mark the set active. Idempotent — safe
     /// to re-run to repair a partially-installed set.
     Activate {
         /// Name of the set to activate
         name: String,
-        /// Preview which members would install, without making any changes
+        /// Execute the activation after showing the concrete plan
         #[arg(long)]
+        apply: bool,
+        /// Deprecated: the activation plan is now shown by default; pass --apply to execute
+        #[arg(long, hide = true, conflicts_with = "apply")]
         dry_run: bool,
         /// Act on a project-scoped set instead of global
         #[arg(long)]
         local: bool,
     },
-    /// Uninstall every member not held by another active set, and mark the
+    /// [Mutates with --apply] Uninstall every member not held by another active set, and mark the
     /// set inactive. A member with local edits blocks its own uninstall
     /// unless `--force` is passed.
     Deactivate {
         /// Name of the set to deactivate
         name: String,
-        /// Preview what would be uninstalled/retained/blocked, without making any changes
+        /// Execute the deactivation after showing the concrete plan
         #[arg(long)]
+        apply: bool,
+        /// Deprecated: the deactivation plan is now shown by default; pass --apply to execute
+        #[arg(long, hide = true, conflicts_with = "apply")]
         dry_run: bool,
         /// Discard local edits on drifted members instead of blocking on them
         #[arg(long)]
@@ -266,21 +272,24 @@ pub enum SetAction {
         #[arg(long)]
         local: bool,
     },
-    /// Delete a set's definition
+    /// [Mutates] Delete a set's definition
     Delete {
         /// Name of the set to delete
         name: String,
         /// Modify a project-scoped set instead of global
         #[arg(long)]
         local: bool,
-        /// Also deactivate (uninstall members not held by another active set) before deleting
+        /// Also deactivate first; previewed by default and only executed with --apply
         #[arg(long)]
         purge: bool,
+        /// With --purge, execute the purge after showing the concrete plan
+        #[arg(long)]
+        apply: bool,
         /// With --purge, discard local edits on drifted members instead of blocking on them
         #[arg(long)]
         force: bool,
     },
-    /// Rename a set
+    /// [Mutates] Rename a set
     Rename {
         /// Current name
         old: String,
@@ -294,7 +303,7 @@ pub enum SetAction {
 
 #[derive(Subcommand)]
 pub enum ArtifactAction {
-    /// Install artifact(s) from a source
+    /// [Mutates] Install artifact(s) from a source
     Install {
         /// Artifact name(s); each may be `source:name` to pin to a specific source
         names: Vec<String>,
@@ -333,7 +342,7 @@ pub enum ArtifactAction {
         #[arg(long)]
         full: bool,
     },
-    /// Update an installed artifact from its source
+    /// [Mutates] Update an installed artifact from its source
     Update {
         /// Artifact name
         name: Option<String>,
@@ -344,7 +353,7 @@ pub enum ArtifactAction {
         #[arg(long)]
         force: bool,
     },
-    /// Reconcile a skill that has diverged across platforms by copying one
+    /// [Mutates with --apply] Reconcile a skill that has diverged across platforms by copying one
     /// copy over the others. Unlike `update` (which pulls from a source), `sync`
     /// works between install locations — so it also reconciles `external` skills.
     Sync {
@@ -353,14 +362,17 @@ pub enum ArtifactAction {
         /// Platform whose copy wins (default: the newest version)
         #[arg(long, value_enum)]
         from: Option<Platform>,
-        /// Preview the reconciliation without writing anything
+        /// Execute the reconciliation after showing the concrete plan
         #[arg(long)]
+        apply: bool,
+        /// Deprecated: the reconciliation plan is now shown by default; pass --apply to execute
+        #[arg(long, hide = true, conflicts_with = "apply")]
         dry_run: bool,
         /// Reconcile within project scope instead of global
         #[arg(long)]
         local: bool,
     },
-    /// Promote in-place edits of an installed artifact back into the canonical
+    /// [Mutates with --apply] Promote in-place edits of an installed artifact back into the canonical
     /// home — the mirror of `update`. Use after editing a skill where it's
     /// installed, to make those edits the canonical copy. By default cmx picks
     /// the copy that was edited in place (the drifted one); if several platforms
@@ -372,8 +384,11 @@ pub enum ArtifactAction {
         /// Platform whose copy wins (default: the drifted copy)
         #[arg(long, value_enum)]
         from: Option<Platform>,
+        /// Execute the promotion after showing the concrete plan
+        #[arg(long)]
+        apply: bool,
     },
-    /// Uninstall installed artifact(s) — removed everywhere cmx tracks them
+    /// [Mutates] Uninstall installed artifact(s) — removed everywhere cmx tracks them
     Uninstall {
         /// Artifact name(s) to uninstall
         names: Vec<String>,
@@ -381,7 +396,7 @@ pub enum ArtifactAction {
         #[arg(long)]
         local: bool,
     },
-    /// Unadopt artifact(s): remove them from the canonical home and un-track them
+    /// [Mutates] Unadopt artifact(s): remove them from the canonical home and un-track them
     Unadopt {
         /// Artifact name(s) to unadopt
         names: Vec<String>,
@@ -389,7 +404,7 @@ pub enum ArtifactAction {
         #[arg(long)]
         external: bool,
     },
-    /// Adopt orphaned, hand-authored artifacts into the canonical home
+    /// [Mutates] Adopt orphaned, hand-authored artifacts into the canonical home
     Adopt {
         /// Artifact name(s) to adopt (each must be an orphan reported by `cmx doctor`)
         names: Vec<String>,
@@ -410,7 +425,7 @@ pub enum ArtifactAction {
 
 #[derive(Subcommand)]
 pub enum HomeAction {
-    /// Create the canonical home directory and register it as the `home` source
+    /// [Mutates] Create the canonical home directory and register it as the `home` source
     Init,
     /// Print the resolved canonical home directory
     Path {
@@ -426,12 +441,12 @@ pub enum ConfigAction {
         #[command(flatten)]
         output: OutputArgs,
     },
-    /// Set LLM gateway (openai or ollama)
+    /// [Mutates] Set LLM gateway (openai or ollama)
     Gateway {
         /// Gateway type: openai or ollama
         value: String,
     },
-    /// Set LLM model name
+    /// [Mutates] Set LLM model name
     Model {
         /// Model name (e.g. gpt-5.4, qwen3.5:27b)
         value: String,
@@ -455,13 +470,13 @@ pub enum ConfigAction {
 pub enum PlatformsAction {
     /// List the platforms cmx manages
     List,
-    /// Add a platform to the managed set
+    /// [Mutates] Add a platform to the managed set
     Add {
         /// Platform to manage (e.g. claude, codex)
         #[arg(value_enum)]
         platform: Platform,
     },
-    /// Remove a platform from the managed set
+    /// [Mutates] Remove a platform from the managed set
     Remove {
         /// Platform to stop managing
         #[arg(value_enum)]
@@ -473,12 +488,12 @@ pub enum PlatformsAction {
 pub enum ExternalAction {
     /// List the configured external rules
     List,
-    /// Add an external rule: a directory (e.g. ~/.hermes/skills) or an artifact name
+    /// [Mutates] Add an external rule: a directory (e.g. ~/.hermes/skills) or an artifact name
     Add {
         /// Directory path or bare artifact name to mark external
         entry: String,
     },
-    /// Remove an external rule
+    /// [Mutates] Remove an external rule
     Remove {
         /// The directory path or name to remove
         entry: String,
@@ -488,7 +503,20 @@ pub enum ExternalAction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::Parser;
+    use clap::{CommandFactory, Parser};
+
+    fn help_for(path: &[&str]) -> String {
+        let mut command = Cli::command();
+        for segment in path {
+            command = command
+                .find_subcommand_mut(segment)
+                .unwrap_or_else(|| panic!("missing subcommand {segment}"))
+                .clone();
+        }
+        let mut buf = Vec::new();
+        command.write_long_help(&mut buf).unwrap();
+        String::from_utf8(buf).unwrap()
+    }
 
     #[test]
     fn parse_source_add() {
@@ -737,11 +765,13 @@ mod tests {
                 action:
                     SetAction::Activate {
                         name,
+                        apply,
                         dry_run,
                         local,
                     },
             } => {
                 assert_eq!(name, "rust-work");
+                assert!(!apply);
                 assert!(dry_run);
                 assert!(!local);
             }
@@ -758,12 +788,14 @@ mod tests {
                 action:
                     SetAction::Deactivate {
                         name,
+                        apply,
                         dry_run,
                         force,
                         local,
                     },
             } => {
                 assert_eq!(name, "rust-work");
+                assert!(!apply);
                 assert!(!dry_run);
                 assert!(force);
                 assert!(!local);
@@ -783,12 +815,14 @@ mod tests {
                         name,
                         local,
                         purge,
+                        apply,
                         force,
                     },
             } => {
                 assert_eq!(name, "rust-work");
                 assert!(!local);
                 assert!(purge);
+                assert!(!apply);
                 assert!(force);
             }
             _ => panic!("expected Set Delete"),
@@ -865,13 +899,30 @@ mod tests {
             .unwrap();
         match cli.command {
             Commands::Skill {
-                action: ArtifactAction::Promote { name, from },
+                action: ArtifactAction::Promote { name, from, apply },
             } => {
                 assert_eq!(name, "my-skill");
                 assert_eq!(from, Some(Platform::Codex));
+                assert!(!apply);
             }
             _ => panic!("unexpected command"),
         }
+    }
+
+    #[test]
+    fn mutating_help_marks_plan_apply_commands_and_hides_dry_run() {
+        let help = help_for(&["set", "activate"]);
+        assert!(help.contains("[Mutates with --apply]"), "{help}");
+        assert!(help.contains("--apply"), "{help}");
+        assert!(!help.contains("--dry-run"), "{help}");
+    }
+
+    #[test]
+    fn read_only_help_does_not_gain_mutation_flags() {
+        let help = help_for(&["set", "list"]);
+        assert!(!help.contains("[Mutates"), "{help}");
+        assert!(!help.contains("--apply"), "{help}");
+        assert!(!help.contains("--dry-run"), "{help}");
     }
 
     #[test]

@@ -5,8 +5,16 @@ use crate::types::format_version_prefix;
 
 use super::util;
 
+fn write_discarded_paths(f: &mut fmt::Formatter<'_>, result: &InstallResult) -> fmt::Result {
+    for path in &result.discarded_paths {
+        writeln!(f, "Discarding local modification: {}", path.display())?;
+    }
+    Ok(())
+}
+
 impl fmt::Display for InstallResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_discarded_paths(f, self)?;
         let version_info = format_version_prefix(self.version.as_deref());
         writeln!(
             f,
@@ -64,6 +72,7 @@ mod tests {
             dest_dir: PathBuf::from("/home/user/.claude/agents"),
             version: Some("1.2.3".to_string()),
             platform: crate::platform::Platform::Claude,
+            discarded_paths: Vec::new(),
         };
         let out = r.to_string();
         assert!(out.contains("my-agent"));
@@ -101,6 +110,7 @@ mod tests {
                 dest_dir: PathBuf::from("/home/user/.claude/skills"),
                 version: None,
                 platform: crate::platform::Platform::Claude,
+                discarded_paths: Vec::new(),
             }],
             kind: ArtifactKind::Skill,
             is_update: false,

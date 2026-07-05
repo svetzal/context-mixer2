@@ -195,9 +195,9 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
     if c.diverged > 0 {
         lines.push(format!(
             "  • {} artifact(s) diverge across their install locations (their content differs). Pick by your situation:\n\
-             \x20   - source- or home-backed, edited in place → `cmx skill promote <name>`\n\
+             \x20   - source- or home-backed, edited in place → `cmx skill promote <name>` (shows a plan; add `--apply`)\n\
              \x20   - source-backed, restore from source      → `cmx skill update <name> --force`\n\
-             \x20   - external / source-less                  → `cmx skill sync <name>` (or `--from <platform>`)\n\
+             \x20   - external / source-less                  → `cmx skill sync <name>` (or `--from <platform>`; add `--apply`)\n\
              \x20   - not sure? inspect first                  → `cmx skill diff <name>`",
             c.diverged
         ));
@@ -206,7 +206,8 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
         lines.push(format!(
             "  • {} set/installed mismatch(es) — an active set is missing a member, or an inactive \
              set's member is still installed on its behalf. `cmx set activate <name>` repairs a \
-             missing member; `cmx set deactivate <name>` clears a lingering one.",
+             missing member after showing its plan; `cmx set deactivate <name>` previews first \
+             and clears a lingering one with `--apply`.",
             c.set_inconsistent
         ));
     }

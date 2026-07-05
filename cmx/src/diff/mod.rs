@@ -16,6 +16,7 @@ mod structural;
 
 use discovery::{discover_copies, evaluate_copies, representative_platform};
 use reconcile::{focus_lock_state, reconciliations};
+pub(crate) use structural::file_changes_between;
 
 // ---------------------------------------------------------------------------
 // Result types (public surface — unchanged from before)

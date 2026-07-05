@@ -1,10 +1,11 @@
 use anyhow::{Result, bail};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::artifact_status;
 use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
+use crate::diff::{FileChange, FileStatus, file_changes_between};
 use crate::lockfile;
 use crate::paths::ConfigPaths;
 use crate::platform::Platform;
@@ -24,6 +25,8 @@ pub struct InstallResult {
     pub dest_dir: PathBuf,
     /// The platform this copy was installed for.
     pub platform: Platform,
+    /// Concrete target files whose local changes were discarded by `--force`.
+    pub discarded_paths: Vec<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -78,6 +81,16 @@ pub fn install(
              or 'cmx {kind} diff {artifact_name}' to review changes first."
         );
     }
+    let discarded_paths = if force && facts.locally_modified {
+        collect_discarded_paths(
+            kind,
+            &ctx.paths.require_installed_artifact_path(kind, artifact_name, scope)?,
+            &found.artifact.path,
+            ctx,
+        )?
+    } else {
+        Vec::new()
+    };
 
     commit_install(&plan, kind, scope, &found.artifact.path, source_checksum, &decision, ctx)?;
 
@@ -88,6 +101,7 @@ pub fn install(
         source_name: plan.source_name,
         dest_dir: plan.dest_dir,
         platform: ctx.paths.platform,
+        discarded_paths,
     })
 }
 
@@ -300,25 +314,17 @@ pub(crate) fn gather_install_facts(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<InstallFacts> {
-    let lock_for_check = if force {
-        None
-    } else {
-        Some(lockfile::load(scope, ctx.fs, ctx.paths)?)
-    };
-    let locally_modified = if let Some(ref lock) = lock_for_check {
-        check_local_modifications(
-            artifact_name,
-            kind,
-            scope,
-            lock.packages.get(artifact_name),
-            ctx,
-        )?
-    } else {
-        false
-    };
+    let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
+    let locally_modified = check_local_modifications(
+        artifact_name,
+        kind,
+        scope,
+        lock.packages.get(artifact_name),
+        ctx,
+    )?;
     let already_installed = ctx.paths.is_installed(kind, artifact_name, scope, ctx.fs);
     Ok(InstallFacts {
-        locally_modified,
+        locally_modified: locally_modified && (!force || already_installed),
         already_installed,
     })
 }
@@ -334,6 +340,13 @@ fn commit_install(
     decision: &InstallDecision,
     ctx: &AppContext<'_>,
 ) -> Result<PathBuf> {
+    if decision.replace_existing {
+        let existing =
+            kind.installed_path(&plan.artifact_name, &plan.dest_dir, ArtifactKind::HOME_AGENT_EXT);
+        if ctx.fs.exists(&existing) {
+            crate::uninstall::remove_installed(kind, &existing, ctx.fs)?;
+        }
+    }
     let dest_path =
         copy::copy_artifact(source_path, &plan.dest_dir, kind, &plan.artifact_name, ctx)?;
     let installed_checksum = checksum::checksum_artifact(&dest_path, kind, ctx.fs)?;
@@ -367,7 +380,7 @@ fn commit_install(
 
 /// Compute the destination directory and relative source path for an install.
 /// Pure function — no filesystem access.
-fn plan_install(
+pub(crate) fn plan_install(
     artifact_name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
@@ -395,6 +408,9 @@ pub(crate) struct InstallDecision {
     /// Only set for fresh installs — rolling back an existing copy is worse than
     /// the ghost we're trying to prevent.
     pub rollback_on_lock_fail: bool,
+    /// True when the existing on-disk copy should be removed before copying the
+    /// replacement, so local-only files do not linger after `--force`.
+    pub replace_existing: bool,
 }
 
 /// Pure decision function: given pre-gathered facts, return the install decisions.
@@ -407,6 +423,7 @@ pub(crate) fn decide_install(
     InstallDecision {
         blocked: locally_modified && !force,
         rollback_on_lock_fail: !already_installed,
+        replace_existing: force && already_installed,
     }
 }
 
@@ -456,6 +473,31 @@ fn parse_name(name: &str) -> (Option<&str>, &str) {
         (Some(source), artifact)
     } else {
         (None, name)
+    }
+}
+
+fn collect_discarded_paths(
+    kind: ArtifactKind,
+    installed_path: &Path,
+    source_path: &Path,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<PathBuf>> {
+    let changes = file_changes_between(kind, installed_path, source_path, ctx)?;
+    Ok(changes
+        .into_iter()
+        .map(|change| changed_target_path(installed_path, &change))
+        .collect())
+}
+
+fn changed_target_path(installed_path: &Path, change: &FileChange) -> PathBuf {
+    match change.status {
+        FileStatus::Modified | FileStatus::OnlyInInstalled | FileStatus::OnlyInSource => {
+            if installed_path.is_file() {
+                installed_path.to_path_buf()
+            } else {
+                installed_path.join(&change.path)
+            }
+        }
     }
 }
 

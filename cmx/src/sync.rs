@@ -21,6 +21,7 @@ use crate::adopt::HOME_SOURCE;
 use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
+use crate::diff::{FileChange, file_changes_between};
 use crate::lockfile;
 use crate::platform::{Platform, platforms_label};
 use crate::types::{ArtifactKind, InstallScope};
@@ -35,23 +36,27 @@ pub struct SyncTarget {
     /// Platforms whose install directory resolves to this location.
     pub platforms: Vec<Platform>,
     pub location: PathBuf,
+    pub artifact_path: PathBuf,
     /// The version this copy carried before the sync.
     pub from_version: Option<String>,
+    /// Per-file changes this target will receive (or received).
+    pub file_changes: Vec<FileChange>,
 }
 
 #[derive(Debug)]
 pub struct SyncResult {
     pub name: String,
-    pub dry_run: bool,
+    pub apply: bool,
     /// `true` when the skill matched an `external` rule — reconciled anyway,
     /// but the user is told another tool may re-diverge it.
     pub external: bool,
     /// Platforms that provided the winning copy.
     pub winner_platforms: Vec<Platform>,
+    pub winner_path: PathBuf,
     pub winner_version: Option<String>,
     /// `true` when every copy already matched — nothing to do.
     pub already_synced: bool,
-    /// Locations changed (or, under `--dry-run`, that would change).
+    /// Locations changed (or, in plan mode, that would change).
     pub targets: Vec<SyncTarget>,
 }
 
@@ -72,12 +77,14 @@ struct Copy {
 }
 
 impl Copy {
-    fn as_target(&self) -> SyncTarget {
-        SyncTarget {
+    fn as_target(&self, winner: &Copy, ctx: &AppContext<'_>) -> Result<SyncTarget> {
+        Ok(SyncTarget {
             platforms: self.platforms.clone(),
             location: self.dir.clone(),
+            artifact_path: self.path.clone(),
             from_version: self.version.clone(),
-        }
+            file_changes: file_changes_between(ArtifactKind::Skill, &self.path, &winner.path, ctx)?,
+        })
     }
 }
 
@@ -322,7 +329,7 @@ pub fn sync(
     kind: ArtifactKind,
     scope: InstallScope,
     from: Option<Platform>,
-    dry_run: bool,
+    apply: bool,
     ctx: &AppContext<'_>,
 ) -> Result<SyncResult> {
     if kind != ArtifactKind::Skill {
@@ -345,9 +352,10 @@ pub fn sync(
     if copies.iter().all(|c| c.checksum == copies[0].checksum) {
         return Ok(SyncResult {
             name: name.to_string(),
-            dry_run,
+            apply,
             external,
             winner_platforms: copies[0].platforms.clone(),
+            winner_path: copies[0].path.clone(),
             winner_version: copies[0].version.clone(),
             already_synced: true,
             targets: Vec::new(),
@@ -368,15 +376,16 @@ pub fn sync(
 
     let result = SyncResult {
         name: name.to_string(),
-        dry_run,
+        apply,
         external,
         winner_platforms: winner.platforms.clone(),
+        winner_path: winner.path.clone(),
         winner_version: winner.version.clone(),
         already_synced: false,
-        targets: targets.iter().map(|c| c.as_target()).collect(),
+        targets: targets.iter().map(|c| c.as_target(winner, ctx)).collect::<Result<_>>()?,
     };
 
-    if !dry_run {
+    if apply {
         apply_winner(name, kind, scope, winner, &targets, ctx)?;
     }
     Ok(result)

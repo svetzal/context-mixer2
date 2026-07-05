@@ -66,7 +66,7 @@ fn sync_newest_version_wins_and_updates_the_older_copy() {
     place_skill(&t, Platform::Codex, "mailctl", "1.0.3");
 
     let r =
-        sync("mailctl", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx()).unwrap();
+        sync("mailctl", ArtifactKind::Skill, InstallScope::Global, None, true, &t.ctx()).unwrap();
 
     assert!(!r.already_synced);
     assert_eq!(r.winner_version.as_deref(), Some("1.1.2"));
@@ -86,7 +86,7 @@ fn sync_from_forces_direction_even_against_newest() {
         ArtifactKind::Skill,
         InstallScope::Global,
         Some(Platform::Claude),
-        false,
+        true,
         &t.ctx(),
     )
     .unwrap();
@@ -110,7 +110,7 @@ fn sync_ambiguous_without_from_errors_but_succeeds_with_from() {
         ArtifactKind::Skill,
         InstallScope::Global,
         Some(Platform::Claude),
-        false,
+        true,
         &t.ctx(),
     )
     .unwrap();
@@ -180,8 +180,8 @@ fn sync_dry_run_changes_nothing_on_disk() {
     place_skill(&t, Platform::Claude, "s", "1.1.2");
     place_skill(&t, Platform::Codex, "s", "1.0.3");
 
-    let r = sync("s", ArtifactKind::Skill, InstallScope::Global, None, true, &t.ctx()).unwrap();
-    assert!(r.dry_run);
+    let r = sync("s", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx()).unwrap();
+    assert!(!r.apply);
     assert_eq!(r.targets.len(), 1);
     // Codex copy is untouched.
     assert!(read_skill(&t, Platform::Codex, "s").contains("version: 1.0.3"));
