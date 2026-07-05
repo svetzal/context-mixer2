@@ -563,13 +563,6 @@ fn init_json_reports_drifted_and_forced_update_statuses() {
         ),
     )
     .unwrap();
-    let mut lock: LockFile =
-        serde_json::from_slice(&fs::read(fixture.config_dir.join("cmx-lock.json")).unwrap())
-            .unwrap();
-    let entry = lock.packages.get_mut("cmx").expect("cmx lock entry after init");
-    entry.installed_checksum = "sha256:drifted".to_string();
-    entry.source_checksum = "sha256:drifted".to_string();
-    write_json(&fixture.config_dir.join("cmx-lock.json"), &lock);
 
     let skipped = fixture.run(&["init", "--json"]);
     assert!(
@@ -585,6 +578,52 @@ fn init_json_reports_drifted_and_forced_update_statuses() {
     let forced = fixture.run_json(&["init", "--force", "--json"]);
     assert_eq!(forced["targets"][0]["action"], "update");
     assert_eq!(forced["targets"][0]["status"], "updated");
+}
+
+#[test]
+fn init_force_lists_discarded_file_paths_in_human_output() {
+    let fixture = empty_fixture();
+    let initial = fixture.run(&["init"]);
+    assert!(
+        initial.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&initial.stdout),
+        String::from_utf8_lossy(&initial.stderr)
+    );
+
+    let skill_dir = fixture.home.join(".claude").join("skills").join("cmx");
+    let skill_md = skill_dir.join("SKILL.md");
+    let local_only = skill_dir.join("local-only.md");
+    fs::write(
+        &skill_md,
+        concat!(
+            "---\n",
+            "description: Locally edited.\n",
+            "metadata:\n",
+            "  version: \"",
+            env!("CARGO_PKG_VERSION"),
+            "\"\n",
+            "  author: Test\n",
+            "---\n",
+            "# locally edited\n"
+        ),
+    )
+    .unwrap();
+    fs::write(&local_only, "scratch notes\n").unwrap();
+
+    let forced = fixture.run(&["init", "--force"]);
+    assert!(
+        forced.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&forced.stdout),
+        String::from_utf8_lossy(&forced.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&forced.stdout);
+    assert!(stdout.contains("Discarding local modification:"), "{stdout}");
+    assert!(stdout.contains(&skill_md.display().to_string()), "{stdout}");
+    assert!(stdout.contains(&local_only.display().to_string()), "{stdout}");
+    assert!(!local_only.exists(), "local-only file should be discarded on forced init");
 }
 
 #[test]

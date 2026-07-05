@@ -139,22 +139,11 @@ pub fn run_remove(local: bool, ctx: &AppContext<'_>) -> Result<InitOutcome> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cmx_core::checksum;
     use cmx_core::gateway::Filesystem;
     use cmx_core::platform::Platform;
-    use cmx_core::test_support::{
-        TestContext, make_lock_entry_versioned, metadata_versioned_skill_content,
-        save_lock_with_entry,
-    };
+    use cmx_core::test_support::{TestContext, make_lock_entry_versioned, save_lock_with_entry};
     use cmx_core::types::{ArtifactKind, InstallScope};
-
-    fn drifted_cmx_entry() -> cmx_core::types::LockEntry {
-        make_lock_entry_versioned(
-            ArtifactKind::Skill,
-            env!("CARGO_PKG_VERSION"),
-            "bundled:cmx",
-            "skills/cmx",
-        )
-    }
 
     #[test]
     fn stamp_version_locks_frontmatter_to_cmx_version() {
@@ -270,23 +259,24 @@ mod tests {
     #[test]
     fn run_init_drifted_copy_without_force_skips_and_fails() {
         let t = TestContext::new();
+        let initial_ctx = t.ctx();
+        run_init(false, false, &initial_ctx).unwrap();
+
         let claude_paths = t.paths.with_platform(Platform::Claude);
         let skill_dir = claude_paths
             .install_dir(ArtifactKind::Skill, InstallScope::Global)
             .unwrap()
             .join("cmx");
         let skill_md = skill_dir.join("SKILL.md");
-        let drifted = metadata_versioned_skill_content("locally edited", env!("CARGO_PKG_VERSION"));
+        let drifted = stamp_version(SKILL_CONTENT)
+            .replace("## Agent contract 1", "Locally edited.\n\n## Agent contract 1");
         t.fs.add_file(&skill_md, drifted.as_str());
-        let mut entry = drifted_cmx_entry();
-        entry.installed_checksum = "sha256:drifted".to_string();
-        entry.source_checksum = "sha256:drifted".to_string();
-        save_lock_with_entry(&t.fs, &claude_paths, "cmx", entry, InstallScope::Global);
 
         let ctx = t.ctx();
         let outcome = run_init(false, false, &ctx).unwrap();
         let rendered = outcome.to_string();
         assert_eq!(outcome.exit_code(), ExitCode::FAILURE);
+        assert!(rendered.contains("Skipped 1 drifted copy (use --force)."));
         assert!(rendered.contains("re-run with --force to overwrite"));
         assert!(rendered.contains("cmx skill promote cmx"));
         match outcome {
@@ -305,24 +295,30 @@ mod tests {
     #[test]
     fn run_init_force_overwrites_drifted_copy_and_exits_success() {
         let t = TestContext::new();
+        let initial_ctx = t.ctx();
+        run_init(false, false, &initial_ctx).unwrap();
+
         let claude_paths = t.paths.with_platform(Platform::Claude);
         let skill_dir = claude_paths
             .install_dir(ArtifactKind::Skill, InstallScope::Global)
             .unwrap()
             .join("cmx");
         let skill_md = skill_dir.join("SKILL.md");
+        let local_only = skill_dir.join("local-only.md");
         t.fs.add_file(
             &skill_md,
-            metadata_versioned_skill_content("locally edited", env!("CARGO_PKG_VERSION")),
+            stamp_version(SKILL_CONTENT)
+                .replace("## Agent contract 1", "Locally edited.\n\n## Agent contract 1"),
         );
-        let mut entry = drifted_cmx_entry();
-        entry.installed_checksum = "sha256:drifted".to_string();
-        entry.source_checksum = "sha256:drifted".to_string();
-        save_lock_with_entry(&t.fs, &claude_paths, "cmx", entry, InstallScope::Global);
+        t.fs.add_file(&local_only, "scratch notes\n");
 
         let ctx = t.ctx();
         let outcome = run_init(false, true, &ctx).unwrap();
+        let rendered = outcome.to_string();
         assert_eq!(outcome.exit_code(), ExitCode::SUCCESS);
+        assert!(rendered.contains("Discarding local modification:"));
+        assert!(rendered.contains(&skill_md.display().to_string()));
+        assert!(rendered.contains(&local_only.display().to_string()));
         match outcome {
             InitOutcome::Installed(report) => {
                 assert_eq!(report.applied().count(), 1);
@@ -330,7 +326,14 @@ mod tests {
                     report.targets.first().unwrap().action,
                     TargetAction::Update { .. }
                 ));
+                assert_eq!(report.targets.first().unwrap().discarded_paths.len(), 2);
                 assert_eq!(t.fs.read_to_string(&skill_md).unwrap(), stamp_version(SKILL_CONTENT));
+                assert!(!t.fs.exists(&local_only));
+                let bundled = bundled_skill();
+                assert_eq!(
+                    checksum::checksum_artifact(&skill_dir, ArtifactKind::Skill, &t.fs).unwrap(),
+                    cmx_core::skill_fs::checksum_bundled(&bundled.files)
+                );
             }
             _ => panic!("expected Installed"),
         }

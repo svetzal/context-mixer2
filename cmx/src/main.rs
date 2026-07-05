@@ -816,9 +816,7 @@ mod tests {
     use cmx::gateway::Filesystem;
     use cmx::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use cmx::platform::Platform;
-    use cmx_core::test_support::{
-        make_lock_entry_versioned, metadata_versioned_skill_content, save_lock_with_entry,
-    };
+    use cmx_core::test_support::metadata_versioned_skill_content;
     use std::path::PathBuf;
 
     fn test_paths() -> ConfigPaths {
@@ -1722,6 +1720,15 @@ mod tests {
     #[test]
     fn handle_init_drifted_copy_without_force_returns_failure() {
         let (fs, git, clock, paths) = fake_trio();
+        let initial_ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let initial_args = InitArgs {
+            local: false,
+            force: false,
+            remove: false,
+            output: no_json(),
+        };
+        assert_eq!(handle_init(initial_args, &initial_ctx).unwrap(), ExitCode::SUCCESS);
+
         let pv = paths.with_platform(Platform::Claude);
         let skill_dir =
             pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join("cmx");
@@ -1729,15 +1736,6 @@ mod tests {
             skill_dir.join("SKILL.md"),
             metadata_versioned_skill_content("locally edited", env!("CARGO_PKG_VERSION")),
         );
-        let mut entry = make_lock_entry_versioned(
-            ArtifactKind::Skill,
-            env!("CARGO_PKG_VERSION"),
-            "bundled:cmx",
-            "skills/cmx",
-        );
-        entry.installed_checksum = "sha256:drifted".to_string();
-        entry.source_checksum = "sha256:drifted".to_string();
-        save_lock_with_entry(&fs, &pv, "cmx", entry, InstallScope::Global);
 
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let args = InitArgs {

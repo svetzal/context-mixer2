@@ -1,4 +1,5 @@
 use std::fmt;
+use std::path::PathBuf;
 
 use cmx_core::platform::Platform;
 use cmx_core::skill_install::{InstallPlan, Report, TargetAction};
@@ -52,6 +53,7 @@ impl fmt::Display for InitOutcome {
 
 fn render_report(f: &mut fmt::Formatter<'_>, report: &Report) -> fmt::Result {
     let counts = ActionCounts::from_actions(report.targets.iter().map(|target| &target.action));
+    write_discarded_paths(f, report)?;
     writeln!(f, "{}", report_summary(&counts))?;
     if counts.skipped_up_to_date > 0
         && (counts.installed > 0 || counts.updated > 0 || counts.skipped_drifted > 0)
@@ -73,6 +75,16 @@ fn render_report(f: &mut fmt::Formatter<'_>, report: &Report) -> fmt::Result {
     }
     if report.source_registered {
         writeln!(f, "  (registered as cmx source)")?;
+    }
+    Ok(())
+}
+
+fn write_discarded_paths(f: &mut fmt::Formatter<'_>, report: &Report) -> fmt::Result {
+    let mut seen = std::collections::BTreeSet::<PathBuf>::new();
+    for path in report.targets.iter().flat_map(|target| target.discarded_paths.iter()) {
+        if seen.insert(path.clone()) {
+            writeln!(f, "Discarding local modification: {}", path.display())?;
+        }
     }
     Ok(())
 }
@@ -291,6 +303,7 @@ mod tests {
                 action,
                 files_written,
                 installed_checksum,
+                discarded_paths: Vec::new(),
             }],
             source_registered: false,
         }
@@ -335,6 +348,23 @@ mod tests {
         let out = outcome.to_string();
         assert!(out.contains("Skipped 1 drifted copy (use --force)."));
         assert!(out.contains("cmx skill promote cmx"));
+    }
+
+    #[test]
+    fn display_force_update_lists_discarded_paths_once() {
+        let mut report = sample_report(TargetAction::Update {
+            from: Some("2.10.2".to_string()),
+        });
+        report.targets[0].discarded_paths = vec![
+            PathBuf::from("/home/u/.claude/skills/cmx/SKILL.md"),
+            PathBuf::from("/home/u/.claude/skills/cmx/local-only.md"),
+            PathBuf::from("/home/u/.claude/skills/cmx/SKILL.md"),
+        ];
+
+        let out = InitOutcome::Installed(report).to_string();
+        assert_eq!(out.matches("Discarding local modification:").count(), 2);
+        assert!(out.contains("/home/u/.claude/skills/cmx/SKILL.md"));
+        assert!(out.contains("/home/u/.claude/skills/cmx/local-only.md"));
     }
 
     #[test]

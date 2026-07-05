@@ -24,12 +24,13 @@
 
 use anyhow::{Result, bail};
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
+use crate::fs_util;
 use crate::lockfile;
 use crate::platform::Platform;
 use crate::platform_iter;
@@ -254,6 +255,8 @@ pub struct TargetOutcome {
     /// Checksum recorded in the lock file. `Some` for written targets, `None`
     /// for skipped targets (no lock entry was touched).
     pub installed_checksum: Option<String>,
+    /// Concrete target files whose local changes were discarded by `--force`.
+    pub discarded_paths: Vec<PathBuf>,
 }
 
 /// The full report returned by [`SkillInstaller::apply`].
@@ -282,6 +285,11 @@ impl Report {
     pub fn skipped(&self) -> impl Iterator<Item = &TargetOutcome> {
         self.targets.iter().filter(|o| !o.action.will_write())
     }
+}
+
+struct PreparedWrites {
+    dirs_to_write: BTreeSet<PathBuf>,
+    discarded_paths_by_dir: BTreeMap<PathBuf, Vec<PathBuf>>,
 }
 
 impl std::fmt::Display for Report {
@@ -442,7 +450,7 @@ impl SkillInstaller {
                     force,
                     &skill_dest,
                     ctx,
-                )
+                )?
             } else if ctx.fs.exists(&skill_dest) {
                 // On disk but not tracked: treat as Install (untracked copy)
                 TargetAction::Install
@@ -498,13 +506,10 @@ impl SkillInstaller {
             );
         }
 
-        // Collect distinct dest dirs that need writing (dedup shared dirs).
-        let mut dirs_to_write: BTreeSet<PathBuf> = BTreeSet::new();
-        for target in &plan.targets {
-            if target.action.will_write() {
-                dirs_to_write.insert(target.dest_dir.clone());
-            }
-        }
+        let PreparedWrites {
+            dirs_to_write,
+            discarded_paths_by_dir,
+        } = prepare_writes(plan, skill, ctx)?;
 
         // Write each distinct dir once.
         for dir in &dirs_to_write {
@@ -524,6 +529,7 @@ impl SkillInstaller {
                     action: target.action.clone(),
                     files_written: 0,
                     installed_checksum: None,
+                    discarded_paths: Vec::new(),
                 });
                 continue;
             }
@@ -543,6 +549,10 @@ impl SkillInstaller {
                 action: target.action.clone(),
                 files_written: target.files.len(),
                 installed_checksum: Some(installed_checksum.clone()),
+                discarded_paths: discarded_paths_by_dir
+                    .get(&target.dest_dir)
+                    .cloned()
+                    .unwrap_or_default(),
             });
         }
 
@@ -736,58 +746,117 @@ fn decide_action_for_entry(
     force: bool,
     skill_dest: &std::path::Path,
     ctx: &AppContext<'_>,
-) -> TargetAction {
+) -> Result<TargetAction> {
     let installed_version = entry.version.as_deref();
     let cmp = compare_versions(installed_version, bundled_version);
 
     match cmp {
-        Ordering::Less => {
-            // Installed is older → update
-            TargetAction::Update {
-                from: installed_version.map(str::to_string),
-            }
-        }
+        Ordering::Less => Ok(TargetAction::Update {
+            from: installed_version.map(str::to_string),
+        }),
         Ordering::Equal => {
-            // Same version — check if content matches
-            if entry.installed_checksum == source_checksum {
-                // Check on-disk state
-                if ctx.fs.exists(skill_dest) {
-                    TargetAction::Skip
-                } else {
-                    // File is gone — reinstall
-                    TargetAction::Install
-                }
+            if !ctx.fs.exists(skill_dest) {
+                return Ok(TargetAction::Install);
+            }
+
+            let disk_checksum =
+                checksum::checksum_artifact(skill_dest, ArtifactKind::Skill, ctx.fs)?;
+            if disk_checksum == source_checksum {
+                Ok(TargetAction::Skip)
+            } else if force {
+                Ok(TargetAction::Update {
+                    from: installed_version.map(str::to_string),
+                })
             } else {
-                // Content differs from locked checksum — check on-disk drift
-                if ctx.fs.exists(skill_dest) {
-                    if force {
-                        TargetAction::Update {
-                            from: installed_version.map(str::to_string),
-                        }
-                    } else {
-                        // The on-disk copy may differ from bundled due to edits
-                        TargetAction::DriftedSkip {
-                            installed: installed_version.unwrap_or("unknown").to_string(),
-                        }
-                    }
-                } else {
-                    TargetAction::Install
-                }
+                Ok(TargetAction::DriftedSkip {
+                    installed: installed_version.unwrap_or("unknown").to_string(),
+                })
             }
         }
         Ordering::Greater => {
-            // Installed is newer
             if force {
-                TargetAction::Downgrade {
+                Ok(TargetAction::Downgrade {
                     from: installed_version.unwrap_or("unknown").to_string(),
-                }
+                })
             } else {
-                TargetAction::RefuseNewer {
+                Ok(TargetAction::RefuseNewer {
                     installed: installed_version.unwrap_or("unknown").to_string(),
-                }
+                })
             }
         }
     }
+}
+
+fn discarded_paths_against_bundle(
+    skill_dest: &std::path::Path,
+    bundled_files: &[SkillFile],
+    ctx: &AppContext<'_>,
+) -> Result<Vec<PathBuf>> {
+    if !ctx.fs.exists(skill_dest) {
+        return Ok(Vec::new());
+    }
+
+    let installed_files = fs_util::collect_files_recursive(skill_dest, ctx.fs)?;
+    let mut installed_by_rel = BTreeMap::new();
+    for path in installed_files {
+        let rel = path.strip_prefix(skill_dest).unwrap_or(&path).to_path_buf();
+        installed_by_rel.insert(rel, ctx.fs.read(&path)?);
+    }
+
+    let mut bundled_by_rel = BTreeMap::new();
+    for file in skill_fs::canonical_files(bundled_files) {
+        bundled_by_rel.insert(file.rel_path.clone(), file.bytes.clone());
+    }
+
+    let mut changed_paths = Vec::new();
+    let relative_paths: BTreeSet<_> =
+        installed_by_rel.keys().chain(bundled_by_rel.keys()).cloned().collect();
+
+    for rel_path in relative_paths {
+        match (installed_by_rel.get(&rel_path), bundled_by_rel.get(&rel_path)) {
+            (Some(installed), Some(bundled)) if installed == bundled => {}
+            (Some(_) | None, Some(_)) | (Some(_), None) => {
+                changed_paths.push(skill_dest.join(rel_path));
+            }
+            (None, None) => {}
+        }
+    }
+
+    Ok(changed_paths)
+}
+
+fn prepare_writes(
+    plan: &InstallPlan,
+    skill: &BundledSkill,
+    ctx: &AppContext<'_>,
+) -> Result<PreparedWrites> {
+    let mut dirs_to_write = BTreeSet::new();
+    let mut dirs_to_replace = BTreeSet::new();
+
+    for target in &plan.targets {
+        if target.action.will_write() {
+            dirs_to_write.insert(target.dest_dir.clone());
+        }
+        if plan.force
+            && matches!(target.action, TargetAction::Update { .. } | TargetAction::Downgrade { .. })
+        {
+            dirs_to_replace.insert(target.dest_dir.clone());
+        }
+    }
+
+    let mut discarded_paths_by_dir = BTreeMap::new();
+    for dir in &dirs_to_replace {
+        discarded_paths_by_dir
+            .insert(dir.clone(), discarded_paths_against_bundle(dir, &skill.files, ctx)?);
+        if ctx.fs.exists(dir) {
+            ctx.fs.remove_dir_all(dir)?;
+        }
+    }
+
+    Ok(PreparedWrites {
+        dirs_to_write,
+        discarded_paths_by_dir,
+    })
 }
 
 fn build_lock_entry(tool: &ToolIdentity, checksum: &str, installed_at: &str) -> LockEntry {
@@ -1001,8 +1070,7 @@ mod tests {
             .install_dir(ArtifactKind::Skill, InstallScope::Global)
             .unwrap()
             .join("sample");
-        // Put a file on disk so `exists()` returns true
-        t.fs.add_file(skill_dir.join("SKILL.md"), "---\nversion: 1.0.0\n---\n# Sample skill\n");
+        skill_fs::write_skill_files(&skill_dir, &skill.files, &t.fs).unwrap();
 
         crate::test_support::save_lock_with_entry(
             &t.fs,
@@ -1031,6 +1099,7 @@ mod tests {
     fn same_version_differing_content_no_force_produces_drifted_skip() {
         let t = TestContext::new();
         let skill = sample_skill("1.0.0");
+        let checksum = skill_fs::checksum_bundled(&skill.files);
 
         let claude_paths = t.paths.with_platform(Platform::Claude);
         let skill_dir = claude_paths
@@ -1051,8 +1120,8 @@ mod tests {
                     repo: "bundled:sample".to_string(),
                     path: "skills/sample".to_string(),
                 },
-                source_checksum: "sha256:different".to_string(),
-                installed_checksum: "sha256:different".to_string(),
+                source_checksum: checksum.clone(),
+                installed_checksum: checksum,
             },
             InstallScope::Global,
         );
@@ -1066,6 +1135,7 @@ mod tests {
     fn same_version_differing_content_with_force_produces_update() {
         let t = TestContext::new();
         let skill = sample_skill("1.0.0");
+        let checksum = skill_fs::checksum_bundled(&skill.files);
 
         let claude_paths = t.paths.with_platform(Platform::Claude);
         let skill_dir = claude_paths
@@ -1086,8 +1156,8 @@ mod tests {
                     repo: "bundled:sample".to_string(),
                     path: "skills/sample".to_string(),
                 },
-                source_checksum: "sha256:different".to_string(),
-                installed_checksum: "sha256:different".to_string(),
+                source_checksum: checksum.clone(),
+                installed_checksum: checksum,
             },
             InstallScope::Global,
         );
@@ -1125,7 +1195,7 @@ mod tests {
             .install_dir(ArtifactKind::Skill, InstallScope::Global)
             .unwrap()
             .join("sample");
-        t.fs.add_dir(skill_dir);
+        skill_fs::write_skill_files(&skill_dir, &skill.files, &t.fs).unwrap();
 
         crate::test_support::save_lock_with_entry(
             &t.fs,
@@ -1242,7 +1312,7 @@ mod tests {
             .install_dir(ArtifactKind::Skill, InstallScope::Global)
             .unwrap()
             .join("sample");
-        t.fs.add_file(skill_dir.join("SKILL.md"), "---\nversion: 1.0.0\n---\n# Sample skill\n");
+        skill_fs::write_skill_files(&skill_dir, &skill.files, &t.fs).unwrap();
 
         crate::test_support::save_lock_with_entry(
             &t.fs,
@@ -1546,7 +1616,7 @@ mod tests {
             .install_dir(ArtifactKind::Skill, InstallScope::Global)
             .unwrap()
             .join("sample");
-        t.fs.add_file(skill_dir.join("SKILL.md"), "---\nversion: 1.0.0\n---\n# Sample skill\n");
+        skill_fs::write_skill_files(&skill_dir, &skill.files, &t.fs).unwrap();
 
         crate::test_support::save_lock_with_entry(
             &t.fs,
@@ -1584,6 +1654,7 @@ mod tests {
     fn drifted_skip_outcome_is_distinguishable_from_plain_skip() {
         let t = TestContext::new();
         let skill = sample_skill("1.0.0");
+        let checksum = skill_fs::checksum_bundled(&skill.files);
 
         let claude_paths = t.paths.with_platform(Platform::Claude);
         let skill_dir = claude_paths
@@ -1604,8 +1675,8 @@ mod tests {
                     repo: "bundled:sample".to_string(),
                     path: "skills/sample".to_string(),
                 },
-                source_checksum: "sha256:different".to_string(),
-                installed_checksum: "sha256:different".to_string(),
+                source_checksum: checksum.clone(),
+                installed_checksum: checksum,
             },
             InstallScope::Global,
         );
@@ -1625,6 +1696,7 @@ mod tests {
     fn force_overwrites_drifted_copy_and_reports_update() {
         let t = TestContext::new();
         let skill = sample_skill("1.0.0");
+        let checksum = skill_fs::checksum_bundled(&skill.files);
 
         let claude_paths = t.paths.with_platform(Platform::Claude);
         let skill_dir = claude_paths
@@ -1632,7 +1704,9 @@ mod tests {
             .unwrap()
             .join("sample");
         let skill_md = skill_dir.join("SKILL.md");
+        let local_only = skill_dir.join("local-only.md");
         t.fs.add_file(&skill_md, "---\nversion: 1.0.0\n---\n# Modified\n");
+        t.fs.add_file(&local_only, "scratch\n");
 
         crate::test_support::save_lock_with_entry(
             &t.fs,
@@ -1646,8 +1720,8 @@ mod tests {
                     repo: "bundled:sample".to_string(),
                     path: "skills/sample".to_string(),
                 },
-                source_checksum: "sha256:different".to_string(),
-                installed_checksum: "sha256:different".to_string(),
+                source_checksum: checksum.clone(),
+                installed_checksum: checksum.clone(),
             },
             InstallScope::Global,
         );
@@ -1658,10 +1732,21 @@ mod tests {
 
         let updated = report.applied().next().expect("expected an updated target");
         assert!(matches!(updated.action, TargetAction::Update { .. }));
+        let discarded: BTreeSet<_> = updated.discarded_paths.iter().cloned().collect();
+        assert_eq!(
+            discarded,
+            BTreeSet::from([
+                local_only.clone(),
+                skill_md.clone(),
+                skill_dir.join("scripts/tool.py")
+            ])
+        );
         assert_eq!(
             t.fs.read_to_string(&skill_md).unwrap(),
             "---\nversion: 1.0.0\n---\n# Sample skill\n"
         );
+        assert!(!t.fs.exists(&local_only));
+        assert_eq!(checksum::checksum_dir(&skill_dir, &t.fs).unwrap(), checksum);
     }
 
     // -----------------------------------------------------------------------
@@ -1684,7 +1769,6 @@ mod tests {
     fn report_display_distinguishes_drifted_skip() {
         let t = TestContext::new();
         let skill = sample_skill("1.0.0");
-        let checksum = skill_fs::checksum_bundled(&skill.files);
 
         // First apply: fresh install
         let ctx = t.ctx();
@@ -1700,6 +1784,7 @@ mod tests {
 
         // Set up drifted scenario
         let t2 = TestContext::new();
+        let checksum = skill_fs::checksum_bundled(&skill.files);
         let claude_paths = t2.paths.with_platform(Platform::Claude);
         let skill_dir = claude_paths
             .install_dir(ArtifactKind::Skill, InstallScope::Global)
@@ -1719,8 +1804,8 @@ mod tests {
                     repo: "bundled:sample".to_string(),
                     path: "skills/sample".to_string(),
                 },
-                source_checksum: "sha256:different".to_string(),
-                installed_checksum: "sha256:different".to_string(),
+                source_checksum: checksum.clone(),
+                installed_checksum: checksum,
             },
             InstallScope::Global,
         );
@@ -1738,8 +1823,6 @@ mod tests {
             skip_text, drifted_text,
             "up-to-date skip and drifted skip must produce different display output"
         );
-        // suppress unused warning
-        let _ = checksum;
         let _ = up_to_date_text;
     }
 
