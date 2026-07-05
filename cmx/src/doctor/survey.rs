@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -12,6 +12,7 @@ use crate::scan;
 use crate::source_iter;
 use crate::types::{ArtifactKind, InstallScope, LockFile};
 
+use super::set_consistency::{SetInconsistency, set_inconsistencies};
 use super::types::{ArtifactState, DoctorArtifact, DoctorReport, DoctorRow, MissingRow};
 
 /// The scopes to survey: global always, plus local when `include_local`.
@@ -367,6 +368,29 @@ fn sort_rows(rows: &mut [DoctorRow]) {
     });
 }
 
+/// Load every scope's sets and cross-reference each member against what the
+/// survey found installed, read-only (see `SETS.md`, "doctor integration").
+/// `artifacts` already reflects every location/platform the survey walked, so
+/// "installed" here means "present anywhere doctor's survey found it" —
+/// consistent with `sets::show`'s own installed check.
+fn collect_set_inconsistencies(
+    scopes: &[InstallScope],
+    artifacts: &[DoctorArtifact],
+    ctx: &AppContext<'_>,
+) -> Result<Vec<SetInconsistency>> {
+    let installed: HashSet<(ArtifactKind, String)> =
+        artifacts.iter().map(|a| (a.kind, a.name.clone())).collect();
+    let is_installed =
+        |kind: ArtifactKind, name: &str| installed.contains(&(kind, name.to_string()));
+
+    let mut found = Vec::new();
+    for &scope in scopes {
+        let sets = config::load_sets(scope, ctx.fs, ctx.paths)?;
+        found.extend(set_inconsistencies(scope, &sets, &is_installed));
+    }
+    Ok(found)
+}
+
 fn sort_missing(missing: &mut [MissingRow]) {
     missing.sort_by(|a, b| {
         a.kind
@@ -402,6 +426,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
     sort_rows(&mut rows);
     sort_missing(&mut missing);
     let artifacts = group_rows(&rows);
+    let set_inconsistencies = collect_set_inconsistencies(&scopes, &artifacts, ctx)?;
 
     Ok(DoctorReport {
         rows,
@@ -411,5 +436,6 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
         surveyed_platforms: platforms.len(),
         scoped_to_managed: !cfg.platforms.is_empty(),
         show_all: false,
+        set_inconsistencies,
     })
 }

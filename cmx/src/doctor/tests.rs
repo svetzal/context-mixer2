@@ -822,3 +822,104 @@ fn source_of_external_returns_none() {
     let result = source_of("ext-tool", &agg, ArtifactState::External, &locks, &available);
     assert!(result.is_none());
 }
+
+// --- set-consistency (Phase 3, end-to-end via survey) ---
+
+mod set_consistency_survey {
+    use super::*;
+    use crate::config;
+    use crate::types::{SetDef, SetMember, SetState};
+
+    fn seed_set(t: &TestContext, name: &str, state: SetState, members: Vec<SetMember>) {
+        config::mutate_sets(InstallScope::Global, &t.fs, &t.paths, |sets| {
+            sets.sets.insert(
+                name.to_string(),
+                SetDef {
+                    description: None,
+                    state,
+                    members,
+                },
+            );
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    fn agent_member(name: &str) -> SetMember {
+        SetMember {
+            kind: ArtifactKind::Agent,
+            name: name.to_string(),
+            source: Some("guidelines".to_string()),
+        }
+    }
+
+    #[test]
+    fn survey_flags_active_set_with_missing_member() {
+        let t = TestContext::new();
+        seed_set(&t, "rust-work", SetState::Active, vec![agent_member("rust-craftsperson")]);
+
+        let report = survey(false, &t.ctx()).unwrap();
+        assert_eq!(report.set_inconsistencies.len(), 1);
+        assert_eq!(report.set_inconsistencies[0].set_name, "rust-work");
+        assert!(report.has_issues());
+        assert_eq!(report.counts().set_inconsistent, 1);
+    }
+
+    #[test]
+    fn survey_flags_inactive_set_member_still_installed() {
+        let t = TestContext::new();
+        crate::test_support::install_agent_on_disk(
+            &t.fs,
+            &t.paths,
+            "rust-craftsperson",
+            &crate::test_support::agent_content("rust-craftsperson", "desc"),
+            InstallScope::Global,
+        );
+        seed_set(&t, "rust-work", SetState::Inactive, vec![agent_member("rust-craftsperson")]);
+
+        let report = survey(false, &t.ctx()).unwrap();
+        assert_eq!(report.set_inconsistencies.len(), 1);
+        assert!(report.has_issues());
+    }
+
+    #[test]
+    fn survey_does_not_flag_inactive_member_held_by_active_set() {
+        let t = TestContext::new();
+        crate::test_support::install_agent_on_disk(
+            &t.fs,
+            &t.paths,
+            "rust-craftsperson",
+            &crate::test_support::agent_content("rust-craftsperson", "desc"),
+            InstallScope::Global,
+        );
+        seed_set(&t, "blog", SetState::Inactive, vec![agent_member("rust-craftsperson")]);
+        seed_set(&t, "rust-work", SetState::Active, vec![agent_member("rust-craftsperson")]);
+
+        let report = survey(false, &t.ctx()).unwrap();
+        assert!(
+            report.set_inconsistencies.is_empty(),
+            "member held by an active set must not be flagged: {:?}",
+            report.set_inconsistencies
+        );
+    }
+
+    #[test]
+    fn survey_clean_when_active_set_fully_installed() {
+        let t = TestContext::new();
+        crate::test_support::install_agent_on_disk(
+            &t.fs,
+            &t.paths,
+            "rust-craftsperson",
+            &crate::test_support::agent_content("rust-craftsperson", "desc"),
+            InstallScope::Global,
+        );
+        seed_set(&t, "rust-work", SetState::Active, vec![agent_member("rust-craftsperson")]);
+
+        let report = survey(false, &t.ctx()).unwrap();
+        assert!(
+            report.set_inconsistencies.is_empty(),
+            "member installed and claimed by its own active set: {:?}",
+            report.set_inconsistencies
+        );
+    }
+}

@@ -75,9 +75,30 @@ pub fn doctor_json(report: &DoctorReport) -> Value {
             "external": c.external,
             "missing": c.missing,
             "diverged": c.diverged,
+            "set_inconsistent": c.set_inconsistent,
         },
         "artifacts": artifacts,
+        "set_inconsistencies": report
+            .set_inconsistencies
+            .iter()
+            .map(|s| json!({
+                "set": s.set_name,
+                "scope": s.scope.label(),
+                "kind": s.kind.to_string(),
+                "member": s.member,
+                "problem": set_problem_label(s.problem),
+            }))
+            .collect::<Vec<_>>(),
     })
+}
+
+/// Machine-readable label for a [`crate::doctor::SetProblem`] — used by both
+/// `doctor_json` and the human hint text.
+fn set_problem_label(problem: crate::doctor::SetProblem) -> &'static str {
+    match problem {
+        crate::doctor::SetProblem::ActiveMissing => "active_missing",
+        crate::doctor::SetProblem::InactiveLingering => "inactive_lingering",
+    }
 }
 
 /// Build the artifact table from the given grouped logical artifacts — one row
@@ -181,6 +202,14 @@ fn doctor_hints(c: &crate::doctor::StateCounts) -> String {
             c.diverged
         ));
     }
+    if c.set_inconsistent > 0 {
+        lines.push(format!(
+            "  • {} set/installed mismatch(es) — an active set is missing a member, or an inactive \
+             set's member is still installed on its behalf. `cmx set activate <name>` repairs a \
+             missing member; `cmx set deactivate <name>` clears a lingering one.",
+            c.set_inconsistent
+        ));
+    }
     if lines.is_empty() {
         String::new()
     } else {
@@ -218,6 +247,31 @@ fn doctor_divergence_details(
     } else {
         format!("\n{}\n", lines.join("\n"))
     }
+}
+
+/// Detail lines for each set/installed-state mismatch, naming the set, the
+/// member, and what's wrong — one line per [`crate::doctor::SetInconsistency`].
+fn doctor_set_details(report: &DoctorReport) -> String {
+    if report.set_inconsistencies.is_empty() {
+        return String::new();
+    }
+    let mut lines = Vec::new();
+    for s in &report.set_inconsistencies {
+        let what = match s.problem {
+            crate::doctor::SetProblem::ActiveMissing => "active but not installed",
+            crate::doctor::SetProblem::InactiveLingering => {
+                "inactive but still installed (not held by any active set)"
+            }
+        };
+        lines.push(format!(
+            "  • set '{}' ({}): {} {} is {what}",
+            s.set_name,
+            s.scope.label(),
+            s.kind,
+            s.member
+        ));
+    }
+    format!("\n{}\n", lines.join("\n"))
 }
 
 impl fmt::Display for DoctorReport {
@@ -259,7 +313,7 @@ impl fmt::Display for DoctorReport {
             write!(f, "{}", doctor_missing_table(self).render())?;
         }
 
-        if shown.is_empty() && self.missing.is_empty() {
+        if shown.is_empty() && self.missing.is_empty() && self.set_inconsistencies.is_empty() {
             if self.artifacts.is_empty() {
                 writeln!(f, "Nothing installed — your system is clean.")?;
             } else if self.show_all {
@@ -275,18 +329,28 @@ impl fmt::Display for DoctorReport {
         let c = self.counts();
         writeln!(
             f,
-            "\nSummary: {} tracked, {} drifted, {} untracked, {} orphaned, {} external, {} missing · {} diverged.",
-            c.tracked, c.drifted, c.untracked, c.orphaned, c.external, c.missing, c.diverged
+            "\nSummary: {} tracked, {} drifted, {} untracked, {} orphaned, {} external, {} missing · {} diverged · {} set-inconsistent.",
+            c.tracked,
+            c.drifted,
+            c.untracked,
+            c.orphaned,
+            c.external,
+            c.missing,
+            c.diverged,
+            c.set_inconsistent
         )?;
         write!(f, "{}", doctor_hints(&c))?;
-        write!(f, "{}", doctor_divergence_details(&shown, &self.rows))
+        write!(f, "{}", doctor_divergence_details(&shown, &self.rows))?;
+        write!(f, "{}", doctor_set_details(self))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{adopt_all_deprecation_notice, doctor_json};
-    use crate::doctor::{ArtifactState, DoctorArtifact, DoctorReport, MissingRow};
+    use crate::doctor::{
+        ArtifactState, DoctorArtifact, DoctorReport, MissingRow, SetInconsistency, SetProblem,
+    };
     use crate::platform::Platform;
     use crate::types::{ArtifactKind, InstallScope};
     use std::path::PathBuf;
@@ -324,6 +388,7 @@ mod tests {
             surveyed_platforms: 13,
             scoped_to_managed: false,
             show_all: true,
+            set_inconsistencies: vec![],
         };
         let out = r.to_string();
         assert!(out.contains("Installed artifacts:"));
@@ -356,6 +421,7 @@ mod tests {
             surveyed_platforms: 13,
             scoped_to_managed: false,
             show_all: true,
+            set_inconsistencies: vec![],
         };
         let out = r.to_string();
         assert!(out.contains("clipboard"));
@@ -380,6 +446,7 @@ mod tests {
             surveyed_platforms: 13,
             scoped_to_managed: false,
             show_all: false,
+            set_inconsistencies: vec![],
         };
         let out = r.to_string();
         assert!(out.contains("global + project scope"), "local-included scope label");
@@ -401,6 +468,7 @@ mod tests {
             surveyed_platforms: 13,
             scoped_to_managed: false,
             show_all: false,
+            set_inconsistencies: vec![],
         };
         let out = r.to_string();
         assert!(out.contains("(diverged)"), "diverged marker rendered: {out}");
@@ -424,6 +492,7 @@ mod tests {
             surveyed_platforms: 13,
             scoped_to_managed: false,
             show_all: true,
+            set_inconsistencies: vec![],
         };
         let out = r.to_string();
         assert!(out.contains("3.2.0 / 3.3.0"), "version skew named in the table: {out}");
@@ -463,6 +532,7 @@ mod tests {
             surveyed_platforms: 13,
             scoped_to_managed: false,
             show_all: true,
+            set_inconsistencies: vec![],
         };
         let out = r.to_string();
         assert!(out.contains("hopper-coordinator diverges:"), "detail line present: {out}");
@@ -487,6 +557,7 @@ mod tests {
             surveyed_platforms: 13,
             scoped_to_managed: false,
             show_all: false,
+            set_inconsistencies: vec![],
         };
         assert!(r.has_issues(), "a diverged external artifact is an issue");
         let out = r.to_string();
@@ -522,6 +593,7 @@ mod tests {
             surveyed_platforms: 13,
             scoped_to_managed: false,
             show_all: false,
+            set_inconsistencies: vec![],
         };
         let out = healthy.to_string();
         assert!(!out.contains("clipboard"), "tracked artifact hidden by default: {out}");
@@ -564,6 +636,7 @@ mod tests {
             surveyed_platforms: 13,
             scoped_to_managed: false,
             show_all: false,
+            set_inconsistencies: vec![],
         }
     }
 
@@ -585,10 +658,13 @@ mod tests {
             "external",
             "missing",
             "diverged",
+            "set_inconsistent",
         ] {
             assert!(summary.get(key).is_some(), "summary missing {key}: {value}");
         }
         assert_eq!(summary["diverged"], 1);
+        assert_eq!(summary["set_inconsistent"], 0);
+        assert!(value["set_inconsistencies"].as_array().expect("array").is_empty());
 
         let artifacts = value["artifacts"].as_array().expect("artifacts array");
         assert_eq!(artifacts.len(), 1);
@@ -628,6 +704,45 @@ mod tests {
         let artifacts = value["artifacts"].as_array().expect("artifacts array");
         assert_eq!(artifacts.len(), 2, "healthy tracked artifact included with --all: {value}");
         assert!(artifacts.iter().any(|a| a["name"] == "clipboard"));
+    }
+
+    #[test]
+    fn doctor_report_flags_set_inconsistency() {
+        let r = DoctorReport {
+            rows: vec![],
+            artifacts: vec![],
+            missing: vec![],
+            included_local: false,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
+            show_all: false,
+            set_inconsistencies: vec![SetInconsistency {
+                set_name: "rust-work".to_string(),
+                scope: InstallScope::Global,
+                kind: ArtifactKind::Agent,
+                member: "rust-craftsperson".to_string(),
+                problem: SetProblem::ActiveMissing,
+            }],
+        };
+        assert!(r.has_issues(), "a set inconsistency is an issue");
+        let out = r.to_string();
+        assert!(
+            !out.contains("everything cmx manages is healthy"),
+            "must not claim healthy with a set inconsistency: {out}"
+        );
+        assert!(out.contains("1 set-inconsistent"), "summary tallies it: {out}");
+        assert!(out.contains("cmx set activate"), "hint present: {out}");
+        assert!(
+            out.contains("rust-work") && out.contains("rust-craftsperson"),
+            "detail line names the set and member: {out}"
+        );
+
+        let value = doctor_json(&r);
+        assert_eq!(value["summary"]["set_inconsistent"], 1);
+        let entries = value["set_inconsistencies"].as_array().expect("array");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["set"], "rust-work");
+        assert_eq!(entries[0]["problem"], "active_missing");
     }
 
     #[test]

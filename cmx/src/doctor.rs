@@ -16,10 +16,12 @@
 //! with a matching checksum.
 
 mod divergence;
+mod set_consistency;
 mod survey;
 mod types;
 
 pub use divergence::{DivergenceDetail, DivergenceMember, divergence_details, location_members};
+pub use set_consistency::{SetInconsistency, SetProblem, set_inconsistencies};
 pub use survey::survey;
 pub use types::{ArtifactState, DoctorArtifact, DoctorReport, DoctorRow, MissingRow, StateCounts};
 

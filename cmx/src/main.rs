@@ -1159,6 +1159,63 @@ mod tests {
     }
 
     #[test]
+    fn run_doctor_with_set_inconsistency_returns_exit_code_2() {
+        // An active set whose member was never installed (or was manually
+        // uninstalled) is a set/installed-state mismatch — Phase 3 of SETS.md
+        // wires this into doctor's existing exit-code-2 contract.
+        let (fs, git, clock, paths) = fake_trio();
+        cmx::config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| {
+            sets.sets.insert(
+                "rust-work".to_string(),
+                cmx::types::SetDef {
+                    description: None,
+                    state: cmx::types::SetState::Active,
+                    members: vec![cmx::types::SetMember {
+                        kind: ArtifactKind::Agent,
+                        name: "rust-craftsperson".to_string(),
+                        source: Some("guidelines".to_string()),
+                    }],
+                },
+            );
+            Ok(())
+        })
+        .unwrap();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let cli = Cli {
+            platform: Some(Platform::Claude),
+            command: Commands::Doctor {
+                local: false,
+                adopt_all: false,
+                from: None,
+                all: false,
+                json: false,
+            },
+        };
+        let result = run(cli, &ctx, &paths);
+        assert!(result.is_ok(), "expected Ok, not Err: {:?}", result.err());
+        assert_eq!(result.unwrap(), ExitCode::from(2));
+    }
+
+    #[test]
+    fn run_doctor_clean_config_with_no_sets_returns_success() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+        let cli = Cli {
+            platform: Some(Platform::Claude),
+            command: Commands::Doctor {
+                local: false,
+                adopt_all: false,
+                from: None,
+                all: false,
+                json: false,
+            },
+        };
+        let result = run(cli, &ctx, &paths);
+        assert!(result.is_ok(), "expected Ok, not Err: {:?}", result.err());
+        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+    }
+
+    #[test]
     fn run_doctor_adopt_all_still_adopts_despite_deprecation() {
         // `--adopt-all` is soft-deprecated (prints a notice to stderr via
         // `adopt_all_deprecation_notice`) but must keep working this release.

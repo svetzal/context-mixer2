@@ -6,6 +6,22 @@ use crate::sets::{
     SetRenameResult, SetShowResult,
 };
 use crate::table::render_table;
+use crate::types::SetState;
+
+/// Render a character count as an approximate, human-scaled footprint (e.g.
+/// `~2.1k chars`) — see `SETS.md`, "Context-footprint reporting". Ships as a
+/// character count in Phase 3; a token estimate may follow later.
+fn format_footprint(chars: usize) -> String {
+    if chars >= 1000 {
+        // Integer-only `chars / 1000.tenths` — avoids a usize→f64 precision
+        // cast for what is, at most, one decimal digit of rounding.
+        let whole = chars / 1000;
+        let tenths = (chars % 1000) / 100;
+        format!("~{whole}.{tenths}k chars")
+    } else {
+        format!("~{chars} chars")
+    }
+}
 
 impl fmt::Display for SetCreateResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -22,14 +38,19 @@ impl fmt::Display for SetListResult {
             .entries
             .iter()
             .map(|e| {
+                let mut footprint = format_footprint(e.footprint_chars);
+                if e.state == SetState::Inactive {
+                    footprint.push_str(" (not loaded)");
+                }
                 vec![
                     e.name.clone(),
                     e.state.to_string(),
                     e.member_count.to_string(),
+                    footprint,
                 ]
             })
             .collect();
-        write!(f, "{}", render_table(vec!["Name", "State", "Members"], 3, rows))
+        write!(f, "{}", render_table(vec!["Name", "State", "Members", "Footprint"], 3, rows))
     }
 }
 
@@ -39,6 +60,11 @@ impl fmt::Display for SetShowResult {
         if let Some(desc) = &self.description {
             writeln!(f, "  {desc}")?;
         }
+        let mut footprint = format_footprint(self.footprint_chars);
+        if self.state == SetState::Inactive {
+            footprint.push_str(" (not loaded)");
+        }
+        writeln!(f, "  Footprint: {footprint}")?;
         if self.members.is_empty() {
             writeln!(f, "  (no members)")?;
             return Ok(());
@@ -50,7 +76,8 @@ impl fmt::Display for SetShowResult {
             } else {
                 "not installed"
             };
-            writeln!(f, "  {} {} (source: {source}) [{status}]", member.kind, member.name)?;
+            let chars = member.footprint_chars.map_or_else(|| "?".to_string(), format_footprint);
+            writeln!(f, "  {} {} (source: {source}) [{status}] {chars}", member.kind, member.name)?;
         }
         Ok(())
     }
@@ -189,13 +216,33 @@ mod tests {
                 name: "rust-work".to_string(),
                 state: SetState::Active,
                 member_count: 2,
+                footprint_chars: 2100,
             }],
         };
         let out = r.to_string();
         assert!(out.contains("rust-work"));
         assert!(out.contains("active"));
         assert!(out.contains('2'));
-        assert!(!out.contains("Footprint"), "Phase 3 column must not appear yet");
+        assert!(out.contains("Footprint"), "Phase 3 column present");
+        assert!(
+            out.contains("~2.1k chars"),
+            "active set footprint shown without annotation: {out}"
+        );
+        assert!(!out.contains("not loaded"), "active set is currently loaded: {out}");
+    }
+
+    #[test]
+    fn set_list_result_inactive_footprint_annotated_not_loaded() {
+        let r = SetListResult {
+            entries: vec![SetListEntry {
+                name: "client-ort".to_string(),
+                state: SetState::Inactive,
+                member_count: 4,
+                footprint_chars: 1400,
+            }],
+        };
+        let out = r.to_string();
+        assert!(out.contains("~1.4k chars (not loaded)"), "inactive footprint annotated: {out}");
     }
 
     #[test]
@@ -205,10 +252,12 @@ mod tests {
             description: None,
             state: SetState::Inactive,
             members: vec![],
+            footprint_chars: 0,
         };
         let out = r.to_string();
         assert!(out.contains("blog"));
         assert!(out.contains("(no members)"));
+        assert!(out.contains("Footprint: ~0 chars (not loaded)"));
     }
 
     #[test]
@@ -223,14 +272,17 @@ mod tests {
                     name: "rust-craftsperson".to_string(),
                     source: Some("guidelines".to_string()),
                     installed: true,
+                    footprint_chars: Some(1500),
                 },
                 SetMemberStatus {
                     kind: ArtifactKind::Skill,
                     name: "foundry".to_string(),
                     source: None,
                     installed: false,
+                    footprint_chars: None,
                 },
             ],
+            footprint_chars: 1500,
         };
         let out = r.to_string();
         assert!(out.contains("Rust craftsmanship"));
@@ -239,6 +291,9 @@ mod tests {
         assert!(out.contains("[installed]"));
         assert!(out.contains("foundry"));
         assert!(out.contains("[not installed]"));
+        assert!(out.contains("Footprint: ~1.5k chars"));
+        assert!(out.contains("~1.5k chars"), "installed member's own count shown");
+        assert!(out.contains('?'), "unresolvable member rendered as ?");
     }
 
     #[test]

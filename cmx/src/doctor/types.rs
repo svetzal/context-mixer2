@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use super::set_consistency::SetInconsistency;
 use crate::platform::Platform;
 use crate::types::{ArtifactKind, InstallScope};
 
@@ -131,6 +132,11 @@ pub struct DoctorReport {
     /// Display hint: when `true`, the full inventory is shown; otherwise only
     /// artifacts that need attention (the default — `doctor` is for problems).
     pub show_all: bool,
+    /// Set/installed-state mismatches found by the Phase 3 set-consistency
+    /// check (see `SETS.md`, "doctor integration") — active sets with a
+    /// missing member, or inactive sets with a member still lingering
+    /// installed on their behalf.
+    pub set_inconsistencies: Vec<SetInconsistency>,
 }
 
 impl DoctorReport {
@@ -162,6 +168,8 @@ pub struct StateCounts {
     pub missing: usize,
     /// Logical artifacts whose copies disagree across locations.
     pub diverged: usize,
+    /// Set/installed-state mismatches (see [`DoctorReport::set_inconsistencies`]).
+    pub set_inconsistent: usize,
 }
 
 impl DoctorReport {
@@ -169,6 +177,7 @@ impl DoctorReport {
     pub fn counts(&self) -> StateCounts {
         let mut c = StateCounts {
             missing: self.missing.len(),
+            set_inconsistent: self.set_inconsistencies.len(),
             ..StateCounts::default()
         };
         for a in &self.artifacts {
@@ -195,6 +204,8 @@ impl DoctorReport {
     /// by another tool) are not — and a skill consistently installed to many
     /// tools is just that, not a problem.
     pub fn has_issues(&self) -> bool {
-        !self.missing.is_empty() || self.artifacts.iter().any(Self::is_problem)
+        !self.missing.is_empty()
+            || !self.set_inconsistencies.is_empty()
+            || self.artifacts.iter().any(Self::is_problem)
     }
 }

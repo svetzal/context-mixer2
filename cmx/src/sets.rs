@@ -16,6 +16,7 @@ use crate::context::AppContext;
 use crate::install;
 use crate::lockfile;
 use crate::platform_iter;
+use crate::source_iter;
 use crate::types::{ArtifactKind, InstallScope, SetDef, SetMember, SetState, SetsFile};
 use crate::uninstall;
 
@@ -33,6 +34,11 @@ pub struct SetListEntry {
     pub name: String,
     pub state: SetState,
     pub member_count: usize,
+    /// Total character count of the set's members' trigger descriptions — the
+    /// context-footprint the set costs when active (see `SETS.md`,
+    /// "Context-footprint reporting"). Members whose description could not be
+    /// resolved contribute 0.
+    pub footprint_chars: usize,
 }
 
 #[derive(Debug)]
@@ -46,6 +52,9 @@ pub struct SetMemberStatus {
     pub name: String,
     pub source: Option<String>,
     pub installed: bool,
+    /// This member's trigger-description character count, or `None` when it
+    /// could not be resolved (source missing, artifact not found).
+    pub footprint_chars: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -54,6 +63,8 @@ pub struct SetShowResult {
     pub description: Option<String>,
     pub state: SetState,
     pub members: Vec<SetMemberStatus>,
+    /// Sum of every resolvable member's `footprint_chars`.
+    pub footprint_chars: usize,
 }
 
 #[derive(Debug)]
@@ -175,10 +186,15 @@ pub fn list(scope: InstallScope, ctx: &AppContext<'_>) -> Result<SetListResult> 
     let entries = sets
         .sets
         .into_iter()
-        .map(|(name, def)| SetListEntry {
-            name,
-            state: def.state,
-            member_count: def.members.len(),
+        .map(|(name, def)| {
+            let footprint_chars =
+                def.members.iter().map(|m| member_description_chars(m, ctx).unwrap_or(0)).sum();
+            SetListEntry {
+                name,
+                state: def.state,
+                member_count: def.members.len(),
+                footprint_chars,
+            }
         })
         .collect();
     Ok(SetListResult { entries })
@@ -188,7 +204,7 @@ pub fn show(name: &str, scope: InstallScope, ctx: &AppContext<'_>) -> Result<Set
     let sets = config::load_sets(scope, ctx.fs, ctx.paths)?;
     let def = sets.sets.get(name).ok_or_else(|| anyhow::anyhow!("Set '{name}' not found."))?;
 
-    let members = def
+    let members: Vec<SetMemberStatus> = def
         .members
         .iter()
         .map(|m| {
@@ -200,15 +216,18 @@ pub fn show(name: &str, scope: InstallScope, ctx: &AppContext<'_>) -> Result<Set
                 name: m.name.clone(),
                 source: m.source.clone(),
                 installed,
+                footprint_chars: member_description_chars(m, ctx),
             }
         })
         .collect();
+    let footprint_chars = members.iter().filter_map(|m| m.footprint_chars).sum();
 
     Ok(SetShowResult {
         name: name.to_string(),
         description: def.description.clone(),
         state: def.state,
         members,
+        footprint_chars,
     })
 }
 
@@ -634,6 +653,39 @@ fn member_activation_facts(
     Ok((installed, modified))
 }
 
+/// Resolve a member's trigger-description character count (see `SETS.md`,
+/// "Context-footprint reporting"): read the installed copy's `description`
+/// frontmatter when the member happens to be installed (either scope), else
+/// fall back to its pinned source. `None` when neither yields a description —
+/// callers treat that as an unresolvable member, counted as 0 in totals and
+/// rendered as `?`.
+fn member_description_chars(m: &SetMember, ctx: &AppContext<'_>) -> Option<usize> {
+    InstallScope::ALL
+        .iter()
+        .find_map(|&scope| installed_description_chars(m, scope, ctx))
+        .or_else(|| source_description_chars(m, ctx))
+}
+
+fn installed_description_chars(
+    m: &SetMember,
+    scope: InstallScope,
+    ctx: &AppContext<'_>,
+) -> Option<usize> {
+    let path = ctx.paths.installed_artifact_path(m.kind, &m.name, scope)?;
+    if !ctx.fs.exists(&path) {
+        return None;
+    }
+    let content = ctx.fs.read_to_string(&m.kind.content_path(&path)).ok()?;
+    let (frontmatter, _) = crate::scan::split_frontmatter_and_body(&content);
+    crate::scan::extract_field(&frontmatter?, "description").map(|d| d.chars().count())
+}
+
+fn source_description_chars(m: &SetMember, ctx: &AppContext<'_>) -> Option<usize> {
+    source_iter::find_unique(&m.name, m.kind, m.source.as_deref(), ctx)
+        .ok()
+        .map(|sa| sa.artifact.description.chars().count())
+}
+
 /// The name of another `Active` set that still claims `(kind, member_name)`,
 /// if any — the reference-counting check that keeps `deactivate` from
 /// uninstalling a member a sibling set still needs (see `SETS.md`, "Lifecycle
@@ -703,6 +755,77 @@ mod tests {
         assert_eq!(result.entries[0].name, "rust-work");
         assert_eq!(result.entries[0].state, SetState::Inactive);
         assert_eq!(result.entries[0].member_count, 0);
+        assert_eq!(result.entries[0].footprint_chars, 0);
+    }
+
+    // --- footprint ---
+
+    #[test]
+    fn list_footprint_reads_installed_members_description() {
+        let t = TestContext::new();
+        crate::test_support::install_agent_on_disk(
+            &t.fs,
+            &t.paths,
+            "my-agent",
+            &crate::test_support::agent_content("my-agent", "Some description"),
+            InstallScope::Global,
+        );
+        let ctx = t.ctx();
+        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        seed_members(
+            "rust-work",
+            vec![pinned_agent("my-agent", "guidelines")],
+            InstallScope::Global,
+            &ctx,
+        );
+
+        let result = list(InstallScope::Global, &ctx).unwrap();
+        assert_eq!(result.entries[0].footprint_chars, "Some description".chars().count());
+    }
+
+    #[test]
+    fn show_footprint_for_inactive_member_resolves_from_source() {
+        let t = TestContext::new();
+        crate::test_support::setup_source_with_agent(
+            &t.fs,
+            &t.paths,
+            "guidelines",
+            "/src",
+            "rust-craftsperson",
+        );
+        let ctx = t.ctx();
+        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        seed_members(
+            "rust-work",
+            vec![pinned_agent("rust-craftsperson", "guidelines")],
+            InstallScope::Global,
+            &ctx,
+        );
+
+        let result = show("rust-work", InstallScope::Global, &ctx).unwrap();
+        let expected = "A test agent".chars().count();
+        assert_eq!(result.members[0].footprint_chars, Some(expected));
+        assert_eq!(result.footprint_chars, expected);
+    }
+
+    #[test]
+    fn footprint_unresolvable_member_counts_as_zero_and_none() {
+        let t = TestContext::new();
+        let ctx = t.ctx();
+        create("rust-work", None, InstallScope::Global, &ctx).unwrap();
+        seed_members(
+            "rust-work",
+            vec![pinned_agent("ghost", "gone-source")],
+            InstallScope::Global,
+            &ctx,
+        );
+
+        let list_result = list(InstallScope::Global, &ctx).unwrap();
+        assert_eq!(list_result.entries[0].footprint_chars, 0);
+
+        let show_result = show("rust-work", InstallScope::Global, &ctx).unwrap();
+        assert_eq!(show_result.members[0].footprint_chars, None);
+        assert_eq!(show_result.footprint_chars, 0);
     }
 
     // --- show ---
