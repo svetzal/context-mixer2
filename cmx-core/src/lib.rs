@@ -3,6 +3,7 @@ pub mod checksum;
 pub mod config;
 pub mod context;
 pub mod error_summary;
+pub mod frontmatter;
 pub mod fs_util;
 pub mod gateway;
 pub mod json_file;

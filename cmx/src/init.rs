@@ -11,9 +11,10 @@ use cmx_core::skill_install::{
     ToolIdentity,
 };
 
-/// The companion skill bundled into the `cmx` binary. Its frontmatter carries a
-/// placeholder `metadata.version` that is stamped to the cmx binary version at
-/// install time — see [`stamp_version`].
+/// The companion skill bundled into the `cmx` binary. Its `metadata.version` is
+/// reconciled to the cmx binary version by `cmx-core` at install time — the
+/// placeholder in the file is overwritten on write, so it never needs
+/// hand-maintaining here.
 const SKILL_CONTENT: &str = include_str!("../skill/SKILL.md");
 
 /// Map the `--local` flag onto a `cmx-core` [`Scope`]. Global is the default.
@@ -21,46 +22,8 @@ fn scope_from_flags(local: bool) -> Scope {
     if local { Scope::Local } else { Scope::Global }
 }
 
-/// Stamp the cmx binary version (`CARGO_PKG_VERSION`, the workspace version)
-/// into the bundled skill's frontmatter `metadata.version`, locking the skill's
-/// declared version to the cmx release rather than hand-maintaining it.
-///
-/// cmx-core already tracks the install by the same `CARGO_PKG_VERSION` (via
-/// [`ToolIdentity`]); the frontmatter is *also* read when the installed skill is
-/// scanned as a source artifact (`scan::frontmatter`), so leaving it out of step
-/// produces an internal version inconsistency, not merely a cosmetic one. This
-/// keeps the single source of truth the workspace `Cargo.toml` version.
-///
-/// Replaces the first indented `version:` line inside the leading `---` fenced
-/// frontmatter block, preserving its indentation.
-fn stamp_version(content: &str) -> String {
-    let version = env!("CARGO_PKG_VERSION");
-    let mut out = String::with_capacity(content.len() + 8);
-    let mut fences = 0u8;
-    let mut stamped = false;
-    for line in content.lines() {
-        if line.trim() == "---" {
-            fences += 1;
-        } else if fences == 1 && !stamped {
-            let trimmed = line.trim_start();
-            if trimmed.starts_with("version:") {
-                let indent = &line[..line.len() - trimmed.len()];
-                out.push_str(indent);
-                out.push_str("version: \"");
-                out.push_str(version);
-                out.push_str("\"\n");
-                stamped = true;
-                continue;
-            }
-        }
-        out.push_str(line);
-        out.push('\n');
-    }
-    out
-}
-
 fn bundled_skill() -> BundledSkill {
-    BundledSkill::single_md(&stamp_version(SKILL_CONTENT))
+    BundledSkill::single_md(SKILL_CONTENT)
 }
 
 fn make_installer() -> SkillInstaller {
@@ -145,33 +108,36 @@ mod tests {
     use cmx_core::test_support::{TestContext, make_lock_entry_versioned, save_lock_with_entry};
     use cmx_core::types::{ArtifactKind, InstallScope};
 
-    #[test]
-    fn stamp_version_locks_frontmatter_to_cmx_version() {
-        // The bundled source carries a placeholder; stamping must replace it
-        // with the cmx binary version and leave no placeholder behind.
-        let stamped = stamp_version(SKILL_CONTENT);
-        let expected = format!("version: \"{}\"", env!("CARGO_PKG_VERSION"));
-        assert!(
-            stamped.contains(&expected),
-            "stamped skill should declare the cmx version ({expected})"
+    /// The exact SKILL.md bytes `cmx-core` writes to disk for this build — the
+    /// bundled content with `metadata.version` reconciled to the cmx version.
+    fn installed_skill_md() -> String {
+        let files = cmx_core::frontmatter::reconcile_skill_version(
+            &bundled_skill().files,
+            env!("CARGO_PKG_VERSION"),
         );
-        assert!(
-            !stamped.contains("version: \"0.0.0\""),
-            "placeholder version must not survive stamping"
-        );
+        String::from_utf8(files[0].bytes.clone()).unwrap()
     }
 
     #[test]
-    fn stamp_version_only_touches_frontmatter_version() {
-        // Body prose mentioning "version" and the frontmatter `author` line must
-        // be preserved; only the single frontmatter version line changes.
-        let stamped = stamp_version(SKILL_CONTENT);
-        assert!(stamped.contains("author: Stacey Vetzal"));
-        assert_eq!(
-            stamped.matches(&format!("version: \"{}\"", env!("CARGO_PKG_VERSION"))).count(),
-            1,
-            "exactly one version line should be stamped"
-        );
+    fn install_stamps_frontmatter_to_cmx_version() {
+        // cmx-core reconciles metadata.version at install; the on-disk skill must
+        // declare the cmx binary version and leave no placeholder behind.
+        let t = TestContext::new();
+        let ctx = t.ctx();
+        run_init(false, false, &ctx).unwrap();
+
+        let skill_md = t
+            .paths
+            .with_platform(Platform::Claude)
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("cmx")
+            .join("SKILL.md");
+        let content = t.fs.read_to_string(&skill_md).unwrap();
+        let expected = format!("version: \"{}\"", env!("CARGO_PKG_VERSION"));
+        assert!(content.contains(&expected), "installed skill should declare {expected}");
+        assert!(!content.contains("version: \"0.0.0\""), "placeholder must not survive install");
+        assert!(content.contains("author: Stacey Vetzal"), "other frontmatter preserved");
     }
 
     #[test]
@@ -268,7 +234,7 @@ mod tests {
             .unwrap()
             .join("cmx");
         let skill_md = skill_dir.join("SKILL.md");
-        let drifted = stamp_version(SKILL_CONTENT)
+        let drifted = installed_skill_md()
             .replace("## Agent contract 1", "Locally edited.\n\n## Agent contract 1");
         t.fs.add_file(&skill_md, drifted.as_str());
 
@@ -307,7 +273,7 @@ mod tests {
         let local_only = skill_dir.join("local-only.md");
         t.fs.add_file(
             &skill_md,
-            stamp_version(SKILL_CONTENT)
+            installed_skill_md()
                 .replace("## Agent contract 1", "Locally edited.\n\n## Agent contract 1"),
         );
         t.fs.add_file(&local_only, "scratch notes\n");
@@ -327,12 +293,15 @@ mod tests {
                     TargetAction::Update { .. }
                 ));
                 assert_eq!(report.targets.first().unwrap().discarded_paths.len(), 2);
-                assert_eq!(t.fs.read_to_string(&skill_md).unwrap(), stamp_version(SKILL_CONTENT));
+                assert_eq!(t.fs.read_to_string(&skill_md).unwrap(), installed_skill_md());
                 assert!(!t.fs.exists(&local_only));
-                let bundled = bundled_skill();
+                let installed = cmx_core::frontmatter::reconcile_skill_version(
+                    &bundled_skill().files,
+                    env!("CARGO_PKG_VERSION"),
+                );
                 assert_eq!(
                     checksum::checksum_artifact(&skill_dir, ArtifactKind::Skill, &t.fs).unwrap(),
-                    cmx_core::skill_fs::checksum_bundled(&bundled.files)
+                    cmx_core::skill_fs::checksum_bundled(&installed)
                 );
             }
             _ => panic!("expected Installed"),

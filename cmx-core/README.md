@@ -9,6 +9,8 @@ use cmx_core::production::ProductionContext;
 use cmx_core::skill_install::{BundledSkill, Scope, SkillInstaller, ToolIdentity};
 
 let skill = BundledSkill::single_md(include_str!("../skills/mytool/SKILL.md"));
+// The version passed here is stamped into the installed SKILL.md's
+// metadata.version — the bundled file needs no version of its own.
 let installer = SkillInstaller::new(ToolIdentity::new("mytool", "1.2.0"));
 let prod_ctx = ProductionContext::claude()?;
 let ctx = prod_ctx.ctx();
@@ -30,12 +32,26 @@ always `$HOME/.config/context-mixer` — and it does **not** determine which pla
 a skill installs to. Installation targets are resolved at plan time from the cmx config
 and existing lock files on the machine.
 
-## Lockfile is the source of truth
+## One version, declared once
 
-The `cmx-lock.json` / `cmx-lock-<platform>.json` files are the single source of truth
-for installed-version tracking. The bundled content (via `BundledSkill`) needs no
-version frontmatter stamping — the version comes from `ToolIdentity` passed at
-construction time and is recorded in the lock entry.
+You declare your version exactly once — the string passed to `ToolIdentity`. cmx-core
+records it in the lock entry **and** reconciles the installed `SKILL.md` frontmatter's
+`metadata.version` to match, automatically, at plan/apply time. You do **not** hand-roll
+a frontmatter stamper, and the bundled `SKILL.md` needs no version placeholder — whatever
+`metadata.version` it carries (or doesn't) is overwritten with the `ToolIdentity` version
+on write.
+
+This closes a gap that used to force every embedder to stamp the frontmatter itself:
+the lockfile tracks the version, but readers like `cmx doctor` / `cmx list` parse it back
+out of the installed `SKILL.md`. If the two disagree, the skill reports a wrong (or
+missing) version. cmx-core now keeps them in lockstep on the community-standard
+`metadata.version` key.
+
+The reconciliation is surgical and idempotent: it rewrites only the version line
+(preserving folded description blocks, comments, and key order), removes any shadowing
+top-level `version:`, and produces byte-identical output on a re-install, so it composes
+cleanly with the skip/drift guards below. `cmx-lock.json` / `cmx-lock-<platform>.json`
+remain the source of truth for *tracking*; the frontmatter is kept consistent with it.
 
 ## `remove()` semantics
 

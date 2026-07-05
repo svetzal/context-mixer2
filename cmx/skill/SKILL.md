@@ -16,7 +16,7 @@ description: >
 license: MIT
 compatibility: Rust binary `cmx`. All commands work in every build; an `llm`-feature build with a configured gateway additionally generates `info` summaries and `diff` analyses (both degrade gracefully without one).
 metadata:
-  # Placeholder — stamped to the cmx binary version at install by `cmx init`.
+  # Placeholder — cmx-core reconciles this to the cmx binary version at install.
   version: "0.0.0"
   author: Stacey Vetzal
 ---

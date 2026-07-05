@@ -10,7 +10,9 @@
 //! use cmx_core::production::ProductionContext;
 //! use cmx_core::skill_install::{BundledSkill, Scope, SkillInstaller, ToolIdentity};
 //!
-//! let skill = BundledSkill::single_md("---\nversion: 1.2.0\n---\n# My skill\n");
+//! // The SKILL.md needs no version of its own — the installer stamps
+//! // `metadata.version` from the ToolIdentity below at install time.
+//! let skill = BundledSkill::single_md("---\nname: mytool\n---\n# My skill\n");
 //! let installer = SkillInstaller::new(ToolIdentity::new("mytool", "1.2.0"));
 //! let prod_ctx = ProductionContext::claude()?;
 //! let ctx = prod_ctx.ctx();
@@ -30,6 +32,7 @@ use std::path::PathBuf;
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
+use crate::frontmatter;
 use crate::fs_util;
 use crate::lockfile;
 use crate::platform::Platform;
@@ -401,7 +404,11 @@ impl SkillInstaller {
             bail!("BundledSkill for '{}' is missing SKILL.md", self.tool.name);
         }
 
-        let source_checksum = skill_fs::checksum_bundled(&skill.files);
+        // Reconcile the SKILL.md frontmatter's `metadata.version` to this tool's
+        // version before anything else, so the checksum, the written bytes, and the
+        // lock entry all describe the same, version-stamped content.
+        let files = frontmatter::reconcile_skill_version(&skill.files, &self.tool.version);
+        let source_checksum = skill_fs::checksum_bundled(&files);
         let install_scope = scope.to_install_scope();
 
         let platform_targets =
@@ -431,8 +438,7 @@ impl SkillInstaller {
             let skill_dest = dest_dir.join(&self.tool.name);
 
             // Build planned files
-            let files: Vec<PlannedFile> = skill
-                .files
+            let planned_files: Vec<PlannedFile> = files
                 .iter()
                 .map(|f| PlannedFile {
                     rel_path: f.rel_path.clone(),
@@ -462,7 +468,7 @@ impl SkillInstaller {
                 platform,
                 scope: install_scope,
                 dest_dir: skill_dest,
-                files,
+                files: planned_files,
                 action,
                 cmx_managed,
             });
@@ -497,8 +503,12 @@ impl SkillInstaller {
             );
         }
 
+        // Reconcile the same way plan() did, so the checksum below and the bytes
+        // written match the planned source_checksum exactly.
+        let files = frontmatter::reconcile_skill_version(&skill.files, &self.tool.version);
+
         // Parity guard: the skill passed here must match the one that was planned.
-        let current_checksum = skill_fs::checksum_bundled(&skill.files);
+        let current_checksum = skill_fs::checksum_bundled(&files);
         if current_checksum != plan.source_checksum {
             bail!(
                 "Parity check failed for '{}': the BundledSkill has changed since plan() was called.",
@@ -509,11 +519,11 @@ impl SkillInstaller {
         let PreparedWrites {
             dirs_to_write,
             discarded_paths_by_dir,
-        } = prepare_writes(plan, skill, ctx)?;
+        } = prepare_writes(plan, &files, ctx)?;
 
         // Write each distinct dir once.
         for dir in &dirs_to_write {
-            skill_fs::write_skill_files(dir, &skill.files, ctx.fs)?;
+            skill_fs::write_skill_files(dir, &files, ctx.fs)?;
         }
 
         let installed_checksum = plan.source_checksum.clone();
@@ -565,7 +575,7 @@ impl SkillInstaller {
             let home =
                 config::resolve_artifact_home(&config::load_config(ctx.fs, ctx.paths)?, ctx.paths);
             let materialized = home.join("skills").join(&self.tool.name);
-            skill_fs::write_skill_files(&materialized, &skill.files, ctx.fs)?;
+            skill_fs::write_skill_files(&materialized, &files, ctx.fs)?;
 
             config::mutate_sources(ctx.fs, ctx.paths, |sources| {
                 sources.sources.entry(source_name.clone()).or_insert_with(|| SourceEntry {
@@ -827,7 +837,7 @@ fn discarded_paths_against_bundle(
 
 fn prepare_writes(
     plan: &InstallPlan,
-    skill: &BundledSkill,
+    files: &[SkillFile],
     ctx: &AppContext<'_>,
 ) -> Result<PreparedWrites> {
     let mut dirs_to_write = BTreeSet::new();
@@ -847,7 +857,7 @@ fn prepare_writes(
     let mut discarded_paths_by_dir = BTreeMap::new();
     for dir in &dirs_to_replace {
         discarded_paths_by_dir
-            .insert(dir.clone(), discarded_paths_against_bundle(dir, &skill.files, ctx)?);
+            .insert(dir.clone(), discarded_paths_against_bundle(dir, files, ctx)?);
         if ctx.fs.exists(dir) {
             ctx.fs.remove_dir_all(dir)?;
         }
@@ -893,9 +903,16 @@ mod tests {
         }
     }
 
+    // Uses the canonical `metadata.version` frontmatter form so that cmx-core's
+    // auto-stamp (see `frontmatter::reconcile_skill_version`) is idempotent on it:
+    // the bundled bytes already equal what the installer would write, keeping the
+    // checksum fixtures below stable.
     fn sample_skill(version: &str) -> BundledSkill {
         BundledSkill::from_files(vec![
-            make_file("SKILL.md", &format!("---\nversion: {version}\n---\n# Sample skill\n")),
+            make_file(
+                "SKILL.md",
+                &format!("---\nmetadata:\n  version: \"{version}\"\n---\n# Sample skill\n"),
+            ),
             make_file("scripts/tool.py", "print('hello')"),
         ])
     }
@@ -1384,8 +1401,13 @@ mod tests {
         let ctx = t.ctx();
         let plan = installer("1.0.0").plan(&skill_v1, Scope::Global, false, &ctx).unwrap();
 
-        // Apply with a different skill
-        let skill_v2 = sample_skill("2.0.0");
+        // Apply with a skill whose *body* differs (a version-only difference would be
+        // normalized away by the auto-stamp, so parity must be exercised on content
+        // the stamp does not touch).
+        let skill_v2 = BundledSkill::from_files(vec![
+            make_file("SKILL.md", "---\nmetadata:\n  version: \"1.0.0\"\n---\n# DIFFERENT body\n"),
+            make_file("scripts/tool.py", "print('hello')"),
+        ]);
         let result = installer("1.0.0").apply(&skill_v2, &plan, &ctx);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Parity"));
@@ -1743,7 +1765,7 @@ mod tests {
         );
         assert_eq!(
             t.fs.read_to_string(&skill_md).unwrap(),
-            "---\nversion: 1.0.0\n---\n# Sample skill\n"
+            "---\nmetadata:\n  version: \"1.0.0\"\n---\n# Sample skill\n"
         );
         assert!(!t.fs.exists(&local_only));
         assert_eq!(checksum::checksum_dir(&skill_dir, &t.fs).unwrap(), checksum);
