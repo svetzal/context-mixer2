@@ -82,6 +82,26 @@ fn write_json<T: Serialize>(path: &Path, value: &T) {
     fs::write(path, serde_json::to_vec_pretty(value).unwrap()).unwrap();
 }
 
+fn assert_no_human_placeholders(value: &Value) {
+    match value {
+        Value::String(s) => assert!(
+            !matches!(s.as_str(), "-" | " " | "✅" | "⚠️" | "⛔"),
+            "JSON should not contain human placeholder strings: {s}"
+        ),
+        Value::Array(items) => {
+            for item in items {
+                assert_no_human_placeholders(item);
+            }
+        }
+        Value::Object(map) => {
+            for item in map.values() {
+                assert_no_human_placeholders(item);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn checksum_for(kind: ArtifactKind, path: &Path) -> String {
     checksum::checksum_artifact(path, kind, &RealFilesystem).unwrap()
 }
@@ -365,14 +385,17 @@ fn data_reporting_commands_accept_json_and_emit_expected_fields() {
     assert_eq!(list_artifact["kind"], "agent");
     assert_eq!(list_artifact["scope"], "global");
     assert_eq!(list_artifact["available_version"], "2.0.0");
-    assert_eq!(list_artifact["tools"], serde_json::json!(["claude"]));
+    assert_eq!(list_artifact["platforms"], serde_json::json!(["claude"]));
+    assert_eq!(list_artifact["status"], "outdated");
 
     let outdated = fixture.run_json(&["outdated", "--json"]);
     assert_eq!(outdated["artifacts"][0]["name"], "rust-agent");
-    assert_eq!(outdated["artifacts"][0]["status"], "update");
+    assert_eq!(outdated["artifacts"][0]["status"], "outdated");
+    assert_eq!(outdated["artifacts"][0]["locally_modified"], false);
 
     let search = fixture.run_json(&["search", "focus", "--json"]);
     assert_eq!(search["query"], "focus");
+    assert_eq!(search["results"][0]["version"], "1.5.0");
     assert!(
         search["results"][0]["description"]
             .as_str()
@@ -503,6 +526,112 @@ fn empty_state_json_is_valid_and_machine_readable() {
 
     let home = fixture.run_json(&["home", "path", "--json"]);
     assert!(home["path"].as_str().unwrap().ends_with(".config/context-mixer/home"));
+}
+
+#[test]
+fn outdated_empty_state_human_output_is_successful() {
+    let fixture = empty_fixture();
+    let output = fixture.run(&["outdated"]);
+    assert!(
+        output.status.success(),
+        "outdated should exit successfully when nothing is outdated\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "Everything is up to date.\n");
+}
+
+#[test]
+fn unversioned_json_uses_null_versions_and_enum_statuses() {
+    let fixture = empty_fixture();
+    let source_root = fixture.home.parent().unwrap().join("guidelines");
+    let source_skill_dir = source_root.join("focus-skill");
+    let installed_skill_dir = fixture.home.join(".claude").join("skills").join("focus-skill");
+
+    fs::create_dir_all(&source_skill_dir).unwrap();
+    fs::create_dir_all(&installed_skill_dir).unwrap();
+
+    fs::write(
+        source_skill_dir.join("SKILL.md"),
+        concat!(
+            "---\n",
+            "description: Use this skill when you need focus.\n",
+            "---\n",
+            "# focus-skill\n",
+            "updated source copy\n"
+        ),
+    )
+    .unwrap();
+    fs::write(
+        installed_skill_dir.join("SKILL.md"),
+        concat!(
+            "---\n",
+            "description: Use this skill when you need focus.\n",
+            "---\n",
+            "# focus-skill\n",
+            "installed copy\n"
+        ),
+    )
+    .unwrap();
+
+    let installed_checksum = checksum_for(ArtifactKind::Skill, &installed_skill_dir);
+
+    write_json(
+        &fixture.config_dir.join("sources.json"),
+        &SourcesFile {
+            version: 1,
+            sources: BTreeMap::from([(
+                "guidelines".to_string(),
+                SourceEntry {
+                    source_type: SourceType::Local,
+                    path: Some(source_root),
+                    url: None,
+                    local_clone: None,
+                    branch: None,
+                    last_updated: Some("2026-07-05T00:00:00Z".to_string()),
+                },
+            )]),
+        },
+    );
+    write_json(
+        &fixture.config_dir.join("cmx-lock.json"),
+        &LockFile {
+            version: 1,
+            packages: BTreeMap::from([(
+                "focus-skill".to_string(),
+                LockEntry {
+                    artifact_type: ArtifactKind::Skill,
+                    version: None,
+                    installed_at: "2026-07-05T00:00:00Z".to_string(),
+                    source: LockSource {
+                        repo: "guidelines".to_string(),
+                        path: "focus-skill".to_string(),
+                    },
+                    source_checksum: installed_checksum.clone(),
+                    installed_checksum,
+                },
+            )]),
+        },
+    );
+
+    let list = fixture.run_json(&["skill", "list", "--json"]);
+    let list_artifact = &list["artifacts"][0];
+    assert!(list_artifact["installed_version"].is_null());
+    assert!(list_artifact["available_version"].is_null());
+    assert_eq!(list_artifact["status"], "unversioned");
+
+    let outdated = fixture.run_json(&["outdated", "--json"]);
+    let outdated_artifact = &outdated["artifacts"][0];
+    assert!(outdated_artifact["installed_version"].is_null());
+    assert!(outdated_artifact["available_version"].is_null());
+    assert_eq!(outdated_artifact["status"], "outdated");
+
+    let search = fixture.run_json(&["search", "focus", "--json"]);
+    assert!(search["results"][0]["version"].is_null());
+
+    assert_no_human_placeholders(&list);
+    assert_no_human_placeholders(&outdated);
+    assert_no_human_placeholders(&search);
 }
 
 #[test]

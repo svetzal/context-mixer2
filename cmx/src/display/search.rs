@@ -16,7 +16,7 @@ impl fmt::Display for SearchOutput {
                 vec![
                     r.name.clone(),
                     r.kind.clone(),
-                    r.version.clone(),
+                    r.version.as_deref().unwrap_or("unversioned").to_string(),
                     r.source.clone(),
                     truncate_description(&r.description, 80),
                 ]
@@ -61,7 +61,7 @@ mod tests {
             results: vec![SearchResult {
                 name: "rust-craftsperson".to_string(),
                 kind: "agent".to_string(),
-                version: "1.0.0".to_string(),
+                version: Some("1.0.0".to_string()),
                 source: "guidelines".to_string(),
                 description: "Rust expert".to_string(),
             }],
@@ -69,5 +69,21 @@ mod tests {
         let out = r.to_string();
         assert!(out.contains("rust-craftsperson"));
         assert!(out.contains("1 result(s) found."));
+    }
+
+    #[test]
+    fn search_output_unversioned_renders_explicitly() {
+        let r = SearchOutput {
+            query: "rust".to_string(),
+            results: vec![SearchResult {
+                name: "rust-craftsperson".to_string(),
+                kind: "agent".to_string(),
+                version: None,
+                source: "guidelines".to_string(),
+                description: "Rust expert".to_string(),
+            }],
+        };
+        let out = r.to_string();
+        assert!(out.contains("unversioned"));
     }
 }

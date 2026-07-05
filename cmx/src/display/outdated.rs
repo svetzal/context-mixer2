@@ -7,22 +7,30 @@ use super::util;
 impl fmt::Display for OutdatedReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let rows = &self.0;
+        if rows.is_empty() {
+            return writeln!(f, "Everything is up to date.");
+        }
+
         let mapped_rows: Vec<Vec<String>> = rows
             .iter()
             .map(|r| {
                 vec![
                     r.name.clone(),
                     r.kind.to_string(),
-                    r.installed_version.clone(),
-                    r.available_version.clone(),
+                    r.installed_version.as_deref().unwrap_or("unversioned").to_string(),
+                    r.available_version.as_deref().unwrap_or("unversioned").to_string(),
                     r.source.clone(),
-                    r.status.clone(),
+                    if r.locally_modified {
+                        format!("{} (modified)", r.status.label())
+                    } else {
+                        r.status.label().to_string()
+                    },
                 ]
             })
             .collect();
-        write!(
+        writeln!(
             f,
-            "{}",
+            "{}Update with: cmx <kind> update <name> (or cmx skill update --all)",
             util::table_or_empty(
                 "Everything is up to date.",
                 vec!["Name", "Type", "Installed", "Available", "Source", "Status"],
@@ -36,7 +44,7 @@ impl fmt::Display for OutdatedReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::outdated::OutdatedRow;
+    use crate::outdated::{OutdatedRow, OutdatedStatus};
     use crate::types::{ArtifactKind, InstallScope};
 
     // --- Step 8: OutdatedReport ---
@@ -53,14 +61,34 @@ mod tests {
             name: "my-agent".to_string(),
             kind: ArtifactKind::Agent,
             scope: InstallScope::Global,
-            installed_version: "1.0.0".to_string(),
-            available_version: "2.0.0".to_string(),
+            installed_version: Some("1.0.0".to_string()),
+            available_version: Some("2.0.0".to_string()),
             source: "guidelines".to_string(),
-            status: "update".to_string(),
+            status: OutdatedStatus::Outdated,
+            locally_modified: true,
         }]);
         let out = r.to_string();
         assert!(out.contains("my-agent"));
         assert!(out.contains("1.0.0"));
         assert!(out.contains("2.0.0"));
+        assert!(out.contains("outdated (modified)"));
+        assert!(out.contains("Update with: cmx <kind> update <name>"));
+    }
+
+    #[test]
+    fn outdated_report_unversioned_rows_use_explicit_words() {
+        let r = OutdatedReport(vec![OutdatedRow {
+            name: "my-agent".to_string(),
+            kind: ArtifactKind::Agent,
+            scope: InstallScope::Global,
+            installed_version: None,
+            available_version: None,
+            source: "guidelines".to_string(),
+            status: OutdatedStatus::Changed,
+            locally_modified: false,
+        }]);
+        let out = r.to_string();
+        assert!(out.contains("unversioned"));
+        assert!(!out.contains(" - "));
     }
 }

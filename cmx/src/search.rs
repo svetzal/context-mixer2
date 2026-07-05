@@ -3,7 +3,6 @@ use serde::Serialize;
 
 use crate::context::AppContext;
 use crate::source_iter;
-use crate::types::display_version;
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -13,7 +12,7 @@ use crate::types::display_version;
 pub struct SearchResult {
     pub name: String,
     pub kind: String,
-    pub version: String,
+    pub version: Option<String>,
     pub source: String,
     pub description: String,
 }
@@ -40,7 +39,7 @@ pub fn search(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
             results.push(SearchResult {
                 name: sa.artifact.name,
                 kind: sa.artifact.kind.to_string(),
-                version: display_version(sa.artifact.version.as_deref()).to_string(),
+                version: sa.artifact.version,
                 source: sa.source_name,
                 description: sa.artifact.description,
             });

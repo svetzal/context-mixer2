@@ -9,21 +9,40 @@ use crate::config::InstalledWithSources;
 use crate::context::{AppContext, LoadedState};
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
-use crate::types::{ArtifactKind, InstallScope, LockFile, display_version};
+use crate::types::{ArtifactKind, InstallScope, LockFile};
 
 // ---------------------------------------------------------------------------
 // Result types
 // ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OutdatedStatus {
+    Untracked,
+    Outdated,
+    Changed,
+}
+
+impl OutdatedStatus {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Untracked => "untracked",
+            Self::Outdated => "outdated",
+            Self::Changed => "changed",
+        }
+    }
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct OutdatedRow {
     pub name: String,
     pub kind: ArtifactKind,
     pub scope: InstallScope,
-    pub installed_version: String,
-    pub available_version: String,
+    pub installed_version: Option<String>,
+    pub available_version: Option<String>,
     pub source: String,
-    pub status: String,
+    pub status: OutdatedStatus,
+    pub locally_modified: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -45,7 +64,6 @@ pub fn outdated(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
         }
     }
 
-    // Deduplicate by (name, source) in case both lock and disk scan find the same artifact
     let mut seen = BTreeSet::new();
     rows.retain(|r| seen.insert((r.name.clone(), r.source.clone())));
 
@@ -56,13 +74,12 @@ pub fn outdated(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
 // Private helpers
 // ---------------------------------------------------------------------------
 
-/// Derives the human-readable status label given installed and available version
-/// strings.  Pure function — no I/O.
-fn outdated_status_label(installed_v: Option<&str>, available_v: Option<&str>) -> &'static str {
+fn outdated_status(installed_v: Option<&str>, available_v: Option<&str>) -> OutdatedStatus {
     match (installed_v, available_v) {
-        (None, Some(_)) => "untracked",
-        (Some(i), Some(a)) if i != a => "update",
-        _ => "changed",
+        (None, Some(_)) => OutdatedStatus::Untracked,
+        (Some(installed), Some(available)) if installed != available => OutdatedStatus::Outdated,
+        (None, None) => OutdatedStatus::Outdated,
+        _ => OutdatedStatus::Changed,
     }
 }
 
@@ -102,7 +119,6 @@ fn collect_outdated_for_scope_with(
     Ok(())
 }
 
-/// Pre-compute whether each artifact has been locally modified since installation.
 fn compute_modification_status(
     kind: ArtifactKind,
     scope: InstallScope,
@@ -120,8 +136,6 @@ fn compute_modification_status(
         .collect()
 }
 
-/// Pure comparison — no filesystem access. Accepts pre-computed pairs and
-/// pre-loaded modification status.
 fn compare_versions(
     kind: ArtifactKind,
     scope: InstallScope,
@@ -131,37 +145,33 @@ fn compare_versions(
     let mut rows = Vec::new();
 
     for (ia, source_infos) in pairs {
-        let lock_entry = ia.lock_entry;
-
-        // No source artifact — nothing to compare against
         let Some(source_infos) = source_infos else {
             continue;
         };
 
-        let installed_v: Option<String> = ia.installed_version.clone();
+        let installed_v = ia.installed_version.clone();
         let locally_modified = modifications.get(&ia.name).copied().unwrap_or(false);
 
         for source_info in source_infos {
-            let available_v: Option<String> = source_info.version.clone();
+            let available_v = source_info.version.clone();
 
-            if !source_outdated(lock_entry, &source_info.checksum, source_info.version.as_deref()) {
+            if !source_outdated(
+                ia.lock_entry,
+                &source_info.checksum,
+                source_info.version.as_deref(),
+            ) {
                 continue;
-            }
-
-            let mut status =
-                outdated_status_label(installed_v.as_deref(), available_v.as_deref()).to_string();
-            if locally_modified {
-                status = format!("{status} (modified)");
             }
 
             rows.push(OutdatedRow {
                 name: ia.name.clone(),
                 kind,
                 scope,
-                installed_version: display_version(installed_v.as_deref()).to_string(),
-                available_version: display_version(available_v.as_deref()).to_string(),
+                installed_version: installed_v.clone(),
+                available_version: available_v.clone(),
                 source: source_info.source_name.clone(),
-                status,
+                status: outdated_status(installed_v.as_deref(), available_v.as_deref()),
+                locally_modified,
             });
         }
     }
@@ -184,8 +194,6 @@ mod tests {
     };
     use crate::types::{ArtifactKind, InstallScope, InstalledArtifact, LockFile};
     use std::collections::{BTreeMap, HashMap};
-
-    // --- compare_versions (pure, no gateway fakes needed) ---
 
     #[test]
     fn compare_versions_emits_outdated_row_when_checksum_differs() {
@@ -224,12 +232,13 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "my-agent");
         assert_eq!(rows[0].scope, InstallScope::Global);
-        assert_eq!(rows[0].available_version, "2.0.0");
-        assert_eq!(rows[0].status, "update");
+        assert_eq!(rows[0].available_version.as_deref(), Some("2.0.0"));
+        assert_eq!(rows[0].status, OutdatedStatus::Outdated);
+        assert!(!rows[0].locally_modified);
     }
 
     #[test]
-    fn compare_versions_appends_modified_suffix_when_locally_modified() {
+    fn compare_versions_carries_locally_modified_as_separate_state() {
         let mut packages = BTreeMap::new();
         packages.insert(
             "my-agent".to_string(),
@@ -263,16 +272,12 @@ mod tests {
         let rows =
             compare_versions(ArtifactKind::Agent, InstallScope::Global, pairs, &modifications);
         assert_eq!(rows.len(), 1);
-        assert!(
-            rows[0].status.contains("modified"),
-            "expected 'modified' in status: {}",
-            rows[0].status
-        );
+        assert!(rows[0].locally_modified);
+        assert_eq!(rows[0].status, OutdatedStatus::Outdated);
     }
 
     #[test]
     fn compare_versions_skips_pairs_without_source_infos() {
-        let lock = LockFile::default();
         let ia = InstalledArtifact {
             name: "orphan".to_string(),
             lock_entry: None,
@@ -284,38 +289,20 @@ mod tests {
         let rows =
             compare_versions(ArtifactKind::Agent, InstallScope::Global, pairs, &modifications);
         assert!(rows.is_empty(), "orphan with no source should produce no rows");
-        let _ = lock;
-    }
-
-    // --- outdated_status_label ---
-
-    #[test]
-    fn status_label_untracked() {
-        assert_eq!(outdated_status_label(None, Some("1.0.0")), "untracked");
     }
 
     #[test]
-    fn status_label_update_available() {
-        assert_eq!(outdated_status_label(Some("1.0.0"), Some("2.0.0")), "update");
+    fn outdated_status_distinguishes_untracked_outdated_and_changed() {
+        assert_eq!(outdated_status(None, Some("1.0.0")), OutdatedStatus::Untracked);
+        assert_eq!(outdated_status(Some("1.0.0"), Some("2.0.0")), OutdatedStatus::Outdated);
+        assert_eq!(outdated_status(Some("1.0.0"), Some("1.0.0")), OutdatedStatus::Changed);
+        assert_eq!(outdated_status(None, None), OutdatedStatus::Outdated);
     }
-
-    #[test]
-    fn status_label_changed_same_version() {
-        assert_eq!(outdated_status_label(Some("1.0.0"), Some("1.0.0")), "changed");
-    }
-
-    #[test]
-    fn status_label_changed_no_versions() {
-        assert_eq!(outdated_status_label(None, None), "changed");
-    }
-
-    // --- outdated_with ---
 
     #[test]
     fn gather_outdated_outdated_artifact_appears_in_rows() {
         let t = TestContext::new();
 
-        // Source has version 2.0.0
         setup_source_with_versioned_agent(
             &t.fs,
             &t.paths,
@@ -325,7 +312,6 @@ mod tests {
             "2.0.0",
         );
 
-        // Install on disk with version 1.0.0 lock entry
         install_agent_on_disk(
             &t.fs,
             &t.paths,
@@ -347,34 +333,30 @@ mod tests {
             InstallScope::Global,
         );
 
-        let ctx = t.ctx();
-        let report = outdated(&ctx).unwrap();
+        let report = outdated(&t.ctx()).unwrap();
 
         assert_eq!(report.0.len(), 1, "expected one outdated artifact");
         assert_eq!(report.0[0].name, "my-agent");
-        assert_eq!(report.0[0].installed_version, "1.0.0");
-        assert_eq!(report.0[0].available_version, "2.0.0");
+        assert_eq!(report.0[0].installed_version.as_deref(), Some("1.0.0"));
+        assert_eq!(report.0[0].available_version.as_deref(), Some("2.0.0"));
         assert_eq!(report.0[0].source, "guidelines");
+        assert_eq!(report.0[0].status, OutdatedStatus::Outdated);
     }
 
     #[test]
     fn gather_outdated_up_to_date_returns_empty() {
         let t = TestContext::new();
-
-        // No installed artifacts, no sources
         setup_empty_sources(&t.fs, &t.paths);
 
-        let ctx = t.ctx();
-        let report = outdated(&ctx).unwrap();
+        let report = outdated(&t.ctx()).unwrap();
 
         assert!(report.0.is_empty(), "expected no rows when everything is up to date");
     }
 
     #[test]
-    fn gather_outdated_untracked_artifact_appears_as_untracked() {
+    fn gather_outdated_untracked_artifact_uses_null_installed_version_semantics() {
         let t = TestContext::new();
 
-        // Source has version 1.0.0
         setup_source_with_versioned_agent(
             &t.fs,
             &t.paths,
@@ -384,7 +366,6 @@ mod tests {
             "1.0.0",
         );
 
-        // Installed on disk but NOT in lock file
         install_agent_on_disk(
             &t.fs,
             &t.paths,
@@ -392,7 +373,6 @@ mod tests {
             &agent_content("my-agent", "A test agent"),
             InstallScope::Global,
         );
-        // Empty lock file — no lock entry
         lockfile::save(
             &LockFile {
                 version: 1,
@@ -404,20 +384,19 @@ mod tests {
         )
         .unwrap();
 
-        let ctx = t.ctx();
-        let report = outdated(&ctx).unwrap();
+        let report = outdated(&t.ctx()).unwrap();
 
         assert_eq!(report.0.len(), 1, "untracked artifact should appear");
         assert_eq!(report.0[0].name, "my-agent");
-        assert_eq!(report.0[0].installed_version, "-");
-        assert_eq!(report.0[0].status, "untracked");
+        assert_eq!(report.0[0].installed_version, None);
+        assert_eq!(report.0[0].status, OutdatedStatus::Untracked);
+        assert!(!report.0[0].locally_modified);
     }
 
     #[test]
-    fn gather_outdated_locally_modified_appends_modified_status() {
+    fn gather_outdated_locally_modified_sets_flag() {
         let t = TestContext::new();
 
-        // Source has version 2.0.0
         setup_source_with_versioned_agent(
             &t.fs,
             &t.paths,
@@ -427,7 +406,6 @@ mod tests {
             "2.0.0",
         );
 
-        // Install on disk
         install_agent_on_disk(
             &t.fs,
             &t.paths,
@@ -436,7 +414,6 @@ mod tests {
             InstallScope::Global,
         );
 
-        // Lock entry says installed_checksum doesn't match disk content
         let mut entry = make_lock_entry_with_checksum(
             ArtifactKind::Agent,
             Some("1.0.0"),
@@ -444,26 +421,19 @@ mod tests {
             "my-agent.md",
             "sha256:old",
         );
-        // Installed checksum doesn't match disk content
         entry.installed_checksum = "sha256:different".to_string();
         save_lock_with_entry(&t.fs, &t.paths, "my-agent", entry, InstallScope::Global);
 
-        let ctx = t.ctx();
-        let report = outdated(&ctx).unwrap();
+        let report = outdated(&t.ctx()).unwrap();
 
         assert_eq!(report.0.len(), 1);
-        assert!(
-            report.0[0].status.contains("modified"),
-            "status should contain 'modified': {}",
-            report.0[0].status
-        );
+        assert!(report.0[0].locally_modified);
     }
 
     #[test]
     fn outdated_shows_rows_from_both_sources_when_artifact_in_two() {
         let t = TestContext::new();
 
-        // Two sources with the same agent at different versions
         setup_sources(
             &t.fs,
             &t.paths,
@@ -481,7 +451,6 @@ mod tests {
             versioned_agent_content("my-agent", "A test agent", "3.0.0"),
         );
 
-        // Install on disk with version 1.0.0
         install_agent_on_disk(
             &t.fs,
             &t.paths,
@@ -503,8 +472,7 @@ mod tests {
             InstallScope::Global,
         );
 
-        let ctx = t.ctx();
-        let report = outdated(&ctx).unwrap();
+        let report = outdated(&t.ctx()).unwrap();
 
         assert_eq!(report.0.len(), 2, "should show outdated row for each source");
 
@@ -514,7 +482,7 @@ mod tests {
 
         let guidelines_row = report.0.iter().find(|r| r.source == "guidelines").unwrap();
         let marketplace_row = report.0.iter().find(|r| r.source == "marketplace").unwrap();
-        assert_eq!(guidelines_row.available_version, "2.0.0");
-        assert_eq!(marketplace_row.available_version, "3.0.0");
+        assert_eq!(guidelines_row.available_version.as_deref(), Some("2.0.0"));
+        assert_eq!(marketplace_row.available_version.as_deref(), Some("3.0.0"));
     }
 }

@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cmx {skill,agent} promote <name>` now accepts `--from <platform>` to choose which installed copy wins, matching `sync`. The global `--platform` selector still works as a fallback, but `promote` now documents and prefers `--from` for winner selection.
 - `cmx set create <name>` now uses `--from-plugin <source>:<plugin>` for marketplace-plugin seeding, replacing the overloaded `--from`.
 - `cmx {skill,agent} adopt --all` now uses `--from-dir <dir>` for install-directory filtering, replacing the overloaded `--from`.
+- `cmx list`, `cmx {skill,agent} list`, and `cmx outdated` now use explicit human table labels: the `Tools` header is now `Platforms`, version gaps read as `unversioned` or `source missing` instead of `-`, list rows include a named `Status` column, and `cmx outdated` ends with an update hint while still printing `Everything is up to date.` on an empty result.
+- JSON for `cmx list`, `cmx {skill,agent} list`, `cmx outdated`, and `cmx search` now emits semantic machine values instead of human placeholders: absent versions are `null` instead of `"-"`, list rows use `platforms` instead of `tools`, and status fields are enum strings such as `outdated`, `unversioned`, or `source_missing`.
 
 ### Deprecated
 

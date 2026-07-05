@@ -59,18 +59,18 @@ impl fmt::Display for ListOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::list::Row;
+    use crate::list::{ListStatus, Row};
     use crate::types::ArtifactKind;
     use std::collections::BTreeMap;
 
     fn make_row(name: &str) -> Row {
         Row {
             name: name.to_string(),
-            installed: "1.0.0".to_string(),
-            available: "1.0.0".to_string(),
-            source: "src".to_string(),
-            tools: vec!["claude".to_string()],
-            status: "✅",
+            installed_version: Some("1.0.0".to_string()),
+            available_version: Some("1.0.0".to_string()),
+            source: Some("src".to_string()),
+            platforms: vec!["claude".to_string()],
+            status: ListStatus::Ok,
         }
     }
 
@@ -96,6 +96,8 @@ mod tests {
         let out = r.to_string();
         assert!(out.contains("Global agents:"));
         assert!(out.contains("agent-a"));
+        assert!(out.contains("Platforms"));
+        assert!(out.contains("Status"));
     }
 
     #[test]

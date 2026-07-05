@@ -16,10 +16,10 @@ fn list_row_json(kind: ArtifactKind, scope: InstallScope, row: &Row) -> Value {
         "kind": kind.to_string(),
         "scope": scope.label(),
         "name": row.name,
-        "installed_version": row.installed,
-        "available_version": row.available,
+        "installed_version": row.installed_version,
+        "available_version": row.available_version,
         "source": row.source,
-        "tools": row.tools,
+        "platforms": row.platforms,
         "status": row.status,
     })
 }
@@ -61,6 +61,7 @@ pub fn outdated_json(report: &OutdatedReport) -> Value {
             "available_version": row.available_version,
             "source": row.source,
             "status": row.status,
+            "locally_modified": row.locally_modified,
         })).collect::<Vec<_>>(),
     })
 }
@@ -153,6 +154,8 @@ pub fn home_path_json(path: &Path) -> Value {
 mod tests {
     use super::*;
     use crate::info::SkillFileEntry;
+    use crate::list::ListStatus;
+    use crate::outdated::{OutdatedReport, OutdatedRow, OutdatedStatus};
     use crate::types::{Deprecation, SetState};
     use std::collections::BTreeMap;
     use std::path::PathBuf;
@@ -164,6 +167,46 @@ mod tests {
             skills: BTreeMap::new(),
         });
         assert_eq!(value["artifacts"], json!([]));
+    }
+
+    #[test]
+    fn list_json_uses_null_versions_and_semantic_status() {
+        let value = list_json(&ListOutput {
+            agents: BTreeMap::new(),
+            skills: BTreeMap::from([(
+                InstallScope::Global,
+                vec![Row {
+                    name: "focus-skill".to_string(),
+                    installed_version: None,
+                    available_version: None,
+                    source: Some("guidelines".to_string()),
+                    platforms: vec!["claude".to_string()],
+                    status: ListStatus::Unversioned,
+                }],
+            )]),
+        });
+        assert!(value["artifacts"][0]["installed_version"].is_null());
+        assert!(value["artifacts"][0]["available_version"].is_null());
+        assert_eq!(value["artifacts"][0]["platforms"], json!(["claude"]));
+        assert_eq!(value["artifacts"][0]["status"], "unversioned");
+    }
+
+    #[test]
+    fn outdated_json_uses_null_versions_and_locally_modified_flag() {
+        let value = outdated_json(&OutdatedReport(vec![OutdatedRow {
+            name: "focus-skill".to_string(),
+            kind: ArtifactKind::Skill,
+            scope: InstallScope::Global,
+            installed_version: None,
+            available_version: None,
+            source: "guidelines".to_string(),
+            status: OutdatedStatus::Changed,
+            locally_modified: true,
+        }]));
+        assert!(value["artifacts"][0]["installed_version"].is_null());
+        assert!(value["artifacts"][0]["available_version"].is_null());
+        assert_eq!(value["artifacts"][0]["status"], "changed");
+        assert_eq!(value["artifacts"][0]["locally_modified"], json!(true));
     }
 
     #[test]
