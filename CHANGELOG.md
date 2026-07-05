@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - LLM-backed degradation paths (`cmx info` summaries and compact `cmx diff`) now collapse provider failures to one-line, action-oriented notes instead of leaking raw upstream JSON payloads.
 - Argument-validation failures now include a `try:` line with the next command to run, and unknown-artifact failures now suggest a close match when one exists or point at the relevant discovery command.
+- Artifact pin parsing is now source-aware: names are only treated as `source:name` pins when the source prefix matches a registered source, so bundled companion skills from `bundled:cmx` update normally and explicit pins with colon-containing source names still work.
 
 ## [3.0.0] - 2026-07-05
 

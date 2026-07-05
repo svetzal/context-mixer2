@@ -10,7 +10,7 @@ use crate::lockfile;
 use crate::paths::ConfigPaths;
 use crate::platform::Platform;
 use crate::source_iter;
-use crate::types::{self, ArtifactKind, InstallScope, LockEntry, LockSource};
+use crate::types::{self, ArtifactKind, InstallScope, LockEntry, LockSource, SourcesFile};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -65,9 +65,21 @@ pub fn install(
     force: bool,
     ctx: &AppContext<'_>,
 ) -> Result<InstallResult> {
+    let sources = crate::config::load_sources(ctx.fs, ctx.paths)?;
+    let (source_name, artifact_name) = parse_name_with_sources(name, &sources);
+    install_resolved(source_name, artifact_name, kind, scope, force, ctx)
+}
+
+fn install_resolved(
+    source_name: Option<&str>,
+    artifact_name: &str,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    force: bool,
+    ctx: &AppContext<'_>,
+) -> Result<InstallResult> {
     ctx.paths.ensure_supports(kind)?;
 
-    let (source_name, artifact_name) = parse_name(name);
     let found = source_iter::find_unique(artifact_name, kind, source_name, ctx)?;
     let plan = plan_install(artifact_name, kind, scope, &found, ctx.paths)?;
     ctx.fs.create_dir_all(&plan.dest_dir)?;
@@ -186,8 +198,7 @@ pub fn update(
             crate::suggestions::installed_artifact_hint(name, Some(kind), ctx)
         );
     };
-    let pinned = format!("{}:{}", entry.source.repo, name);
-    install(&pinned, kind, scope, force, ctx)
+    install_resolved(Some(&entry.source.repo), name, kind, scope, force, ctx)
 }
 
 /// Install every available artifact of `kind` from the sources into each of
@@ -238,8 +249,8 @@ fn install_all_one(
                 continue;
             }
         }
-        let pinned = format!("{}:{}", sa.source_name, sa.artifact.name);
-        let result = install(&pinned, kind, scope, force, ctx)?;
+        let result =
+            install_resolved(Some(&sa.source_name), &sa.artifact.name, kind, scope, force, ctx)?;
         installed.push(result);
     }
 
@@ -277,8 +288,8 @@ pub fn update_all(
                         )
                 })
             {
-                let pinned = format!("{}:{name}", entry.source.repo);
-                let result = install(&pinned, kind, *scope, force, ctx)?;
+                let result =
+                    install_resolved(Some(&entry.source.repo), name, kind, *scope, force, ctx)?;
                 updated.push(result);
             }
         }
@@ -469,12 +480,16 @@ fn build_lock_entry(
     }
 }
 
-fn parse_name(name: &str) -> (Option<&str>, &str) {
-    if let Some((source, artifact)) = name.split_once(':') {
-        (Some(source), artifact)
-    } else {
-        (None, name)
+fn parse_name_with_sources<'a>(name: &'a str, sources: &SourcesFile) -> (Option<&'a str>, &'a str) {
+    let mut resolved: Option<(Option<&'a str>, &'a str)> = None;
+    for (idx, _) in name.match_indices(':') {
+        let candidate = &name[..idx];
+        if sources.sources.contains_key(candidate) {
+            resolved = Some((Some(candidate), &name[idx + 1..]));
+        }
     }
+
+    resolved.unwrap_or((None, name))
 }
 
 fn collect_discarded_paths(

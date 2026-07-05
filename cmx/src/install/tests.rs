@@ -3,11 +3,12 @@ use crate::gateway::Filesystem;
 use crate::platform::Platform;
 use crate::source_iter::SourceArtifact;
 use crate::test_support::{
-    TestContext, add_skill, agent_content, setup_empty_sources, setup_source,
+    TestContext, add_skill, agent_content, make_local_entry, setup_empty_sources, setup_source,
     setup_source_with_agent, setup_source_with_skill, setup_sources, test_paths,
 };
-use crate::types::{Artifact, ArtifactKind, Deprecation, InstallScope, LockFile};
+use crate::types::{Artifact, ArtifactKind, Deprecation, InstallScope, LockFile, SourcesFile};
 use chrono::Utc;
+use std::collections::BTreeMap;
 
 // --- decide_install (pure) ---
 
@@ -201,39 +202,46 @@ fn install_many_installs_each_and_collects_failures() {
 
 // --- parse_name ---
 
+fn make_sources_file(names: &[&str]) -> SourcesFile {
+    SourcesFile {
+        version: 1,
+        sources: names
+            .iter()
+            .map(|name| ((*name).to_string(), make_local_entry(format!("/{name}"), None)))
+            .collect::<BTreeMap<_, _>>(),
+    }
+}
+
 #[test]
-fn parse_name_with_source_prefix() {
-    let (source, artifact) = parse_name("guidelines:rust-craftsperson");
+fn parse_name_with_registered_source_prefix() {
+    let sources = make_sources_file(&["guidelines"]);
+    let (source, artifact) = parse_name_with_sources("guidelines:rust-craftsperson", &sources);
     assert_eq!(source, Some("guidelines"));
     assert_eq!(artifact, "rust-craftsperson");
 }
 
 #[test]
 fn parse_name_without_source_prefix() {
-    let (source, artifact) = parse_name("rust-craftsperson");
+    let sources = make_sources_file(&["guidelines"]);
+    let (source, artifact) = parse_name_with_sources("rust-craftsperson", &sources);
     assert_eq!(source, None);
     assert_eq!(artifact, "rust-craftsperson");
 }
 
 #[test]
-fn parse_name_splits_on_first_colon_only() {
-    let (source, artifact) = parse_name("a:b:c");
-    assert_eq!(source, Some("a"));
-    assert_eq!(artifact, "b:c");
+fn parse_name_without_registered_source_prefix_falls_back_to_literal_name() {
+    let sources = make_sources_file(&["guidelines"]);
+    let (source, artifact) = parse_name_with_sources("unknown:artifact", &sources);
+    assert_eq!(source, None);
+    assert_eq!(artifact, "unknown:artifact");
 }
 
 #[test]
-fn parse_name_empty_source() {
-    let (source, artifact) = parse_name(":artifact");
-    assert_eq!(source, Some(""));
-    assert_eq!(artifact, "artifact");
-}
-
-#[test]
-fn parse_name_empty_artifact() {
-    let (source, artifact) = parse_name("source:");
-    assert_eq!(source, Some("source"));
-    assert_eq!(artifact, "");
+fn parse_name_uses_longest_registered_source_prefix() {
+    let sources = make_sources_file(&["foo", "foo:bar"]);
+    let (source, artifact) = parse_name_with_sources("foo:bar:baz", &sources);
+    assert_eq!(source, Some("foo:bar"));
+    assert_eq!(artifact, "baz");
 }
 
 // --- install_with business logic tests ---
@@ -302,6 +310,29 @@ fn install_succeeds_with_source_prefix_disambiguation() {
         t.fs.file_exists(&expected_dest),
         "agent file should be installed at {}",
         expected_dest.display()
+    );
+}
+
+#[test]
+fn install_succeeds_with_source_name_containing_colon() {
+    let t = TestContext::new();
+
+    setup_source_with_skill(&t.fs, &t.paths, "bundled:cmx", "/sources/bundled-cmx", "cmx", "1.0.0");
+
+    let ctx = t.ctx();
+    let result = install("bundled:cmx:cmx", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
+    assert!(result.is_ok(), "expected ok, got: {:?}", result.err());
+
+    let installed = t
+        .paths
+        .install_dir(ArtifactKind::Skill, InstallScope::Global)
+        .unwrap()
+        .join("cmx")
+        .join("SKILL.md");
+    assert!(
+        t.fs.file_exists(&installed),
+        "skill should be installed at {}",
+        installed.display()
     );
 }
 
@@ -780,6 +811,38 @@ fn install_all_reinstalls_artifact_when_source_checksum_changed() {
 }
 
 // --- update_all: version-newly-appeared picks up artifact ---
+
+#[test]
+fn update_succeeds_when_lock_source_name_contains_colon() {
+    let t = TestContext::new();
+    setup_source_with_skill(&t.fs, &t.paths, "bundled:cmx", "/sources/bundled-cmx", "cmx", "1.0.0");
+
+    let ctx = t.ctx();
+    install("cmx", ArtifactKind::Skill, InstallScope::Global, false, &ctx).unwrap();
+
+    let result = update("cmx", ArtifactKind::Skill, true, &ctx).unwrap();
+    assert_eq!(result.artifact_name, "cmx");
+    assert_eq!(result.source_name, "bundled:cmx");
+}
+
+#[test]
+fn update_all_succeeds_when_lock_source_name_contains_colon() {
+    let t = TestContext::new();
+    setup_source_with_skill(&t.fs, &t.paths, "bundled:cmx", "/sources/bundled-cmx", "cmx", "1.0.0");
+
+    let ctx = t.ctx();
+    install("cmx", ArtifactKind::Skill, InstallScope::Global, false, &ctx).unwrap();
+
+    t.fs.add_file(
+        "/sources/bundled-cmx/cmx/SKILL.md",
+        crate::test_support::versioned_skill_content("A test skill", "2.0.0"),
+    );
+
+    let result = update_all(ArtifactKind::Skill, false, &ctx).unwrap();
+    assert_eq!(result.items.len(), 1);
+    assert_eq!(result.items[0].artifact_name, "cmx");
+    assert_eq!(result.items[0].source_name, "bundled:cmx");
+}
 
 #[test]
 fn update_all_picks_up_artifact_when_version_newly_appears_in_source() {
