@@ -121,6 +121,7 @@ Entry points:
 - `cmx/src/lib.rs` — crate root; re-exports all public modules
 - `cmx/src/cli.rs` — clap CLI definition
 - `cmx/src/context.rs` — AppContext: bundles all I/O gateway dependencies for command invocations
+- `cmx/src/init.rs` — `cmx init`: install/remove cmx's own companion skill (embedded `skill/SKILL.md`) via `cmx-core`'s `SkillInstaller`, following the `<tool> init` convention
 
 Source management:
 - `cmx/src/source/mod.rs` — `cmx source` subcommands (add, list, browse, update, remove)
@@ -131,12 +132,14 @@ Source management:
 Artifact scanning:
 - `cmx/src/scan/mod.rs` — artifact detection (walks source repos, matches agents/skills by frontmatter)
 - `cmx/src/scan/frontmatter.rs` — YAML frontmatter parsing for artifact detection
+- `cmx/src/scan/yaml_repair.rs` — frontmatter normalization (tabs→spaces, quoting stray `>`/`|` values) applied before YAML parsing to tolerate real-world non-spec artifacts
 - `cmx/src/scan_marketplace.rs` — scans marketplace-structured plugin repos
 
 Install/uninstall:
 - `cmx/src/install.rs` — `cmx agent install` / `cmx skill install`
 - `cmx/src/uninstall.rs` — `cmx agent uninstall` / `cmx skill uninstall`
 - `cmx/src/sync.rs` — `cmx skill sync`: reconcile a skill that diverged across platforms by copying one copy (newest version, or `--from <platform>`) over the others; works for external/source-less skills
+- `cmx/src/promote.rs` — `cmx skill promote` / `cmx agent promote`: the mirror of `install::update` — copy the in-place-edited installed copy back into the canonical home and refresh `home`-provenance lock baselines (home target only; git-sourced and reformatted-agent copies rejected)
 - `cmx/src/copy.rs` — file copy helpers used by install
 
 Query & display:
@@ -152,10 +155,13 @@ Query & display:
 - `cmx/src/diff/analyze.rs` — LLM-powered analysis (feature-gated path): `analyze_focus`
 - `cmx/src/text_diff.rs` — general line-oriented LCS text differ (`split_lines`/`lcs_ops`/`render_hunks`); pure, no coupling to the artifact model
 - `cmx/src/display/mod.rs` — output formatting for all commands; one submodule per command:
-  `adopt.rs`, `config.rs`, `diff.rs`, `doctor.rs`, `info.rs`, `install.rs`, `list.rs`,
-  `outdated.rs`, `search.rs`, `source.rs`, `uninstall.rs`
+  `adopt.rs`, `config.rs`, `diff.rs`, `doctor.rs`, `info.rs`, `init.rs`, `install.rs`, `list.rs`,
+  `outdated.rs`, `promote.rs`, `search.rs`, `sets.rs`, `source.rs`, `sync.rs`, `uninstall.rs`, `util.rs`
 - Tests for a `Display` impl live in the same `display/<command>.rs` module as the impl; core modules (`install.rs`, `uninstall.rs`, etc.) must not contain `Display`-formatting tests.
 - `cmx/src/table.rs` — table rendering helpers
+
+Sets:
+- `cmx/src/sets.rs` — `cmx set` subcommands (create, list, show, add, remove, delete, rename): locally-defined named groups of installed artifacts with a desired activation state (see `SETS.md`); Phase 1 is pure curation with no install side effects
 
 System survey / adoption:
 - `cmx/src/doctor.rs` — `cmx doctor`: read-only system-wide survey of installed artifacts across platforms
@@ -204,7 +210,7 @@ Publisher and authoring tool for managing agentic context artifacts.
 - `cmf/src/cli.rs` — clap CLI definition (7 commands: facet, recipe, plugin, manifest, marketplace, validate, status)
 - `cmf/src/repo.rs` — Repo root detection (marketplace, plugin, facets-only, unknown)
 - `cmf/src/plugin.rs` — Plugin scanning, initialization, validation
-- `cmf/src/plugin_types.rs` — Serde types for plugin.json and marketplace.json
+- `cmf/src/plugin_types.rs` — thin re-export shim (`pub use cmx::plugin_types::{...}`); the serde types for plugin.json and marketplace.json now live in `cmx/src/plugin_types.rs` (single source of truth)
 - `cmf/src/marketplace.rs` — Marketplace validation and generation
 - `cmf/src/facet.rs` — Facet scanning and validation
 - `cmf/src/facet_types.rs` — Facet and Recipe structs, frontmatter parser
