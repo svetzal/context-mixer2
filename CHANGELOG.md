@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-07-05
+
+### Added
+
+- **Sets — consumer-side activation groups.** A new top-level noun, `cmx set`, for grouping installed skills and agents into named units that can be **activated** and **deactivated** together — a lever for managing the standing context cost of an installation (every installed artifact's trigger description is loaded into an assistant's context whether or not it fires; a set lets you switch the cost of unrelated bodies of work on and off as a unit). Sets are local, user-composed state, distinct from publisher-side marketplace plugins. See `SETS.md` for the full design.
+  - **Definitions and curation:** `cmx set create <name> [--desc <text>] [--from <source>:<plugin>] [--local]`, plus `list`, `show`, `add`, `remove`, `delete`, and `rename`. Membership is stored in a `sets.json` state file — global at `~/.config/context-mixer/sets.json`, project-local at `.context-mixer/sets.json`. `set add` snapshots each member's source from the lockfile so reactivation is deterministic.
+  - **Activation lifecycle:** `cmx set activate <name>` installs every member from its pinned source (idempotent — doubles as a repair); `cmx set deactivate <name>` uninstalls them while **retaining the set definition**. Deactivation is reference-count-aware (a member also held by another active set is retained, not removed) and drift-guarded (a member with local edits blocks its own uninstall unless `--force`). Both verbs support `--dry-run`. `cmx set delete --purge` deactivates before deleting.
+  - **Context-footprint reporting:** `set list` and `set show` report the character footprint of each set's trigger descriptions, annotating inactive sets as not-currently-loaded — so the cost of a set is visible before you activate it.
+  - **`--from <source>:<plugin>` seeding:** `set create` can pre-populate a set from an existing marketplace plugin's declared agents and skills, pinning their source. The set is created inactive; the artifacts need not be installed yet.
+  - **doctor integration:** `cmx doctor` now surveys set consistency — flagging active sets missing a member, and inactive sets whose members linger installed (reference-count-aware) — under the existing issue model and exit-code-2 contract.
+
 ## [2.12.1] - 2026-07-04
 
 ### Fixed
