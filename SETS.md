@@ -248,11 +248,8 @@ work, no changes to the install/uninstall primitives it composes.
 
 ## Open decisions (not blocking Phase 1)
 
-- **Noun choice.** `set` is short and clear but collides with the English verb
-  and the shell builtin. `profile` reads well for an activate/deactivate toggle
-  ("switch to my rust profile"); `group` and `bundle` are also candidates. The
-  data model and semantics are name-agnostic — this can be settled before the CLI
-  surface lands in Phase 1 without reworking anything below it.
+- **Noun choice — DECIDED (2026-07-05): `set`.** Considered `profile` / `group`
+  / `bundle`; settled on `set`, now shipped in the Phase 1 CLI surface.
 - **Footprint units.** Character count is trivial and always available; a rough
   token estimate is friendlier but approximate. Phase 3 can ship chars first and
   add a token estimate later.
