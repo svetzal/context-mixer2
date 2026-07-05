@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The global `--platform` help is now compact on subcommands and keeps the full annotated platform roster only in top-level `cmx --help`, so command-specific help is no longer drowned by the repeated platform enum block.
 - `cmx {skill,agent} promote`, `cmx skill sync`, `cmx set activate`, and `cmx set deactivate` now show a concrete reconciliation plan by default and only mutate when re-run with `--apply`. The plan names the source and target paths and ends with `Re-run with --apply to make these changes.` `cmx set delete --purge` now follows the same preview/apply flow for its deactivation step.
 - `cmx {skill,agent} install --force` and `cmx {skill,agent} update --force` still execute immediately, but now print the exact local file paths whose edits are being discarded before the normal success output.
 - `cmx {skill,agent} promote <name>` now accepts `--from <platform>` to choose which installed copy wins, matching `sync`. The global `--platform` selector still works as a fallback, but `promote` now documents and prefers `--from` for winner selection.

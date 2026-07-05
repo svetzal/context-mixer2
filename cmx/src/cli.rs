@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 
-use crate::platform::Platform;
+use crate::platform::{PLATFORM_HELP_VALUES, Platform};
 
 #[derive(Args, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OutputArgs {
@@ -15,15 +15,19 @@ pub struct OutputArgs {
 #[command(
     name = "cmx",
     about = "Package manager for curated agentic context — agents and skills",
+    after_long_help = PLATFORM_HELP_VALUES,
     version
 )]
 pub struct Cli {
-    /// Target AI coding assistant platform (env: `CMX_PLATFORM`).
-    ///
-    /// When omitted, `install`/`uninstall` act across every platform already in
-    /// use (those with tracked artifacts); other commands default to Claude.
-    /// Pass this to constrain an operation to a single platform.
-    #[arg(long, value_enum, global = true, env = "CMX_PLATFORM")]
+    #[arg(
+        long,
+        value_enum,
+        hide_possible_values = true,
+        global = true,
+        env = "CMX_PLATFORM",
+        help = "Target AI coding assistant platform (see 'cmx --help' for the full list)",
+        long_help = "Target AI coding assistant platform (see 'cmx --help' for the full list)"
+    )]
     pub platform: Option<Platform>,
 
     #[command(subcommand)]
@@ -503,19 +507,58 @@ pub enum ExternalAction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::{CommandFactory, Parser};
+    use clap::{CommandFactory, Parser, error::ErrorKind};
+
+    fn rendered_help(args: &[&str]) -> String {
+        let err = Cli::command()
+            .try_get_matches_from_mut(args)
+            .expect_err("help flag should short-circuit parsing");
+        assert_eq!(err.kind(), ErrorKind::DisplayHelp);
+        err.to_string()
+    }
+
+    fn top_level_help() -> String {
+        rendered_help(&["cmx", "--help"])
+    }
 
     fn help_for(path: &[&str]) -> String {
-        let mut command = Cli::command();
-        for segment in path {
-            command = command
-                .find_subcommand_mut(segment)
-                .unwrap_or_else(|| panic!("missing subcommand {segment}"))
-                .clone();
-        }
-        let mut buf = Vec::new();
-        command.write_long_help(&mut buf).unwrap();
-        String::from_utf8(buf).unwrap()
+        let mut args = Vec::with_capacity(path.len() + 2);
+        args.push("cmx");
+        args.extend_from_slice(path);
+        args.push("--help");
+        rendered_help(&args)
+    }
+
+    #[test]
+    fn top_level_help_keeps_full_platform_roster() {
+        let help = top_level_help();
+        assert!(help.contains("Platform values:"), "{help}");
+        assert!(help.contains("opencode   opencode — markdown agents"), "{help}");
+        assert!(help.contains("codex      Codex CLI — TOML agents"), "{help}");
+    }
+
+    #[test]
+    fn subcommand_help_uses_compact_platform_line() {
+        let help = help_for(&["source", "add"]);
+        assert!(help.contains("--platform <PLATFORM>"), "{help}");
+        assert!(help.contains("see 'cmx --help' for the full list"), "{help}");
+        assert!(help.contains("CMX_PLATFORM"), "{help}");
+        assert!(!help.contains("opencode — markdown agents"), "{help}");
+        assert!(!help.contains("Codex CLI — TOML agents"), "{help}");
+        assert!(!help.contains("Possible values:"), "{help}");
+        assert!(help.lines().count() < 25, "{help}");
+    }
+
+    #[test]
+    fn invalid_platform_values_still_list_possible_values() {
+        let err = Cli::try_parse_from(["cmx", "list", "--platform", "bogus"])
+            .err()
+            .expect("invalid platform should be rejected")
+            .to_string();
+        assert!(err.contains("possible values"), "{err}");
+        assert!(err.contains("claude"), "{err}");
+        assert!(err.contains("codex"), "{err}");
+        assert!(err.contains("devin"), "{err}");
     }
 
     #[test]

@@ -22,6 +22,24 @@ struct PlatformSpec {
     agent_format: Option<AgentFormat>,
 }
 
+pub const PLATFORM_HELP_VALUES: &str = concat!(
+    "Platform values:\n",
+    "  claude     Claude Code — markdown agents and skills in `.claude/`.\n",
+    "  copilot    GitHub Copilot — markdown agents and skills; local in `.github/`, global in `~/.copilot/`.\n",
+    "  cursor     Cursor — markdown agents and skills in `.cursor/`.\n",
+    "  windsurf   Windsurf — markdown agents and skills; global in `~/.codeium/windsurf/`.\n",
+    "  gemini     Gemini CLI — markdown agents and skills in `.gemini/`.\n",
+    "  opencode   opencode — markdown agents; skills in the shared `.agents` directory.\n",
+    "  codex      Codex CLI — TOML agents; skills in the shared `.agents` directory.\n",
+    "  pi         Pi — skills only; no native agent concept.\n",
+    "  crush      Crush — skills only; reads the shared `.agents` directory.\n",
+    "  amp        Amp — skills only; global scope uses `~/.config/agents/skills`.\n",
+    "  zed        Zed — skills only; agents are settings-embedded profiles cmx does not manage.\n",
+    "  openhands  OpenHands — skills only; agents are trigger-activated skills.\n",
+    "  hermes     Hermes — skills only; global scope uses `~/.hermes/skills`; no agent files.\n",
+    "  devin      Devin — skills only; discovers `SKILL.md` in connected repos and reads the shared `.agents` directory.\n",
+);
+
 // --- enum ---
 
 /// The target AI coding assistant platform for artifact installation.
@@ -49,24 +67,14 @@ pub enum Platform {
     Cursor,
     Windsurf,
     Gemini,
-    /// opencode — markdown agents; skills in the shared .agents directory.
     Opencode,
-    /// Codex CLI — TOML agents; skills in the shared .agents directory.
     Codex,
-    /// Pi — skills only; no native agent concept.
     Pi,
-    /// Crush — skills only; reads the shared .agents directory.
     Crush,
-    /// Amp — skills only; reads the shared .agents directory.
     Amp,
-    /// Zed — skills only; agents are settings-embedded profiles cmx does not manage.
     Zed,
-    /// openhands — skills only; agents are trigger-activated skills.
     Openhands,
-    /// Hermes — skills only; global-centric (~/.hermes/skills); no agent files.
     Hermes,
-    /// Devin — skills only; discovers `SKILL.md` in connected repos and reads
-    /// the shared .agents directory (its recommended location); no agent files.
     Devin,
 }
 

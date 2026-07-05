@@ -506,6 +506,55 @@ fn empty_state_json_is_valid_and_machine_readable() {
 }
 
 #[test]
+fn skill_info_honors_cmx_platform_env() {
+    let fixture = populated_fixture();
+    let claude_skill_dir = fixture.home.join(".claude").join("skills").join("shared-skill");
+    let codex_skill_dir = fixture.home.join(".agents").join("skills").join("shared-skill");
+
+    fs::create_dir_all(&claude_skill_dir).unwrap();
+    fs::create_dir_all(&codex_skill_dir).unwrap();
+
+    fs::write(
+        claude_skill_dir.join("SKILL.md"),
+        concat!("---\n", "description: Claude copy.\n", "---\n", "# shared-skill\n"),
+    )
+    .unwrap();
+    fs::write(
+        codex_skill_dir.join("SKILL.md"),
+        concat!("---\n", "description: Codex copy.\n", "---\n", "# shared-skill\n"),
+    )
+    .unwrap();
+
+    let default_info = fixture.run_json(&["skill", "info", "shared-skill", "--json"]);
+    assert_eq!(default_info["activation_description"], "Claude copy.");
+    assert!(
+        default_info["path"].as_str().unwrap().contains("/.claude/skills/shared-skill"),
+        "default lookup should prefer the default active platform"
+    );
+
+    let env_output = fixture
+        .command(&["skill", "info", "shared-skill", "--json"])
+        .env("CMX_PLATFORM", "codex")
+        .output()
+        .unwrap();
+    assert!(
+        env_output.status.success(),
+        "CMX_PLATFORM=codex should prefer the Codex-visible copy\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&env_output.stdout),
+        String::from_utf8_lossy(&env_output.stderr)
+    );
+
+    let info: Value = serde_json::from_slice(&env_output.stdout).unwrap();
+    assert_eq!(info["name"], "shared-skill");
+    assert_eq!(info["kind"], "skill");
+    assert_eq!(info["activation_description"], "Codex copy.");
+    assert!(
+        info["path"].as_str().unwrap().contains("/.agents/skills/shared-skill"),
+        "CMX_PLATFORM=codex should change the preferred copy"
+    );
+}
+
+#[test]
 fn adopt_from_dir_succeeds_without_deprecation_warning() {
     let fixture = empty_fixture();
     let orphan_dir = fixture.home.join(".claude").join("skills").join("focus-skill");
