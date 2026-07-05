@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `cmx init` now reports companion-skill outcomes accurately when installed copies have local edits: plain `cmx init` skips drifted same-version copies with an explicit overwrite-or-promote hint and exits non-zero when every target was skipped, while `cmx init --force` now overwrites those drifted copies (matching its help and newer-version override semantics). `cmx init --json` now exposes per-target statuses such as `installed`, `updated`, `skipped_drifted`, and `skipped_newer`.
 - LLM-backed degradation paths (`cmx info` summaries and compact `cmx diff`) now collapse provider failures to one-line, action-oriented notes instead of leaking raw upstream JSON payloads.
 - Argument-validation failures now include a `try:` line with the next command to run, and unknown-artifact failures now suggest a close match when one exists or point at the relevant discovery command.
 - Artifact pin parsing is now source-aware: names are only treated as `source:name` pins when the source prefix matches a registered source, so bundled companion skills from `bundled:cmx` update normally and explicit pins with colon-containing source names still work.

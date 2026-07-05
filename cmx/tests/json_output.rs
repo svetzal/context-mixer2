@@ -542,6 +542,52 @@ fn outdated_empty_state_human_output_is_successful() {
 }
 
 #[test]
+fn init_json_reports_drifted_and_forced_update_statuses() {
+    let fixture = empty_fixture();
+    let initial = fixture.run_json(&["init", "--json"]);
+    assert_eq!(initial["targets"][0]["status"], "installed");
+
+    let skill_md = fixture.home.join(".claude").join("skills").join("cmx").join("SKILL.md");
+    fs::write(
+        &skill_md,
+        concat!(
+            "---\n",
+            "description: Locally edited.\n",
+            "metadata:\n",
+            "  version: \"",
+            env!("CARGO_PKG_VERSION"),
+            "\"\n",
+            "  author: Test\n",
+            "---\n",
+            "# locally edited\n"
+        ),
+    )
+    .unwrap();
+    let mut lock: LockFile =
+        serde_json::from_slice(&fs::read(fixture.config_dir.join("cmx-lock.json")).unwrap())
+            .unwrap();
+    let entry = lock.packages.get_mut("cmx").expect("cmx lock entry after init");
+    entry.installed_checksum = "sha256:drifted".to_string();
+    entry.source_checksum = "sha256:drifted".to_string();
+    write_json(&fixture.config_dir.join("cmx-lock.json"), &lock);
+
+    let skipped = fixture.run(&["init", "--json"]);
+    assert!(
+        !skipped.status.success(),
+        "drift refusal should exit non-zero\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&skipped.stdout),
+        String::from_utf8_lossy(&skipped.stderr)
+    );
+    let skipped_json: Value = serde_json::from_slice(&skipped.stdout).unwrap();
+    assert_eq!(skipped_json["targets"][0]["action"], "drifted_skip");
+    assert_eq!(skipped_json["targets"][0]["status"], "skipped_drifted");
+
+    let forced = fixture.run_json(&["init", "--force", "--json"]);
+    assert_eq!(forced["targets"][0]["action"], "update");
+    assert_eq!(forced["targets"][0]["status"], "updated");
+}
+
+#[test]
 fn unversioned_json_uses_null_versions_and_enum_statuses() {
     let fixture = empty_fixture();
     let source_root = fixture.home.parent().unwrap().join("guidelines");

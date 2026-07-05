@@ -760,9 +760,15 @@ fn decide_action_for_entry(
             } else {
                 // Content differs from locked checksum — check on-disk drift
                 if ctx.fs.exists(skill_dest) {
-                    // The on-disk copy may differ from bundled due to edits
-                    TargetAction::DriftedSkip {
-                        installed: installed_version.unwrap_or("unknown").to_string(),
+                    if force {
+                        TargetAction::Update {
+                            from: installed_version.map(str::to_string),
+                        }
+                    } else {
+                        // The on-disk copy may differ from bundled due to edits
+                        TargetAction::DriftedSkip {
+                            installed: installed_version.unwrap_or("unknown").to_string(),
+                        }
                     }
                 } else {
                     TargetAction::Install
@@ -1054,6 +1060,41 @@ mod tests {
         let ctx = t.ctx();
         let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
         assert!(matches!(plan.targets[0].action, TargetAction::DriftedSkip { .. }));
+    }
+
+    #[test]
+    fn same_version_differing_content_with_force_produces_update() {
+        let t = TestContext::new();
+        let skill = sample_skill("1.0.0");
+
+        let claude_paths = t.paths.with_platform(Platform::Claude);
+        let skill_dir = claude_paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("sample");
+        t.fs.add_file(skill_dir.join("SKILL.md"), "---\nversion: 1.0.0\n---\n# Modified\n");
+
+        crate::test_support::save_lock_with_entry(
+            &t.fs,
+            &claude_paths,
+            "sample",
+            LockEntry {
+                artifact_type: ArtifactKind::Skill,
+                version: Some("1.0.0".to_string()),
+                installed_at: "2024-01-01T00:00:00Z".to_string(),
+                source: LockSource {
+                    repo: "bundled:sample".to_string(),
+                    path: "skills/sample".to_string(),
+                },
+                source_checksum: "sha256:different".to_string(),
+                installed_checksum: "sha256:different".to_string(),
+            },
+            InstallScope::Global,
+        );
+
+        let ctx = t.ctx();
+        let plan = installer("1.0.0").plan(&skill, Scope::Global, true, &ctx).unwrap();
+        assert!(matches!(plan.targets[0].action, TargetAction::Update { .. }));
     }
 
     #[test]
@@ -1577,6 +1618,49 @@ mod tests {
         assert!(
             matches!(skip.action, TargetAction::DriftedSkip { .. }),
             "action must be DriftedSkip, not plain Skip"
+        );
+    }
+
+    #[test]
+    fn force_overwrites_drifted_copy_and_reports_update() {
+        let t = TestContext::new();
+        let skill = sample_skill("1.0.0");
+
+        let claude_paths = t.paths.with_platform(Platform::Claude);
+        let skill_dir = claude_paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("sample");
+        let skill_md = skill_dir.join("SKILL.md");
+        t.fs.add_file(&skill_md, "---\nversion: 1.0.0\n---\n# Modified\n");
+
+        crate::test_support::save_lock_with_entry(
+            &t.fs,
+            &claude_paths,
+            "sample",
+            LockEntry {
+                artifact_type: ArtifactKind::Skill,
+                version: Some("1.0.0".to_string()),
+                installed_at: "2024-01-01T00:00:00Z".to_string(),
+                source: LockSource {
+                    repo: "bundled:sample".to_string(),
+                    path: "skills/sample".to_string(),
+                },
+                source_checksum: "sha256:different".to_string(),
+                installed_checksum: "sha256:different".to_string(),
+            },
+            InstallScope::Global,
+        );
+
+        let ctx = t.ctx();
+        let plan = installer("1.0.0").plan(&skill, Scope::Global, true, &ctx).unwrap();
+        let report = installer("1.0.0").apply(&skill, &plan, &ctx).unwrap();
+
+        let updated = report.applied().next().expect("expected an updated target");
+        assert!(matches!(updated.action, TargetAction::Update { .. }));
+        assert_eq!(
+            t.fs.read_to_string(&skill_md).unwrap(),
+            "---\nversion: 1.0.0\n---\n# Sample skill\n"
         );
     }
 

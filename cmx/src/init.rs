@@ -7,7 +7,8 @@ use std::process::ExitCode;
 
 use cmx_core::context::AppContext;
 use cmx_core::skill_install::{
-    BundledSkill, RemoveReport, Report, Scope, SkillInstaller, TargetAction, ToolIdentity,
+    BundledSkill, InstallPlan, RemoveReport, Report, Scope, SkillInstaller, TargetAction,
+    ToolIdentity,
 };
 
 /// The companion skill bundled into the `cmx` binary. Its frontmatter carries a
@@ -66,24 +67,35 @@ fn make_installer() -> SkillInstaller {
     SkillInstaller::new(ToolIdentity::new("cmx", env!("CARGO_PKG_VERSION")))
 }
 
-/// Outcome of `cmx init` / `cmx init --remove`, wrapping the `cmx-core` report
-/// types so `Display` can delegate to them directly (see `display/init.rs`).
+/// Outcome of `cmx init` / `cmx init --remove`.
 pub enum InitOutcome {
     Installed(Report),
     Removed(RemoveReport),
     /// The plan was blocked (e.g. a newer version is already installed and
     /// `--force` was not passed).
     Blocked {
+        plan: InstallPlan,
         reasons: Vec<String>,
     },
 }
 
 impl InitOutcome {
-    /// The process exit code for this outcome: non-zero only when blocked.
+    /// The process exit code for this outcome.
     pub fn exit_code(&self) -> ExitCode {
         match self {
             InitOutcome::Blocked { .. } => ExitCode::FAILURE,
-            InitOutcome::Installed(_) | InitOutcome::Removed(_) => ExitCode::SUCCESS,
+            InitOutcome::Installed(report) => {
+                let skipped_drifted = report
+                    .targets
+                    .iter()
+                    .any(|target| matches!(target.action, TargetAction::DriftedSkip { .. }));
+                if report.applied().count() == 0 && skipped_drifted {
+                    ExitCode::FAILURE
+                } else {
+                    ExitCode::SUCCESS
+                }
+            }
+            InitOutcome::Removed(_) => ExitCode::SUCCESS,
         }
     }
 }
@@ -109,7 +121,7 @@ pub fn run_init(local: bool, force: bool, ctx: &AppContext<'_>) -> Result<InitOu
                 other => format!("{}: blocked ({other:?})", t.platform),
             })
             .collect();
-        return Ok(InitOutcome::Blocked { reasons });
+        return Ok(InitOutcome::Blocked { plan, reasons });
     }
 
     let report = installer.apply(&skill, &plan, ctx)?;
@@ -129,8 +141,20 @@ mod tests {
     use super::*;
     use cmx_core::gateway::Filesystem;
     use cmx_core::platform::Platform;
-    use cmx_core::test_support::{TestContext, make_lock_entry_versioned, save_lock_with_entry};
+    use cmx_core::test_support::{
+        TestContext, make_lock_entry_versioned, metadata_versioned_skill_content,
+        save_lock_with_entry,
+    };
     use cmx_core::types::{ArtifactKind, InstallScope};
+
+    fn drifted_cmx_entry() -> cmx_core::types::LockEntry {
+        make_lock_entry_versioned(
+            ArtifactKind::Skill,
+            env!("CARGO_PKG_VERSION"),
+            "bundled:cmx",
+            "skills/cmx",
+        )
+    }
 
     #[test]
     fn stamp_version_locks_frontmatter_to_cmx_version() {
@@ -234,11 +258,81 @@ mod tests {
 
         let outcome = run_init(false, false, &ctx).unwrap();
         match outcome {
-            InitOutcome::Blocked { reasons } => {
+            InitOutcome::Blocked { plan, reasons } => {
+                assert_eq!(plan.targets.len(), 1);
                 assert_eq!(reasons.len(), 1);
                 assert!(reasons[0].contains("--force"));
             }
             _ => panic!("expected Blocked"),
+        }
+    }
+
+    #[test]
+    fn run_init_drifted_copy_without_force_skips_and_fails() {
+        let t = TestContext::new();
+        let claude_paths = t.paths.with_platform(Platform::Claude);
+        let skill_dir = claude_paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("cmx");
+        let skill_md = skill_dir.join("SKILL.md");
+        let drifted = metadata_versioned_skill_content("locally edited", env!("CARGO_PKG_VERSION"));
+        t.fs.add_file(&skill_md, drifted.as_str());
+        let mut entry = drifted_cmx_entry();
+        entry.installed_checksum = "sha256:drifted".to_string();
+        entry.source_checksum = "sha256:drifted".to_string();
+        save_lock_with_entry(&t.fs, &claude_paths, "cmx", entry, InstallScope::Global);
+
+        let ctx = t.ctx();
+        let outcome = run_init(false, false, &ctx).unwrap();
+        let rendered = outcome.to_string();
+        assert_eq!(outcome.exit_code(), ExitCode::FAILURE);
+        assert!(rendered.contains("re-run with --force to overwrite"));
+        assert!(rendered.contains("cmx skill promote cmx"));
+        match outcome {
+            InitOutcome::Installed(report) => {
+                assert_eq!(report.applied().count(), 0);
+                assert!(matches!(
+                    report.targets.first().unwrap().action,
+                    TargetAction::DriftedSkip { .. }
+                ));
+                assert_eq!(t.fs.read_to_string(&skill_md).unwrap(), drifted);
+            }
+            _ => panic!("expected Installed"),
+        }
+    }
+
+    #[test]
+    fn run_init_force_overwrites_drifted_copy_and_exits_success() {
+        let t = TestContext::new();
+        let claude_paths = t.paths.with_platform(Platform::Claude);
+        let skill_dir = claude_paths
+            .install_dir(ArtifactKind::Skill, InstallScope::Global)
+            .unwrap()
+            .join("cmx");
+        let skill_md = skill_dir.join("SKILL.md");
+        t.fs.add_file(
+            &skill_md,
+            metadata_versioned_skill_content("locally edited", env!("CARGO_PKG_VERSION")),
+        );
+        let mut entry = drifted_cmx_entry();
+        entry.installed_checksum = "sha256:drifted".to_string();
+        entry.source_checksum = "sha256:drifted".to_string();
+        save_lock_with_entry(&t.fs, &claude_paths, "cmx", entry, InstallScope::Global);
+
+        let ctx = t.ctx();
+        let outcome = run_init(false, true, &ctx).unwrap();
+        assert_eq!(outcome.exit_code(), ExitCode::SUCCESS);
+        match outcome {
+            InitOutcome::Installed(report) => {
+                assert_eq!(report.applied().count(), 1);
+                assert!(matches!(
+                    report.targets.first().unwrap().action,
+                    TargetAction::Update { .. }
+                ));
+                assert_eq!(t.fs.read_to_string(&skill_md).unwrap(), stamp_version(SKILL_CONTENT));
+            }
+            _ => panic!("expected Installed"),
         }
     }
 
