@@ -288,10 +288,14 @@ cmx init --remove [--local]   # uninstall
 cmx init --json           # machine-readable report instead of human text
 ```
 
-`cmx init` refuses to downgrade an installed copy that's newer than the
-bundled one unless `--force` is passed; that refusal exits non-zero.
-`--global` is accepted as a no-op alias (global is already the default) so
-scripts written before this alias existed keep working.
+`cmx init` protects existing copies with two safety refusals, both exiting
+non-zero and both overridden by `--force`: it won't downgrade an installed
+copy newer than the bundled one, and it won't overwrite a copy with local
+edits (detected against disk, same as `info`/`diff`) — the skip hints
+`--force` to overwrite or `cmx skill promote cmx` to keep the edits. When
+`--force` discards edits it prints the exact file paths first. `--global`
+is accepted as a no-op alias (global is already the default) so scripts
+written before this alias existed keep working.
 
 ## Typical workflows (agent-shaped)
 
