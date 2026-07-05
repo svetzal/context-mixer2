@@ -23,7 +23,7 @@ fn shown_artifacts(report: &DoctorReport) -> Vec<&DoctorArtifact> {
 pub fn adopt_all_deprecation_notice() -> &'static str {
     "warning: `cmx doctor --adopt-all` is deprecated and will be removed in the \
      next major release. Use `cmx skill adopt --all` / `cmx agent adopt --all` \
-     instead (pass `--from <dir>` there in place of doctor's `--from`)."
+     instead (pass `--from-dir <dir>` there in place of doctor's `--from`)."
 }
 
 /// Project the survey to the machine-readable schema documented for

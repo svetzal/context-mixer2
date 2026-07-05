@@ -30,7 +30,7 @@ use crate::uninstall;
 pub struct SetCreateResult {
     pub name: String,
     pub member_count: usize,
-    /// The `<source>:<plugin>` spec the set was seeded from, if `--from` was used.
+    /// The `<source>:<plugin>` spec the set was seeded from, if `--from-plugin` was used.
     pub seeded_from: Option<String>,
 }
 
@@ -168,7 +168,7 @@ pub fn create(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<SetCreateResult> {
-    // Resolve-then-mutate: fail fast, before writing anything, if `--from`
+    // Resolve-then-mutate: fail fast, before writing anything, if `--from-plugin`
     // can't be resolved to a known source/plugin.
     let members = match from {
         Some(spec) => seed_from_plugin(spec, ctx)?,
@@ -206,10 +206,10 @@ pub fn create(
 /// installed yet.
 fn seed_from_plugin(spec: &str, ctx: &AppContext<'_>) -> Result<Vec<SetMember>> {
     let Some((source_name, plugin_name)) = spec.split_once(':') else {
-        bail!("Invalid --from value '{spec}'; expected <source>:<plugin>.");
+        bail!("Invalid --from-plugin value '{spec}'; expected <source>:<plugin>.");
     };
     if source_name.is_empty() || plugin_name.is_empty() {
-        bail!("Invalid --from value '{spec}'; expected <source>:<plugin>.");
+        bail!("Invalid --from-plugin value '{spec}'; expected <source>:<plugin>.");
     }
 
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
@@ -809,7 +809,7 @@ mod tests {
         assert_eq!(def.description.as_deref(), Some("blog work"));
     }
 
-    // --- create --from (plugin seeding) ---
+    // --- create --from-plugin (plugin seeding) ---
 
     fn marketplace_json(plugins_json: &str) -> String {
         format!(r#"{{"name":"test","plugins":[{plugins_json}]}}"#)

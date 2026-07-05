@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `--json` now covers every read-only data-reporting `cmx` command, not just `doctor` and `init`: `list`, kind-scoped `agent|skill list`, `outdated`, `search`, `info`, `source list`, `source browse`, `set list`, `set show`, `config show`, and `home path` all emit machine-readable JSON to stdout while preserving their existing human output as the default.
 
+### Changed
+
+- `cmx {skill,agent} promote <name>` now accepts `--from <platform>` to choose which installed copy wins, matching `sync`. The global `--platform` selector still works as a fallback, but `promote` now documents and prefers `--from` for winner selection.
+- `cmx set create <name>` now uses `--from-plugin <source>:<plugin>` for marketplace-plugin seeding, replacing the overloaded `--from`.
+- `cmx {skill,agent} adopt --all` now uses `--from-dir <dir>` for install-directory filtering, replacing the overloaded `--from`.
+
+### Deprecated
+
+- `cmx set create --from <source>:<plugin>` and `cmx {skill,agent} adopt --all --from <dir>` still work for one release as hidden aliases, but now print a one-line stderr warning steering to `--from-plugin` and `--from-dir` respectively.
+
 ## [3.0.0] - 2026-07-05
 
 ### Added

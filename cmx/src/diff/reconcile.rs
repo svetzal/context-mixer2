@@ -39,7 +39,8 @@ pub(super) fn reconciliations(
 ) -> Vec<Reconciliation> {
     let mut out = Vec::new();
     let source_is_home = cmp.source_name == crate::adopt::HOME_SOURCE;
-    let plat = platform.map(|p| format!(" --platform {p}")).unwrap_or_default();
+    let promote_plat = platform.map(|p| format!(" --from {p}")).unwrap_or_default();
+    let update_plat = platform.map(|p| format!(" --platform {p}")).unwrap_or_default();
     let name = cmp.name;
     let kind = cmp.kind;
     let source_name = cmp.source_name;
@@ -48,7 +49,7 @@ pub(super) fn reconciliations(
     if source_is_home {
         out.push(Reconciliation {
             description: format!("keep {changed}'s edits — copy {changed} into {source_name}"),
-            command: format!("cmx {kind} promote {name}{plat}"),
+            command: format!("cmx {kind} promote {name}{promote_plat}"),
             note: None,
         });
     }
@@ -56,9 +57,9 @@ pub(super) fn reconciliations(
     out.push(Reconciliation {
         description: format!("discard {changed}'s edits — restore {changed} from {source_name}"),
         command: if locally_modified {
-            format!("cmx {kind} update {name}{plat} --force")
+            format!("cmx {kind} update {name}{update_plat} --force")
         } else {
-            format!("cmx {kind} update {name}{plat}")
+            format!("cmx {kind} update {name}{update_plat}")
         },
         note: locally_modified.then(|| format!("--force overwrites {changed}'s local edits")),
     });
@@ -130,7 +131,7 @@ mod tests {
             changed_version: None,
         };
         let rs = reconciliations(&cmp, true, Some(Platform::Codex));
-        assert!(rs[0].command.contains("promote pf --platform codex"), "{:?}", rs[0]);
+        assert!(rs[0].command.contains("promote pf --from codex"), "{:?}", rs[0]);
         assert!(rs[1].command.contains("update pf --platform codex --force"), "{:?}", rs[1]);
     }
 }

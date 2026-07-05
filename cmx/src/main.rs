@@ -217,9 +217,21 @@ fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
         SetAction::Create {
             name,
             desc,
-            from,
+            from_plugin,
+            deprecated_from,
             local,
-        } => handle_set_create(&name, desc.as_deref(), from.as_deref(), local, ctx),
+        } => {
+            if deprecated_from.is_some() {
+                eprintln!("--from is deprecated; use --from-plugin");
+            }
+            handle_set_create(
+                &name,
+                desc.as_deref(),
+                from_plugin.as_deref().or(deprecated_from.as_deref()),
+                local,
+                ctx,
+            )
+        }
         SetAction::List { local, output } => handle_set_list(local, output, ctx),
         SetAction::Show {
             name,
@@ -620,8 +632,8 @@ fn handle_artifact(
             print!("{result}");
             Ok(ExitCode::SUCCESS)
         }
-        ArtifactAction::Promote { name } => {
-            let result = cmx::promote::promote(&name, kind, selector, ctx)?;
+        ArtifactAction::Promote { name, from } => {
+            let result = cmx::promote::promote(&name, kind, from.or(selector), ctx)?;
             print!("{result}");
             Ok(ExitCode::SUCCESS)
         }
@@ -634,10 +646,22 @@ fn handle_artifact(
         ArtifactAction::Adopt {
             names,
             all,
-            from,
+            from_dir,
+            deprecated_from,
             local,
         } => {
-            handle_adopt(&names, kind, all, from.as_deref(), local, ctx).map(|()| ExitCode::SUCCESS)
+            if deprecated_from.is_some() {
+                eprintln!("--from is deprecated; use --from-dir");
+            }
+            handle_adopt(
+                &names,
+                kind,
+                all,
+                from_dir.as_deref().or(deprecated_from.as_deref()),
+                local,
+                ctx,
+            )
+            .map(|()| ExitCode::SUCCESS)
         }
     }
 }
@@ -731,6 +755,7 @@ fn handle_adopt(
 mod tests {
     use super::*;
     use chrono::Utc;
+    use cmx::gateway::Filesystem;
     use cmx::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use cmx::platform::Platform;
     use std::path::PathBuf;
@@ -987,7 +1012,8 @@ mod tests {
                 SetAction::Create {
                     name: "rust-work".to_string(),
                     desc: None,
-                    from: None,
+                    from_plugin: None,
+                    deprecated_from: None,
                     local: false,
                 },
                 &ctx,
@@ -1022,7 +1048,8 @@ mod tests {
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
-                from: None,
+                from_plugin: None,
+                deprecated_from: None,
                 local: false,
             },
             &ctx,
@@ -1069,7 +1096,8 @@ mod tests {
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
-                from: None,
+                from_plugin: None,
+                deprecated_from: None,
                 local: false,
             },
             &ctx,
@@ -1111,7 +1139,8 @@ mod tests {
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
-                from: None,
+                from_plugin: None,
+                deprecated_from: None,
                 local: false,
             },
             &ctx,
@@ -1160,7 +1189,8 @@ mod tests {
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
-                from: None,
+                from_plugin: None,
+                deprecated_from: None,
                 local: false,
             },
             &ctx,
@@ -1175,6 +1205,74 @@ mod tests {
             &ctx,
         );
         assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+    }
+
+    #[test]
+    fn handle_promote_prefers_from_over_global_platform_selector() {
+        let (fs, git, clock, paths) = fake_trio();
+        let ctx = make_test_ctx(&fs, &git, &clock, &paths);
+
+        let claude_paths = paths.with_platform(Platform::Claude);
+        let codex_paths = paths.with_platform(Platform::Codex);
+        let claude_skill = claude_paths
+            .installed_artifact_path(ArtifactKind::Skill, "pf", InstallScope::Global)
+            .unwrap();
+        let codex_skill = codex_paths
+            .installed_artifact_path(ArtifactKind::Skill, "pf", InstallScope::Global)
+            .unwrap();
+        fs.add_file(
+            claude_skill.join("SKILL.md"),
+            "---\ndescription: claude wins\n---\n# claude\n",
+        );
+        fs.add_file(codex_skill.join("SKILL.md"), "---\ndescription: codex loses\n---\n# codex\n");
+
+        for (platform, skill_path) in [
+            (Platform::Claude, &claude_skill),
+            (Platform::Codex, &codex_skill),
+        ] {
+            let checksum =
+                cmx::checksum::checksum_artifact(skill_path, ArtifactKind::Skill, &fs).unwrap();
+            let pv = paths.with_platform(platform);
+            cmx::lockfile::mutate(InstallScope::Global, &fs, &pv, |lock| {
+                lock.packages.insert(
+                    "pf".to_string(),
+                    cmx::types::LockEntry {
+                        artifact_type: ArtifactKind::Skill,
+                        version: Some("1.0.0".to_string()),
+                        installed_at: "2026-07-05T00:00:00Z".to_string(),
+                        source: cmx::types::LockSource {
+                            repo: cmx::adopt::HOME_SOURCE.to_string(),
+                            path: "skills/pf/SKILL.md".to_string(),
+                        },
+                        source_checksum: "sha256:stale".to_string(),
+                        installed_checksum: if platform == Platform::Claude {
+                            "sha256:stale".to_string()
+                        } else {
+                            checksum.clone()
+                        },
+                    },
+                );
+                Ok::<(), anyhow::Error>(())
+            })
+            .unwrap()
+            .unwrap();
+        }
+
+        let result = handle_artifact(
+            ArtifactAction::Promote {
+                name: "pf".to_string(),
+                from: Some(Platform::Claude),
+            },
+            ArtifactKind::Skill,
+            Some(Platform::Codex),
+            &ctx,
+        );
+        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+
+        let home_skill = paths.config_dir.join("home").join("skills").join("pf").join("SKILL.md");
+        let promoted = fs.read_to_string(&home_skill).unwrap();
+        assert!(promoted.contains("claude wins"), "{promoted}");
+        assert!(!promoted.contains("codex loses"), "{promoted}");
     }
 
     #[test]

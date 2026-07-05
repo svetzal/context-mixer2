@@ -520,7 +520,7 @@ mod tests {
             "the Claude copy is reported as matching"
         );
         assert!(
-            output.reconciliations[0].command.contains("--platform codex"),
+            output.reconciliations[0].command.contains("--from codex"),
             "reconcile qualified to the diverging platform: {:?}",
             output.reconciliations[0]
         );

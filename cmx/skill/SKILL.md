@@ -72,8 +72,8 @@ together as a unit, without losing the grouping — the cheaper alternative to
 hoarding installs or losing track of what you had.
 
 ```bash
-cmx set create <name> [--desc <text>] [--from <source>:<plugin>] [--local]
-                                          # --from seeds membership from a marketplace
+cmx set create <name> [--desc <text>] [--from-plugin <source>:<plugin>] [--local]
+                                          # --from-plugin seeds membership from a marketplace
                                           # plugin's declared agents/skills (not installed yet)
 cmx set list [--json]                    # name, state, member count, context footprint
 cmx set show <name> [--json]             # members + per-member source and install status
@@ -133,11 +133,11 @@ cmx skill sync <name> [--from <tool>] [--dry-run] [--local]
                                         # copy one platform's copy over the others;
                                         # works even for skills cmx doesn't track a
                                         # source for ("external" skills)
-cmx skill promote <name> [--platform <tool>]
+cmx skill promote <name> [--from <tool>]
                                         # push in-place edits back into the canonical
                                         # home — the mirror of `update`; if several
                                         # platforms diverge, pick the winner with
-                                        # --platform
+                                        # --from
 ```
 
 ### Canonical home and adoption
@@ -148,7 +148,7 @@ from any one assistant's install directory.
 ```bash
 cmx home init                   # create the canonical home, register it as the `home` source
 cmx home path [--json]          # print the resolved canonical home directory
-cmx skill adopt <name> [<name>...] [--all] [--from <dir>] [--local]
+cmx skill adopt <name> [<name>...] [--all] [--from-dir <dir>] [--local]
                                  # bring an orphaned, hand-authored skill under the home
 cmx skill unadopt <name> [<name>...] [--external]
                                  # remove from the home and stop tracking it
@@ -242,7 +242,7 @@ cmx agent adopt --all         # ...and orphaned agents
 ```bash
 cmx skill diff <name>                 # see what changed (llm build)
 cmx skill sync <name> --dry-run       # preview which copy would win
-cmx skill promote <name> --platform cursor   # or: make the Cursor edit canonical
+cmx skill promote <name> --from cursor       # or: make the Cursor edit canonical
 ```
 
 **Stay current:**

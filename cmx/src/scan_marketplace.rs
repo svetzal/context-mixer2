@@ -87,7 +87,7 @@ pub(crate) enum PluginScan {
     RemoteUnsupported(String),
 }
 
-/// Resolves a single named plugin from a marketplace file, for `cmx set create --from`.
+/// Resolves a single named plugin from a marketplace file, for `cmx set create --from-plugin`.
 ///
 /// Unlike [`scan_marketplace_with`], which flattens every plugin in the
 /// marketplace, this looks up one [`MarketplaceEntry`] by name so a set can be

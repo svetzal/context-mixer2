@@ -157,7 +157,7 @@ fn adopt_rows(
 
 /// Adopt every orphan the survey finds, optionally narrowed by artifact `kind`
 /// and install `location` (a directory prefix). Backs `cmx doctor --adopt-all`
-/// and `cmx <kind> adopt --all [--from <dir>]`.
+/// and `cmx <kind> adopt --all [--from-dir <dir>]`.
 ///
 /// Only *orphaned* artifacts are adopted — untracked (source-available) ones are
 /// left for `install`. The `from` filter is how you exclude, say, a vendor
@@ -571,7 +571,7 @@ mod tests {
         let outcome =
             adopt_all(Some(ArtifactKind::Skill), Some(&claude_skills), false, &t.ctx()).unwrap();
         let names: Vec<&str> = outcome.adopted.iter().map(|a| a.name.as_str()).collect();
-        assert_eq!(names, ["mine"], "only the orphan under the --from location is adopted");
+        assert_eq!(names, ["mine"], "only the orphan under the --from-dir location is adopted");
     }
 
     #[test]

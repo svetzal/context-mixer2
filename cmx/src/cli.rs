@@ -81,7 +81,7 @@ pub enum Commands {
         #[arg(long = "adopt-all")]
         adopt_all: bool,
         /// With --adopt-all, only adopt orphans under this install directory
-        /// (deprecated; use `--from` on `cmx <kind> adopt --all`)
+        /// (deprecated; use `--from-dir` on `cmx <kind> adopt --all`)
         #[arg(long)]
         from: Option<PathBuf>,
         /// Show the full inventory, not just artifacts that need attention
@@ -184,8 +184,15 @@ pub enum SetAction {
         #[arg(long = "desc")]
         desc: Option<String>,
         /// Seed membership from a marketplace plugin's declared agents/skills
-        #[arg(long, value_name = "source>:<plugin")]
-        from: Option<String>,
+        #[arg(
+            long = "from-plugin",
+            value_name = "source>:<plugin",
+            conflicts_with = "deprecated_from"
+        )]
+        from_plugin: Option<String>,
+        /// Deprecated: use --from-plugin
+        #[arg(long = "from", hide = true, conflicts_with = "from_plugin")]
+        deprecated_from: Option<String>,
         /// Create in project scope instead of global
         #[arg(long)]
         local: bool,
@@ -357,11 +364,14 @@ pub enum ArtifactAction {
     /// home — the mirror of `update`. Use after editing a skill where it's
     /// installed, to make those edits the canonical copy. By default cmx picks
     /// the copy that was edited in place (the drifted one); if several platforms
-    /// diverge, pass `--platform <name>` to choose which copy wins. Inspect the
+    /// diverge, pass `--from <name>` to choose which copy wins. Inspect the
     /// divergence first with `cmx <kind> diff <name>`.
     Promote {
         /// Artifact name to promote into the home
         name: String,
+        /// Platform whose copy wins (default: the drifted copy)
+        #[arg(long, value_enum)]
+        from: Option<Platform>,
     },
     /// Uninstall installed artifact(s) — removed everywhere cmx tracks them
     Uninstall {
@@ -387,8 +397,11 @@ pub enum ArtifactAction {
         #[arg(long, conflicts_with = "names")]
         all: bool,
         /// With --all, only adopt orphans under this install directory
-        #[arg(long)]
-        from: Option<PathBuf>,
+        #[arg(long = "from-dir", conflicts_with = "deprecated_from")]
+        from_dir: Option<PathBuf>,
+        /// Deprecated: use --from-dir
+        #[arg(long = "from", hide = true, conflicts_with = "from_dir")]
+        deprecated_from: Option<PathBuf>,
         /// Search project (local) scope as well as global for orphans
         #[arg(long)]
         local: bool,
@@ -549,13 +562,15 @@ mod tests {
                     SetAction::Create {
                         name,
                         desc,
-                        from,
+                        from_plugin,
+                        deprecated_from,
                         local,
                     },
             } => {
                 assert_eq!(name, "rust-work");
                 assert_eq!(desc.as_deref(), Some("desc"));
-                assert!(from.is_none());
+                assert!(from_plugin.is_none());
+                assert!(deprecated_from.is_none());
                 assert!(!local);
             }
             _ => panic!("expected Set Create"),
@@ -563,7 +578,36 @@ mod tests {
     }
 
     #[test]
-    fn parse_set_create_from() {
+    fn parse_set_create_from_plugin() {
+        let cli = Cli::try_parse_from([
+            "cmx",
+            "set",
+            "create",
+            "rust-work",
+            "--from-plugin",
+            "guidelines:my-plugin",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Set {
+                action:
+                    SetAction::Create {
+                        name,
+                        from_plugin,
+                        deprecated_from,
+                        ..
+                    },
+            } => {
+                assert_eq!(name, "rust-work");
+                assert_eq!(from_plugin.as_deref(), Some("guidelines:my-plugin"));
+                assert!(deprecated_from.is_none());
+            }
+            _ => panic!("expected Set Create"),
+        }
+    }
+
+    #[test]
+    fn parse_set_create_deprecated_from_alias() {
         let cli = Cli::try_parse_from([
             "cmx",
             "set",
@@ -575,13 +619,36 @@ mod tests {
         .unwrap();
         match cli.command {
             Commands::Set {
-                action: SetAction::Create { name, from, .. },
+                action:
+                    SetAction::Create {
+                        from_plugin,
+                        deprecated_from,
+                        ..
+                    },
             } => {
-                assert_eq!(name, "rust-work");
-                assert_eq!(from.as_deref(), Some("guidelines:my-plugin"));
+                assert!(from_plugin.is_none());
+                assert_eq!(deprecated_from.as_deref(), Some("guidelines:my-plugin"));
             }
             _ => panic!("expected Set Create"),
         }
+    }
+
+    #[test]
+    fn parse_set_create_rejects_new_and_deprecated_flags_together() {
+        let err = Cli::try_parse_from([
+            "cmx",
+            "set",
+            "create",
+            "rust-work",
+            "--from-plugin",
+            "guidelines:new-plugin",
+            "--from",
+            "guidelines:old-plugin",
+        ])
+        .err()
+        .expect("new and deprecated flags should conflict")
+        .to_string();
+        assert!(err.contains("cannot be used with"), "{err}");
     }
 
     #[test]
@@ -790,6 +857,91 @@ mod tests {
             }
             _ => panic!("unexpected command"),
         }
+    }
+
+    #[test]
+    fn parse_skill_promote_from() {
+        let cli = Cli::try_parse_from(["cmx", "skill", "promote", "my-skill", "--from", "codex"])
+            .unwrap();
+        match cli.command {
+            Commands::Skill {
+                action: ArtifactAction::Promote { name, from },
+            } => {
+                assert_eq!(name, "my-skill");
+                assert_eq!(from, Some(Platform::Codex));
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_skill_adopt_from_dir() {
+        let cli = Cli::try_parse_from([
+            "cmx",
+            "skill",
+            "adopt",
+            "--all",
+            "--from-dir",
+            "/tmp/skills",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Skill {
+                action:
+                    ArtifactAction::Adopt {
+                        names,
+                        all,
+                        from_dir,
+                        deprecated_from,
+                        local,
+                    },
+            } => {
+                assert!(names.is_empty());
+                assert!(all);
+                assert_eq!(from_dir, Some(PathBuf::from("/tmp/skills")));
+                assert!(deprecated_from.is_none());
+                assert!(!local);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_skill_adopt_deprecated_from_alias() {
+        let cli = Cli::try_parse_from(["cmx", "skill", "adopt", "--all", "--from", "/tmp/skills"])
+            .unwrap();
+        match cli.command {
+            Commands::Skill {
+                action:
+                    ArtifactAction::Adopt {
+                        from_dir,
+                        deprecated_from,
+                        ..
+                    },
+            } => {
+                assert!(from_dir.is_none());
+                assert_eq!(deprecated_from, Some(PathBuf::from("/tmp/skills")));
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn parse_skill_adopt_rejects_new_and_deprecated_flags_together() {
+        let err = Cli::try_parse_from([
+            "cmx",
+            "skill",
+            "adopt",
+            "--all",
+            "--from-dir",
+            "/tmp/new",
+            "--from",
+            "/tmp/old",
+        ])
+        .err()
+        .expect("new and deprecated flags should conflict")
+        .to_string();
+        assert!(err.contains("cannot be used with"), "{err}");
     }
 
     #[test]

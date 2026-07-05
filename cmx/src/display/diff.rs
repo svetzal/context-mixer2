@@ -213,7 +213,7 @@ mod tests {
         d.changed_label = "codex".to_string();
         d.reconciliations = vec![Reconciliation {
             description: "keep codex's edits — copy codex into home".to_string(),
-            command: "cmx skill promote personal-finance --platform codex".to_string(),
+            command: "cmx skill promote personal-finance --from codex".to_string(),
             note: None,
         }];
         d.copies = vec![
@@ -332,7 +332,7 @@ mod tests {
         assert!(out.contains("+ lines are codex"), "convention names codex: {out}");
         // Reconcile targets the focused (codex) copy.
         assert!(
-            out.contains("cmx skill promote personal-finance --platform codex"),
+            out.contains("cmx skill promote personal-finance --from codex"),
             "reconcile qualified to codex: {out}"
         );
     }

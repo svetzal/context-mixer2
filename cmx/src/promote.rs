@@ -62,10 +62,10 @@ pub struct PromoteResult {
 
 /// Promote the installed copy of `name` into the canonical home.
 ///
-/// When `selector` names a platform (`--platform`), that platform's copy is
+/// When `selector` names a platform (`--from`), that platform's copy is
 /// canonicalized. Otherwise the copy is chosen by **drift**: the one edited in
 /// place since install. No drifted copy is a no-op; several that disagree is
-/// ambiguous and asks the user to pick with `--platform`.
+/// ambiguous and asks the user to pick with `--from`.
 ///
 /// Rejects artifacts sourced from a registered git source (home-only for now)
 /// and agents whose active platform reformats them away from markdown.
@@ -240,7 +240,7 @@ fn resolve_home_copies(name: &str, ctx: &AppContext<'_>) -> Result<(InstallScope
     Ok((InstallScope::Global, Vec::new()))
 }
 
-/// Pick which copy to canonicalize. An explicit `--platform` wins; otherwise the
+/// Pick which copy to canonicalize. An explicit `--from` wins; otherwise the
 /// single drifted (edited-in-place) copy is chosen. Zero drifted copies is a
 /// no-op — or a refusal when the home diverged elsewhere; two or more that
 /// disagree is ambiguous and asks the user to pick.
@@ -259,7 +259,7 @@ fn choose_copy(
             .ok_or_else(|| {
                 anyhow!(
                     "'{name}' isn't installed and home-tracked on platform '{p}'. It's \
-                     home-tracked on: {}. Promote from one of those, or drop --platform to \
+                     home-tracked on: {}. Promote from one of those, or drop --from to \
                      auto-select the edited copy.",
                     platform_list(copies)
                 )
@@ -278,7 +278,7 @@ fn choose_copy(
                     "No in-place edits detected on any platform — nothing to promote. The home \
                      already differs from the installed copies (it was changed elsewhere). Run \
                      `cmx skill update {name} --force` to pull the home over the installs, or \
-                     `cmx skill promote {name} --platform <name>` to force a specific copy into \
+                     `cmx skill promote {name} --from <name>` to force a specific copy into \
                      the home."
                 )
             }
@@ -287,7 +287,7 @@ fn choose_copy(
         _ => bail!(
             "Multiple platforms have diverging in-place edits: {}. cmx can't tell which should \
              become the canonical home copy. Inspect them with `cmx skill diff {name}`, then \
-             promote the one you want with `cmx skill promote {name} --platform <name>`.",
+             promote the one you want with `cmx skill promote {name} --from <name>`.",
             drifted_labels(&drifted, ctx.paths.platform)
         ),
     }

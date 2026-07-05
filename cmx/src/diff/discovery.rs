@@ -104,7 +104,7 @@ fn gather_skill_copies(
 
 /// Pick the platform to name in reconcile commands for a copy shared by several:
 /// the active platform if it reads this copy, else a managed platform, else the
-/// first — so `--platform codex` is suggested over `--platform opencode`.
+/// first — so `--from codex` is suggested over `--from opencode` for `promote`.
 pub(super) fn representative_platform(
     copy: &InstalledCopy,
     active: Platform,

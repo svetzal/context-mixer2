@@ -52,8 +52,12 @@ impl Fixture {
         command
     }
 
+    fn run(&self, args: &[&str]) -> std::process::Output {
+        self.command(args).output().unwrap()
+    }
+
     fn run_json(&self, args: &[&str]) -> Value {
-        let output = self.command(args).output().unwrap();
+        let output = self.run(args);
         assert!(
             output.status.success(),
             "command {:?} failed\nstdout:\n{}\nstderr:\n{}",
@@ -499,4 +503,136 @@ fn empty_state_json_is_valid_and_machine_readable() {
 
     let home = fixture.run_json(&["home", "path", "--json"]);
     assert!(home["path"].as_str().unwrap().ends_with(".config/context-mixer/home"));
+}
+
+#[test]
+fn adopt_from_dir_succeeds_without_deprecation_warning() {
+    let fixture = empty_fixture();
+    let orphan_dir = fixture.home.join(".claude").join("skills").join("focus-skill");
+    fs::create_dir_all(&orphan_dir).unwrap();
+    fs::write(
+        orphan_dir.join("SKILL.md"),
+        concat!(
+            "---\n",
+            "description: A hand-authored skill.\n",
+            "version: 1.0.0\n",
+            "---\n",
+            "# focus-skill\n"
+        ),
+    )
+    .unwrap();
+
+    let orphan_dir_arg = orphan_dir.parent().unwrap().display().to_string();
+    let output = fixture.run(&["skill", "adopt", "--all", "--from-dir", &orphan_dir_arg]);
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stdout.contains("--from is deprecated; use --from-dir"), "{stdout}");
+    assert!(!stderr.contains("--from is deprecated; use --from-dir"), "{stderr}");
+    assert!(fixture.config_dir.join("home/skills/focus-skill/SKILL.md").exists());
+}
+
+#[test]
+fn adopt_deprecated_from_warns_on_stderr_only() {
+    let fixture = empty_fixture();
+    let orphan_dir = fixture.home.join(".claude").join("skills").join("focus-skill");
+    fs::create_dir_all(&orphan_dir).unwrap();
+    fs::write(
+        orphan_dir.join("SKILL.md"),
+        concat!(
+            "---\n",
+            "description: A hand-authored skill.\n",
+            "version: 1.0.0\n",
+            "---\n",
+            "# focus-skill\n"
+        ),
+    )
+    .unwrap();
+
+    let orphan_dir_arg = orphan_dir.parent().unwrap().display().to_string();
+    let output = fixture.run(&["skill", "adopt", "--all", "--from", &orphan_dir_arg]);
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stdout.contains("--from is deprecated; use --from-dir"), "{stdout}");
+    assert!(stderr.contains("--from is deprecated; use --from-dir"), "{stderr}");
+    assert!(fixture.config_dir.join("home/skills/focus-skill/SKILL.md").exists());
+}
+
+#[test]
+fn set_create_from_plugin_succeeds_without_deprecation_warning() {
+    let fixture = populated_fixture();
+    let source_root = fixture.home.parent().unwrap().join("guidelines");
+    fs::create_dir_all(source_root.join(".claude-plugin")).unwrap();
+    fs::write(
+        source_root.join(".claude-plugin").join("marketplace.json"),
+        r#"{"name":"test","plugins":[{"name":"workbench","agents":["./agents/rust-agent.md"],"skills":["./focus-skill"]}]}"#,
+    )
+    .unwrap();
+
+    let output = fixture.run(&[
+        "set",
+        "create",
+        "seeded",
+        "--from-plugin",
+        "guidelines:workbench",
+    ]);
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stdout.contains("--from is deprecated; use --from-plugin"), "{stdout}");
+    assert!(!stderr.contains("--from is deprecated; use --from-plugin"), "{stderr}");
+
+    let sets: SetsFile =
+        serde_json::from_slice(&fs::read(fixture.config_dir.join("sets.json")).unwrap()).unwrap();
+    let seeded = sets.sets.get("seeded").expect("set created");
+    assert_eq!(seeded.members.len(), 2);
+}
+
+#[test]
+fn set_create_deprecated_from_warns_on_stderr_only() {
+    let fixture = populated_fixture();
+    let source_root = fixture.home.parent().unwrap().join("guidelines");
+    fs::create_dir_all(source_root.join(".claude-plugin")).unwrap();
+    fs::write(
+        source_root.join(".claude-plugin").join("marketplace.json"),
+        r#"{"name":"test","plugins":[{"name":"workbench","agents":["./agents/rust-agent.md"],"skills":["./focus-skill"]}]}"#,
+    )
+    .unwrap();
+
+    let output = fixture.run(&["set", "create", "seeded", "--from", "guidelines:workbench"]);
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stdout.contains("--from is deprecated; use --from-plugin"), "{stdout}");
+    assert!(stderr.contains("--from is deprecated; use --from-plugin"), "{stderr}");
+
+    let sets: SetsFile =
+        serde_json::from_slice(&fs::read(fixture.config_dir.join("sets.json")).unwrap()).unwrap();
+    let seeded = sets.sets.get("seeded").expect("set created");
+    assert_eq!(seeded.members.len(), 2);
 }

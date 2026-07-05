@@ -131,7 +131,7 @@ fn promote_auto_selects_the_single_drifted_copy() {
     entry.source_checksum = codex_cs;
     save_lock_with_entry(&t.fs, &pv, "pf", entry, InstallScope::Global);
 
-    // No --platform: cmx must pick the drifted Claude copy, not default-to-Claude
+    // No --from: cmx must pick the drifted Claude copy, not default-to-Claude
     // by luck — Codex being pristine is what makes the choice unambiguous.
     let r = promote("pf", ArtifactKind::Skill, None, &t.ctx()).unwrap();
     assert!(!r.already_current);
@@ -153,7 +153,7 @@ fn promote_refuses_when_multiple_platforms_drift_differently() {
     let err = promote("pf", ArtifactKind::Skill, None, &t.ctx()).unwrap_err().to_string();
     assert!(err.contains("Multiple platforms"), "explains the ambiguity: {err}");
     assert!(err.contains("diff pf"), "points at diff to inspect: {err}");
-    assert!(err.contains("--platform"), "offers the tie-breaker flag: {err}");
+    assert!(err.contains("--from"), "offers the tie-breaker flag: {err}");
     // The home is untouched — nothing was promoted.
     assert!(!t.fs.exists(&home_skill_md(&t, "pf")), "home not written on refusal");
 }
