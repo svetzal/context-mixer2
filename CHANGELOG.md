@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-07-04
+
+### Fixed
+
+- The **embedded companion agent skill** (baked into the binary and installed by `cmx init`) is refreshed to match the current surface. It no longer points at the deprecated `cmx doctor --adopt-all` — orphan adoption now steers to the canonical `cmx skill adopt --all` / `cmx agent adopt --all` — and it documents `cmx doctor --json`. The `2.12.0` binary shipped the pre-reconciliation skill; installing `2.12.1` (then re-running `cmx init`) picks up the corrected guidance.
+
+### Internal
+
+- CI workflows bump `actions/checkout`, `actions/upload-artifact`, and `actions/download-artifact` from their deprecated Node 20 majors (`@v4`) to Node 24 (`@v5`), clearing the GitHub deprecation warnings on CI and release runs. No user-visible change.
+
 ## [2.12.0] - 2026-07-04
 
 ### Added
