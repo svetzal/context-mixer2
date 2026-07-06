@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-07-05
+
 ### Changed
 
 - `cmx-core` (0.2.0) now reconciles the installed `SKILL.md`'s `metadata.version` to the embedding tool's `ToolIdentity` version automatically at install time, on the agent-skills community-standard `metadata.version` key. Embedders no longer hand-roll their own frontmatter stampers — a source of divergence (three tools, three different keys, one of them — `parite-version` — invisible to `cmx`'s own reader). `cmx init` now delegates version stamping to `cmx-core` and its bespoke `stamp_version` has been deleted; the installed skill still declares the correct version, but via the shared, tested reconciliation path.
