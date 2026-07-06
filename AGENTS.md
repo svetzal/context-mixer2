@@ -42,7 +42,9 @@ Two GitHub Actions workflows: `ci.yml` (on push/PR) and `release.yml` (on
 pushing a `v*` tag). `release.yml` runs the quality gate, builds binaries for
 three targets (macOS arm64/x64, Linux x64), creates a GitHub Release with the
 archives, and **overwrites the Homebrew tap formula** (`svetzal/homebrew-tap`,
-`Formula/cmx.rb`) with the tag's version. There is no crates.io publish.
+`Formula/cmx.rb`) with the tag's version. `release.yml` itself publishes
+neither to crates.io nor npm — those are the `cmx-core` library channels (see
+"cmx-core & cmx-core-ts" below).
 
 Homebrew is the **distribution** channel for end users. This **development
 machine installs locally via `cargo install`**, not Homebrew — so after a
@@ -68,7 +70,11 @@ Releasing is three distinct steps:
      changed the surface but not the skill's content is not ready to tag.**
    - Bump `version` in the root `Cargo.toml` (workspace version; `cmx`/`cmf`
      inherit it via `version.workspace = true`). `cmx-core` versions
-     independently — do not touch it here.
+     independently on its own tag channel — do not touch it in a cmx-only
+     release. **If cmx-core's source has changed since its last `cmx-core-v*`
+     tag, do not cut a cmx-only release at all** — use the coordinated
+     cmx-core release process below so the crate, its TS twin, and the CLI move
+     together.
    - Run a build so `Cargo.lock` picks up the new `cmx`/`cmf` versions.
    - Finalize `CHANGELOG.md` (date the new section, open a fresh
      `## [Unreleased]`).
@@ -106,6 +112,66 @@ Conventions and gotchas:
 - `--generate-notes` builds the GitHub Release body from commits; no manual
   release notes needed.
 - Semver: new backward-compatible commands/features → minor bump; fixes → patch.
+
+### cmx-core & cmx-core-ts — one library, two ports, released in lockstep
+
+`cmx-core` (Rust crate, published to **crates.io** via `cmx-core-v*` tags) and
+`cmx-core-ts` (npm package `cmx-core`, published via `cmx-core-ts-v*` tags using
+OIDC trusted publishing) are two ports of the **same** embeddable library. They
+MUST stay behaviorally synchronized and share a version number.
+
+**The conformance suite is the contract, not a suggestion.** `cmx-core/SPEC.md`
+plus the shared golden fixtures under `cmx-core/conformance/` (checksum,
+frontmatter, version-guard, paths, target-resolve, install-e2e) define the
+byte-for-byte behavior every port must satisfy. Both ports run these same
+fixtures — the Rust crate via `cargo test` (`conformance.rs`), the TS port via
+`bun test` (`cmx-core-ts/test/conformance.test.ts`, which reads
+`../../cmx-core/conformance`). A behavior change to one port is only "done" when
+(a) the shared SPEC/fixture is updated to encode the new behavior, and (b) BOTH
+ports pass it. Never change behavior in one port without landing the fixture and
+making the other port green — a port that lags the fixtures is a release blocker.
+
+**Version lockstep.** The crates.io crate and the npm package carry the same
+version; bump and release them together, even when only one port's source
+changed — the matching version on the unchanged port asserts continued
+conformance parity (its passing `cargo test` / `bun test` against the current
+fixtures is the proof). Do not let the two ports drift to different versions.
+
+**Coordinated release (whenever cmx-core has changed).** cmx depends on cmx-core
+by path, so a cmx binary always compiles the current core source; but the
+library's own consumers (crates.io, npm — e.g. hopper) only receive changes when
+the library is published. When cmx-core's source has changed, release all three
+artifacts in one coordinated pass instead of a cmx-only `v*` release:
+
+1. **Prep (one commit on `main`).**
+   - Bump `cmx-core/Cargo.toml` and `cmx-core-ts/package.json` to the **same**
+     new version (semver on the library's observable behavior: new behavior →
+     minor, fixes → patch).
+   - Add a dated entry to `cmx-core/CHANGELOG.md` (SPEC/fixture deltas, behavior
+     fixes, refactors).
+   - Bump the workspace `version` (`cmx`/`cmf`) per its own semver and add the
+     matching `CHANGELOG.md` entry — a bare "picks up cmx-core X.Y.Z" is a valid
+     patch when cmx has no other change. Reconcile `cmx/skill/SKILL.md` if the
+     CLI surface moved (see the cmx release steps above).
+   - `cargo build` to refresh `Cargo.lock`.
+   - Run BOTH gate suites green before committing: the cmx quality gate above,
+     AND `cd cmx-core-ts && bun run typecheck && bun run lint && bun test`.
+   - Commit `chore(release): prepare cmx X.Y.Z + cmx-core A.B.C`.
+2. **Tag & publish one channel at a time — never fire two publishing tags
+   concurrently.** Push each tag, watch its workflow to green
+   (`gh run watch <id> --exit-status`) before pushing the next:
+   - `cmx-core-vA.B.C` → `publish-cmx-core.yml` → **crates.io** (the job guards
+     that the tag matches `cmx-core/Cargo.toml`'s version).
+   - `cmx-core-ts-vA.B.C` → `publish-cmx-core-ts.yml` → **npm** (OIDC).
+   - `vX.Y.Z` → `release.yml` → cmx/cmf binaries + Homebrew.
+
+   crates.io and npm publishes cannot be overwritten (only yanked) — treat these
+   two pushes as irreversible and confirm the prep is right before pushing.
+3. **Local install** the new cmx/cmf exactly as in the cmx release steps above,
+   and verify.
+
+If cmx-core has **not** changed since its last `cmx-core-v*` tag, skip all of
+this and cut a normal cmx-only `v*` release.
 
 ## Reference repositories
 
