@@ -20,10 +20,9 @@ pub fn checksum_file(path: &Path, fs: &dyn Filesystem) -> Result<String> {
 /// Compute SHA-256 checksum for a skill (directory) via the given filesystem.
 /// Hashes all files in sorted order for determinism.
 pub fn checksum_dir(path: &Path, fs: &dyn Filesystem) -> Result<String> {
-    let mut files = fs_util::collect_files_recursive(path, fs)?;
-    files.sort();
+    let files = fs_util::collect_files_recursive(path, fs)?;
 
-    let entries: Vec<(std::path::PathBuf, Vec<u8>)> = files
+    let mut entries: Vec<(std::path::PathBuf, Vec<u8>)> = files
         .iter()
         .map(|file| {
             let relative = file.strip_prefix(path).unwrap_or(file).to_path_buf();
@@ -31,6 +30,12 @@ pub fn checksum_dir(path: &Path, fs: &dyn Filesystem) -> Result<String> {
             Ok((relative, content))
         })
         .collect::<Result<_>>()?;
+
+    // Order by the `/`-joined relative-path string (SPEC §5.1 / §11.4), *not*
+    // component-wise `Path` order, which diverges at the `.`-vs-`/` boundary
+    // (e.g. `a.b` vs `a/b`). Keying on the same string as the in-memory bundle
+    // keeps `checksum_dir` and `checksum_bundled` in agreement.
+    entries.sort_by_key(|(rel, _)| rel_path_key(rel));
 
     Ok(checksum_in_memory(
         entries.iter().map(|(rel, content)| (rel.as_path(), content.as_slice())),
@@ -48,11 +53,24 @@ pub fn checksum_in_memory<'a>(
 ) -> String {
     let mut hasher = Sha256::new();
     for (rel, content) in entries {
-        hasher.update(rel.to_string_lossy().as_bytes());
+        hasher.update(rel_path_key(rel).as_bytes());
         hasher.update(content);
     }
     let hash = hasher.finalize();
     format!("sha256:{}", hex_encode(&hash))
+}
+
+/// The canonical hash/sort key for a relative artifact path: its components
+/// joined with `/`, independent of the OS path separator (SPEC §5.1).
+///
+/// Both the checksum stream and the file ordering key on this, so a skill's
+/// in-memory checksum and its on-disk checksum agree, and ordering stays stable
+/// across platforms. On macOS/Linux this equals the plain path string for normal
+/// relative paths, so it does not change existing checksums; it fixes the
+/// `.`-vs-`/` ordering divergence (SPEC §11.4) and normalizes `\`-separated
+/// paths a Windows port might produce (SPEC §11.3).
+pub(crate) fn rel_path_key(rel: &Path) -> String {
+    rel.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/")
 }
 
 /// Compute the checksum for an artifact, dispatching to the correct strategy

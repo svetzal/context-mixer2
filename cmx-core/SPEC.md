@@ -221,13 +221,14 @@ A fixture with files like `a`, `a/b`, `a.b` pins the ordering, since string sort
 and component-wise sort differ at the `/`-vs-`.` boundary. Ports sort the
 normalized path strings directly.
 
-> **Note for the reference implementation.** Rust currently sorts `PathBuf`
-> component-wise (`checksum_dir` sorts `Vec<PathBuf>`; `canonical_files` sorts by
-> `rel_path.cmp`). For single-segment and simple nested paths this already
-> matches string sort, but the two can diverge (`a.b` vs `a/b`). To make the Rust
-> impl the faithful oracle for §11.4, its sort should key on the `/`-joined
-> string. Flagged as a follow-up fix in the reference before fixtures are
-> generated (§10) — otherwise a generated fixture could encode the wrong order.
+> **Reference implementation — done (2026-07-05).** `checksum_dir` and
+> `canonical_files` now sort on a shared `rel_path_key` (components joined with
+> `/`), and `checksum_in_memory` hashes that same key, so the reference is a
+> faithful oracle for §11.3–§11.4. Regression tests
+> `canonical_files_string_sort_orders_dot_before_slash` and
+> `checksum_bundled_matches_after_write_with_dot_slash_paths` pin the ordering and
+> the in-memory/on-disk parity. Normal single/nested paths are unchanged, so no
+> existing skill checksum moved.
 
 ---
 
@@ -401,13 +402,13 @@ Fixture rules:
 3. **Checksum path separator (§5.1)** — `rel_path` is **normalized to `/`** before
    sorting and hashing. Closes a latent cross-platform (Windows-port) divergence.
 4. **Checksum sort collation (§5.1)** — **string sort** of the `/`-joined path,
-   plain byte comparison — *not* component-wise. **Follow-up:** the Rust reference
-   currently sorts component-wise (`checksum_dir` / `canonical_files`); its sort
-   key must move to the joined string before fixtures are generated, so the oracle
-   is faithful. Tracked as a code fix, not just a doc note.
+   plain byte comparison — *not* component-wise. **Reference fix landed
+   2026-07-05:** `checksum_dir` / `canonical_files` / `checksum_in_memory` now key
+   on a shared `rel_path_key`, with regression tests; oracle is faithful.
 5. **install-vs-remove platform asymmetry (§8.1)** — **kept deliberate**: install
    infers platforms-in-use, remove falls back to all.
 
-With these settled, the two remaining build steps are: **(a)** the §11.4 Rust sort
-fix, then **(b)** the fixture generator against the Rust oracle, after which the
-TS port queues with the friction-report gate (EMBEDDING.md #3).
+The §11.4 Rust sort fix **landed 2026-07-05**, so the reference is now a faithful
+oracle. The one remaining build step before the ports is **the fixture generator**
+against that oracle (§10), after which the TS port queues with the friction-report
+gate (EMBEDDING.md #3).

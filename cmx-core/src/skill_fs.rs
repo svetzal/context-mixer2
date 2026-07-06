@@ -42,7 +42,12 @@ impl SkillFile {
 ///   component that starts with `'.'`).
 /// - Exclude files whose relative path contains a transient component
 ///   (matched by [`is_transient`]).
-/// - Sort by `rel_path` for determinism.
+/// - Sort by the `/`-joined relative-path string for determinism.
+///
+/// The ordering keys on [`crate::checksum::rel_path_key`] — the same string
+/// `checksum_dir` uses — so an in-memory bundle checksum matches the on-disk
+/// checksum after [`write_skill_files`], including at the `.`-vs-`/` boundary
+/// (SPEC §5.1 / §11.4).
 pub fn canonical_files(files: &[SkillFile]) -> Vec<&SkillFile> {
     let mut out: Vec<&SkillFile> = files
         .iter()
@@ -53,7 +58,9 @@ pub fn canonical_files(files: &[SkillFile]) -> Vec<&SkillFile> {
             })
         })
         .collect();
-    out.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
+    out.sort_by(|a, b| {
+        crate::checksum::rel_path_key(&a.rel_path).cmp(&crate::checksum::rel_path_key(&b.rel_path))
+    });
     out
 }
 
@@ -156,5 +163,39 @@ mod tests {
         write_skill_files(Path::new("/dest/skill"), &files, &fs).unwrap();
         let on_disk = crate::checksum::checksum_dir(Path::new("/dest/skill"), &fs).unwrap();
         assert_eq!(expected, on_disk);
+    }
+
+    #[test]
+    fn canonical_files_string_sort_orders_dot_before_slash() {
+        // SPEC §11.4: order by the `/`-joined string, not component-wise. Since
+        // '.' (0x2E) < '/' (0x2F), `a.b` sorts before `a/b`; the bare prefix `a`
+        // sorts before both. Component-wise `Path` ordering would put `a/b`
+        // before `a.b`, so this test fails against the old sort.
+        let files = vec![
+            make_file("a/b", b"nested"),
+            make_file("a.b", b"dotted"),
+            make_file("a", b"bare"),
+        ];
+        let canonical = canonical_files(&files);
+        let names: Vec<_> = canonical.iter().map(|f| f.rel_path.to_str().unwrap()).collect();
+        assert_eq!(names, vec!["a", "a.b", "a/b"]);
+    }
+
+    #[test]
+    fn checksum_bundled_matches_after_write_with_dot_slash_paths() {
+        // The in-memory and on-disk checksums must still agree once the sort key
+        // spans the `.`-vs-`/` boundary — the parity the shared rel_path_key
+        // guarantees. (No bare `a` here: it would collide with the `a/` dir on
+        // write.)
+        let fs = FakeFilesystem::new();
+        let files = vec![
+            make_file("a/b", b"nested"),
+            make_file("a.b", b"dotted"),
+            make_file("SKILL.md", b"# skill"),
+        ];
+        let expected = checksum_bundled(&files);
+        write_skill_files(Path::new("/dest/skill"), &files, &fs).unwrap();
+        let on_disk = crate::checksum::checksum_dir(Path::new("/dest/skill"), &fs).unwrap();
+        assert_eq!(expected, on_disk, "bundle and on-disk checksums must agree across .-vs-/ paths");
     }
 }
