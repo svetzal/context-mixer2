@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::install::{BatchInstallResult, InstallManyResult, InstallResult};
+use crate::install::{BatchInstallResult, InstallManyResult, InstallResult, UpdateResult};
 use crate::types::format_version_prefix;
 
 use super::util;
@@ -25,6 +25,12 @@ impl fmt::Display for InstallResult {
             self.source_name,
             self.dest_dir.display()
         )
+    }
+}
+
+impl fmt::Display for UpdateResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.updated.fmt(f)
     }
 }
 

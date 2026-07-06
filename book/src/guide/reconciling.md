@@ -53,7 +53,13 @@ the home (`promote`) instead.
 ## sync vs promote vs update
 
 - **`sync`** — reconcile a skill's copies **between install locations**; no
-  source or home involved. Newest version wins by default.
+  source or home involved. Use this when you want every installed copy to match.
+  Newest version wins by default.
 - **[`promote`](./promoting.md)** — push the *installed* edits into the home,
   making them canonical.
-- **`update`** — pull the *source* over the installed copy.
+- **`update`** — pull the *source* over one installed copy (default platform
+  unless `--platform` is given).
+
+After `sync`, re-run `cmx doctor` to confirm the divergence is gone. An exit `0`
+means the command ran, not that some other untouched copy could not still need
+attention.

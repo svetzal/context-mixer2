@@ -1,4 +1,5 @@
 use anyhow::{Result, bail};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::artifact_status;
@@ -34,6 +35,12 @@ pub struct BatchInstallResult {
     pub items: Vec<InstallResult>,
     pub kind: ArtifactKind,
     pub is_update: bool,
+}
+
+#[derive(Debug)]
+pub struct UpdateResult {
+    pub updated: InstallResult,
+    pub sibling_drifted_platforms: Vec<Platform>,
 }
 
 /// Outcome of installing several named artifacts in one pass.
@@ -191,14 +198,19 @@ pub fn update(
     kind: ArtifactKind,
     force: bool,
     ctx: &AppContext<'_>,
-) -> Result<InstallResult> {
+) -> Result<UpdateResult> {
     let Some((entry, scope)) = lockfile::find_entry(name, ctx.fs, ctx.paths)? else {
         bail!(
             "No installed {kind} named '{name}' found. {}",
             crate::suggestions::installed_artifact_hint(name, Some(kind), ctx)
         );
     };
-    install_resolved(Some(&entry.source.repo), name, kind, scope, force, ctx)
+    let updated = install_resolved(Some(&entry.source.repo), name, kind, scope, force, ctx)?;
+    let sibling_drifted_platforms = drifted_sibling_platforms(name, kind, scope, &updated, ctx)?;
+    Ok(UpdateResult {
+        updated,
+        sibling_drifted_platforms,
+    })
 }
 
 /// Install every available artifact of `kind` from the sources into each of
@@ -456,6 +468,65 @@ fn check_local_modifications(
         }
     }
     Ok(false)
+}
+
+fn drifted_sibling_platforms(
+    artifact_name: &str,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    updated: &InstallResult,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<Platform>> {
+    let mut sibling_paths: BTreeMap<PathBuf, Vec<Platform>> = BTreeMap::new();
+    for platform in crate::config::managed_or_all_platforms(ctx.fs, ctx.paths)? {
+        if platform == updated.platform || !platform.supports(kind) {
+            continue;
+        }
+        let pv = ctx.paths.with_platform(platform);
+        let Some(path) = pv.installed_artifact_path(kind, artifact_name, scope) else {
+            continue;
+        };
+        if !ctx.fs.exists(&path) {
+            continue;
+        }
+        sibling_paths.entry(path).or_default().push(platform);
+    }
+
+    let updated_checksum = if kind == ArtifactKind::Skill {
+        let updated_path = ctx.paths.require_installed_artifact_path(kind, artifact_name, scope)?;
+        Some(checksum::checksum_artifact(&updated_path, kind, ctx.fs)?)
+    } else {
+        None
+    };
+
+    let mut drifted = Vec::new();
+    for (path, platforms) in sibling_paths {
+        let mut tracked_platforms = Vec::new();
+        let mut lock_entry = None;
+        for platform in platforms {
+            let pv = ctx.paths.with_platform(platform);
+            if let Some(entry) = lockfile::load(scope, ctx.fs, &pv)?.packages.get(artifact_name)
+                && entry.artifact_type == kind
+            {
+                tracked_platforms.push(platform);
+                lock_entry.get_or_insert_with(|| entry.clone());
+            }
+        }
+        if tracked_platforms.is_empty() {
+            continue;
+        }
+
+        let sibling_checksum = checksum::checksum_artifact(&path, kind, ctx.fs)?;
+        let lock_drifted =
+            lock_entry.is_some_and(|entry| entry.installed_checksum != sibling_checksum);
+        let diverged_from_updated =
+            updated_checksum.as_ref().is_some_and(|checksum| checksum != &sibling_checksum);
+        if lock_drifted || diverged_from_updated {
+            drifted.extend(tracked_platforms);
+        }
+    }
+
+    Ok(drifted)
 }
 
 /// Pure builder: construct a `LockEntry` from plan data and pre-computed checksums.

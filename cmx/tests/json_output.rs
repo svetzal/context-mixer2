@@ -16,7 +16,7 @@ use tempfile::TempDir;
 const BIN: &str = env!("CARGO_BIN_EXE_cmx");
 
 struct Fixture {
-    _temp: TempDir,
+    temp: TempDir,
     home: PathBuf,
     project: PathBuf,
     config_dir: PathBuf,
@@ -116,7 +116,7 @@ fn populated_fixture() -> Fixture {
     assert!(!checksums.agent_source.is_empty());
 
     Fixture {
-        _temp: temp,
+        temp,
         home: paths.home,
         project: paths.project,
         config_dir: paths.config_dir,
@@ -324,6 +324,230 @@ fn write_sets_file(paths: &FixturePaths) {
     );
 }
 
+fn versioned_skill(desc: &str, version: &str) -> String {
+    format!("---\ndescription: {desc}\nversion: {version}\n---\n# focus-skill\n")
+}
+
+fn versioned_agent(version: &str) -> String {
+    format!(
+        "---\nname: rust-agent\ndescription: A Rust craftsperson agent.\nversion: {version}\n---\n# rust-agent\n"
+    )
+}
+
+fn tracked_lock_entry(
+    artifact_type: ArtifactKind,
+    source_path: &str,
+    source_checksum: String,
+    installed_checksum: String,
+) -> LockEntry {
+    LockEntry {
+        artifact_type,
+        version: Some("1.0.0".to_string()),
+        installed_at: "2026-07-01T10:00:00Z".to_string(),
+        source: LockSource {
+            repo: "guidelines".to_string(),
+            path: source_path.to_string(),
+        },
+        source_checksum,
+        installed_checksum,
+    }
+}
+
+fn write_update_fixture_config(config_dir: &Path, source_root: &Path, platforms: Vec<Platform>) {
+    write_json(
+        &config_dir.join("sources.json"),
+        &SourcesFile {
+            version: 1,
+            sources: BTreeMap::from([(
+                "guidelines".to_string(),
+                SourceEntry {
+                    source_type: SourceType::Local,
+                    path: Some(source_root.to_path_buf()),
+                    url: None,
+                    local_clone: None,
+                    branch: None,
+                    last_updated: Some("2026-07-05T00:00:00Z".to_string()),
+                },
+            )]),
+        },
+    );
+    write_json(
+        &config_dir.join("config.json"),
+        &CmxConfig {
+            version: 1,
+            llm: LlmConfig {
+                gateway: LlmGatewayType::OpenAI,
+                model: "gpt-5.4".to_string(),
+            },
+            home: None,
+            external: vec![],
+            platforms,
+        },
+    );
+    write_json(&config_dir.join("sets.json"), &SetsFile::default());
+}
+
+fn write_single_lock(config_dir: &Path, filename: &str, name: &str, entry: LockEntry) {
+    write_json(
+        &config_dir.join(filename),
+        &LockFile {
+            version: 1,
+            packages: BTreeMap::from([(name.to_string(), entry)]),
+        },
+    );
+}
+
+fn multi_platform_skill_update_fixture() -> Fixture {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+    let home = root.join("home");
+    let project = root.join("project");
+    let config_dir = home.join(".config").join("context-mixer");
+    let source_root = root.join("guidelines");
+    let source_skill_dir = source_root.join("focus-skill");
+    let source_skill_path = source_skill_dir.join("SKILL.md");
+    let claude_skill_dir = home.join(".claude").join("skills").join("focus-skill");
+    let codex_skill_dir = home.join(".agents").join("skills").join("focus-skill");
+    let hermes_skill_dir = home.join(".hermes").join("skills").join("focus-skill");
+
+    for dir in [
+        &project,
+        &config_dir,
+        &source_skill_dir,
+        &claude_skill_dir,
+        &codex_skill_dir,
+        &hermes_skill_dir,
+    ] {
+        fs::create_dir_all(dir).unwrap();
+    }
+
+    fs::write(&source_skill_path, versioned_skill("A test skill", "1.0.0")).unwrap();
+    fs::write(claude_skill_dir.join("SKILL.md"), versioned_skill("A test skill", "1.0.0")).unwrap();
+    fs::write(codex_skill_dir.join("SKILL.md"), versioned_skill("A test skill", "1.0.0")).unwrap();
+    fs::write(hermes_skill_dir.join("SKILL.md"), versioned_skill("A test skill", "1.0.0")).unwrap();
+
+    let source_checksum = checksum_for(ArtifactKind::Skill, &source_skill_dir);
+    let claude_checksum = checksum_for(ArtifactKind::Skill, &claude_skill_dir);
+    let codex_checksum = checksum_for(ArtifactKind::Skill, &codex_skill_dir);
+    let hermes_checksum = checksum_for(ArtifactKind::Skill, &hermes_skill_dir);
+
+    write_update_fixture_config(
+        &config_dir,
+        &source_root,
+        vec![Platform::Claude, Platform::Codex, Platform::Hermes],
+    );
+    write_single_lock(
+        &config_dir,
+        "cmx-lock.json",
+        "focus-skill",
+        tracked_lock_entry(
+            ArtifactKind::Skill,
+            "focus-skill",
+            source_checksum.clone(),
+            claude_checksum,
+        ),
+    );
+    write_single_lock(
+        &config_dir,
+        "cmx-lock-codex.json",
+        "focus-skill",
+        tracked_lock_entry(
+            ArtifactKind::Skill,
+            "focus-skill",
+            source_checksum.clone(),
+            codex_checksum,
+        ),
+    );
+    write_single_lock(
+        &config_dir,
+        "cmx-lock-hermes.json",
+        "focus-skill",
+        tracked_lock_entry(ArtifactKind::Skill, "focus-skill", source_checksum, hermes_checksum),
+    );
+
+    fs::write(&source_skill_path, versioned_skill("A test skill", "2.0.0")).unwrap();
+    fs::write(codex_skill_dir.join("SKILL.md"), versioned_skill("Codex local edit", "1.1.0"))
+        .unwrap();
+    fs::write(hermes_skill_dir.join("SKILL.md"), versioned_skill("Hermes local edit", "1.2.0"))
+        .unwrap();
+
+    Fixture {
+        temp,
+        home,
+        project,
+        config_dir,
+    }
+}
+
+fn multi_platform_agent_update_fixture() -> Fixture {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+    let home = root.join("home");
+    let project = root.join("project");
+    let config_dir = home.join(".config").join("context-mixer");
+    let source_root = root.join("guidelines");
+    let source_agents_dir = source_root.join("agents");
+    let source_agent_path = source_agents_dir.join("rust-agent.md");
+    let claude_agent_path = home.join(".claude").join("agents").join("rust-agent.md");
+    let cursor_agent_path = home.join(".cursor").join("agents").join("rust-agent.md");
+
+    for dir in [
+        &project,
+        &config_dir,
+        &source_agents_dir,
+        claude_agent_path.parent().unwrap(),
+        cursor_agent_path.parent().unwrap(),
+    ] {
+        fs::create_dir_all(dir).unwrap();
+    }
+
+    fs::write(&source_agent_path, versioned_agent("1.0.0")).unwrap();
+    fs::write(&claude_agent_path, versioned_agent("1.0.0")).unwrap();
+    fs::write(&cursor_agent_path, versioned_agent("1.0.0")).unwrap();
+
+    let source_checksum = checksum_for(ArtifactKind::Agent, &source_agent_path);
+    let claude_checksum = checksum_for(ArtifactKind::Agent, &claude_agent_path);
+    let cursor_checksum = checksum_for(ArtifactKind::Agent, &cursor_agent_path);
+
+    write_update_fixture_config(
+        &config_dir,
+        &source_root,
+        vec![Platform::Claude, Platform::Cursor],
+    );
+    write_single_lock(
+        &config_dir,
+        "cmx-lock.json",
+        "rust-agent",
+        tracked_lock_entry(
+            ArtifactKind::Agent,
+            "agents/rust-agent.md",
+            source_checksum.clone(),
+            claude_checksum,
+        ),
+    );
+    write_single_lock(
+        &config_dir,
+        "cmx-lock-cursor.json",
+        "rust-agent",
+        tracked_lock_entry(
+            ArtifactKind::Agent,
+            "agents/rust-agent.md",
+            source_checksum,
+            cursor_checksum,
+        ),
+    );
+
+    fs::write(&source_agent_path, versioned_agent("2.0.0")).unwrap();
+    fs::write(&cursor_agent_path, versioned_agent("1.1.0")).unwrap();
+
+    Fixture {
+        temp,
+        home,
+        project,
+        config_dir,
+    }
+}
+
 fn empty_fixture() -> Fixture {
     let temp = TempDir::new().unwrap();
     let root = temp.path();
@@ -342,7 +566,7 @@ fn empty_fixture() -> Fixture {
     write_json(&config_dir.join("sets.json"), &SetsFile::default());
 
     Fixture {
-        _temp: temp,
+        temp,
         home,
         project,
         config_dir,
@@ -990,4 +1214,65 @@ fn update_force_lists_discarded_file_paths() {
     assert!(stdout.contains(&skill_md.display().to_string()), "{stdout}");
     assert!(stdout.contains(&extra.display().to_string()), "{stdout}");
     assert!(!extra.exists(), "local-only file should be discarded on forced update");
+}
+
+#[test]
+fn skill_update_warns_about_drifted_sibling_platforms_on_stderr() {
+    let fixture = multi_platform_skill_update_fixture();
+    let output = fixture.run(&["skill", "update", "focus-skill", "--force"]);
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stdout.contains("Installed focus-skill"), "{stdout}");
+    assert!(stdout.contains("for claude"), "{stdout}");
+    assert!(stderr.contains("codex, hermes"), "{stderr}");
+    assert!(stderr.contains("cmx skill sync focus-skill"), "{stderr}");
+    assert!(stderr.contains("'update' only targets claude"), "{stderr}");
+}
+
+#[test]
+fn skill_update_without_sibling_installs_emits_no_warning_note() {
+    let fixture = populated_fixture();
+    let source_skill = fixture.temp.path().join("guidelines").join("focus-skill").join("SKILL.md");
+    fs::write(&source_skill, versioned_skill("Updated focus", "2.0.0")).unwrap();
+
+    let output = fixture.run(&["skill", "update", "focus-skill"]);
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("'update' only targets"), "{stderr}");
+}
+
+#[test]
+fn agent_update_warns_about_drifted_sibling_platforms_on_stderr() {
+    let fixture = multi_platform_agent_update_fixture();
+    let output = fixture.run(&["agent", "update", "rust-agent"]);
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stdout.contains("Installed rust-agent"), "{stdout}");
+    assert!(stdout.contains("for claude"), "{stdout}");
+    assert!(stderr.contains("cursor"), "{stderr}");
+    assert!(
+        stderr.contains("cmx agent update rust-agent --platform <platform> --force"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("'update' only targets claude"), "{stderr}");
 }

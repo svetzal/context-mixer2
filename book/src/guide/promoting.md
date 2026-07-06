@@ -52,9 +52,14 @@ instead:
 
 - **`promote`** — keep the *installed* edits, making them canonical in the home.
 - **[`sync`](./reconciling.md)** — reconcile a skill's copies **between install
-  locations** (no source involved); newest version wins by default.
-- **`update`** — pull the *source* over the installed copy (discards local edits;
-  `--force` to overwrite a modified one).
+  locations** (no source involved); use this when you want every installed copy
+  to match.
+- **`update`** — pull the *source* over one installed copy (default platform
+  unless `--platform` is given), discarding local edits; `--force` overwrites a
+  modified one.
 
 `cmx skill diff` recommends a direction and prints the exact `promote` /
 `update` commands in its reconcile footer.
+
+After `promote`, re-run `cmx doctor` to confirm the remaining platform copies
+are actually reconciled.

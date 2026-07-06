@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use crate::cli::ArtifactAction;
 use crate::context::AppContext;
-use crate::platform::Platform;
+use crate::platform::{Platform, platforms_label};
 use crate::types::{ArtifactKind, InstallScope};
 
 use super::set::apply_from_flags;
@@ -51,6 +51,7 @@ pub fn handle_update(
     all: bool,
     force: bool,
     kind: ArtifactKind,
+    selector: Option<Platform>,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
     crate::source_update::ensure_fresh(ctx)?;
@@ -61,12 +62,41 @@ pub fn handle_update(
     } else if let Some(name) = name {
         let result = crate::install::update(&name, kind, force, ctx)?;
         print!("{result}");
+        if selector.is_none() && !result.sibling_drifted_platforms.is_empty() {
+            print_update_note(
+                &name,
+                kind,
+                result.updated.platform,
+                &result.sibling_drifted_platforms,
+            );
+        }
         Ok(ExitCode::SUCCESS)
     } else {
         Err(usage_error(
             "Provide an artifact name or use --all",
             &format!("cmx {kind} update <name>"),
         ))
+    }
+}
+
+fn print_update_note(
+    name: &str,
+    kind: ArtifactKind,
+    updated_platform: Platform,
+    sibling_platforms: &[Platform],
+) {
+    let sibling_list = platforms_label(sibling_platforms);
+    match kind {
+        ArtifactKind::Skill => eprintln!(
+            "note: '{name}' is also installed on {sibling_list} and remains out of sync there; \
+             'update' only targets {updated_platform}. Reconcile the other copies with \
+             'cmx skill sync {name}'."
+        ),
+        ArtifactKind::Agent => eprintln!(
+            "note: '{name}' is also installed on {sibling_list} and remains drifted there; \
+             'update' only targets {updated_platform}. Re-run 'cmx agent update {name} \
+             --platform <platform> --force' for each remaining platform."
+        ),
     }
 }
 
@@ -130,7 +160,9 @@ pub fn handle_artifact(
             print!("{output}");
             Ok(ExitCode::SUCCESS)
         }
-        ArtifactAction::Update { name, all, force } => handle_update(name, all, force, kind, ctx),
+        ArtifactAction::Update { name, all, force } => {
+            handle_update(name, all, force, kind, selector, ctx)
+        }
         ArtifactAction::Sync {
             name,
             from,

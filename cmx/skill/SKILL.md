@@ -194,6 +194,10 @@ cmx skill update --all          # update every tracked skill
 cmx skill update <name> --force # overwrite even if locally modified (lists discarded files)
 ```
 
+Without `--platform`, `update` targets only the default platform (Claude); `--all`
+means all artifacts, not all platforms. To converge sibling install copies across
+platforms, use `sync`, not `update`.
+
 Check `cmx info <name> --json | jq .locally_modified` before updating a
 single artifact — a `true` means plain `update` will refuse and you must
 decide between `--force` (discard edits) and `promote` (keep them; below).
@@ -215,9 +219,10 @@ cmx skill promote <name> [--from <platform>] [--apply]
                                         # home (the mirror of update); --apply executes
 ```
 
-Decision rule (doctor prints the same guidance): edited in place and want to
-keep it → `promote`; want the source version back → `update --force`;
-external/source-less divergence → `sync`; unsure → `diff` first.
+Decision rule (doctor prints the same guidance): `update` pulls from source to
+one platform; `sync` reconciles between install locations (use this when you
+want every install copy to match); `promote` pushes in-place edits back to the
+canonical home.
 
 ### Canonical home and adoption
 
@@ -254,6 +259,10 @@ cmx agent adopt --all            # ...and every orphaned agent
 
 **Exit code contract:** `2` = actionable issues found, `0` = clean, anything
 else = the command itself failed. Script against this.
+
+After any mutation, re-run `cmx doctor` to confirm the drift is actually gone.
+An exit `0` from `update` / `sync` / `promote` means the command ran, not that
+every sibling copy is now reconciled.
 
 ### Search and config
 

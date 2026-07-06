@@ -59,6 +59,10 @@ physical copy and clearing every platform's lock entry. Pass `--platform <tool>`
 to scope either to one platform: install onboards just that tool, uninstall
 removes from just that one and leaves the others intact.
 
+`update` is intentionally different: without `--platform`, it targets only the
+default platform (Claude). `cmx <kind> update --all` means all tracked artifacts
+on that one platform, not all platforms.
+
 ## Skill management
 
 Same commands as agent, using `cmx skill` instead of `cmx agent`, plus one
@@ -76,6 +80,10 @@ differing copies are unversioned (or share a version) it asks for `--from`
 rather than guessing, and lists each copy so you can choose. Agents are excluded
 because they're reformatted per platform (e.g. Codex TOML), so a byte-level
 cross-platform comparison isn't meaningful.
+
+Use `sync` when you want every installed copy of a skill to match. `update`
+pulls from source to one platform; `promote` pushes an installed copy back into
+the canonical home.
 
 ### `cmx {agent,skill} promote`
 

@@ -28,6 +28,18 @@ confidence-threshold = 0.8
 
 [bans]
 multiple-versions = "warn"
+# Known duplicate transitive crates from the current mojentic/reqwest/test graph.
+# These are tracked explicitly so `cargo deny check` stays warning-free while
+# we retain duplicate detection for anything newly introduced.
+skip = [
+    { crate = "block-buffer", reason = "sha1 and sha2 currently pull different major lines via mojentic's websocket stack" },
+    { crate = "core-foundation", reason = "reqwest's TLS stack currently mixes transitive macOS crates across versions" },
+    { crate = "cpufeatures", reason = "sha1 and sha2 currently pull different major lines via mojentic's websocket stack" },
+    { crate = "crypto-common", reason = "sha1 and sha2 currently pull different major lines via mojentic's websocket stack" },
+    { crate = "digest", reason = "sha1 and sha2 currently pull different major lines via mojentic's websocket stack" },
+    { crate = "getrandom", reason = "runtime, build, and test-only dependencies currently require separate major lines" },
+    { crate = "r-efi", reason = "pulled only through the split getrandom major versions in the transitive graph" },
+]
 
 [sources]
 unknown-registry = "deny"

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `cmx {skill,agent} update <name>` now warns on stderr when a bare update only refreshes the default platform while sibling managed-platform copies of the same artifact remain out of sync. The success line still reports the platform that was updated, exit codes are unchanged, and the note points to the right follow-up: `cmx skill sync <name>` for skills, or per-platform `cmx agent update <name> --platform <platform> --force` for agents.
+- `cmx skill sync` no longer claims a home-tracked artifact is "managed by another tool" just because one install location matches an `external` path rule. The note now says exactly what the check means: a copy matched an external rule at that location.
+
 ## [3.1.1] - 2026-07-05
 
 ### Changed

@@ -47,8 +47,7 @@ pub struct SyncTarget {
 pub struct SyncResult {
     pub name: String,
     pub apply: bool,
-    /// `true` when the skill matched an `external` rule — reconciled anyway,
-    /// but the user is told another tool may re-diverge it.
+    /// `true` when at least one copy matched an `external` config rule.
     pub external: bool,
     /// Platforms that provided the winning copy.
     pub winner_platforms: Vec<Platform>,
@@ -88,8 +87,8 @@ impl Copy {
     }
 }
 
-/// Whether any copy of `name` matches an `external` rule (managed by another
-/// tool). `sync` reconciles it anyway but tells the user.
+/// Whether any copy of `name` matches an `external` config rule. `sync`
+/// reconciles it anyway but tells the user the note is path-rule based.
 fn is_external(name: &str, copies: &[Copy], ctx: &AppContext<'_>) -> Result<bool> {
     let rules = crate::config::load_config(ctx.fs, ctx.paths)?.external;
     Ok(copies

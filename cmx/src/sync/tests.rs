@@ -1,6 +1,8 @@
 use super::*;
 use crate::gateway::Filesystem;
-use crate::test_support::{TestContext, versioned_skill_content};
+use crate::test_support::{
+    TestContext, make_lock_entry_builder, save_lock_with_entry, versioned_skill_content,
+};
 use std::cmp::Ordering;
 
 /// Place a skill copy for `platform` at its install dir, with the given version.
@@ -38,6 +40,14 @@ fn read_skill(t: &TestContext, platform: Platform, name: &str) -> String {
 fn set_managed(t: &TestContext, platforms: &[Platform]) {
     let config = crate::types::CmxConfig {
         platforms: platforms.to_vec(),
+        ..Default::default()
+    };
+    crate::config::save_config(&config, &t.fs, &t.paths).unwrap();
+}
+
+fn set_external_rules(t: &TestContext, rules: &[&str]) {
+    let config = crate::types::CmxConfig {
+        external: rules.iter().map(|rule| (*rule).to_string()).collect(),
         ..Default::default()
     };
     crate::config::save_config(&config, &t.fs, &t.paths).unwrap();
@@ -140,8 +150,6 @@ fn sync_ambiguous_error_lists_candidates_and_from_commands() {
 
 #[test]
 fn sync_ambiguous_error_suggests_promote_for_home_tracked() {
-    use crate::test_support::{make_lock_entry_builder, save_lock_with_entry};
-
     let t = TestContext::new();
     place_unversioned(&t, Platform::Claude, "s", "alpha");
     place_unversioned(&t, Platform::Codex, "s", "beta");
@@ -161,6 +169,30 @@ fn sync_ambiguous_error_suggests_promote_for_home_tracked() {
 
     assert!(err.contains("tracked from the home"), "mentions the home path: {err}");
     assert!(err.contains("cmx skill promote s"), "offers promote: {err}");
+}
+
+#[test]
+fn sync_home_tracked_copy_matching_external_rule_avoids_other_tool_claim() {
+    let t = TestContext::new();
+    place_skill(&t, Platform::Claude, "mailctl", "1.1.2");
+    place_skill(&t, Platform::Codex, "mailctl", "1.0.3");
+    set_external_rules(&t, &["~/.claude/skills"]);
+
+    let entry = make_lock_entry_builder(ArtifactKind::Skill, "home", "skills/mailctl/SKILL.md");
+    save_lock_with_entry(
+        &t.fs,
+        &t.paths.with_platform(Platform::Claude),
+        "mailctl",
+        entry,
+        InstallScope::Global,
+    );
+
+    let out = sync("mailctl", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx())
+        .unwrap()
+        .to_string();
+
+    assert!(out.contains("matches an external rule"), "got: {out}");
+    assert!(!out.contains("managed by another tool"), "got: {out}");
 }
 
 #[test]

@@ -23,7 +23,7 @@ impl fmt::Display for SyncResult {
         if self.external {
             writeln!(
                 f,
-                "Note: '{}' is external (managed by another tool); reconciling its copies anyway.",
+                "Note: '{}' matches an external rule at one install location; reconciling its copies anyway.",
                 self.name
             )?;
         }
@@ -149,7 +149,7 @@ mod tests {
             ..base_result()
         }
         .to_string();
-        assert!(out.contains("is external (managed by another tool)"), "got: {out}");
+        assert!(out.contains("matches an external rule"), "got: {out}");
     }
 
     #[test]

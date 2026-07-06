@@ -212,6 +212,14 @@ fn make_sources_file(names: &[&str]) -> SourcesFile {
     }
 }
 
+fn set_managed_platforms(t: &TestContext, platforms: &[Platform]) {
+    let config = crate::types::CmxConfig {
+        platforms: platforms.to_vec(),
+        ..Default::default()
+    };
+    crate::config::save_config(&config, &t.fs, &t.paths).unwrap();
+}
+
 #[test]
 fn parse_name_with_registered_source_prefix() {
     let sources = make_sources_file(&["guidelines"]);
@@ -821,8 +829,64 @@ fn update_succeeds_when_lock_source_name_contains_colon() {
     install("cmx", ArtifactKind::Skill, InstallScope::Global, false, &ctx).unwrap();
 
     let result = update("cmx", ArtifactKind::Skill, true, &ctx).unwrap();
-    assert_eq!(result.artifact_name, "cmx");
-    assert_eq!(result.source_name, "bundled:cmx");
+    assert_eq!(result.updated.artifact_name, "cmx");
+    assert_eq!(result.updated.source_name, "bundled:cmx");
+}
+
+#[test]
+fn update_reports_drifted_sibling_platforms_for_skills() {
+    let t = TestContext::new();
+    set_managed_platforms(&t, &[Platform::Claude, Platform::Codex]);
+    setup_source_with_skill(
+        &t.fs,
+        &t.paths,
+        "guidelines",
+        "/sources/guidelines",
+        "focus-skill",
+        "1.0.0",
+    );
+
+    let claude = t.ctx();
+    install("focus-skill", ArtifactKind::Skill, InstallScope::Global, false, &claude).unwrap();
+    let codex_paths = t.paths.with_platform(Platform::Codex);
+    let codex = claude.with_paths(&codex_paths);
+    install("focus-skill", ArtifactKind::Skill, InstallScope::Global, false, &codex).unwrap();
+
+    t.fs.add_file(
+        "/sources/guidelines/focus-skill/SKILL.md",
+        crate::test_support::versioned_skill_content("A test skill", "2.0.0"),
+    );
+    t.fs.add_file(
+        "/home/testuser/.agents/skills/focus-skill/SKILL.md",
+        crate::test_support::versioned_skill_content("Locally edited", "1.1.0"),
+    );
+
+    let result = update("focus-skill", ArtifactKind::Skill, true, &claude).unwrap();
+    assert_eq!(result.sibling_drifted_platforms, vec![Platform::Codex]);
+}
+
+#[test]
+fn update_skips_sibling_warning_when_only_default_platform_is_installed() {
+    let t = TestContext::new();
+    set_managed_platforms(&t, &[Platform::Claude, Platform::Codex]);
+    setup_source_with_skill(
+        &t.fs,
+        &t.paths,
+        "guidelines",
+        "/sources/guidelines",
+        "focus-skill",
+        "1.0.0",
+    );
+
+    let claude = t.ctx();
+    install("focus-skill", ArtifactKind::Skill, InstallScope::Global, false, &claude).unwrap();
+    t.fs.add_file(
+        "/sources/guidelines/focus-skill/SKILL.md",
+        crate::test_support::versioned_skill_content("A test skill", "2.0.0"),
+    );
+
+    let result = update("focus-skill", ArtifactKind::Skill, false, &claude).unwrap();
+    assert!(result.sibling_drifted_platforms.is_empty(), "{result:?}");
 }
 
 #[test]
