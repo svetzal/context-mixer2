@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.3] - 2026-07-06
+
+### Changed
+
+- Picks up `cmx-core` 0.3.0 (released in lockstep with its TypeScript port). The
+  library gains the shared conformance suite as its cross-port parity contract
+  and a canonical path-ordering/checksum fix at the `.`-vs-`/` boundary; normal
+  paths and existing checksums are unaffected, so `cmx`/`cmf` behavior is
+  unchanged. See `cmx-core/CHANGELOG.md`.
+
 ## [3.1.2] - 2026-07-06
 
 ### Fixed

@@ -1,6 +1,6 @@
 {
   "name": "cmx-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Embeddable core for installing agent skills across platforms — the TypeScript port of cmx-core.",
   "license": "MIT",
