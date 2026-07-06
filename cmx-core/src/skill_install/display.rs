@@ -84,10 +84,10 @@ impl std::fmt::Display for RemoveReport {
 #[cfg(test)]
 mod tests {
     use super::super::{ArtifactKind, BundledSkill, Platform, Scope, SkillInstaller, ToolIdentity};
+    use crate::skill_fs;
     use crate::skill_fs::SkillFile;
     use crate::test_support::TestContext;
     use crate::types::{InstallScope, LockEntry, LockSource};
-    use crate::skill_fs;
 
     fn make_file(rel: &str, content: &str) -> SkillFile {
         SkillFile {

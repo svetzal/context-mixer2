@@ -63,7 +63,6 @@ pub fn create(
     })
 }
 
-
 pub fn list(scope: InstallScope, ctx: &AppContext<'_>) -> Result<SetListResult> {
     let sets = config::load_sets(scope, ctx.fs, ctx.paths)?;
     let entries = sets

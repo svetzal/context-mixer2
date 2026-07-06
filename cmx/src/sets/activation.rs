@@ -8,7 +8,7 @@ use crate::install;
 use crate::platform::Platform;
 use crate::platform_iter;
 use crate::source_iter;
-use crate::types::{ArtifactKind, InstallScope, SetMember, SetsFile, SetState};
+use crate::types::{ArtifactKind, InstallScope, SetMember, SetState, SetsFile};
 use crate::uninstall;
 
 use super::{

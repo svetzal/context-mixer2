@@ -5,6 +5,7 @@ pub(crate) mod codex_agent;
 pub mod completions;
 pub(crate) mod copy;
 pub mod diff;
+pub mod dispatch;
 pub mod display;
 pub mod doctor;
 pub mod info;

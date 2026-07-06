@@ -32,7 +32,7 @@ mod display;
 mod plan;
 use plan::{build_lock_entry, decide_action_for_entry, prepare_writes};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use crate::checksum;
 use crate::config;

@@ -156,7 +156,11 @@ pub(super) fn prepare_writes(
     })
 }
 
-pub(super) fn build_lock_entry(tool: &ToolIdentity, checksum: &str, installed_at: &str) -> LockEntry {
+pub(super) fn build_lock_entry(
+    tool: &ToolIdentity,
+    checksum: &str,
+    installed_at: &str,
+) -> LockEntry {
     LockEntry {
         artifact_type: ArtifactKind::Skill,
         version: Some(tool.version.clone()),
