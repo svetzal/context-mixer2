@@ -1,0 +1,95 @@
+# Publishes the `cmx-core` npm package (TypeScript port) via OIDC trusted
+# publishing — no stored NPM_TOKEN. Requires a Trusted Publisher configured on
+# npmjs.com for the `cmx-core` package pointing at THIS workflow filename
+# (publish-cmx-core-ts.yml). See EMBEDDING.md and cmx-core-ts/README.md.
+#
+# Trigger: push a tag `cmx-core-ts-v<version>` matching cmx-core-ts/package.json
+# (distinct from the Rust crate's `cmx-core-v*` tags and the CLI's `v*` tags).
+# The first publish must be done manually to claim the name; trusted publishing
+# handles every release after that.
+name: Publish cmx-core (npm)
+
+on:
+  push:
+    tags: ["cmx-core-ts-v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-cmx-core-ts-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cmx-core-ts
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check
+        run: bunx tsc --noEmit
+
+      - name: Lint
+        run: bunx biome check .
+
+      - name: Test (conformance + unit)
+        run: bun test
+
+      - name: Build
+        run: bun run build
+
+  publish:
+    name: Publish to npm
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    # id-token: write is what lets npm exchange an OIDC token for a short-lived
+    # publish credential. contents: read is the default least-privilege.
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: cmx-core-ts
+    steps:
+      - uses: actions/checkout@v5
+
+      # Bun runs the `prepack` build (tsc + fix-dist-dts) during `npm publish`.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # Node provides `npm`; registry-url wires up the registry for publish.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      # Trusted publishing + automatic provenance need npm >= 11.5.1.
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify tag matches package version
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#cmx-core-ts-v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package version $PKG_VERSION" >&2
+            exit 1
+          fi
+
+      # No NODE_AUTH_TOKEN: OIDC provides the credential. Provenance is generated
+      # automatically (public repo + public package). `prepack` builds dist/.
+      - name: Publish to npm
+        run: npm publish --access public

@@ -41,6 +41,13 @@ The canonical API documentation is [cmx-core/README.md](cmx-core/README.md) (ren
 - Workflow: `.github/workflows/publish-cmx-core.yml` — full quality gate, tag-vs-crate-version consistency check, then `cargo publish` using the `CRATES_IO_TOKEN` repo secret (same pattern as mojentic-ru).
 - `cmx` and `cmf` are explicitly `publish = false`; only the library can reach crates.io.
 
+**TypeScript port (`cmx-core` on npm, source in `cmx-core-ts/`):**
+
+- Tag scheme: `cmx-core-ts-v<version>` (distinct from the crate's `cmx-core-v*` and the CLI's `v*`).
+- Workflow: `.github/workflows/publish-cmx-core-ts.yml` — quality gate (bun install / tsc / biome / test / build), tag-vs-`package.json`-version check, then `npm publish` via **OIDC trusted publishing (no stored token)**. Node 24 + `npm@latest` (trusted publishing needs npm ≥ 11.5.1); provenance is automatic for the public repo+package. Bun runs the `prepack` build.
+- Two setup steps happen **once, out of band** and can't be scripted here: (1) the **first publish is manual** — `npm login` (session-based, 2FA/OTP) then `npm publish` from `cmx-core-ts/` — because npm has no pending-publisher flow, so the package must exist before a Trusted Publisher can be attached; (2) after it exists, configure the **Trusted Publisher** on npmjs.com → package Settings, pointing at workflow file `publish-cmx-core-ts.yml`. Every release after that is keyless via the workflow.
+- npm auth context (2026): classic tokens are revoked; local `npm login` issues a 2-hour session with 2FA enforced on publish; CI uses OIDC. See `cmx-core-ts/README.md` if that surface shifts again.
+
 ### Proving consumers
 
 Both migrations ran as autonomous hopper engineering items, each required to file a candid "cmx-core API friction" report — those reports drove the stabilization pass, and **this consumer-files-friction-report pattern should be repeated for each port's first consumer**.
