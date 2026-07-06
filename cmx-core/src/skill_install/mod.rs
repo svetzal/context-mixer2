@@ -24,356 +24,26 @@
 //! # }
 //! ```
 
-use anyhow::{Result, bail};
-use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+mod types;
+pub use types::*;
+
+mod display;
+
+mod plan;
+use plan::{build_lock_entry, decide_action_for_entry, prepare_writes};
+
+use anyhow::{bail, Result};
 
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
 use crate::frontmatter;
-use crate::fs_util;
 use crate::lockfile;
 use crate::platform::Platform;
 use crate::platform_iter;
-use crate::skill_fs::{self, SkillFile};
+use crate::skill_fs;
 use crate::targets;
-use crate::types::{ArtifactKind, InstallScope, LockEntry, LockSource, SourceEntry, SourceType};
-
-// ---------------------------------------------------------------------------
-// Public API types
-// ---------------------------------------------------------------------------
-
-/// Identity of the embedding tool — name and semver version string.
-#[derive(Debug, Clone)]
-pub struct ToolIdentity {
-    pub name: String,
-    pub version: String,
-}
-
-impl ToolIdentity {
-    /// Construct a tool identity from a name and version string.
-    pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            version: version.into(),
-        }
-    }
-}
-
-/// A skill bundled inside a tool binary (via `include_str!` or similar).
-pub struct BundledSkill {
-    pub files: Vec<SkillFile>,
-}
-
-impl BundledSkill {
-    /// Construct from a list of files (e.g. assembled by the embedding tool from
-    /// `include_str!` or `include_bytes!` calls).
-    pub fn from_files(files: Vec<SkillFile>) -> Self {
-        Self { files }
-    }
-
-    /// Convenience constructor for the common single-`SKILL.md` case.
-    ///
-    /// Builds a bundle containing exactly one file at path `SKILL.md` with the
-    /// given content. Use `from_files` when the skill includes additional files.
-    pub fn single_md(content: &str) -> Self {
-        Self {
-            files: vec![SkillFile {
-                rel_path: PathBuf::from("SKILL.md"),
-                bytes: content.as_bytes().to_vec(),
-            }],
-        }
-    }
-
-    /// Returns `true` when the bundle contains a `SKILL.md` at the root level
-    /// (i.e. `rel_path == "SKILL.md"`).
-    pub fn has_skill_md(&self) -> bool {
-        self.files.iter().any(|f| f.rel_path.as_os_str() == "SKILL.md")
-    }
-}
-
-/// Installation scope — global (user-wide) or local (project-scoped).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Scope {
-    #[default]
-    Global,
-    Local,
-}
-
-impl Scope {
-    pub fn to_install_scope(self) -> InstallScope {
-        match self {
-            Scope::Global => InstallScope::Global,
-            Scope::Local => InstallScope::Local,
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Plan types
-// ---------------------------------------------------------------------------
-
-/// The action to take for a single target platform during an install.
-///
-/// # Non-exhaustive
-///
-/// This enum is `#[non_exhaustive]`: new action variants may be added in
-/// future minor releases. Embedders should render actions via the `Display`
-/// impl on `Report`/`InstallPlan` or match on specific variants they care
-/// about with a catch-all `_` arm. The `will_write()` and `is_blocked()`
-/// helpers cover the two common branching points without requiring exhaustive
-/// matching.
-#[non_exhaustive]
-#[derive(Debug, Clone)]
-pub enum TargetAction {
-    /// First-time install (no existing copy).
-    Install,
-    /// Overwrite an older installed version.
-    Update {
-        /// The previously installed version string (if known).
-        from: Option<String>,
-    },
-    /// Already installed at the same version and checksum — nothing to do.
-    Skip,
-    /// Same version but the on-disk content differs from the bundled content,
-    /// and `force` was not requested.
-    DriftedSkip { installed: String },
-    /// The installed version is newer than the bundled version, and `force` was
-    /// not requested.
-    RefuseNewer { installed: String },
-    /// The installed version is newer, but `force` was requested — downgrade.
-    Downgrade { from: String },
-}
-
-impl TargetAction {
-    /// Whether this action will write files to disk.
-    pub fn will_write(&self) -> bool {
-        matches!(self, Self::Install | Self::Update { .. } | Self::Downgrade { .. })
-    }
-
-    /// Whether this action blocks the install from proceeding.
-    pub fn is_blocked(&self) -> bool {
-        matches!(self, Self::RefuseNewer { .. })
-    }
-}
-
-/// A single file to be written, with its relative and absolute destination paths.
-#[derive(Debug, Clone)]
-pub struct PlannedFile {
-    /// Relative path within the skill directory (e.g. `SKILL.md`).
-    pub rel_path: PathBuf,
-    /// Absolute (or scope-relative) destination path on disk.
-    pub dest_path: PathBuf,
-}
-
-/// The plan for a single target platform.
-#[derive(Debug)]
-pub struct TargetPlan {
-    pub platform: Platform,
-    pub scope: InstallScope,
-    pub dest_dir: PathBuf,
-    pub files: Vec<PlannedFile>,
-    pub action: TargetAction,
-    /// Whether this platform is in the cmx-managed set.
-    pub cmx_managed: bool,
-}
-
-/// The full installation plan — computed from source metadata, with no writes.
-#[derive(Debug)]
-pub struct InstallPlan {
-    pub tool: ToolIdentity,
-    pub scope: InstallScope,
-    pub source_checksum: String,
-    /// Whether cmx is managing this machine (config or non-empty lock exists).
-    pub cmx_present: bool,
-    pub force: bool,
-    pub targets: Vec<TargetPlan>,
-}
-
-impl InstallPlan {
-    /// Returns `true` if any target action is blocked (e.g. `RefuseNewer`).
-    pub fn is_blocked(&self) -> bool {
-        self.targets.iter().any(|t| t.action.is_blocked())
-    }
-
-    /// The number of targets that will write files to disk.
-    pub fn write_count(&self) -> usize {
-        self.targets.iter().filter(|t| t.action.will_write()).count()
-    }
-}
-
-impl std::fmt::Display for InstallPlan {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Install plan for {} v{}", self.tool.name, self.tool.version)?;
-        writeln!(f, "  scope: {}", self.scope.label())?;
-        writeln!(f, "  checksum: {}", self.source_checksum)?;
-        for target in &self.targets {
-            writeln!(
-                f,
-                "  {} → {} ({})",
-                target.platform,
-                target.dest_dir.display(),
-                format_action(&target.action)
-            )?;
-        }
-        Ok(())
-    }
-}
-
-fn format_action(action: &TargetAction) -> String {
-    match action {
-        TargetAction::Install => "install".to_string(),
-        TargetAction::Update { from } => {
-            format!("update from {}", from.as_deref().unwrap_or("?"))
-        }
-        TargetAction::Skip => "skip (up to date)".to_string(),
-        TargetAction::DriftedSkip { installed } => {
-            format!("skip (drifted from {installed})")
-        }
-        TargetAction::RefuseNewer { installed } => {
-            format!("refuse (installed {installed} is newer)")
-        }
-        TargetAction::Downgrade { from } => format!("downgrade from {from}"),
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Apply result types
-// ---------------------------------------------------------------------------
-
-/// The outcome for a single target platform after `apply`.
-///
-/// Both written and skipped targets appear in `Report::targets`; the `action`
-/// field distinguishes them. Use `Report::applied()` / `Report::skipped()` for
-/// filtered views.
-#[derive(Debug)]
-pub struct TargetOutcome {
-    pub platform: Platform,
-    pub dest_dir: PathBuf,
-    pub action: TargetAction,
-    /// Number of files written to disk (0 for skipped targets).
-    pub files_written: usize,
-    /// Checksum recorded in the lock file. `Some` for written targets, `None`
-    /// for skipped targets (no lock entry was touched).
-    pub installed_checksum: Option<String>,
-    /// Concrete target files whose local changes were discarded by `--force`.
-    pub discarded_paths: Vec<PathBuf>,
-}
-
-/// The full report returned by [`SkillInstaller::apply`].
-///
-/// All targets — both written and skipped — are captured in `targets` so that
-/// skipped targets retain their `dest_dir` and the `action` discriminant
-/// distinguishes an ordinary up-to-date skip from a `DriftedSkip` (local edits
-/// preserved). Use the `applied()` and `skipped()` iterators for filtered views.
-#[derive(Debug)]
-pub struct Report {
-    pub tool: ToolIdentity,
-    pub scope: InstallScope,
-    /// Every platform that was considered, written or not.
-    pub targets: Vec<TargetOutcome>,
-    /// Whether a source entry was registered in sources.json.
-    pub source_registered: bool,
-}
-
-impl Report {
-    /// Targets where files were written to disk (Install / Update / Downgrade).
-    pub fn applied(&self) -> impl Iterator<Item = &TargetOutcome> {
-        self.targets.iter().filter(|o| o.action.will_write())
-    }
-
-    /// Targets where no files were written (`Skip` / `DriftedSkip` / `RefuseNewer`).
-    pub fn skipped(&self) -> impl Iterator<Item = &TargetOutcome> {
-        self.targets.iter().filter(|o| !o.action.will_write())
-    }
-}
-
-struct PreparedWrites {
-    dirs_to_write: BTreeSet<PathBuf>,
-    discarded_paths_by_dir: BTreeMap<PathBuf, Vec<PathBuf>>,
-}
-
-impl std::fmt::Display for Report {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Installed {} v{} ({})",
-            self.tool.name,
-            self.tool.version,
-            self.scope.label()
-        )?;
-        for outcome in &self.targets {
-            writeln!(
-                f,
-                "  {} → {} ({})",
-                outcome.platform,
-                outcome.dest_dir.display(),
-                format_action(&outcome.action)
-            )?;
-        }
-        if self.source_registered {
-            writeln!(f, "  (registered as cmx source)")?;
-        }
-        Ok(())
-    }
-}
-
-impl std::fmt::Display for RemoveReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Removed {} ({})", self.tool_name, self.scope.label())?;
-        for platform in &self.platforms_cleared {
-            writeln!(f, "  {platform} lock entry cleared")?;
-        }
-        for dir in &self.removed_dirs {
-            writeln!(f, "  removed: {}", dir.display())?;
-        }
-        if self.source_unregistered {
-            writeln!(f, "  unregistered from cmx sources")?;
-        }
-        writeln!(f, "  note: cmx-lock.json left on disk (shared with other tools)")?;
-        Ok(())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Status types
-// ---------------------------------------------------------------------------
-
-/// Status of a skill on a single platform.
-#[derive(Debug)]
-pub struct TargetStatus {
-    pub platform: Platform,
-    pub installed: bool,
-    pub installed_version: Option<String>,
-    pub drifted: bool,
-    pub tracked: bool,
-}
-
-/// Status of a skill across all relevant platforms.
-#[derive(Debug)]
-pub struct Status {
-    pub tool_name: String,
-    pub scope: InstallScope,
-    pub targets: Vec<TargetStatus>,
-}
-
-// ---------------------------------------------------------------------------
-// Remove result types
-// ---------------------------------------------------------------------------
-
-/// The result of removing a skill.
-#[derive(Debug)]
-pub struct RemoveReport {
-    pub tool_name: String,
-    pub scope: InstallScope,
-    pub removed_dirs: Vec<PathBuf>,
-    pub platforms_cleared: Vec<Platform>,
-    pub source_unregistered: bool,
-    pub was_on_disk: bool,
-    pub was_tracked: bool,
-}
+use crate::types::{ArtifactKind, SourceEntry, SourceType};
 
 // ---------------------------------------------------------------------------
 // SkillInstaller
@@ -656,7 +326,8 @@ impl SkillInstaller {
             .filter(|p| p.supports(ArtifactKind::Skill))
             .collect::<Vec<_>>();
 
-        let mut dirs_to_delete: BTreeSet<PathBuf> = BTreeSet::new();
+        let mut dirs_to_delete: std::collections::BTreeSet<std::path::PathBuf> =
+            std::collections::BTreeSet::new();
         let mut platforms_cleared: Vec<Platform> = Vec::new();
         let mut was_tracked = false;
 
@@ -683,7 +354,7 @@ impl SkillInstaller {
         }
 
         let was_on_disk = !dirs_to_delete.is_empty();
-        let removed_dirs: Vec<PathBuf> = dirs_to_delete.into_iter().collect();
+        let removed_dirs: Vec<std::path::PathBuf> = dirs_to_delete.into_iter().collect();
         for dir in &removed_dirs {
             ctx.fs.remove_dir_all(dir)?;
         }
@@ -724,166 +395,6 @@ impl SkillInstaller {
 }
 
 // ---------------------------------------------------------------------------
-// Private helpers
-// ---------------------------------------------------------------------------
-
-/// Compare two semver version strings.
-///
-/// - `None` installed → `Less` (treat as "not installed").
-/// - Both parse → standard semver comparison.
-/// - Either parse fails → string equality: `Equal` if equal, else `Less`.
-fn compare_versions(installed: Option<&str>, bundled: &str) -> Ordering {
-    let Some(inst) = installed else {
-        return Ordering::Less;
-    };
-    match (semver::Version::parse(inst), semver::Version::parse(bundled)) {
-        (Ok(a), Ok(b)) => a.cmp(&b),
-        _ => {
-            if inst == bundled {
-                Ordering::Equal
-            } else {
-                Ordering::Less
-            }
-        }
-    }
-}
-
-/// Decide what action to take for a platform that already has a lock entry.
-fn decide_action_for_entry(
-    entry: &LockEntry,
-    bundled_version: &str,
-    source_checksum: &str,
-    force: bool,
-    skill_dest: &std::path::Path,
-    ctx: &AppContext<'_>,
-) -> Result<TargetAction> {
-    let installed_version = entry.version.as_deref();
-    let cmp = compare_versions(installed_version, bundled_version);
-
-    match cmp {
-        Ordering::Less => Ok(TargetAction::Update {
-            from: installed_version.map(str::to_string),
-        }),
-        Ordering::Equal => {
-            if !ctx.fs.exists(skill_dest) {
-                return Ok(TargetAction::Install);
-            }
-
-            let disk_checksum =
-                checksum::checksum_artifact(skill_dest, ArtifactKind::Skill, ctx.fs)?;
-            if disk_checksum == source_checksum {
-                Ok(TargetAction::Skip)
-            } else if force {
-                Ok(TargetAction::Update {
-                    from: installed_version.map(str::to_string),
-                })
-            } else {
-                Ok(TargetAction::DriftedSkip {
-                    installed: installed_version.unwrap_or("unknown").to_string(),
-                })
-            }
-        }
-        Ordering::Greater => {
-            if force {
-                Ok(TargetAction::Downgrade {
-                    from: installed_version.unwrap_or("unknown").to_string(),
-                })
-            } else {
-                Ok(TargetAction::RefuseNewer {
-                    installed: installed_version.unwrap_or("unknown").to_string(),
-                })
-            }
-        }
-    }
-}
-
-fn discarded_paths_against_bundle(
-    skill_dest: &std::path::Path,
-    bundled_files: &[SkillFile],
-    ctx: &AppContext<'_>,
-) -> Result<Vec<PathBuf>> {
-    if !ctx.fs.exists(skill_dest) {
-        return Ok(Vec::new());
-    }
-
-    let installed_files = fs_util::collect_files_recursive(skill_dest, ctx.fs)?;
-    let mut installed_by_rel = BTreeMap::new();
-    for path in installed_files {
-        let rel = path.strip_prefix(skill_dest).unwrap_or(&path).to_path_buf();
-        installed_by_rel.insert(rel, ctx.fs.read(&path)?);
-    }
-
-    let mut bundled_by_rel = BTreeMap::new();
-    for file in skill_fs::canonical_files(bundled_files) {
-        bundled_by_rel.insert(file.rel_path.clone(), file.bytes.clone());
-    }
-
-    let mut changed_paths = Vec::new();
-    let relative_paths: BTreeSet<_> =
-        installed_by_rel.keys().chain(bundled_by_rel.keys()).cloned().collect();
-
-    for rel_path in relative_paths {
-        match (installed_by_rel.get(&rel_path), bundled_by_rel.get(&rel_path)) {
-            (Some(installed), Some(bundled)) if installed == bundled => {}
-            (Some(_) | None, Some(_)) | (Some(_), None) => {
-                changed_paths.push(skill_dest.join(rel_path));
-            }
-            (None, None) => {}
-        }
-    }
-
-    Ok(changed_paths)
-}
-
-fn prepare_writes(
-    plan: &InstallPlan,
-    files: &[SkillFile],
-    ctx: &AppContext<'_>,
-) -> Result<PreparedWrites> {
-    let mut dirs_to_write = BTreeSet::new();
-    let mut dirs_to_replace = BTreeSet::new();
-
-    for target in &plan.targets {
-        if target.action.will_write() {
-            dirs_to_write.insert(target.dest_dir.clone());
-        }
-        if plan.force
-            && matches!(target.action, TargetAction::Update { .. } | TargetAction::Downgrade { .. })
-        {
-            dirs_to_replace.insert(target.dest_dir.clone());
-        }
-    }
-
-    let mut discarded_paths_by_dir = BTreeMap::new();
-    for dir in &dirs_to_replace {
-        discarded_paths_by_dir
-            .insert(dir.clone(), discarded_paths_against_bundle(dir, files, ctx)?);
-        if ctx.fs.exists(dir) {
-            ctx.fs.remove_dir_all(dir)?;
-        }
-    }
-
-    Ok(PreparedWrites {
-        dirs_to_write,
-        discarded_paths_by_dir,
-    })
-}
-
-fn build_lock_entry(tool: &ToolIdentity, checksum: &str, installed_at: &str) -> LockEntry {
-    LockEntry {
-        artifact_type: ArtifactKind::Skill,
-        version: Some(tool.version.clone()),
-        installed_at: installed_at.to_string(),
-        source: LockSource {
-            repo: format!("bundled:{}", tool.name),
-            path: format!("skills/{}", tool.name),
-        },
-        source_checksum: checksum.to_string(),
-        installed_checksum: checksum.to_string(),
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 
@@ -893,8 +404,9 @@ mod tests {
     use crate::gateway::Filesystem as _;
     use crate::skill_fs::SkillFile;
     use crate::test_support::TestContext;
-    use crate::types::{CmxConfig, InstallScope};
+    use crate::types::{CmxConfig, InstallScope, LockEntry, LockSource};
     use crate::{checksum, config};
+    use std::collections::BTreeSet;
 
     fn make_file(rel: &str, content: &str) -> SkillFile {
         SkillFile {
@@ -1769,98 +1281,5 @@ mod tests {
         );
         assert!(!t.fs.exists(&local_only));
         assert_eq!(checksum::checksum_dir(&skill_dir, &t.fs).unwrap(), checksum);
-    }
-
-    // -----------------------------------------------------------------------
-    // Display tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn install_plan_display_contains_target_lines() {
-        let t = TestContext::new();
-        let skill = sample_skill("1.0.0");
-        let ctx = t.ctx();
-        let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
-        let rendered = plan.to_string();
-        assert!(rendered.contains("sample"), "plan display must include tool name");
-        assert!(rendered.contains("1.0.0"), "plan display must include version");
-        assert!(rendered.contains("install"), "plan display must include action");
-    }
-
-    #[test]
-    fn report_display_distinguishes_drifted_skip() {
-        let t = TestContext::new();
-        let skill = sample_skill("1.0.0");
-
-        // First apply: fresh install
-        let ctx = t.ctx();
-        let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
-        let up_to_date_report = installer("1.0.0").apply(&skill, &plan, &ctx).unwrap();
-        let up_to_date_text = up_to_date_report.to_string();
-
-        // Second apply (same version, same checksum) → Skip
-        let plan2 = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
-        let skip_report = installer("1.0.0").apply(&skill, &plan2, &ctx).unwrap();
-        let skip_text = skip_report.to_string();
-        assert!(skip_text.contains("up to date"), "up-to-date skip must say 'up to date'");
-
-        // Set up drifted scenario
-        let t2 = TestContext::new();
-        let checksum = skill_fs::checksum_bundled(&skill.files);
-        let claude_paths = t2.paths.with_platform(Platform::Claude);
-        let skill_dir = claude_paths
-            .install_dir(ArtifactKind::Skill, InstallScope::Global)
-            .unwrap()
-            .join("sample");
-        t2.fs
-            .add_file(skill_dir.join("SKILL.md"), "---\nversion: 1.0.0\n---\n# Modified\n");
-        crate::test_support::save_lock_with_entry(
-            &t2.fs,
-            &claude_paths,
-            "sample",
-            LockEntry {
-                artifact_type: ArtifactKind::Skill,
-                version: Some("1.0.0".to_string()),
-                installed_at: "2024-01-01T00:00:00Z".to_string(),
-                source: LockSource {
-                    repo: "bundled:sample".to_string(),
-                    path: "skills/sample".to_string(),
-                },
-                source_checksum: checksum.clone(),
-                installed_checksum: checksum,
-            },
-            InstallScope::Global,
-        );
-        let ctx2 = t2.ctx();
-        let drifted_plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx2).unwrap();
-        let drifted_report = installer("1.0.0").apply(&skill, &drifted_plan, &ctx2).unwrap();
-        let drifted_text = drifted_report.to_string();
-
-        // Drifted display must differ from up-to-date skip display
-        assert!(
-            drifted_text.contains("drifted"),
-            "drifted skip must mention 'drifted' in output, got: {drifted_text}"
-        );
-        assert_ne!(
-            skip_text, drifted_text,
-            "up-to-date skip and drifted skip must produce different display output"
-        );
-        let _ = up_to_date_text;
-    }
-
-    #[test]
-    fn remove_report_display_notes_lockfile_left() {
-        let t = TestContext::new();
-        let skill = sample_skill("1.0.0");
-        let ctx = t.ctx();
-        let plan = installer("1.0.0").plan(&skill, Scope::Global, false, &ctx).unwrap();
-        installer("1.0.0").apply(&skill, &plan, &ctx).unwrap();
-
-        let report = installer("1.0.0").remove(Scope::Global, &ctx).unwrap();
-        let rendered = report.to_string();
-        assert!(
-            rendered.contains("cmx-lock.json"),
-            "remove report must note the lockfile is left on disk"
-        );
     }
 }
