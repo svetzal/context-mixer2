@@ -1,6 +1,9 @@
-# cmx-core-ts
+# cmx-core (TypeScript)
 
-Native Bun/TypeScript port of the `cmx-core` skill-install surface.
+Native Bun/TypeScript port of the `cmx-core` skill-install surface. Published to
+npm as `cmx-core`; the source lives in the `cmx-core-ts/` directory of the
+[context-mixer2](https://github.com/svetzal/context-mixer2) repo, alongside the
+Rust reference and the shared conformance fixtures.
 
 It exposes the same embeddable shape as the Rust library:
 
@@ -28,7 +31,7 @@ import {
   SkillInstaller,
   SystemClock,
   ToolIdentity,
-} from "cmx-core-ts";
+} from "cmx-core";
 
 const installer = new SkillInstaller(new ToolIdentity("mytool", "1.2.0"));
 const skill = BundledSkill.singleMd("---\nname: mytool\n---\n# My skill\n");
