@@ -1,0 +1,23 @@
+{
+  "name": "cmx-core-ts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "module": "src/index.ts",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit",
+    "lint": "bunx biome check .",
+    "format": "bunx biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.2",
+    "@types/bun": "^1.3.14",
+    "@types/node": "^26.1.0",
+    "@types/semver": "^7.7.1",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "semver": "^7.7.3"
+  }
+}
