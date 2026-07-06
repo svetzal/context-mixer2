@@ -78,10 +78,28 @@ where
 }
 
 fn normalized_path_string(path: &Path) -> String {
-    path.components()
-        .map(|component| component.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("/")
+    use std::path::Component;
+    // Join the *non-root* components with `/`, re-adding a single leading slash
+    // for absolute paths. Joining every component (including `Component::RootDir`,
+    // which stringifies to `/`) would emit a doubled leading slash — `//home/...`
+    // — for absolute dest_dirs.
+    let mut absolute = false;
+    let parts: Vec<String> = path
+        .components()
+        .filter_map(|component| match component {
+            Component::RootDir => {
+                absolute = true;
+                None
+            }
+            other => Some(other.as_os_str().to_string_lossy().into_owned()),
+        })
+        .collect();
+    let joined = parts.join("/");
+    if absolute {
+        format!("/{joined}")
+    } else {
+        joined
+    }
 }
 
 fn bundle() -> BundledSkill {

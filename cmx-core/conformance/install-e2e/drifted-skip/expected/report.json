@@ -7,7 +7,7 @@
     "targets": [
       {
         "platform": "claude",
-        "dest_dir": "//home/testuser/.claude/skills/fixture-tool",
+        "dest_dir": "/home/testuser/.claude/skills/fixture-tool",
         "action": {
           "kind": "drifted-skip",
           "from": null,
@@ -29,7 +29,7 @@
       "targets": [
         {
           "platform": "claude",
-          "dest_dir": "//home/testuser/.claude/skills/fixture-tool",
+          "dest_dir": "/home/testuser/.claude/skills/fixture-tool",
           "action": {
             "kind": "drifted-skip",
             "from": null,

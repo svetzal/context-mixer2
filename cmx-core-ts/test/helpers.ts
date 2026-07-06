@@ -151,14 +151,8 @@ export const makeTempFilesystem = async (): Promise<{
   };
 };
 
-export const normalizedPathString = (targetPath: string): string => {
-  const normalized = targetPath.replaceAll("\\", "/");
-  if (!normalized.startsWith("/")) {
-    return normalized;
-  }
-
-  return `//${normalized.slice(1)}`;
-};
+export const normalizedPathString = (targetPath: string): string =>
+  targetPath.replaceAll("\\", "/");
 
 export const normalizedFixturePath = (targetPath: string): string =>
   targetPath.startsWith("/") ? targetPath.slice(1) : posixPath.join("project", targetPath);

@@ -7,7 +7,7 @@
     "targets": [
       {
         "platform": "claude",
-        "dest_dir": "//home/testuser/.claude/skills/fixture-tool",
+        "dest_dir": "/home/testuser/.claude/skills/fixture-tool",
         "action": {
           "kind": "update",
           "from": "1.0.0",
@@ -29,7 +29,7 @@
       "targets": [
         {
           "platform": "claude",
-          "dest_dir": "//home/testuser/.claude/skills/fixture-tool",
+          "dest_dir": "/home/testuser/.claude/skills/fixture-tool",
           "action": {
             "kind": "update",
             "from": "1.0.0",
