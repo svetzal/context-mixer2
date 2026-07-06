@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "fresh-machine",
+      "description": "With no managed set and no non-empty locks, installs target Claude only.",
+      "input": {
+        "scope": "global",
+        "config_platforms": [],
+        "non_empty_locks": []
+      },
+      "expected": {
+        "resolved_platforms": [
+          "claude"
+        ]
+      }
+    },
+    {
+      "name": "explicit-config-set",
+      "description": "A non-empty managed config set overrides inferred locks.",
+      "input": {
+        "scope": "global",
+        "config_platforms": [
+          "codex",
+          "gemini"
+        ],
+        "non_empty_locks": [
+          "claude",
+          "hermes"
+        ]
+      },
+      "expected": {
+        "resolved_platforms": [
+          "codex",
+          "gemini"
+        ]
+      }
+    },
+    {
+      "name": "unmanaged-nonempty-lock-inference",
+      "description": "Without a managed config, installs target every platform whose lockfile is already non-empty.",
+      "input": {
+        "scope": "global",
+        "config_platforms": [],
+        "non_empty_locks": [
+          "codex",
+          "hermes"
+        ]
+      },
+      "expected": {
+        "resolved_platforms": [
+          "codex",
+          "hermes"
+        ]
+      }
+    }
+  ]
+}

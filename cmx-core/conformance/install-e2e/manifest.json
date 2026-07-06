@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "fresh-install",
+      "description": "Fresh unmanaged install onto a machine with no existing locks.",
+      "input": {
+        "tool_name": "fixture-tool",
+        "tool_version": "2.4.6",
+        "scope": "global",
+        "force": false,
+        "bundle_dir": "fresh-install/bundle",
+        "pre_tree_dir": "fresh-install/pre/tree",
+        "pre_locks_dir": "fresh-install/pre/locks"
+      },
+      "expected": {
+        "tree_dir": "fresh-install/expected/tree",
+        "locks_dir": "fresh-install/expected/locks",
+        "report_path": "fresh-install/expected/report.json"
+      }
+    },
+    {
+      "name": "skip-identical",
+      "description": "Tracked current install with matching bytes skips cleanly.",
+      "input": {
+        "tool_name": "fixture-tool",
+        "tool_version": "2.4.6",
+        "scope": "global",
+        "force": false,
+        "bundle_dir": "skip-identical/bundle",
+        "pre_tree_dir": "skip-identical/pre/tree",
+        "pre_locks_dir": "skip-identical/pre/locks"
+      },
+      "expected": {
+        "tree_dir": "skip-identical/expected/tree",
+        "locks_dir": "skip-identical/expected/locks",
+        "report_path": "skip-identical/expected/report.json"
+      }
+    },
+    {
+      "name": "drifted-skip",
+      "description": "Tracked current install with local edits preserves those edits when force is false.",
+      "input": {
+        "tool_name": "fixture-tool",
+        "tool_version": "2.4.6",
+        "scope": "global",
+        "force": false,
+        "bundle_dir": "drifted-skip/bundle",
+        "pre_tree_dir": "drifted-skip/pre/tree",
+        "pre_locks_dir": "drifted-skip/pre/locks"
+      },
+      "expected": {
+        "tree_dir": "drifted-skip/expected/tree",
+        "locks_dir": "drifted-skip/expected/locks",
+        "report_path": "drifted-skip/expected/report.json"
+      }
+    },
+    {
+      "name": "update-from-older",
+      "description": "Tracked older install updates to the bundled version.",
+      "input": {
+        "tool_name": "fixture-tool",
+        "tool_version": "2.4.6",
+        "scope": "global",
+        "force": false,
+        "bundle_dir": "update-from-older/bundle",
+        "pre_tree_dir": "update-from-older/pre/tree",
+        "pre_locks_dir": "update-from-older/pre/locks"
+      },
+      "expected": {
+        "tree_dir": "update-from-older/expected/tree",
+        "locks_dir": "update-from-older/expected/locks",
+        "report_path": "update-from-older/expected/report.json"
+      }
+    },
+    {
+      "name": "refuse-newer",
+      "description": "Tracked newer install blocks the plan without force.",
+      "input": {
+        "tool_name": "fixture-tool",
+        "tool_version": "2.4.6",
+        "scope": "global",
+        "force": false,
+        "bundle_dir": "refuse-newer/bundle",
+        "pre_tree_dir": "refuse-newer/pre/tree",
+        "pre_locks_dir": "refuse-newer/pre/locks"
+      },
+      "expected": {
+        "tree_dir": "refuse-newer/expected/tree",
+        "locks_dir": "refuse-newer/expected/locks",
+        "report_path": "refuse-newer/expected/report.json"
+      }
+    },
+    {
+      "name": "force-downgrade",
+      "description": "Tracked newer install downgrades when force is true.",
+      "input": {
+        "tool_name": "fixture-tool",
+        "tool_version": "2.4.6",
+        "scope": "global",
+        "force": true,
+        "bundle_dir": "force-downgrade/bundle",
+        "pre_tree_dir": "force-downgrade/pre/tree",
+        "pre_locks_dir": "force-downgrade/pre/locks"
+      },
+      "expected": {
+        "tree_dir": "force-downgrade/expected/tree",
+        "locks_dir": "force-downgrade/expected/locks",
+        "report_path": "force-downgrade/expected/report.json"
+      }
+    }
+  ]
+}

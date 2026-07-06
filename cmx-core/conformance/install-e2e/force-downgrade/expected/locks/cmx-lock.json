@@ -1,0 +1,16 @@
+{
+  "packages": {
+    "fixture-tool": {
+      "installed_at": "2026-07-05T12:00:00+00:00",
+      "installed_checksum": "sha256:ca26a0bd0260bb482b16ac09d3acd6b00353ef9558e1ed735bf4c5c5b7813622",
+      "source": {
+        "path": "skills/fixture-tool",
+        "repo": "bundled:fixture-tool"
+      },
+      "source_checksum": "sha256:ca26a0bd0260bb482b16ac09d3acd6b00353ef9558e1ed735bf4c5c5b7813622",
+      "type": "skill",
+      "version": "2.4.6"
+    }
+  },
+  "version": 1
+}

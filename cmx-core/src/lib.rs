@@ -18,4 +18,7 @@ pub mod targets;
 pub mod types;
 
 #[cfg(any(test, feature = "test-support"))]
+pub mod conformance;
+
+#[cfg(any(test, feature = "test-support"))]
 pub mod test_support;

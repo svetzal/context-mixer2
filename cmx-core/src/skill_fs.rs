@@ -196,6 +196,9 @@ mod tests {
         let expected = checksum_bundled(&files);
         write_skill_files(Path::new("/dest/skill"), &files, &fs).unwrap();
         let on_disk = crate::checksum::checksum_dir(Path::new("/dest/skill"), &fs).unwrap();
-        assert_eq!(expected, on_disk, "bundle and on-disk checksums must agree across .-vs-/ paths");
+        assert_eq!(
+            expected, on_disk,
+            "bundle and on-disk checksums must agree across .-vs-/ paths"
+        );
     }
 }

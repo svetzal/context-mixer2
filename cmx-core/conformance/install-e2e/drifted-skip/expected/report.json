@@ -1,0 +1,47 @@
+{
+  "plan": {
+    "blocked": false,
+    "cmx_present": true,
+    "scope": "global",
+    "source_checksum": "sha256:ca26a0bd0260bb482b16ac09d3acd6b00353ef9558e1ed735bf4c5c5b7813622",
+    "targets": [
+      {
+        "platform": "claude",
+        "dest_dir": "//home/testuser/.claude/skills/fixture-tool",
+        "action": {
+          "kind": "drifted-skip",
+          "from": null,
+          "installed": "2.4.6",
+          "will_write": false,
+          "blocked": false
+        },
+        "cmx_managed": false
+      }
+    ]
+  },
+  "apply": {
+    "status": "applied",
+    "error": null,
+    "report": {
+      "tool_name": "fixture-tool",
+      "scope": "global",
+      "source_registered": false,
+      "targets": [
+        {
+          "platform": "claude",
+          "dest_dir": "//home/testuser/.claude/skills/fixture-tool",
+          "action": {
+            "kind": "drifted-skip",
+            "from": null,
+            "installed": "2.4.6",
+            "will_write": false,
+            "blocked": false
+          },
+          "files_written": 0,
+          "installed_checksum": null,
+          "discarded_paths": []
+        }
+      ]
+    }
+  }
+}

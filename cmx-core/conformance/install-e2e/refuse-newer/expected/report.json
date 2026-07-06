@@ -1,0 +1,27 @@
+{
+  "plan": {
+    "blocked": true,
+    "cmx_present": true,
+    "scope": "global",
+    "source_checksum": "sha256:ca26a0bd0260bb482b16ac09d3acd6b00353ef9558e1ed735bf4c5c5b7813622",
+    "targets": [
+      {
+        "platform": "claude",
+        "dest_dir": "//home/testuser/.claude/skills/fixture-tool",
+        "action": {
+          "kind": "refuse-newer",
+          "from": null,
+          "installed": "9.0.0",
+          "will_write": false,
+          "blocked": true
+        },
+        "cmx_managed": false
+      }
+    ]
+  },
+  "apply": {
+    "status": "blocked",
+    "error": "Install plan for 'fixture-tool' is blocked. Run with force=true to override.",
+    "report": null
+  }
+}

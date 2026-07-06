@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "string-sort-a-dot-slash",
+      "description": "Pins SPEC §11.4 string sorting for `a`, `a.b`, and `a/b` using an inline file set that cannot exist on disk.",
+      "input": {
+        "files": [
+          {
+            "path": "a/b",
+            "content_utf8": "nested\n"
+          },
+          {
+            "path": "a.b",
+            "content_utf8": "dotted\n"
+          },
+          {
+            "path": "a",
+            "content_utf8": "bare\n"
+          }
+        ]
+      },
+      "expected": {
+        "sha256": "sha256:7d6033b0e9536add85f180c8add9dc4d4138a698d87f663e74746e4dac42c83a",
+        "canonical_order": [
+          "a",
+          "a.b",
+          "a/b"
+        ],
+        "canonical_included_paths": [
+          "a",
+          "a.b",
+          "a/b"
+        ]
+      }
+    },
+    {
+      "name": "canonical-filter",
+      "description": "Exercises dotfile, dotdir, transient-name, and `.pyc` filtering while leaving canonical files intact.",
+      "input": {
+        "files": [
+          {
+            "path": "SKILL.md",
+            "content_utf8": "# skill\n"
+          },
+          {
+            "path": "scripts/tool.py",
+            "content_utf8": "print('ok')\n"
+          },
+          {
+            "path": ".hidden",
+            "content_utf8": "secret\n"
+          },
+          {
+            "path": "scripts/.env",
+            "content_utf8": "TOKEN=1\n"
+          },
+          {
+            "path": "node_modules/pkg/index.js",
+            "content_utf8": "vendored\n"
+          },
+          {
+            "path": "scripts/node_modules/pkg/index.js",
+            "content_utf8": "nested vendored\n"
+          },
+          {
+            "path": "__pycache__/tool.cpython-313.pyc",
+            "content_utf8": "compiled\n"
+          },
+          {
+            "path": "scripts/tool.pyc",
+            "content_utf8": "compiled\n"
+          },
+          {
+            "path": ".DS_Store",
+            "content_utf8": "mac metadata\n"
+          },
+          {
+            "path": "nested/.git/config",
+            "content_utf8": "[core]\n"
+          }
+        ]
+      },
+      "expected": {
+        "sha256": "sha256:4c8bbad90366eeaa6822e33db9ce427e32f8e5f8604d61c413bd1222d6c0d63d",
+        "canonical_order": [
+          "SKILL.md",
+          "scripts/tool.py"
+        ],
+        "canonical_included_paths": [
+          "SKILL.md",
+          "scripts/tool.py"
+        ]
+      }
+    }
+  ]
+}

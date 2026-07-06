@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "untracked-install",
+      "description": "No lock entry always plans an install.",
+      "input": {
+        "bundled_version": "2.4.6",
+        "tracked": false,
+        "installed_version": null,
+        "disk_state": "missing",
+        "force": false
+      },
+      "expected": {
+        "kind": "install",
+        "from": null,
+        "installed": null,
+        "will_write": true,
+        "blocked": false
+      }
+    },
+    {
+      "name": "tracked-version-absent-update",
+      "description": "A tracked entry with no installed version compares as Less and updates.",
+      "input": {
+        "bundled_version": "2.4.6",
+        "tracked": true,
+        "installed_version": null,
+        "disk_state": "matches-source",
+        "force": false
+      },
+      "expected": {
+        "kind": "update",
+        "from": null,
+        "installed": null,
+        "will_write": true,
+        "blocked": false
+      }
+    },
+    {
+      "name": "older-update",
+      "description": "An older installed semver version updates.",
+      "input": {
+        "bundled_version": "2.4.6",
+        "tracked": true,
+        "installed_version": "1.9.0",
+        "disk_state": "matches-source",
+        "force": false
+      },
+      "expected": {
+        "kind": "update",
+        "from": "1.9.0",
+        "installed": null,
+        "will_write": true,
+        "blocked": false
+      }
+    },
+    {
+      "name": "equal-missing-disk-install",
+      "description": "An equal tracked version with no on-disk copy installs again.",
+      "input": {
+        "bundled_version": "2.4.6",
+        "tracked": true,
+        "installed_version": "2.4.6",
+        "disk_state": "missing",
+        "force": false
+      },
+      "expected": {
+        "kind": "install",
+        "from": null,
+        "installed": null,
+        "will_write": true,
+        "blocked": false
+      }
+    },
+    {
+      "name": "equal-same-skip",
+      "description": "An equal tracked version with matching bytes skips.",
+      "input": {
+        "bundled_version": "2.4.6",
+        "tracked": true,
+        "installed_version": "2.4.6",
+        "disk_state": "matches-source",
+        "force": false
+      },
+      "expected": {
+        "kind": "skip",
+        "from": null,
+        "installed": null,
+        "will_write": false,
+        "blocked": false
+      }
+    },
+    {
+      "name": "equal-drifted-skip",
+      "description": "An equal tracked version with local edits drift-skips when force is false.",
+      "input": {
+        "bundled_version": "2.4.6",
+        "tracked": true,
+        "installed_version": "2.4.6",
+        "disk_state": "drifted",
+        "force": false
+      },
+      "expected": {
+        "kind": "drifted-skip",
+        "from": null,
+        "installed": "2.4.6",
+        "will_write": false,
+        "blocked": false
+      }
+    },
+    {
+      "name": "equal-drifted-force-update",
+      "description": "An equal tracked version with local edits updates when force is true.",
+      "input": {
+        "bundled_version": "2.4.6",
+        "tracked": true,
+        "installed_version": "2.4.6",
+        "disk_state": "drifted",
+        "force": true
+      },
+      "expected": {
+        "kind": "update",
+        "from": "2.4.6",
+        "installed": null,
+        "will_write": true,
+        "blocked": false
+      }
+    },
+    {
+      "name": "newer-refuse",
+      "description": "A newer installed semver version blocks the plan without force.",
+      "input": {
+        "bundled_version": "2.4.6",
+        "tracked": true,
+        "installed_version": "9.0.0",
+        "disk_state": "matches-source",
+        "force": false
+      },
+      "expected": {
+        "kind": "refuse-newer",
+        "from": null,
+        "installed": "9.0.0",
+        "will_write": false,
+        "blocked": true
+      }
+    },
+    {
+      "name": "newer-force-downgrade",
+      "description": "A newer installed semver version downgrades when force is true.",
+      "input": {
+        "bundled_version": "2.4.6",
+        "tracked": true,
+        "installed_version": "9.0.0",
+        "disk_state": "matches-source",
+        "force": true
+      },
+      "expected": {
+        "kind": "downgrade",
+        "from": "9.0.0",
+        "installed": null,
+        "will_write": true,
+        "blocked": false
+      }
+    },
+    {
+      "name": "non-semver-equal-fallback",
+      "description": "Equal non-semver strings fall back to string equality and then to normal equal-version handling.",
+      "input": {
+        "bundled_version": "dev-build",
+        "tracked": true,
+        "installed_version": "dev-build",
+        "disk_state": "matches-source",
+        "force": false
+      },
+      "expected": {
+        "kind": "skip",
+        "from": null,
+        "installed": null,
+        "will_write": false,
+        "blocked": false
+      }
+    },
+    {
+      "name": "non-semver-unequal-fallback",
+      "description": "Unequal non-semver strings fall back to Less and update.",
+      "input": {
+        "bundled_version": "dev-build",
+        "tracked": true,
+        "installed_version": "nightly",
+        "disk_state": "matches-source",
+        "force": false
+      },
+      "expected": {
+        "kind": "update",
+        "from": "nightly",
+        "installed": null,
+        "will_write": true,
+        "blocked": false
+      }
+    }
+  ]
+}

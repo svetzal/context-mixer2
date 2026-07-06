@@ -86,6 +86,11 @@ impl FakeFilesystem {
     pub fn file_exists(&self, path: &Path) -> bool {
         self.files.borrow().contains_key(path)
     }
+
+    /// Return a sorted snapshot of every file currently stored in the fake filesystem.
+    pub fn snapshot_files(&self) -> BTreeMap<PathBuf, Vec<u8>> {
+        self.files.borrow().clone()
+    }
 }
 
 impl Default for FakeFilesystem {

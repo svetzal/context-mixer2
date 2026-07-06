@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "no-fence",
+      "description": "Leaves SKILL.md unchanged when no leading frontmatter fence exists.",
+      "input": {
+        "version": "2.4.6",
+        "skill_md_path": "no-fence/input/SKILL.md"
+      },
+      "expected": {
+        "skill_md_path": "no-fence/expected/SKILL.md",
+        "byte_exact": true,
+        "idempotent_second_pass": false
+      }
+    },
+    {
+      "name": "empty-metadata-block",
+      "description": "Adds `metadata.version` using the default two-space indent when the metadata block is empty.",
+      "input": {
+        "version": "2.4.6",
+        "skill_md_path": "empty-metadata-block/input/SKILL.md"
+      },
+      "expected": {
+        "skill_md_path": "empty-metadata-block/expected/SKILL.md",
+        "byte_exact": true,
+        "idempotent_second_pass": false
+      }
+    },
+    {
+      "name": "existing-metadata-version",
+      "description": "Replaces an existing `metadata.version` value in place.",
+      "input": {
+        "version": "2.4.6",
+        "skill_md_path": "existing-metadata-version/input/SKILL.md"
+      },
+      "expected": {
+        "skill_md_path": "existing-metadata-version/expected/SKILL.md",
+        "byte_exact": true,
+        "idempotent_second_pass": false
+      }
+    },
+    {
+      "name": "shadowing-top-level-version",
+      "description": "Removes a shadowing top-level `version:` key and writes `metadata.version` instead.",
+      "input": {
+        "version": "2.4.6",
+        "skill_md_path": "shadowing-top-level-version/input/SKILL.md"
+      },
+      "expected": {
+        "skill_md_path": "shadowing-top-level-version/expected/SKILL.md",
+        "byte_exact": true,
+        "idempotent_second_pass": false
+      }
+    },
+    {
+      "name": "crlf-line-endings",
+      "description": "Captures the reference output for CRLF frontmatter input exactly as emitted by the Rust oracle.",
+      "input": {
+        "version": "2.4.6",
+        "skill_md_path": "crlf-line-endings/input/SKILL.md"
+      },
+      "expected": {
+        "skill_md_path": "crlf-line-endings/expected/SKILL.md",
+        "byte_exact": true,
+        "idempotent_second_pass": false
+      }
+    },
+    {
+      "name": "metadata-indent-four-spaces",
+      "description": "Inserts `metadata.version` using the indentation of the metadata block's first child.",
+      "input": {
+        "version": "2.4.6",
+        "skill_md_path": "metadata-indent-four-spaces/input/SKILL.md"
+      },
+      "expected": {
+        "skill_md_path": "metadata-indent-four-spaces/expected/SKILL.md",
+        "byte_exact": true,
+        "idempotent_second_pass": false
+      }
+    },
+    {
+      "name": "folded-description-before-version",
+      "description": "Updates `metadata.version` without disturbing a folded `description:` block above it.",
+      "input": {
+        "version": "2.4.6",
+        "skill_md_path": "folded-description-before-version/input/SKILL.md"
+      },
+      "expected": {
+        "skill_md_path": "folded-description-before-version/expected/SKILL.md",
+        "byte_exact": true,
+        "idempotent_second_pass": false
+      }
+    },
+    {
+      "name": "idempotent-already-reconciled",
+      "description": "Re-running reconciliation against already-correct bytes yields the same byte stream.",
+      "input": {
+        "version": "2.4.6",
+        "skill_md_path": "idempotent-already-reconciled/input/SKILL.md"
+      },
+      "expected": {
+        "skill_md_path": "idempotent-already-reconciled/expected/SKILL.md",
+        "byte_exact": true,
+        "idempotent_second_pass": true
+      }
+    }
+  ]
+}

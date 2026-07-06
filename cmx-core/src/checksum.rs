@@ -70,7 +70,10 @@ pub fn checksum_in_memory<'a>(
 /// `.`-vs-`/` ordering divergence (SPEC §11.4) and normalizes `\`-separated
 /// paths a Windows port might produce (SPEC §11.3).
 pub(crate) fn rel_path_key(rel: &Path) -> String {
-    rel.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/")
+    rel.components()
+        .map(|c| c.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// Compute the checksum for an artifact, dispatching to the correct strategy

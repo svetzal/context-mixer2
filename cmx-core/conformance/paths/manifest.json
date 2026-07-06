@@ -1,0 +1,341 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "claude-global",
+      "input": {
+        "platform": "claude",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".claude/skills",
+        "lockname": "cmx-lock.json"
+      }
+    },
+    {
+      "name": "copilot-global",
+      "input": {
+        "platform": "copilot",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".copilot/skills",
+        "lockname": "cmx-lock-copilot.json"
+      }
+    },
+    {
+      "name": "cursor-global",
+      "input": {
+        "platform": "cursor",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".cursor/skills",
+        "lockname": "cmx-lock-cursor.json"
+      }
+    },
+    {
+      "name": "windsurf-global",
+      "input": {
+        "platform": "windsurf",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".codeium/windsurf/skills",
+        "lockname": "cmx-lock-windsurf.json"
+      }
+    },
+    {
+      "name": "gemini-global",
+      "input": {
+        "platform": "gemini",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".gemini/skills",
+        "lockname": "cmx-lock-gemini.json"
+      }
+    },
+    {
+      "name": "opencode-global",
+      "input": {
+        "platform": "opencode",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-opencode.json"
+      }
+    },
+    {
+      "name": "codex-global",
+      "input": {
+        "platform": "codex",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-codex.json"
+      }
+    },
+    {
+      "name": "pi-global",
+      "input": {
+        "platform": "pi",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-pi.json"
+      }
+    },
+    {
+      "name": "crush-global",
+      "input": {
+        "platform": "crush",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-crush.json"
+      }
+    },
+    {
+      "name": "amp-global",
+      "input": {
+        "platform": "amp",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".config/agents/skills",
+        "lockname": "cmx-lock-amp.json"
+      }
+    },
+    {
+      "name": "zed-global",
+      "input": {
+        "platform": "zed",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-zed.json"
+      }
+    },
+    {
+      "name": "openhands-global",
+      "input": {
+        "platform": "openhands",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-openhands.json"
+      }
+    },
+    {
+      "name": "hermes-global",
+      "input": {
+        "platform": "hermes",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".hermes/skills",
+        "lockname": "cmx-lock-hermes.json"
+      }
+    },
+    {
+      "name": "devin-global",
+      "input": {
+        "platform": "devin",
+        "kind": "skill",
+        "scope": "global"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-devin.json"
+      }
+    },
+    {
+      "name": "claude-local",
+      "input": {
+        "platform": "claude",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".claude/skills",
+        "lockname": "cmx-lock.json"
+      }
+    },
+    {
+      "name": "copilot-local",
+      "input": {
+        "platform": "copilot",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".github/skills",
+        "lockname": "cmx-lock-copilot.json"
+      }
+    },
+    {
+      "name": "cursor-local",
+      "input": {
+        "platform": "cursor",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".cursor/skills",
+        "lockname": "cmx-lock-cursor.json"
+      }
+    },
+    {
+      "name": "windsurf-local",
+      "input": {
+        "platform": "windsurf",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".windsurf/skills",
+        "lockname": "cmx-lock-windsurf.json"
+      }
+    },
+    {
+      "name": "gemini-local",
+      "input": {
+        "platform": "gemini",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".gemini/skills",
+        "lockname": "cmx-lock-gemini.json"
+      }
+    },
+    {
+      "name": "opencode-local",
+      "input": {
+        "platform": "opencode",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-opencode.json"
+      }
+    },
+    {
+      "name": "codex-local",
+      "input": {
+        "platform": "codex",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-codex.json"
+      }
+    },
+    {
+      "name": "pi-local",
+      "input": {
+        "platform": "pi",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-pi.json"
+      }
+    },
+    {
+      "name": "crush-local",
+      "input": {
+        "platform": "crush",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-crush.json"
+      }
+    },
+    {
+      "name": "amp-local",
+      "input": {
+        "platform": "amp",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-amp.json"
+      }
+    },
+    {
+      "name": "zed-local",
+      "input": {
+        "platform": "zed",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-zed.json"
+      }
+    },
+    {
+      "name": "openhands-local",
+      "input": {
+        "platform": "openhands",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-openhands.json"
+      }
+    },
+    {
+      "name": "hermes-local",
+      "input": {
+        "platform": "hermes",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-hermes.json"
+      }
+    },
+    {
+      "name": "devin-local",
+      "input": {
+        "platform": "devin",
+        "kind": "skill",
+        "scope": "local"
+      },
+      "expected": {
+        "subpath": ".agents/skills",
+        "lockname": "cmx-lock-devin.json"
+      }
+    }
+  ]
+}

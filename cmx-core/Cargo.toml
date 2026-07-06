@@ -18,6 +18,11 @@ default = []
 llm = ["dep:tokio", "dep:mojentic"]
 test-support = []
 
+[[bin]]
+name = "generate-conformance-fixtures"
+path = "src/bin/generate_conformance_fixtures.rs"
+required-features = ["test-support"]
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
