@@ -62,15 +62,16 @@ Both tools adopted the settled `init` conventions: **global scope by default**, 
 | researcher (Python) | hand-rolled (`researcher init`) | awaiting Python port |
 | hopper (Bun/TS) | hand-rolled (`hopper init`) | awaiting TypeScript port |
 | hone (Bun/TS) | hand-rolled (`hone init`) | awaiting TypeScript port |
+| mailctl (Bun/TS) | hand-rolled (`mailctl init`, single-file `src/init.js`) | awaiting TypeScript port |
 | evt (Python) | no skill yet | gains its first skill with the Python port |
 
 ## What remains
 
 Targets align with the mojentic framework's ports: **Rust, Python, TypeScript, Elixir, Swift, Kotlin** — native ports over FFI bindings, because the domain (file copying, JSON lockfiles, semver comparison) is small enough that a port is cheaper than dragging a Rust toolchain into gilt's pure-Python build or complicating hopper's `bun build --compile` single-binary story. The conformance suite carries the correctness burden.
 
-1. **Behavioral spec + conformance fixtures** — distilled from the now-stable Rust behavior: lockfile schema, path-resolution rules, version-guard semantics, cmx-detection rules, plus golden fixtures (lockfiles, before/after directory trees). This is what makes ports *ports* rather than divergent cousins — the same discipline as mojentic's PARITY.md. Judgment-heavy (what is contract vs. implementation detail); review the spec before queueing ports against it.
+1. **Behavioral spec + conformance fixtures** — distilled from the now-stable Rust behavior: lockfile schema, path-resolution rules, version-guard semantics, cmx-detection rules, plus golden fixtures (lockfiles, before/after directory trees). This is what makes ports *ports* rather than divergent cousins — the same discipline as mojentic's PARITY.md. Judgment-heavy (what is contract vs. implementation detail); review the spec before queueing ports against it. **Draft spec: [cmx-core/SPEC.md](cmx-core/SPEC.md) (2026-07-05)** — carries five ⚖️ contract-vs-detail decisions in its §11 awaiting review; fixtures get built once those are settled.
 2. **Python port** (`cmx-core` on PyPI) — migrate gilt (folding `skill-init` into `init` per decision 3), researcher, and give evt its first skill. First consumer files a friction report before the PyPI publish, mirroring the Rust sequence.
-3. **TypeScript port** (npm) — migrate hopper and hone; same friction-report gate before the npm publish.
+3. **TypeScript port** (npm) — migrate hopper, hone, and mailctl; same friction-report gate before the npm publish.
 4. **Elixir/Swift/Kotlin** — demand-driven: follow when a tool in that ecosystem ships a skill.
 5. **Retire the `--global` no-op aliases** in parite and foundry after one release cycle.
 6. **Optional, unscheduled**: unify cmx's own internal `install` path onto `skill_install` if it earns its keep.
