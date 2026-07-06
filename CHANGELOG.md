@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.2] - 2026-07-06
+
 ### Fixed
 
 - `cmx {skill,agent} update <name>` now warns on stderr when a bare update only refreshes the default platform while sibling managed-platform copies of the same artifact remain out of sync. The success line still reports the platform that was updated, exit codes are unchanged, and the note points to the right follow-up: `cmx skill sync <name>` for skills, or per-platform `cmx agent update <name> --platform <platform> --force` for agents.
