@@ -1,11 +1,19 @@
 use std::path::PathBuf;
 
+use crate::platform::Platform;
+
 use super::types::{DoctorArtifact, DoctorRow};
 
 /// Per-location data for one copy of a diverged artifact.
 #[derive(Debug, Clone)]
 pub struct DivergenceMember {
     pub location: PathBuf,
+    /// A deterministic representative for the location, used by
+    /// `doctor --json`'s singular `platform` field.
+    pub platform: Option<Platform>,
+    /// Every surveyed platform that reads this install location. The human
+    /// doctor table renders one `platform@version` pair per entry here.
+    pub platforms: Vec<Platform>,
     pub version: Option<String>,
     pub state_label: &'static str,
 }
@@ -34,6 +42,8 @@ pub fn location_members(artifact: &DoctorArtifact, rows: &[DoctorRow]) -> Vec<Di
         .into_iter()
         .map(|r| DivergenceMember {
             location: r.location.clone(),
+            platform: r.platforms.first().copied(),
+            platforms: r.platforms.clone(),
             version: r.version.clone(),
             state_label: r.state.label(),
         })

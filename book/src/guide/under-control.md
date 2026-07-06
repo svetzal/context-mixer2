@@ -210,10 +210,11 @@ Summary: 40 tracked, 0 drifted, 0 untracked, 0 orphaned, 24 external, 0 missing 
 everything that isn't is acknowledged but unflagged.
 
 > **One skill, many tools.** A skill you've projected to several assistants is
-> reported as a *single* tracked artifact whose `Tools` column lists every tool
-> it's installed for — not as "duplicates." `diverged` is reserved for the rare
-> case where copies actually disagree (different version or state across
-> locations). `doctor`'s hint names the fix that fits the artifact's provenance:
+> reported as a *single* tracked artifact whose `Platforms` column lists every
+> surveyed copy as `platform@version` — not as "duplicates." `diverged` is
+> reserved for the rare case where copies' content actually disagrees across
+> locations, even when the displayed versions happen to match. `doctor`'s hint
+> names the fix that fits the artifact's provenance:
 > [`cmx skill sync <name>`](./reconciling.md) reconciles copies **between install
 > locations** (the right move for an `external` or source-less skill), while
 > `cmx <kind> update <name> --force` (re-sync from the source) or

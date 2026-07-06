@@ -60,7 +60,7 @@ cmx info <name> --json  → flat object: path, version, installed_at, source,
                           locally_modified, activation_description,
                           summary (str|null — null when no LLM available)
 cmx doctor --json       → {"artifacts": [{name, kind, scope, state, diverged,
-                            locations: [{path, state, version}], ..}],
+                            locations: [{path, platform, state, version}], ..}],
                            "summary": {tracked, drifted, untracked, orphaned,
                                        external, missing, diverged,
                                        set_inconsistent},

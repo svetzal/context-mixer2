@@ -176,15 +176,17 @@ therefore act **only on orphaned** artifacts — an untracked artifact is steere
 to `install` instead of being adopted as if it were private.
 
 A skill installed for several tools is reported as **one logical artifact**
-whose `Tools` column lists every tool it's installed for — not as N duplicates.
-That's the intended "curate once, project to many" outcome. The only
-multi-location situation `doctor` flags is `(diverged)`: copies that actually
-**disagree** — a different version or state across locations. A divergence is an
-anomaly worth surfacing *whoever* owns the artifact, so it's flagged even for
-`external` artifacts; cmx just can't be the one to re-sync an external one (its
-owning tool must). When versions differ the `Version` column names the skew
-(e.g. `3.2.0 / 3.3.0`) instead of collapsing to `-`, and a detail line under the
-summary names which copy is where:
+whose `Platforms` column lists every surveyed copy as `platform@version` — not
+as N duplicates. That's the intended "curate once, project to many" outcome.
+The only multi-location situation `doctor` flags is `(diverged)`: copies whose
+**content differs** across locations. A divergence is an anomaly worth
+surfacing *whoever* owns the artifact, so it's flagged even for `external`
+artifacts; cmx just can't be the one to re-sync an external one (its owning
+tool must). Because the table attributes the version to each platform directly,
+it can show equal versions for content-diverged copies (for example
+`claude@1.1.2, codex@1.1.2`) or version skew (`codex@3.2.0, claude@3.3.0`)
+without hiding which copy is where. A detail line under the summary still names
+the paths:
 
 ```text
   • hopper-coordinator diverges: ~/.agents/skills @ 3.2.0, ~/.claude/skills @ 3.3.0
@@ -237,8 +239,8 @@ The shape mirrors the human view:
       "tools": [],
       "diverged": true,
       "locations": [
-        { "path": "~/.agents/skills", "version": "3.2.0", "state": "external" },
-        { "path": "~/.claude/skills", "version": "3.3.0", "state": "external" }
+        { "path": "~/.agents/skills", "platform": "codex", "version": "3.2.0", "state": "external" },
+        { "path": "~/.claude/skills", "platform": "claude", "version": "3.3.0", "state": "external" }
       ]
     }
   ]
@@ -248,10 +250,10 @@ The shape mirrors the human view:
 `showing` reflects the same selection the human table would use — `--all`
 switches it from `"needs_attention"` to `"all"` and includes healthy artifacts
 too. An artifact carries `version` when every copy agrees, or `versions` (an
-array) when they diverge — same rule as the human table's `Version` column.
-Every artifact's `locations` array replaces the human view's free-text
-"diverges: ..." line with structured `{path, version, state}` entries, so a
-script never has to parse prose to find where copies disagree.
+array) when they diverge. Every artifact's `locations` array replaces the human
+view's free-text "diverges: ..." line with structured `{path, platform,
+version, state}` entries, so a script never has to parse prose to find where
+copies disagree.
 
 ### `cmx init`
 

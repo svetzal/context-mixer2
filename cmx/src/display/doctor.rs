@@ -3,7 +3,6 @@ use std::fmt;
 use serde_json::{Value, json};
 
 use crate::doctor::{DoctorArtifact, DoctorReport};
-use crate::platform::platforms_label;
 use crate::table::Table;
 
 /// The artifacts this survey shows — the same selection whether rendered as
@@ -48,6 +47,7 @@ pub fn doctor_json(report: &DoctorReport) -> Value {
                     .into_iter()
                     .map(|m| json!({
                         "path": m.location.display().to_string(),
+                        "platform": m.platform.map(|p| p.to_string()),
                         "version": m.version,
                         "state": m.state_label,
                     }))
@@ -101,39 +101,73 @@ fn set_problem_label(problem: crate::doctor::SetProblem) -> &'static str {
     }
 }
 
+fn platform_version_label(
+    platform: Option<crate::platform::Platform>,
+    version: Option<&str>,
+) -> String {
+    let platform = platform.map_or_else(|| "unmapped".to_string(), |p| p.to_string());
+    let version = version.unwrap_or("unversioned");
+    format!("{platform}@{version}")
+}
+
+fn doctor_platforms_cell(
+    artifact: &crate::doctor::DoctorArtifact,
+    rows: &[crate::doctor::DoctorRow],
+) -> String {
+    let members = crate::doctor::location_members(artifact, rows);
+    let labels: Vec<String> = if members.is_empty() {
+        artifact
+            .tools
+            .iter()
+            .copied()
+            .map(|platform| platform_version_label(Some(platform), artifact.version.as_deref()))
+            .collect()
+    } else {
+        members
+            .into_iter()
+            .flat_map(|member| {
+                if member.platforms.is_empty() {
+                    vec![platform_version_label(None, member.version.as_deref())]
+                } else {
+                    member
+                        .platforms
+                        .into_iter()
+                        .map(|platform| {
+                            platform_version_label(Some(platform), member.version.as_deref())
+                        })
+                        .collect()
+                }
+            })
+            .collect()
+    };
+
+    if labels.is_empty() {
+        platform_version_label(None, artifact.version.as_deref())
+    } else {
+        labels.join(", ")
+    }
+}
+
 /// Build the artifact table from the given grouped logical artifacts — one row
-/// per skill, the Tools column listing every tool it's installed for.
-fn doctor_artifact_table(artifacts: &[&crate::doctor::DoctorArtifact]) -> Table {
+/// per logical artifact, with the Platforms column attributing versions to the
+/// surveyed install locations.
+fn doctor_artifact_table(
+    artifacts: &[&crate::doctor::DoctorArtifact],
+    rows: &[crate::doctor::DoctorRow],
+) -> Table {
     Table {
-        headers: vec![
-            "Type", "Name", "Scope", "State", "Version", "Source", "Tools",
-        ],
+        headers: vec!["Type", "Name", "Scope", "State", "Source", "Platforms"],
         padded_cols: 6,
         rows: artifacts
             .iter()
             .map(|a| {
-                let tools = if a.tools.is_empty() {
-                    "-".to_string()
-                } else {
-                    platforms_label(&a.tools)
-                };
-                // When copies agree show the single version; when they diverge
-                // name the skew (`3.2.0 / 3.3.0`) rather than an opaque `-`.
-                let version = a.version.clone().unwrap_or_else(|| {
-                    if a.versions.len() > 1 {
-                        a.versions.join(" / ")
-                    } else {
-                        "-".to_string()
-                    }
-                });
                 let mut cells = vec![
                     a.kind.to_string(),
                     a.name.clone(),
                     a.scope.label().to_string(),
                     a.state.label().to_string(),
-                    version,
-                    a.source.clone().unwrap_or_else(|| "-".to_string()),
-                    tools,
+                    a.source.clone().unwrap_or_else(|| "none".to_string()),
+                    doctor_platforms_cell(a, rows),
                 ];
                 if a.diverged {
                     cells.push("(diverged)".to_string());
@@ -303,7 +337,7 @@ impl fmt::Display for DoctorReport {
                     "Needs attention:"
                 }
             )?;
-            write!(f, "{}", doctor_artifact_table(&shown).render())?;
+            write!(f, "{}", doctor_artifact_table(&shown, &self.rows).render())?;
         }
 
         if !self.missing.is_empty() {
@@ -350,7 +384,8 @@ impl fmt::Display for DoctorReport {
 mod tests {
     use super::{adopt_all_deprecation_notice, doctor_json};
     use crate::doctor::{
-        ArtifactState, DoctorArtifact, DoctorReport, MissingRow, SetInconsistency, SetProblem,
+        ArtifactState, DoctorArtifact, DoctorReport, DoctorRow, MissingRow, SetInconsistency,
+        SetProblem,
     };
     use crate::platform::Platform;
     use crate::types::{ArtifactKind, InstallScope};
@@ -368,6 +403,27 @@ mod tests {
             source: None,
             locations: vec![PathBuf::from("/home/u/.claude/skills")],
             diverged: false,
+        }
+    }
+
+    fn skill_row(
+        name: &str,
+        location: &str,
+        platforms: Vec<Platform>,
+        state: ArtifactState,
+        version: Option<&str>,
+    ) -> DoctorRow {
+        DoctorRow {
+            kind: ArtifactKind::Skill,
+            name: name.to_string(),
+            scope: InstallScope::Global,
+            location: PathBuf::from(location),
+            platforms,
+            tracked_for: vec![],
+            state,
+            version: version.map(str::to_string),
+            source: None,
+            content_checksum: format!("sha256:{name}:{location}:{}", version.unwrap_or("none")),
         }
     }
 
@@ -401,10 +457,17 @@ mod tests {
     }
 
     #[test]
-    fn doctor_report_lists_tools_for_multi_tool_artifact() {
-        // One skill installed for two tools is ONE row listing both — not "dup".
+    fn doctor_report_lists_platform_versions_for_multi_platform_artifact() {
+        // One skill installed for two platforms is ONE row listing both copies
+        // as platform@version pairs — not one row per location.
         let r = DoctorReport {
-            rows: vec![],
+            rows: vec![skill_row(
+                "clipboard",
+                "/shared/.agents/skills",
+                vec![Platform::Claude, Platform::Codex],
+                ArtifactState::Tracked,
+                Some("1.0.0"),
+            )],
             artifacts: vec![DoctorArtifact {
                 kind: ArtifactKind::Skill,
                 name: "clipboard".to_string(),
@@ -426,7 +489,12 @@ mod tests {
         };
         let out = r.to_string();
         assert!(out.contains("clipboard"));
-        assert!(out.contains("claude, codex"), "tools listed in one row: {out}");
+        assert!(
+            out.contains("claude@1.0.0, codex@1.0.0"),
+            "platform/version pairs listed in one row: {out}"
+        );
+        assert!(out.contains("Platforms"), "doctor header renamed: {out}");
+        assert!(!out.contains("Tools"), "stale header removed: {out}");
         assert!(out.contains("home"), "source provenance shown: {out}");
         assert!(!out.contains("(diverged)"), "consistent copies carry no diverged marker");
         assert!(out.contains("1 tracked"), "counted once, not per-location");
@@ -479,14 +547,28 @@ mod tests {
 
     #[test]
     fn doctor_report_names_version_skew() {
-        // A version-diverged artifact: no single agreed version, but the distinct
-        // versions are shown (`3.2.0 / 3.3.0`) rather than an opaque `-`.
+        // A version-diverged artifact attributes each version to its platform.
         let mut a = orphan_artifact("hopper-coordinator");
         a.diverged = true;
         a.version = None;
         a.versions = vec!["3.2.0".to_string(), "3.3.0".to_string()];
         let r = DoctorReport {
-            rows: vec![],
+            rows: vec![
+                skill_row(
+                    "hopper-coordinator",
+                    "/u/.agents/skills",
+                    vec![Platform::Codex],
+                    ArtifactState::External,
+                    Some("3.2.0"),
+                ),
+                skill_row(
+                    "hopper-coordinator",
+                    "/u/.claude/skills",
+                    vec![Platform::Claude],
+                    ArtifactState::External,
+                    Some("3.3.0"),
+                ),
+            ],
             artifacts: vec![a],
             missing: vec![],
             included_local: false,
@@ -496,27 +578,13 @@ mod tests {
             set_inconsistencies: vec![],
         };
         let out = r.to_string();
-        assert!(out.contains("3.2.0 / 3.3.0"), "version skew named in the table: {out}");
+        assert!(out.contains("codex@3.2.0, claude@3.3.0"), "skew attributed in the table: {out}");
+        assert!(out.contains("none"), "source uses explicit placeholder: {out}");
         assert!(out.contains("(diverged)"), "still flagged diverged: {out}");
     }
 
     #[test]
     fn doctor_details_name_each_locations_version() {
-        use crate::doctor::{ArtifactState, DoctorRow};
-        use crate::platform::Platform;
-
-        let mk_row = |loc: &str, ver: &str, platform| DoctorRow {
-            kind: ArtifactKind::Skill,
-            name: "hopper-coordinator".to_string(),
-            scope: InstallScope::Global,
-            location: PathBuf::from(loc),
-            platforms: vec![platform],
-            tracked_for: vec![],
-            state: ArtifactState::External,
-            version: Some(ver.to_string()),
-            source: None,
-            content_checksum: format!("sha256:{ver}"),
-        };
         let mut art = orphan_artifact("hopper-coordinator");
         art.state = ArtifactState::External;
         art.diverged = true;
@@ -524,8 +592,20 @@ mod tests {
         art.versions = vec!["3.2.0".to_string(), "3.3.0".to_string()];
         let r = DoctorReport {
             rows: vec![
-                mk_row("/u/.claude/skills", "3.3.0", Platform::Claude),
-                mk_row("/u/.agents/skills", "3.2.0", Platform::Codex),
+                skill_row(
+                    "hopper-coordinator",
+                    "/u/.claude/skills",
+                    vec![Platform::Claude],
+                    ArtifactState::External,
+                    Some("3.3.0"),
+                ),
+                skill_row(
+                    "hopper-coordinator",
+                    "/u/.agents/skills",
+                    vec![Platform::Codex],
+                    ArtifactState::External,
+                    Some("3.2.0"),
+                ),
             ],
             artifacts: vec![art],
             missing: vec![],
@@ -551,7 +631,22 @@ mod tests {
         a.version = None;
         a.versions = vec!["3.2.0".to_string(), "3.3.0".to_string()];
         let r = DoctorReport {
-            rows: vec![],
+            rows: vec![
+                skill_row(
+                    "hopper-coordinator",
+                    "/u/.agents/skills",
+                    vec![Platform::Codex],
+                    ArtifactState::External,
+                    Some("3.2.0"),
+                ),
+                skill_row(
+                    "hopper-coordinator",
+                    "/u/.claude/skills",
+                    vec![Platform::Claude],
+                    ArtifactState::External,
+                    Some("3.3.0"),
+                ),
+            ],
             artifacts: vec![a],
             missing: vec![],
             included_local: false,
@@ -603,20 +698,6 @@ mod tests {
     }
 
     fn diverged_report_with_locations() -> DoctorReport {
-        use crate::doctor::DoctorRow;
-
-        let mk_row = |loc: &str, ver: &str, platform| DoctorRow {
-            kind: ArtifactKind::Skill,
-            name: "hopper-coordinator".to_string(),
-            scope: InstallScope::Global,
-            location: PathBuf::from(loc),
-            platforms: vec![platform],
-            tracked_for: vec![],
-            state: ArtifactState::External,
-            version: Some(ver.to_string()),
-            source: None,
-            content_checksum: format!("sha256:{ver}"),
-        };
         let mut art = orphan_artifact("hopper-coordinator");
         art.state = ArtifactState::External;
         art.diverged = true;
@@ -628,8 +709,20 @@ mod tests {
         ];
         DoctorReport {
             rows: vec![
-                mk_row("/u/.claude/skills", "3.3.0", Platform::Claude),
-                mk_row("/u/.agents/skills", "3.2.0", Platform::Codex),
+                skill_row(
+                    "hopper-coordinator",
+                    "/u/.claude/skills",
+                    vec![Platform::Claude],
+                    ArtifactState::External,
+                    Some("3.3.0"),
+                ),
+                skill_row(
+                    "hopper-coordinator",
+                    "/u/.agents/skills",
+                    vec![Platform::Codex],
+                    ArtifactState::External,
+                    Some("3.2.0"),
+                ),
             ],
             artifacts: vec![art],
             missing: vec![],
@@ -678,14 +771,24 @@ mod tests {
         assert_eq!(locations.len(), 2);
         for loc in locations {
             assert!(loc.get("path").is_some());
+            assert!(loc.get("platform").is_some());
             assert!(loc.get("version").is_some());
             assert!(loc.get("state").is_some());
         }
+        assert_eq!(locations[0]["platform"], "codex");
+        assert_eq!(locations[1]["platform"], "claude");
     }
 
     #[test]
     fn doctor_json_showing_all() {
         let mut r = diverged_report_with_locations();
+        r.rows.push(skill_row(
+            "clipboard",
+            "/u/.claude/skills",
+            vec![Platform::Claude],
+            ArtifactState::Tracked,
+            Some("1.0.0"),
+        ));
         r.artifacts.push(DoctorArtifact {
             kind: ArtifactKind::Skill,
             name: "clipboard".to_string(),
@@ -705,6 +808,52 @@ mod tests {
         let artifacts = value["artifacts"].as_array().expect("artifacts array");
         assert_eq!(artifacts.len(), 2, "healthy tracked artifact included with --all: {value}");
         assert!(artifacts.iter().any(|a| a["name"] == "clipboard"));
+    }
+
+    #[test]
+    fn doctor_report_renders_external_platform_versions_without_dash_cells() {
+        let report = diverged_report_with_locations();
+        let out = report.to_string();
+        assert!(out.contains("codex@3.2.0, claude@3.3.0"), "external copies attributed: {out}");
+        assert!(out.contains("none"), "source is explicit, not a dash: {out}");
+        assert!(
+            out.contains("external  none    codex@3.2.0, claude@3.3.0"),
+            "table row no longer has dash placeholders: {out}"
+        );
+    }
+
+    #[test]
+    fn doctor_report_renders_unversioned_platform_cell() {
+        let report = DoctorReport {
+            rows: vec![skill_row(
+                "personal-finance",
+                "/u/.claude/skills",
+                vec![Platform::Claude],
+                ArtifactState::Drifted,
+                None,
+            )],
+            artifacts: vec![DoctorArtifact {
+                kind: ArtifactKind::Skill,
+                name: "personal-finance".to_string(),
+                scope: InstallScope::Global,
+                state: ArtifactState::Drifted,
+                version: None,
+                versions: vec![],
+                tools: vec![Platform::Claude],
+                source: Some("home".to_string()),
+                locations: vec![PathBuf::from("/u/.claude/skills")],
+                diverged: false,
+            }],
+            missing: vec![],
+            included_local: false,
+            surveyed_platforms: 13,
+            scoped_to_managed: false,
+            show_all: true,
+            set_inconsistencies: vec![],
+        };
+        let out = report.to_string();
+        assert!(out.contains("claude@unversioned"), "unversioned vocabulary preserved: {out}");
+        assert!(!out.contains("Tools"), "doctor output no longer mentions Tools: {out}");
     }
 
     #[test]
