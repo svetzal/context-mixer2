@@ -1,6 +1,6 @@
 # cmx-core — Behavioral Specification
 
-**Status: DRAFT for review (2026-07-05).** Distilled from the stable Rust
+**Status: REVIEWED (2026-07-05).** Distilled from the stable Rust
 reference implementation (`cmx-core` 0.2.0). This is the contract every port
 (Python, TypeScript, …) must satisfy, byte-for-byte where noted. It is the input
 to the conformance fixtures (EMBEDDING.md "What remains" #1) — ports are ports,
@@ -11,12 +11,10 @@ Companion to [EMBEDDING.md](../EMBEDDING.md) (the *why* and the roadmap) and
 [cmx-core/README.md](README.md) (the Rust API surface). This document is
 language-neutral: it describes observable behavior, not Rust types.
 
-> **How to read the ⚖️ callouts.** Each ⚖️ marks a place where the reference
-> implementation does something specific and I need a ruling on whether it is
-> **contract** (ports must match; goes in a fixture) or **implementation
-> detail** (ports may differ). These are the judgment calls EMBEDDING.md flags
-> as needing review before ports queue. Everything *not* marked ⚖️ I am
-> proposing as contract.
+> **Contract-vs-detail decisions are settled** (Stacey, 2026-07-05). The five
+> judgment calls EMBEDDING.md flagged are resolved inline below (marked
+> **✅ DECIDED**) and collected in §11. Everything else is contract: ports must
+> match it and fixtures pin it.
 
 ---
 
@@ -102,11 +100,11 @@ Field rules (contract):
 - **`version`** (per entry): optional string. **Omitted entirely when absent**
   (not `null`). For a bundled-skill install it is always present (the tool's
   version).
-- **`installed_at`**: RFC 3339 timestamp string. ⚖️ **Format precision** — Rust
-  emits `chrono`'s `to_rfc3339()` (e.g. `2026-07-05T12:00:00.123456789+00:00`,
-  nanosecond precision, `+00:00` offset). Proposed contract: any valid RFC 3339
-  string is *accepted*; the exact emitted precision is **implementation detail**
-  (it is a timestamp, not a checksum input). Fixtures must not pin it — see §10.
+- **`installed_at`**: RFC 3339 timestamp string. **✅ DECIDED (§11.1)** — any
+  valid RFC 3339 string is *accepted* on read; the exact emitted precision is
+  **implementation detail** (it is a timestamp, not a checksum input). Fixtures
+  pin it exactly by injecting a **fixed clock** so runs are fully deterministic
+  (§10), rather than masking the field.
 - **`source`**: object with `repo` and `path` strings. For a bundled skill:
   `repo = "bundled:<name>"`, `path = "skills/<name>"`.
 - **`source_checksum`** / **`installed_checksum`**: `sha256:<lowercase-hex>`
@@ -129,11 +127,10 @@ to its own lockfile.
 ### 3.3 Serialization
 
 - **Pretty-printed JSON** (`serde_json::to_string_pretty` — 2-space indent).
-  ⚖️ **Contract or detail?** Pretty-printing is human-friendly and diffs cleanly
-  in git-tracked local lockfiles. Proposed: **contract** = valid JSON with sorted
-  package keys; **detail** = exact whitespace. Fixtures should compare
-  *parsed values*, not bytes, for lockfiles (unlike SKILL.md, §6, which *is*
-  byte-compared). Confirm.
+  **✅ DECIDED (§11.2)** — **contract** = valid JSON with sorted package keys;
+  **whitespace/indentation is implementation detail**, ports may differ. Fixtures
+  compare *parsed values*, not bytes, for lockfiles (unlike SKILL.md, §6, which
+  *is* byte-compared).
 - **Atomic write**: serialize to a sibling `<name>.tmp` in the same directory,
   then rename onto the target. A failed write never corrupts an existing
   lockfile. ⚖️ Proposed **contract** (matters for crash-safety on real runs);
@@ -211,17 +208,26 @@ Excluded files are **still written to disk** on install (a normal copy), but are
 **never** included in a checksum. Ports must apply the identical filter on both
 the write path and the checksum path.
 
-⚖️ **Path-separator in the hash.** Rust hashes `rel_path.to_string_lossy()`. On
-the platforms cmx-core runs (macOS/Linux) that is `/`-separated. A port on the
-same OS produces the same string. **Proposed contract: rel_path is normalized to
-`/`-separated before hashing**, so a Windows port (or a Node path on Windows)
-can't silently diverge. Confirm — this is invisible today but a latent
-cross-platform bug the spec should close now.
+**✅ DECIDED (§11.3) — Path-separator in the hash.** `rel_path` is **normalized
+to `/`-separated before hashing** (and before sorting). Rust hashes
+`rel_path.to_string_lossy()`, which is already `/`-separated on the macOS/Linux
+platforms cmx-core runs; mandating normalization means a Windows port (or a Node
+path built with `\`) cannot silently diverge. Ports must replace the OS separator
+with `/` on every `rel_path` before it enters the sort or the hash.
 
-⚖️ **Sort collation.** Rust sorts `PathBuf` component-wise. Proposed contract:
-sort by the `/`-joined path string, plain byte comparison. Needs a fixture with
-files like `a`, `a/b`, `a.b` to pin the ordering (component-wise vs string sort
-differ on the `/` vs `.` boundary).
+**✅ DECIDED (§11.4) — Sort collation.** Sort by the `/`-joined path **string**,
+plain byte/lexicographic comparison (not Rust's component-wise `PathBuf` order).
+A fixture with files like `a`, `a/b`, `a.b` pins the ordering, since string sort
+and component-wise sort differ at the `/`-vs-`.` boundary. Ports sort the
+normalized path strings directly.
+
+> **Note for the reference implementation.** Rust currently sorts `PathBuf`
+> component-wise (`checksum_dir` sorts `Vec<PathBuf>`; `canonical_files` sorts by
+> `rel_path.cmp`). For single-segment and simple nested paths this already
+> matches string sort, but the two can diverge (`a.b` vs `a/b`). To make the Rust
+> impl the faithful oracle for §11.4, its sort should key on the `/`-joined
+> string. Flagged as a follow-up fix in the reference before fixtures are
+> generated (§10) — otherwise a generated fixture could encode the wrong order.
 
 ---
 
@@ -312,9 +318,11 @@ Given no explicit `--platform` selector (the companion-skill case):
    (i.e. already in use).
 3. Else (fresh machine) → target **Claude only**.
 
-⚖️ Note the asymmetry (documented in the reference): `install` infers
-"platforms already in use" when unmanaged, whereas `remove` (§8.3) falls back to
-**all** platforms. Proposed contract — keep the asymmetry; it is deliberate.
+**✅ DECIDED (§11.5)** — the asymmetry is **deliberate contract**: `install`
+infers "platforms already in use" when unmanaged, whereas `remove` (§8.3) falls
+back to **all** platforms. Rationale: install should not spray a skill onto
+platforms the user never adopted, but remove should leave nothing behind. Ports
+must preserve both behaviors.
 
 ### 8.2 cmx-detection and source registration
 
@@ -374,28 +382,32 @@ cmx-core/conformance/
 Fixture rules:
 
 - **Checksums and SKILL.md**: byte/string exact.
-- **Lockfiles**: compared as **parsed values with `installed_at` masked** (it is
-  a wall-clock timestamp — see §3.1). ⚖️ Confirm the mask approach vs injecting a
-  fixed clock (the Rust impl injects a clock in tests; ports should too, which
-  would let us pin `installed_at` exactly and drop the mask). I lean toward
-  **injected fixed clock** so fixtures are fully deterministic.
+- **Lockfiles**: compared as **parsed values** (whitespace is detail, §11.2) with
+  an **injected fixed clock** (§11.1) so `installed_at` is pinned exactly and
+  every fixture is fully deterministic. The Rust reference already injects a clock
+  in tests; ports must expose the same seam. Package keys sorted.
 - **Directory trees**: exact file set + contents.
 
 ---
 
-## 11. Open decisions for review
+## 11. Decisions (reviewed with Stacey, 2026-07-05)
 
-The ⚖️ callouts above, collected:
+1. **`installed_at` (§3.1)** — accept any valid RFC 3339 on read; emitted
+   precision is implementation detail. Fixtures pin it via an **injected fixed
+   clock**, not by masking the field.
+2. **Lockfile serialization (§3.3)** — contract is parsed-value equality with
+   **sorted package keys**; **whitespace/indentation is implementation detail**.
+   Lockfile fixtures compare parsed values, not bytes.
+3. **Checksum path separator (§5.1)** — `rel_path` is **normalized to `/`** before
+   sorting and hashing. Closes a latent cross-platform (Windows-port) divergence.
+4. **Checksum sort collation (§5.1)** — **string sort** of the `/`-joined path,
+   plain byte comparison — *not* component-wise. **Follow-up:** the Rust reference
+   currently sorts component-wise (`checksum_dir` / `canonical_files`); its sort
+   key must move to the joined string before fixtures are generated, so the oracle
+   is faithful. Tracked as a code fix, not just a doc note.
+5. **install-vs-remove platform asymmetry (§8.1)** — **kept deliberate**: install
+   infers platforms-in-use, remove falls back to all.
 
-1. **§3.1 `installed_at`** — accept-any-RFC3339 + injected fixed clock in
-   fixtures (recommended), or pin the exact emitted format?
-2. **§3.3 lockfile serialization** — contract = parsed-value equality (sorted
-   keys), whitespace is detail? Or pin pretty-print bytes?
-3. **§5.1 path separator in hash** — mandate `/`-normalization before hashing
-   (recommended, closes a latent Windows-port bug)?
-4. **§5.1 sort collation** — string sort of `/`-joined paths (recommended) vs
-   component-wise?
-5. **§8.1 install-vs-remove asymmetry** — keep deliberate (recommended)?
-
-Once these are settled, the fixture generator can be built against the Rust
-oracle and the TS port queued with the friction-report gate (EMBEDDING.md #3).
+With these settled, the two remaining build steps are: **(a)** the §11.4 Rust sort
+fix, then **(b)** the fixture generator against the Rust oracle, after which the
+TS port queues with the friction-report gate (EMBEDDING.md #3).
