@@ -1482,20 +1482,21 @@ Ports should materialize `bundle/`, `pre/tree/`, and `pre/locks/` into an isolat
 
 #[cfg(test)]
 struct DiskTree {
-    dirs: BTreeSet<PathBuf>,
     files: BTreeMap<PathBuf, Vec<u8>>,
 }
 
 #[cfg(test)]
 fn collect_disk_tree(root: &Path) -> Result<DiskTree> {
     let mut tree = DiskTree {
-        dirs: BTreeSet::new(),
         files: BTreeMap::new(),
     };
     collect_disk_tree_recursive(root, root, &mut tree)?;
     Ok(tree)
 }
 
+// Records files only — empty directories are intentionally ignored (see
+// `assert_fixture_tree_matches`: git cannot track them, so they are not part of
+// the fixture contract).
 #[cfg(test)]
 fn collect_disk_tree_recursive(root: &Path, current: &Path, tree: &mut DiskTree) -> Result<()> {
     for entry in fs::read_dir(current).with_context(|| format!("read {}", current.display()))? {
@@ -1507,7 +1508,6 @@ fn collect_disk_tree_recursive(root: &Path, current: &Path, tree: &mut DiskTree)
             .to_path_buf();
 
         if entry.file_type()?.is_dir() {
-            tree.dirs.insert(rel.clone());
             collect_disk_tree_recursive(root, &path, tree)?;
         } else {
             let bytes = fs::read(&path).with_context(|| format!("read {}", path.display()))?;
@@ -1522,12 +1522,14 @@ fn assert_fixture_tree_matches(expected_root: &Path, actual_root: &Path) -> Resu
     let expected = collect_disk_tree(expected_root)?;
     let actual = collect_disk_tree(actual_root)?;
 
-    ensure!(
-        expected.dirs == actual.dirs,
-        "directory set drift:\nexpected: {:?}\nactual: {:?}",
-        expected.dirs,
-        actual.dirs
-    );
+    // Deliberately do NOT compare the empty-directory set. Git cannot track
+    // empty directories, so any purely-empty scaffold dir the generator emits
+    // (e.g. a fresh-install case's empty `pre/tree/...`) survives in a freshly
+    // regenerated tree but vanishes from the committed tree — making a strict
+    // `dirs ==` check pass only in the dirty worktree that just generated them
+    // and fail from every clean checkout. The contract is the set of files and
+    // their contents; the file checks below are authoritative and catch any
+    // meaningful drift (a non-empty dir necessarily shows up as a file path).
     ensure!(
         expected.files.keys().collect::<Vec<_>>() == actual.files.keys().collect::<Vec<_>>(),
         "file set drift:\nexpected: {:?}\nactual: {:?}",
