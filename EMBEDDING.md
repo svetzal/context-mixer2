@@ -83,6 +83,7 @@ Targets align with the mojentic framework's ports: **Rust, Python, TypeScript, E
 3. **Command convention: `<tool> init`** — the standard companion-skill command across the fleet. gilt's `skill-init` folds into `init` during migration; codified in `conventions/cli-ux.md` §12.
 4. **Scope default: global** — skills install to the user's global platform directory (`~/.claude/skills/`, etc.) by default; `--local` opts into project scope. A tool's companion skill describes the tool, not the project.
 5. **cmf stays external for now** — the marketplace/manifest machinery (`plugin_types`) remains CLI-side; cmx-core carries only what embedding tools need.
+6. **Port version parity (2026-07-06)** — the cmx-core ports (Rust, TypeScript `cmx-core` on npm, eventually Python) track each other on **`major.minor`; patch is independent** — the mojentic model. A port's `major.minor` asserts *which SPEC/contract version it conforms to*, and the shared conformance fixtures (§"What remains" #1) prove it: a port on 0.2.x is one that passes the 0.2.x fixtures. The **cmx CLI is explicitly outside this parity** — it is the consuming application, versions on its own `v*` tag track (3.x today), and cmx-core already versions independently of it (`cmx-core-v*` tags; see `cmx-core/Cargo.toml`). So `cmx-core-ts` starts at **0.2.0** to match the Rust crate, not 0.1.0.
 
 ## Chronology
 
