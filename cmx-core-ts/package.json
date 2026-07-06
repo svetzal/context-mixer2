@@ -1,14 +1,42 @@
 {
   "name": "cmx-core",
   "version": "0.2.0",
-  "private": true,
   "type": "module",
-  "module": "src/index.ts",
+  "description": "Embeddable core for installing agent skills across platforms — the TypeScript port of cmx-core.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/svetzal/context-mixer2.git",
+    "directory": "cmx-core-ts"
+  },
+  "keywords": [
+    "agent",
+    "skills",
+    "cli",
+    "install",
+    "claude",
+    "cmx"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "tsc -p tsconfig.build.json && bun run scripts/fix-dist-dts.ts",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
     "lint": "bunx biome check .",
-    "format": "bunx biome check --write ."
+    "format": "bunx biome check --write .",
+    "prepack": "bun run build"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
