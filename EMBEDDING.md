@@ -56,8 +56,16 @@ Both migrations ran as autonomous hopper engineering items, each required to fil
 | -------- | --------- | ----- |
 | parite (`parite init`) | single-file bundle, first contact with the raw API | friction report produced the `e30003e` stabilization; now on published 0.1.0 |
 | foundry (`foundry init`) | multi-file bundle (SKILL.md + 2 references), deletion of in-content version stamping | registry contract preserved: `{binary} init --global --force` (the invocation foundry's registry derives for skill-installing tools) still exits 0; `--json` schema unchanged; now on published 0.1.0 |
+| hopper (`hopper init`) — **TS port consumer #1** | single-file bundle on the published npm `cmx-core` 0.2.0; dropped hand-rolled version stamping + `hopper-version:` field; `bun build --compile` single binary bundles cmx-core cleanly | migrated `c1d64c5` (2026-07-06); `--global --force` exits 0, existing file-level `--json` schema preserved; verified clean-checkout (1430 tests, lint, compile, temp-HOME install/idempotent/remove smoke) |
 
-Both tools adopted the settled `init` conventions: **global scope by default**, `--local` for project scope, `--global` as a temporary no-op alias, `--force` to override the newer-installed refusal, `--remove` to uninstall. Both deleted their hand-rolled per-target rendering in favor of the crate's `Display` impls.
+Both Rust tools adopted the settled `init` conventions: **global scope by default**, `--local` for project scope, `--global` as a temporary no-op alias, `--force` to override the newer-installed refusal, `--remove` to uninstall. Both deleted their hand-rolled per-target rendering in favor of the crate's `Display` impls; hopper did the same on the TS port.
+
+**TS-port friction findings (hopper migration, 2026-07-06)** — carry these into the Python port and a possible cmx-core 0.2.x/0.3.0:
+
+- **Report shape is per-target, consumer contracts are often per-file.** cmx-core's `apply`/`remove` reports are platform/target-level; hopper's `--json` contract is file-level, so preserving it meant stitching `status()` + `plan.targets[].files[].dest_path` + action mapping in consumer code. A file-level view (or a helper) on the report would remove that boilerplate for every consumer.
+- **`refuse-newer` is all-or-nothing at `apply()`.** For a future multi-platform managed install, one blocked target blocks the whole apply through the library surface — no clean partial apply.
+- **Deprecated-dir cleanup has no hook.** hopper's `.claude/skills/hopper-worker` removal must live outside the installer as a consumer-only step.
+- **"Global by default" is consumer policy, not library-encoded.** Each consumer re-implements the default-scope convention; cmx-core could offer it as a documented default.
 
 ### Fleet status
 
@@ -67,7 +75,7 @@ Both tools adopted the settled `init` conventions: **global scope by default**, 
 | foundry (Rust) | cmx-core 0.1.0 (crates.io) | **migrated** |
 | gilt (Python) | hand-rolled (`gilt skill-init`) | awaiting Python port |
 | researcher (Python) | hand-rolled (`researcher init`) | awaiting Python port |
-| hopper (Bun/TS) | hand-rolled (`hopper init`) | TS port shipped — awaiting migration to `cmx-core` (npm) |
+| hopper (Bun/TS) | cmx-core 0.2.0 (npm) | **migrated** (`c1d64c5`, 2026-07-06) |
 | hone (Bun/TS) | hand-rolled (`hone init`) | TS port shipped — awaiting migration to `cmx-core` (npm) |
 | mailctl (Bun/TS) | hand-rolled (`mailctl init`, single-file `src/init.js`) | TS port shipped — awaiting migration to `cmx-core` (npm) |
 | evt (Python) | no skill yet | gains its first skill with the Python port |
@@ -78,7 +86,7 @@ Targets align with the mojentic framework's ports: **Rust, Python, TypeScript, E
 
 1. **Behavioral spec + conformance fixtures** — distilled from the now-stable Rust behavior: lockfile schema, path-resolution rules, version-guard semantics, cmx-detection rules, plus golden fixtures (lockfiles, before/after directory trees). This is what makes ports *ports* rather than divergent cousins — the same discipline as mojentic's PARITY.md. Judgment-heavy (what is contract vs. implementation detail); review the spec before queueing ports against it. **Spec: [cmx-core/SPEC.md](cmx-core/SPEC.md) — reviewed 2026-07-05.** The five contract-vs-detail decisions are settled (§11). The one code follow-up from the review — moving the Rust checksum sort from component-wise to `/`-joined-string collation (§11.3–§11.4) — **landed 2026-07-05** with regression tests, so the reference is now a faithful oracle. Only the fixture generator remains before the ports.
 2. **Python port** (`cmx-core` on PyPI) — migrate gilt (folding `skill-init` into `init` per decision 3), researcher, and give evt its first skill. First consumer files a friction report before the PyPI publish, mirroring the Rust sequence.
-3. **TypeScript port** (npm) — **DONE / published `cmx-core` 0.2.0** (2026-07-06). Native Bun/TS port in `cmx-core-ts/`, passes the full conformance suite; published via OIDC trusted publishing (`.github/workflows/publish-cmx-core-ts.yml`). The friction-report gate ran and surfaced one real wart — a `//home` double-slash in the fixture report serialization — since fixed at the source. **Remaining: migrate hopper, hone, and mailctl** off their hand-rolled `init` onto the published package.
+3. **TypeScript port** (npm) — **DONE / published `cmx-core` 0.2.0** (2026-07-06). Native Bun/TS port in `cmx-core-ts/`, passes the full conformance suite; published via OIDC trusted publishing (`.github/workflows/publish-cmx-core-ts.yml`). The friction-report gate ran and surfaced one real wart — a `//home` double-slash in the fixture report serialization — since fixed at the source. **hopper migrated 2026-07-06** (`c1d64c5`) as TS-port consumer #1, filing a friction report (see "Proving consumers"). **Remaining: migrate hone and mailctl** off their hand-rolled `init` onto the published package.
 4. **Elixir/Swift/Kotlin** — demand-driven: follow when a tool in that ecosystem ships a skill.
 5. **Retire the `--global` no-op aliases** in parite and foundry after one release cycle.
 6. **Optional, unscheduled**: unify cmx's own internal `install` path onto `skill_install` if it earns its keep.
