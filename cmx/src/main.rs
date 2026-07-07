@@ -49,75 +49,21 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
         Commands::Set { action } => handle_set(action, ctx),
         Commands::Agent { action } => handle_artifact(action, ArtifactKind::Agent, selector, ctx),
         Commands::Skill { action } => handle_artifact(action, ArtifactKind::Skill, selector, ctx),
-        Commands::List { all, output } => {
-            let report = cmx::list::list_all(all, ctx)?;
-            if output.json {
-                print_json(&cmx::display::json::list_json(&report))?;
-            } else {
-                print!("{report}");
-            }
-            Ok(ExitCode::SUCCESS)
-        }
+        Commands::List { all, output } => handle_list(all, output, ctx),
         Commands::Doctor {
             local,
             adopt_all,
             from,
             all,
             output,
-        } => {
-            if adopt_all {
-                eprintln!("{}", cmx::display::doctor::adopt_all_deprecation_notice());
-                let outcome = cmx::adopt::adopt_all(None, from.as_deref(), local, ctx)?;
-                if output.json {
-                    let mut report = cmx::doctor::survey(local, ctx)?;
-                    report.show_all = all;
-                    print_json(&cmx::display::doctor::doctor_json(&report))?;
-                } else {
-                    print!("{outcome}");
-                }
-                Ok(ExitCode::SUCCESS)
-            } else if from.is_some() {
-                bail!("--from only applies together with --adopt-all")
-            } else {
-                let mut report = cmx::doctor::survey(local, ctx)?;
-                report.show_all = all;
-                if output.json {
-                    print_json(&cmx::display::doctor::doctor_json(&report))?;
-                } else {
-                    print!("{report}");
-                }
-                if report.has_issues() {
-                    Ok(ExitCode::from(2))
-                } else {
-                    Ok(ExitCode::SUCCESS)
-                }
-            }
-        }
+        } => handle_doctor(local, adopt_all, from.as_deref(), all, output, ctx),
         Commands::Home { action } => handle_home(&action, ctx).map(|()| ExitCode::SUCCESS),
         Commands::Info { name, output } => {
             handle_info(&name, None, output.json, ctx).map(|()| ExitCode::SUCCESS)
         }
         Commands::Completions { shell } => handle_completions(shell),
-        Commands::Outdated { output } => {
-            cmx::source_update::ensure_fresh(ctx)?;
-            let report = cmx::outdated::outdated(ctx)?;
-            if output.json {
-                print_json(&cmx::display::json::outdated_json(&report))?;
-            } else {
-                print!("{report}");
-            }
-            Ok(ExitCode::SUCCESS)
-        }
-        Commands::Search { query, output } => {
-            cmx::source_update::ensure_fresh(ctx)?;
-            let results = cmx::search::search(&query, ctx)?;
-            if output.json {
-                print_json(&cmx::display::json::search_json(&results))?;
-            } else {
-                print!("{results}");
-            }
-            Ok(ExitCode::SUCCESS)
-        }
+        Commands::Outdated { output } => handle_outdated(output, ctx),
+        Commands::Search { query, output } => handle_search(&query, output, ctx),
         Commands::Config { action } => handle_config(action, ctx).map(|()| ExitCode::SUCCESS),
         Commands::Init {
             local,
@@ -135,6 +81,75 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             ctx,
         ),
     }
+}
+
+fn handle_list(all: bool, output: OutputArgs, ctx: &AppContext<'_>) -> Result<ExitCode> {
+    let report = cmx::list::list_all(all, ctx)?;
+    if output.json {
+        print_json(&cmx::display::json::list_json(&report))?;
+    } else {
+        print!("{report}");
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn handle_doctor(
+    local: bool,
+    adopt_all: bool,
+    from: Option<&std::path::Path>,
+    all: bool,
+    output: OutputArgs,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    if adopt_all {
+        eprintln!("{}", cmx::display::doctor::adopt_all_deprecation_notice());
+        let outcome = cmx::adopt::adopt_all(None, from, local, ctx)?;
+        if output.json {
+            let mut report = cmx::doctor::survey(local, ctx)?;
+            report.show_all = all;
+            print_json(&cmx::display::doctor::doctor_json(&report))?;
+        } else {
+            print!("{outcome}");
+        }
+        Ok(ExitCode::SUCCESS)
+    } else if from.is_some() {
+        bail!("--from only applies together with --adopt-all")
+    } else {
+        let mut report = cmx::doctor::survey(local, ctx)?;
+        report.show_all = all;
+        if output.json {
+            print_json(&cmx::display::doctor::doctor_json(&report))?;
+        } else {
+            print!("{report}");
+        }
+        if report.has_issues() {
+            Ok(ExitCode::from(2))
+        } else {
+            Ok(ExitCode::SUCCESS)
+        }
+    }
+}
+
+fn handle_outdated(output: OutputArgs, ctx: &AppContext<'_>) -> Result<ExitCode> {
+    cmx::source_update::ensure_fresh(ctx)?;
+    let report = cmx::outdated::outdated(ctx)?;
+    if output.json {
+        print_json(&cmx::display::json::outdated_json(&report))?;
+    } else {
+        print!("{report}");
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn handle_search(query: &str, output: OutputArgs, ctx: &AppContext<'_>) -> Result<ExitCode> {
+    cmx::source_update::ensure_fresh(ctx)?;
+    let results = cmx::search::search(query, ctx)?;
+    if output.json {
+        print_json(&cmx::display::json::search_json(&results))?;
+    } else {
+        print!("{results}");
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 fn handle_completions(shell: clap_complete::Shell) -> Result<ExitCode> {

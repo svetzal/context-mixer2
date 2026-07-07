@@ -200,78 +200,77 @@ pub(crate) fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
             .push(row);
     }
 
-    groups
-        .into_values()
-        .map(|members| {
-            let first = members[0];
+    groups.into_values().map(|members| fold_group(&members)).collect()
+}
 
-            // Tools cmx manages this for: the union of each location's
-            // tracked-for platforms (lockfile-backed), not every tool that reads
-            // a shared directory.
-            let mut tools: Vec<Platform> =
-                members.iter().flat_map(|r| r.tracked_for.iter().copied()).collect();
-            tools.sort_by_key(|p| p.slug());
-            tools.dedup();
+/// Fold one group of per-location rows into a single logical `DoctorArtifact`,
+/// consolidating state by severity, detecting content divergence, and computing
+/// the union of tracked platforms.
+fn fold_group(members: &[&DoctorRow]) -> DoctorArtifact {
+    let first = members[0];
 
-            let mut locations: Vec<PathBuf> = members.iter().map(|r| r.location.clone()).collect();
-            locations.sort();
-            locations.dedup();
+    // Tools cmx manages this for: the union of each location's
+    // tracked-for platforms (lockfile-backed), not every tool that reads
+    // a shared directory.
+    let mut tools: Vec<Platform> =
+        members.iter().flat_map(|r| r.tracked_for.iter().copied()).collect();
+    tools.sort_by_key(|p| p.slug());
+    tools.dedup();
 
-            let versions: BTreeSet<Option<&str>> =
-                members.iter().map(|r| r.version.as_deref()).collect();
-            // Divergence is a content question: copies are diverged only when
-            // their bytes actually differ. This catches genuinely different
-            // copies that happen to share a version (or carry none), and stops
-            // false-flagging byte-identical copies that merely differ in
-            // tracking state (e.g. tracked for one tool, untracked for another).
-            let checksums: BTreeSet<&str> =
-                members.iter().map(|r| r.content_checksum.as_str()).collect();
-            let diverged = checksums.len() > 1;
+    let mut locations: Vec<PathBuf> = members.iter().map(|r| r.location.clone()).collect();
+    locations.sort();
+    locations.dedup();
 
-            // Consolidated state: the most actionable across copies.
-            let state = members
-                .iter()
-                .map(|r| r.state)
-                .max_by_key(|s| state_severity(*s))
-                .unwrap_or(first.state);
-            // Version only when all copies agree.
-            let version = if versions.len() == 1 {
-                first.version.clone()
-            } else {
-                None
-            };
-            // The distinct versions actually present, sorted — so the display can
-            // name a skew (`3.2.0 / 3.3.0`) rather than collapsing to `-`.
-            let mut distinct_versions: Vec<String> =
-                versions.iter().filter_map(|v| v.map(str::to_string)).collect();
-            distinct_versions.sort();
+    let versions: BTreeSet<Option<&str>> = members.iter().map(|r| r.version.as_deref()).collect();
+    // Divergence is a content question: copies are diverged only when
+    // their bytes actually differ. This catches genuinely different
+    // copies that happen to share a version (or carry none), and stops
+    // false-flagging byte-identical copies that merely differ in
+    // tracking state (e.g. tracked for one tool, untracked for another).
+    let checksums: BTreeSet<&str> = members.iter().map(|r| r.content_checksum.as_str()).collect();
+    let diverged = checksums.len() > 1;
 
-            // Source: the distinct provenance(s) across copies, joined when they
-            // differ (rare — copies normally share a source).
-            let mut sources: Vec<String> =
-                members.iter().filter_map(|r| r.source.clone()).collect();
-            sources.sort();
-            sources.dedup();
-            let source = if sources.is_empty() {
-                None
-            } else {
-                Some(sources.join(", "))
-            };
+    // Consolidated state: the most actionable across copies.
+    let state = members
+        .iter()
+        .map(|r| r.state)
+        .max_by_key(|s| state_severity(*s))
+        .unwrap_or(first.state);
+    // Version only when all copies agree.
+    let version = if versions.len() == 1 {
+        first.version.clone()
+    } else {
+        None
+    };
+    // The distinct versions actually present, sorted — so the display can
+    // name a skew (`3.2.0 / 3.3.0`) rather than collapsing to `-`.
+    let mut distinct_versions: Vec<String> =
+        versions.iter().filter_map(|v| v.map(str::to_string)).collect();
+    distinct_versions.sort();
 
-            DoctorArtifact {
-                kind: first.kind,
-                name: first.name.clone(),
-                scope: first.scope,
-                state,
-                version,
-                versions: distinct_versions,
-                tools,
-                source,
-                locations,
-                diverged,
-            }
-        })
-        .collect()
+    // Source: the distinct provenance(s) across copies, joined when they
+    // differ (rare — copies normally share a source).
+    let mut sources: Vec<String> = members.iter().filter_map(|r| r.source.clone()).collect();
+    sources.sort();
+    sources.dedup();
+    let source = if sources.is_empty() {
+        None
+    } else {
+        Some(sources.join(", "))
+    };
+
+    DoctorArtifact {
+        kind: first.kind,
+        name: first.name.clone(),
+        scope: first.scope,
+        state,
+        version,
+        versions: distinct_versions,
+        tools,
+        source,
+        locations,
+        diverged,
+    }
 }
 
 /// Build one [`DoctorRow`] per installed artifact across all locations.

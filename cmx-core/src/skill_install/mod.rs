@@ -33,6 +33,8 @@ mod plan;
 use plan::{build_lock_entry, decide_action_for_entry, prepare_writes};
 
 use anyhow::{Result, bail};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use crate::checksum;
 use crate::config;
@@ -199,8 +201,34 @@ impl SkillInstaller {
         let installed_checksum = plan.source_checksum.clone();
         let installed_at = ctx.clock.now().to_rfc3339();
 
-        let mut targets: Vec<TargetOutcome> = Vec::new();
+        let targets = self.write_target_outcomes(
+            plan,
+            &discarded_paths_by_dir,
+            &installed_checksum,
+            &installed_at,
+            ctx,
+        )?;
+        let source_registered = self.register_bundled_source(plan, &files, ctx)?;
 
+        Ok(Report {
+            tool: self.tool.clone(),
+            scope: plan.scope,
+            targets,
+            source_registered,
+        })
+    }
+
+    /// Write lock entries for every target that will write files and collect
+    /// the per-target outcomes (both written and skipped).
+    fn write_target_outcomes(
+        &self,
+        plan: &InstallPlan,
+        discarded_paths_by_dir: &BTreeMap<PathBuf, Vec<PathBuf>>,
+        installed_checksum: &str,
+        installed_at: &str,
+        ctx: &AppContext<'_>,
+    ) -> Result<Vec<TargetOutcome>> {
+        let mut targets = Vec::new();
         for target in &plan.targets {
             if !target.action.will_write() {
                 targets.push(TargetOutcome {
@@ -219,7 +247,7 @@ impl SkillInstaller {
             lockfile::mutate(target.scope, ctx.fs, &pv, |lock| {
                 lock.packages.insert(
                     self.tool.name.clone(),
-                    build_lock_entry(&self.tool, &installed_checksum, &installed_at),
+                    build_lock_entry(&self.tool, installed_checksum, installed_at),
                 );
             })?;
 
@@ -228,24 +256,32 @@ impl SkillInstaller {
                 dest_dir: target.dest_dir.clone(),
                 action: target.action.clone(),
                 files_written: target.files.len(),
-                installed_checksum: Some(installed_checksum.clone()),
+                installed_checksum: Some(installed_checksum.to_string()),
                 discarded_paths: discarded_paths_by_dir
                     .get(&target.dest_dir)
                     .cloned()
                     .unwrap_or_default(),
             });
         }
+        Ok(targets)
+    }
 
-        // Register source if cmx is managing this machine.
-        let source_registered = if plan.cmx_present
-            && config::managed_platforms(ctx.fs, ctx.paths)?.is_some()
-        {
+    /// Register a `bundled:<name>` source and materialize the home directory
+    /// when cmx is managing this machine. Returns `true` when registration
+    /// occurred, `false` otherwise.
+    fn register_bundled_source(
+        &self,
+        plan: &InstallPlan,
+        files: &[skill_fs::SkillFile],
+        ctx: &AppContext<'_>,
+    ) -> Result<bool> {
+        if plan.cmx_present && config::managed_platforms(ctx.fs, ctx.paths)?.is_some() {
             let source_name = format!("bundled:{}", self.tool.name);
             // Materialize a directory under the default artifact home for source tracing.
             let home =
                 config::resolve_artifact_home(&config::load_config(ctx.fs, ctx.paths)?, ctx.paths);
             let materialized = home.join("skills").join(&self.tool.name);
-            skill_fs::write_skill_files(&materialized, &files, ctx.fs)?;
+            skill_fs::write_skill_files(&materialized, files, ctx.fs)?;
 
             config::mutate_sources(ctx.fs, ctx.paths, |sources| {
                 sources.sources.entry(source_name.clone()).or_insert_with(|| SourceEntry {
@@ -258,17 +294,10 @@ impl SkillInstaller {
                 });
                 Ok(())
             })?;
-            true
+            Ok(true)
         } else {
-            false
-        };
-
-        Ok(Report {
-            tool: self.tool.clone(),
-            scope: plan.scope,
-            targets,
-            source_registered,
-        })
+            Ok(false)
+        }
     }
 
     /// Query the install status of this skill across relevant platforms.

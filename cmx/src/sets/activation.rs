@@ -8,7 +8,7 @@ use crate::install;
 use crate::platform::Platform;
 use crate::platform_iter;
 use crate::source_iter;
-use crate::types::{ArtifactKind, InstallScope, SetMember, SetState, SetsFile};
+use crate::types::{ArtifactKind, InstallScope, SetMember, SetState, SetsFile, SourcesFile};
 use crate::uninstall;
 
 use super::{
@@ -39,9 +39,40 @@ pub fn activate(
     let def = sets.sets.get(name).ok_or_else(|| anyhow::anyhow!("Set '{name}' not found."))?;
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
+    let members_is_empty = def.members.is_empty();
+    let (resolvable, mut statuses) = partition_members(&def.members, &sources);
+
+    for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
+        statuses.extend(activate_kind(kind, &resolvable, scope, apply, ctx)?);
+    }
+
+    let any_failed = statuses.iter().any(|s| {
+        matches!(
+            s.outcome,
+            MemberActivateOutcome::Unresolvable(_) | MemberActivateOutcome::Failed(_)
+        )
+    });
+
+    persist_active_state(name, members_is_empty, &statuses, apply, scope, ctx)?;
+
+    Ok(SetActivateResult {
+        name: name.to_string(),
+        members: statuses,
+        any_failed,
+        apply,
+    })
+}
+
+/// Partition `members` into resolvable (source registered) and unresolvable
+/// (missing source pin or unregistered source), returning the statuses for the
+/// unresolvable ones alongside the resolvable member list.
+fn partition_members(
+    members: &[SetMember],
+    sources: &SourcesFile,
+) -> (Vec<SetMember>, Vec<MemberActivateStatus>) {
     let mut statuses = Vec::new();
-    let mut resolvable: Vec<SetMember> = Vec::new();
-    for m in &def.members {
+    let mut resolvable = Vec::new();
+    for m in members {
         match &m.source {
             Some(src) if sources.sources.contains_key(src) => resolvable.push(m.clone()),
             Some(src) => statuses.push(MemberActivateStatus {
@@ -60,85 +91,95 @@ pub fn activate(
             }),
         }
     }
-    let members_is_empty = def.members.is_empty();
+    (resolvable, statuses)
+}
 
-    for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-        let members: Vec<&SetMember> = resolvable.iter().filter(|m| m.kind == kind).collect();
-        if members.is_empty() {
-            continue;
-        }
-
-        let targets = install::resolve_targets(None, kind, scope, ctx)?;
-        let pre_installed: HashSet<&str> = members
-            .iter()
-            .filter(|m| {
-                targets
-                    .iter()
-                    .any(|&t| ctx.paths.with_platform(t).is_installed(kind, &m.name, scope, ctx.fs))
-            })
-            .map(|m| m.name.as_str())
-            .collect();
-
-        let failed: HashMap<String, String> = if apply {
-            let pinned: Vec<String> = members
-                .iter()
-                .map(|m| format!("{}:{}", m.source.as_deref().unwrap_or_default(), m.name))
-                .collect();
-            let result = install::install_many(&pinned, kind, scope, false, &targets, ctx)?;
-            result.failed.into_iter().collect()
-        } else {
-            HashMap::new()
-        };
-
-        for m in members {
-            let targets = build_activation_targets(m, scope, &targets, ctx)?;
-            let pin = format!("{}:{}", m.source.as_deref().unwrap_or_default(), m.name);
-            let outcome = if let Some(reason) = failed.get(&pin) {
-                MemberActivateOutcome::Failed(reason.clone())
-            } else if pre_installed.contains(m.name.as_str()) {
-                MemberActivateOutcome::AlreadyInstalled
-            } else {
-                MemberActivateOutcome::Installed
-            };
-            statuses.push(MemberActivateStatus {
-                kind,
-                name: m.name.clone(),
-                outcome,
-                targets,
-            });
-        }
+/// Install all `resolvable` members of the given `kind`, returning their
+/// per-member statuses. Returns an empty vec when no members of this kind
+/// exist in `resolvable`.
+fn activate_kind(
+    kind: ArtifactKind,
+    resolvable: &[SetMember],
+    scope: InstallScope,
+    apply: bool,
+    ctx: &AppContext<'_>,
+) -> Result<Vec<MemberActivateStatus>> {
+    let members: Vec<&SetMember> = resolvable.iter().filter(|m| m.kind == kind).collect();
+    if members.is_empty() {
+        return Ok(Vec::new());
     }
 
-    let any_failed = statuses.iter().any(|s| {
+    let install_targets = install::resolve_targets(None, kind, scope, ctx)?;
+    let pre_installed: HashSet<&str> = members
+        .iter()
+        .filter(|m| {
+            install_targets
+                .iter()
+                .any(|&t| ctx.paths.with_platform(t).is_installed(kind, &m.name, scope, ctx.fs))
+        })
+        .map(|m| m.name.as_str())
+        .collect();
+
+    let failed: HashMap<String, String> = if apply {
+        let pinned: Vec<String> = members
+            .iter()
+            .map(|m| format!("{}:{}", m.source.as_deref().unwrap_or_default(), m.name))
+            .collect();
+        let result = install::install_many(&pinned, kind, scope, false, &install_targets, ctx)?;
+        result.failed.into_iter().collect()
+    } else {
+        HashMap::new()
+    };
+
+    let mut statuses = Vec::new();
+    for m in members {
+        let member_targets = build_activation_targets(m, scope, &install_targets, ctx)?;
+        let pin = format!("{}:{}", m.source.as_deref().unwrap_or_default(), m.name);
+        let outcome = if let Some(reason) = failed.get(&pin) {
+            MemberActivateOutcome::Failed(reason.clone())
+        } else if pre_installed.contains(m.name.as_str()) {
+            MemberActivateOutcome::AlreadyInstalled
+        } else {
+            MemberActivateOutcome::Installed
+        };
+        statuses.push(MemberActivateStatus {
+            kind,
+            name: m.name.clone(),
+            outcome,
+            targets: member_targets,
+        });
+    }
+    Ok(statuses)
+}
+
+/// Persist the `Active` state for the set when `apply` is true and at least
+/// one member installed successfully (or the set is empty).
+fn persist_active_state(
+    name: &str,
+    members_is_empty: bool,
+    statuses: &[MemberActivateStatus],
+    apply: bool,
+    scope: InstallScope,
+    ctx: &AppContext<'_>,
+) -> Result<()> {
+    if !apply {
+        return Ok(());
+    }
+    let any_installed_ok = statuses.iter().any(|s| {
         matches!(
             s.outcome,
-            MemberActivateOutcome::Unresolvable(_) | MemberActivateOutcome::Failed(_)
+            MemberActivateOutcome::Installed | MemberActivateOutcome::AlreadyInstalled
         )
     });
-
-    if apply {
-        let any_installed_ok = statuses.iter().any(|s| {
-            matches!(
-                s.outcome,
-                MemberActivateOutcome::Installed | MemberActivateOutcome::AlreadyInstalled
-            )
-        });
-        if members_is_empty || any_installed_ok {
-            config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
-                if let Some(d) = sets.sets.get_mut(name) {
-                    d.state = SetState::Active;
-                }
-                Ok(())
-            })?;
-        }
+    if members_is_empty || any_installed_ok {
+        config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+            if let Some(d) = sets.sets.get_mut(name) {
+                d.state = SetState::Active;
+            }
+            Ok(())
+        })?;
     }
-
-    Ok(SetActivateResult {
-        name: name.to_string(),
-        members: statuses,
-        any_failed,
-        apply,
-    })
+    Ok(())
 }
 
 /// Uninstall every member of `name`, reference-counted against other active
@@ -360,6 +401,45 @@ mod tests {
             name: name.to_string(),
             source: Some(source.to_string()),
         }
+    }
+
+    #[test]
+    fn partition_members_separates_resolvable_from_unresolvable() {
+        let t = TestContext::new();
+        crate::test_support::setup_source_with_agent(
+            &t.fs,
+            &t.paths,
+            "guidelines",
+            "/src",
+            "rust-craftsperson",
+        );
+        let ctx = t.ctx();
+        let sources = crate::config::load_sources(ctx.fs, ctx.paths).unwrap();
+
+        let members = vec![
+            SetMember {
+                kind: ArtifactKind::Agent,
+                name: "rust-craftsperson".to_string(),
+                source: Some("guidelines".to_string()),
+            },
+            SetMember {
+                kind: ArtifactKind::Skill,
+                name: "ghost-skill".to_string(),
+                source: Some("gone-source".to_string()),
+            },
+            SetMember {
+                kind: ArtifactKind::Skill,
+                name: "no-pin".to_string(),
+                source: None,
+            },
+        ];
+
+        let (resolvable, unresolvable) = partition_members(&members, &sources);
+        assert_eq!(resolvable.len(), 1, "only the registered-source member is resolvable");
+        assert_eq!(resolvable[0].name, "rust-craftsperson");
+        assert_eq!(unresolvable.len(), 2, "unregistered-source and no-pin both unresolvable");
+        assert!(matches!(unresolvable[0].outcome, MemberActivateOutcome::Unresolvable(_)));
+        assert!(matches!(unresolvable[1].outcome, MemberActivateOutcome::Unresolvable(_)));
     }
 
     #[test]

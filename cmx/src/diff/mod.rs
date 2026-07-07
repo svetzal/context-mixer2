@@ -14,7 +14,7 @@ mod discovery;
 mod reconcile;
 mod structural;
 
-use discovery::{discover_copies, evaluate_copies, representative_platform};
+use discovery::{CopyEval, discover_copies, evaluate_copies, representative_platform};
 use reconcile::{focus_lock_state, reconciliations};
 pub(crate) use structural::file_changes_between;
 
@@ -167,48 +167,21 @@ pub(crate) fn gather_diff_with(
     let evals =
         evaluate_copies(raw_copies, kind, &source_checksum, &source_path, &source_name, ctx)?;
 
-    // Focus the copy the user most likely means: the active platform's copy when
-    // it differs, otherwise the first differing copy.
     let active = ctx.paths.platform;
-    let focus = evals
-        .iter()
-        .position(|e| !e.matches && e.copy.platforms.contains(&active))
-        .or_else(|| evals.iter().position(|e| !e.matches));
-
-    let copies: Vec<CopyStatus> = evals
-        .iter()
-        .enumerate()
-        .map(|(i, e)| CopyStatus {
-            platforms: e.copy.platforms.clone(),
-            path: e.copy.path.clone(),
-            matches: e.matches,
-            added: e.added,
-            removed: e.removed,
-            is_focus: Some(i) == focus,
-        })
-        .collect();
+    let focus = select_focus(&evals, active);
+    let copies = build_copy_statuses(&evals, focus);
 
     // Every copy matches the source — nothing to reconcile anywhere.
     let Some(focus_idx) = focus else {
-        return Ok(DiffOutput {
-            artifact_name: name.to_string(),
+        return Ok(up_to_date_output(
+            name,
             kind,
-            is_up_to_date: true,
-            installed_path: evals[0].copy.path.clone(),
-            installed_version: None,
-            installed_locally_edited: false,
+            &evals,
             source_path,
             source_version,
             source_name,
-            file_changes: Vec::new(),
-            diff_text: None,
-            analysis: None,
-            analysis_note: None,
-            reconciliations: Vec::new(),
-            show_full: false,
             copies,
-            changed_label: String::new(),
-        });
+        ));
     };
 
     let multi = copies.len() > 1;
@@ -235,8 +208,95 @@ pub(crate) fn gather_diff_with(
 
     let reconciliations = reconciliations(&cmp, locally_modified, multi.then_some(focus_platform));
 
-    let focus_eval = &evals[focus_idx];
-    Ok(DiffOutput {
+    Ok(diverged_output(
+        name,
+        kind,
+        &evals[focus_idx],
+        installed_version,
+        locally_modified,
+        source_path,
+        source_version,
+        source_name,
+        reconciliations,
+        copies,
+        changed_label,
+    ))
+}
+
+/// Select which copy index to focus: prefer the active platform's differing
+/// copy, then fall back to the first differing copy across all platforms.
+fn select_focus(evals: &[CopyEval], active: Platform) -> Option<usize> {
+    evals
+        .iter()
+        .position(|e| !e.matches && e.copy.platforms.contains(&active))
+        .or_else(|| evals.iter().position(|e| !e.matches))
+}
+
+/// Build the per-platform `CopyStatus` list from the evaluated copies,
+/// marking the focused copy with `is_focus`.
+fn build_copy_statuses(evals: &[CopyEval], focus: Option<usize>) -> Vec<CopyStatus> {
+    evals
+        .iter()
+        .enumerate()
+        .map(|(i, e)| CopyStatus {
+            platforms: e.copy.platforms.clone(),
+            path: e.copy.path.clone(),
+            matches: e.matches,
+            added: e.added,
+            removed: e.removed,
+            is_focus: Some(i) == focus,
+        })
+        .collect()
+}
+
+/// Construct the `DiffOutput` for the case where every copy matches the source.
+fn up_to_date_output(
+    name: &str,
+    kind: ArtifactKind,
+    evals: &[CopyEval],
+    source_path: PathBuf,
+    source_version: Option<String>,
+    source_name: String,
+    copies: Vec<CopyStatus>,
+) -> DiffOutput {
+    DiffOutput {
+        artifact_name: name.to_string(),
+        kind,
+        is_up_to_date: true,
+        installed_path: evals[0].copy.path.clone(),
+        installed_version: None,
+        installed_locally_edited: false,
+        source_path,
+        source_version,
+        source_name,
+        file_changes: Vec::new(),
+        diff_text: None,
+        analysis: None,
+        analysis_note: None,
+        reconciliations: Vec::new(),
+        show_full: false,
+        copies,
+        changed_label: String::new(),
+    }
+}
+
+/// Construct the `DiffOutput` for the case where the focused copy diverges
+/// from the source.
+#[allow(clippy::too_many_arguments)]
+fn diverged_output(
+    name: &str,
+    kind: ArtifactKind,
+    focus_eval: &CopyEval,
+    installed_version: Option<String>,
+    locally_modified: bool,
+    source_path: PathBuf,
+    source_version: Option<String>,
+    source_name: String,
+    reconciliations: Vec<Reconciliation>,
+    copies: Vec<CopyStatus>,
+    changed_label: String,
+) -> DiffOutput {
+    DiffOutput {
         artifact_name: name.to_string(),
         kind,
         is_up_to_date: false,
@@ -254,7 +314,7 @@ pub(crate) fn gather_diff_with(
         show_full: false,
         copies,
         changed_label,
-    })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -346,6 +406,61 @@ mod tests {
     };
     use crate::types::{ArtifactKind, InstallScope};
     use chrono::Utc;
+
+    // --- select_focus ---
+
+    #[test]
+    fn select_focus_prefers_active_platform_then_first_differing() {
+        use super::discovery::InstalledCopy;
+        use super::structural::ArtifactDiff;
+        use std::path::PathBuf;
+
+        fn make_eval(platforms: Vec<Platform>, matches: bool) -> CopyEval {
+            CopyEval {
+                copy: InstalledCopy {
+                    platforms,
+                    path: PathBuf::from("/test"),
+                    checksum: "sha256:test".to_string(),
+                },
+                matches,
+                dir_diff: ArtifactDiff {
+                    changes: Vec::new(),
+                    unified: String::new(),
+                },
+                added: 0,
+                removed: 0,
+            }
+        }
+
+        // Case 1: active platform has a differing copy → it's selected (index 1)
+        let evals = vec![
+            make_eval(vec![Platform::Codex], false),
+            make_eval(vec![Platform::Claude], false),
+        ];
+        assert_eq!(
+            select_focus(&evals, Platform::Claude),
+            Some(1),
+            "active platform's differing copy preferred"
+        );
+
+        // Case 2: active platform matches; first differing copy selected (index 0)
+        let evals = vec![
+            make_eval(vec![Platform::Codex], false),
+            make_eval(vec![Platform::Claude], true),
+        ];
+        assert_eq!(
+            select_focus(&evals, Platform::Claude),
+            Some(0),
+            "first differing copy when active matches"
+        );
+
+        // Case 3: all copies match → no focus
+        let evals = vec![
+            make_eval(vec![Platform::Claude], true),
+            make_eval(vec![Platform::Codex], true),
+        ];
+        assert_eq!(select_focus(&evals, Platform::Claude), None, "None when all match");
+    }
 
     // --- find_in_sources_with ---
 
