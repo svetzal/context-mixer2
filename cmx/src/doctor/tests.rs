@@ -823,6 +823,206 @@ fn source_of_external_returns_none() {
     assert!(result.is_none());
 }
 
+// --- classify_installed ---
+//
+// Direct unit tests for the pure classification decision. `build_rows` and
+// `available_in_sources` are I/O-orchestrating shell functions and are
+// intentionally covered via the end-to-end `survey()` tests above rather than
+// in isolation.
+
+#[test]
+fn classify_installed_tracked_when_checksum_matches_lock() {
+    let agg = skill_agg();
+    let mut locks = HashMap::new();
+    locks.insert((Platform::Claude, InstallScope::Global), lock_with_entry("my-skill", "home"));
+    let available: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+
+    let state = classify_installed("my-skill", &agg, "sha256:abc", &locks, &available);
+    assert_eq!(state, ArtifactState::Tracked);
+}
+
+#[test]
+fn classify_installed_drifted_when_checksum_mismatches_lock() {
+    let agg = skill_agg();
+    let mut locks = HashMap::new();
+    locks.insert((Platform::Claude, InstallScope::Global), lock_with_entry("my-skill", "home"));
+    let available: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+
+    // "sha256:abc" is what's in the lock; passing a different hash means the
+    // artifact was edited after install.
+    let state = classify_installed("my-skill", &agg, "sha256:edited", &locks, &available);
+    assert_eq!(state, ArtifactState::Drifted);
+}
+
+#[test]
+fn classify_installed_untracked_when_no_lock_but_source_provides_it() {
+    let agg = skill_agg();
+    let locks: HashMap<(Platform, InstallScope), LockFile> = HashMap::new();
+    let mut available: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+    available.insert(
+        (ArtifactKind::Skill, "community-skill".to_string()),
+        vec!["community".to_string()],
+    );
+
+    let state = classify_installed("community-skill", &agg, "sha256:xyz", &locks, &available);
+    assert_eq!(state, ArtifactState::Untracked);
+}
+
+#[test]
+fn classify_installed_orphaned_when_no_lock_and_no_source() {
+    let agg = skill_agg();
+    let locks: HashMap<(Platform, InstallScope), LockFile> = HashMap::new();
+    let available: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+
+    let state = classify_installed("hand-authored", &agg, "sha256:xyz", &locks, &available);
+    assert_eq!(state, ArtifactState::Orphaned);
+}
+
+#[test]
+fn classify_installed_tracked_wins_when_any_platform_matches() {
+    // Two platforms: Pi has a stale lock entry, Claude has a matching one.
+    // Tracked must win as soon as any platform's checksum agrees.
+    let agg = LocationAgg {
+        kind: ArtifactKind::Skill,
+        scope: InstallScope::Global,
+        platforms: vec![Platform::Pi, Platform::Claude],
+    };
+
+    let mut pi_lock = lock_with_entry("shared", "home");
+    // Overwrite the installed_checksum to be stale for Pi.
+    pi_lock.packages.get_mut("shared").unwrap().installed_checksum = "sha256:stale".to_string();
+
+    let claude_lock = lock_with_entry("shared", "home"); // still has "sha256:abc"
+
+    let mut locks = HashMap::new();
+    locks.insert((Platform::Pi, InstallScope::Global), pi_lock);
+    locks.insert((Platform::Claude, InstallScope::Global), claude_lock);
+    let available: HashMap<(ArtifactKind, String), Vec<String>> = HashMap::new();
+
+    // Content checksum matches the Claude lock entry → Tracked, not Drifted.
+    let state = classify_installed("shared", &agg, "sha256:abc", &locks, &available);
+    assert_eq!(state, ArtifactState::Tracked, "tracked wins when any platform matches");
+}
+
+// --- collect_missing ---
+
+#[test]
+fn collect_missing_reports_lock_entry_with_no_on_disk_artifact() {
+    let t = TestContext::new();
+    // Write a lock entry for "ghost" but never install it on disk.
+    let entry = make_lock_entry_with_checksum(
+        ArtifactKind::Skill,
+        Some("1.0.0"),
+        "home",
+        "ghost",
+        "sha256:whatever",
+    );
+    save_lock_with_entry(&t.fs, &t.paths, "ghost", entry, InstallScope::Global);
+
+    // Load the lock directly to pass to collect_missing.
+    let pv = t.paths.with_platform(Platform::Claude);
+    let lock = crate::lockfile::load(InstallScope::Global, &t.fs, &pv).unwrap();
+    let mut locks = HashMap::new();
+    locks.insert((Platform::Claude, InstallScope::Global), lock);
+
+    let missing = collect_missing(&locks, &t.ctx());
+    let m = missing.iter().find(|r| r.name == "ghost").expect("ghost reported as missing");
+    assert_eq!(m.kind, ArtifactKind::Skill);
+    assert_eq!(m.platform, Platform::Claude);
+    assert_eq!(m.scope, InstallScope::Global);
+}
+
+#[test]
+fn collect_missing_does_not_report_artifact_present_on_disk() {
+    let t = TestContext::new();
+    // Install the skill on disk first, then record a lock entry for it.
+    let skill_dir = install_skill(&t, Platform::Claude, "present", "1.0.0", InstallScope::Global);
+    let cs = skill_checksum(&t, &skill_dir);
+    let entry =
+        make_lock_entry_with_checksum(ArtifactKind::Skill, Some("1.0.0"), "home", "present", &cs);
+    save_lock_with_entry(&t.fs, &t.paths, "present", entry, InstallScope::Global);
+
+    let pv = t.paths.with_platform(Platform::Claude);
+    let lock = crate::lockfile::load(InstallScope::Global, &t.fs, &pv).unwrap();
+    let mut locks = HashMap::new();
+    locks.insert((Platform::Claude, InstallScope::Global), lock);
+
+    let missing = collect_missing(&locks, &t.ctx());
+    assert!(
+        missing.iter().all(|r| r.name != "present"),
+        "an artifact installed on disk must not appear in missing"
+    );
+}
+
+#[test]
+fn collect_missing_mixed_one_present_one_missing() {
+    let t = TestContext::new();
+    // "here" is on disk; "gone" is not.
+    let skill_dir = install_skill(&t, Platform::Claude, "here", "1.0.0", InstallScope::Global);
+    let cs = skill_checksum(&t, &skill_dir);
+
+    crate::lockfile::mutate(InstallScope::Global, &t.fs, &t.paths, |l| {
+        l.packages.insert(
+            "here".to_string(),
+            make_lock_entry_with_checksum(ArtifactKind::Skill, Some("1.0.0"), "home", "here", &cs),
+        );
+        l.packages.insert(
+            "gone".to_string(),
+            make_lock_entry_with_checksum(
+                ArtifactKind::Skill,
+                Some("1.0.0"),
+                "home",
+                "gone",
+                "sha256:whatever",
+            ),
+        );
+    })
+    .unwrap();
+
+    let pv = t.paths.with_platform(Platform::Claude);
+    let lock = crate::lockfile::load(InstallScope::Global, &t.fs, &pv).unwrap();
+    let mut locks = HashMap::new();
+    locks.insert((Platform::Claude, InstallScope::Global), lock);
+
+    let missing = collect_missing(&locks, &t.ctx());
+    assert_eq!(missing.len(), 1, "only the absent artifact is missing");
+    assert_eq!(missing[0].name, "gone");
+}
+
+// --- read_installed_version ---
+
+#[test]
+fn read_installed_version_returns_version_from_skill_content() {
+    let t = TestContext::new();
+    let pv = t.paths.with_platform(Platform::Claude);
+    let skill_dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
+    let dir = skill_dir.join("versioned-skill");
+    t.fs.add_file(dir.join("SKILL.md"), versioned_skill_content("A skill", "2.3.4"));
+
+    let version = read_installed_version(ArtifactKind::Skill, &dir, &t.ctx());
+    assert_eq!(version.as_deref(), Some("2.3.4"));
+}
+
+#[test]
+fn read_installed_version_returns_none_when_no_version_in_content() {
+    let t = TestContext::new();
+    let pv = t.paths.with_platform(Platform::Claude);
+    let skill_dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
+    let dir = skill_dir.join("unversioned-skill");
+    t.fs.add_file(dir.join("SKILL.md"), "---\ndescription: no version here\n---\n# skill\n");
+
+    let version = read_installed_version(ArtifactKind::Skill, &dir, &t.ctx());
+    assert!(version.is_none(), "content without a version field → None");
+}
+
+#[test]
+fn read_installed_version_returns_none_when_file_absent() {
+    let t = TestContext::new();
+    let nonexistent = std::path::PathBuf::from("/home/testuser/.claude/skills/missing-skill");
+    let version = read_installed_version(ArtifactKind::Skill, &nonexistent, &t.ctx());
+    assert!(version.is_none(), "nonexistent path → None");
+}
+
 // --- set-consistency (Phase 3, end-to-end via survey) ---
 
 mod set_consistency_survey {

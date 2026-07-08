@@ -96,7 +96,7 @@ fn load_all_locks(
 ///
 /// Pure: the caller hashes the artifact once (the same checksum feeds divergence
 /// detection) and passes it here, so classification performs no I/O.
-fn classify_installed(
+pub(crate) fn classify_installed(
     name: &str,
     agg: &LocationAgg,
     content_checksum: &str,
@@ -163,7 +163,7 @@ pub(crate) fn source_of(
 }
 
 /// Read an installed artifact's declared version from its content file.
-fn read_installed_version(
+pub(crate) fn read_installed_version(
     kind: ArtifactKind,
     path: &std::path::Path,
     ctx: &AppContext<'_>,
@@ -334,7 +334,7 @@ fn build_rows(
 }
 
 /// Collect lock entries whose artifact file is gone from disk.
-fn collect_missing(
+pub(crate) fn collect_missing(
     locks: &HashMap<(Platform, InstallScope), LockFile>,
     ctx: &AppContext<'_>,
 ) -> Vec<MissingRow> {
