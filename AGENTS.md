@@ -31,6 +31,7 @@ cargo tarpaulin      # code coverage (target >80%)
 - If any check fails, STOP immediately, fix the root cause (don't suppress), and re-run all checks
 - Never use `#[allow(clippy::lint_name)]` without documenting why
 - The `llm` feature gates tokio and mojentic; default builds are lean with no RUSTSEC advisories
+- The architecture map is enforced by `cmx/tests/architecture_doc.rs` — adding, moving, or deleting a module requires updating the Architecture section in the same commit
 
 ## Branching Workflow
 
@@ -188,9 +189,14 @@ this and cut a normal cmx-only `v*` release.
 Entry points:
 
 - `cmx/src/main.rs` — binary entry point; constructs AppContext with real gateways and dispatches CLI commands
-- `cmx/src/lib.rs` — crate root; re-exports all public modules
+- `cmx/src/lib.rs` — crate root; re-exports all public modules (including all `cmx-core` modules listed in the Re-exports section below)
 - `cmx/src/cli.rs` — clap CLI definition
-- `cmx/src/context.rs` — AppContext: bundles all I/O gateway dependencies for command invocations
+- `cmx/src/dispatch/mod.rs` — command dispatch from `main.rs`; one submodule per command family:
+  `cmx/src/dispatch/adopt.rs`, `cmx/src/dispatch/artifact.rs`, `cmx/src/dispatch/config.rs`,
+  `cmx/src/dispatch/diff.rs`, `cmx/src/dispatch/info.rs`, `cmx/src/dispatch/set.rs`,
+  `cmx/src/dispatch/source.rs`, `cmx/src/dispatch/test_support.rs`
+- `cmx/src/completions.rs` — shell-completion generation
+- `cmx/src/suggestions.rs` — suggestion helpers for commands
 - `cmx/src/init.rs` — `cmx init`: install/remove cmx's own companion skill (embedded `skill/SKILL.md`) via `cmx-core`'s `SkillInstaller`, following the `<tool> init` convention
 
 Source management:
@@ -210,9 +216,12 @@ Artifact scanning:
 Install/uninstall:
 
 - `cmx/src/install.rs` — `cmx agent install` / `cmx skill install`
+- `cmx/src/install/tests.rs` — install integration tests
 - `cmx/src/uninstall.rs` — `cmx agent uninstall` / `cmx skill uninstall`
 - `cmx/src/sync.rs` — `cmx skill sync`: reconcile a skill that diverged across platforms by copying one copy (newest version, or `--from <platform>`) over the others; works for external/source-less skills
+- `cmx/src/sync/tests.rs` — sync integration tests
 - `cmx/src/promote.rs` — `cmx skill promote` / `cmx agent promote`: the mirror of `install::update` — copy the in-place-edited installed copy back into the canonical home and refresh `home`-provenance lock baselines (home target only; git-sourced and reformatted-agent copies rejected)
+- `cmx/src/promote/tests.rs` — promote integration tests
 - `cmx/src/copy.rs` — file copy helpers used by install
 
 Query & display:
@@ -229,55 +238,103 @@ Query & display:
 - `cmx/src/diff/analyze.rs` — LLM-powered analysis (feature-gated path): `analyze_focus`
 - `cmx/src/text_diff.rs` — general line-oriented LCS text differ (`split_lines`/`lcs_ops`/`render_hunks`); pure, no coupling to the artifact model
 - `cmx/src/display/mod.rs` — output formatting for all commands; one submodule per command:
-  `adopt.rs`, `config.rs`, `diff.rs`, `doctor.rs`, `info.rs`, `init.rs`, `install.rs`, `list.rs`,
-  `outdated.rs`, `promote.rs`, `search.rs`, `sets.rs`, `source.rs`, `sync.rs`, `uninstall.rs`, `util.rs`
+  `cmx/src/display/adopt.rs`, `cmx/src/display/config.rs`, `cmx/src/display/diff.rs`,
+  `cmx/src/display/doctor.rs`, `cmx/src/display/info.rs`, `cmx/src/display/init.rs`,
+  `cmx/src/display/install.rs`, `cmx/src/display/json.rs`, `cmx/src/display/list.rs`,
+  `cmx/src/display/outdated.rs`, `cmx/src/display/promote.rs`, `cmx/src/display/search.rs`,
+  `cmx/src/display/sets.rs`, `cmx/src/display/source.rs`, `cmx/src/display/sync.rs`,
+  `cmx/src/display/uninstall.rs`, `cmx/src/display/util.rs`
 - Tests for a `Display` impl live in the same `display/<command>.rs` module as the impl; core modules (`install.rs`, `uninstall.rs`, etc.) must not contain `Display`-formatting tests.
 - `cmx/src/table.rs` — table rendering helpers
 
 Sets:
 
-- `cmx/src/sets.rs` — `cmx set` subcommands (create, list, show, add, remove, activate, deactivate, delete, rename): locally-defined named groups of installed artifacts with a desired activation state (see `SETS.md`). `activate`/`deactivate` compose `install`/`uninstall` with reference-counting and a drift guard; `create --from <source>:<plugin>` seeds membership from a marketplace plugin's declared agents/skills (via `scan_marketplace::scan_marketplace_plugin`) without installing anything; `list`/`show` report context-footprint, and `doctor` checks set consistency
+- `cmx/src/sets/mod.rs` — `cmx set` subcommands (create, list, show, add, remove, activate, deactivate, delete, rename): locally-defined named groups of installed artifacts with a desired activation state (see `SETS.md`). `activate`/`deactivate` compose `install`/`uninstall` with reference-counting and a drift guard; `create --from <source>:<plugin>` seeds membership from a marketplace plugin's declared agents/skills (via `scan_marketplace::scan_marketplace_plugin`) without installing anything; `list`/`show` report context-footprint, and `doctor` checks set consistency
+- `cmx/src/sets/types.rs` — set data types
+- `cmx/src/sets/members.rs` — set membership management
+- `cmx/src/sets/activation.rs` — set activation and deactivation logic
 
 System survey / adoption:
 
 - `cmx/src/doctor.rs` — `cmx doctor`: read-only system-wide survey of installed artifacts across platforms
 - `cmx/src/doctor/survey.rs` — walks platform install dirs and cross-references lock files
 - `cmx/src/doctor/divergence.rs` — detects divergence between installed artifacts and sources
+- `cmx/src/doctor/set_consistency.rs` — set consistency checks used by `cmx doctor`
 - `cmx/src/doctor/types.rs` — doctor result/report types
+- `cmx/src/doctor/tests.rs` — doctor integration tests
 - `cmx/src/adopt.rs` — `cmx adopt`: brings orphaned hand-authored artifacts under management
 - `cmx/src/partition.rs` — batch classification of artifact names during adoption/partitioning
 
 Config & persistence:
 
-- `cmx/src/config/mod.rs` — config dir paths, sources.json read/write
-- `cmx/src/config/installed.rs` — installed-artifact config records
 - `cmx/src/cmx_config.rs` — `cmx config` subcommands (show, set, external, platforms — the managed-platform allowlist that scopes install/uninstall/doctor)
-- `cmx/src/paths.rs` — ConfigPaths: global/local install dir resolution
-- `cmx/src/lockfile.rs` — lock file read/write
-- `cmx/src/json_file.rs` — generic JSON file load/save helpers
-- `cmx/src/checksum.rs` — SHA-256 checksums for files and directories
-- `cmx/src/fs_util.rs` — filesystem utility functions
 
 Types:
 
-- `cmx/src/types.rs` — shared types (SourceEntry, Artifact, ArtifactKind, LockFile, etc.)
 - `cmx/src/plugin_types.rs` — serde types for plugin.json and marketplace.json (single source of truth lifted from cmf)
-- `cmx/src/platform.rs` — target AI-coding-assistant platform enum used for install-directory resolution
 - `cmx/src/codex_agent.rs` — transforms a cmx markdown agent into a Codex CLI subagent TOML document
+
+Re-exports from cmx-core:
+
+`cmx/src/lib.rs` re-exports the following modules from `cmx-core` so that `crate::` paths in cmx modules and tests resolve unchanged: `artifact_status`, `checksum`, `config`, `context`, `error_summary`, `fs_util`, `gateway`, `json_file`, `lockfile`, `paths`, `platform`, `platform_iter`, `targets`, `types`. Any edits to these modules belong in `cmx-core/src/`, not `cmx/src/`. Creating a file in `cmx/src/` with the same name as one of these re-exports (e.g. a new paths module) would shadow the re-export and is a mistake.
+
+## cmx-core — Embeddable Core Library
+
+The embeddable library; a path-dependency of `cmx`, published to crates.io on the `cmx-core-v*` tag channel, and twinned with the TypeScript port `cmx-core-ts` (npm). Both ports share a version number and must satisfy the same conformance suite.
+
+**Behavioral contract:** `cmx-core/SPEC.md` and the shared golden fixtures under `cmx-core/conformance/` (categories: `checksum`, `frontmatter`, `version-guard`, `paths`, `target-resolve`, `install-e2e`) define byte-for-byte behavior every port must satisfy. The Rust port runs these via `cmx-core/src/conformance.rs` (`cargo test`); the TS port via `cmx-core-ts/test/conformance.test.ts` (`bun test`). A behavior change to one port is only complete when the shared SPEC/fixture is updated and both ports pass it.
+
+### cmx-core Architecture
+
+Types and platform:
+
+- `cmx-core/src/lib.rs` — crate root; exports all public modules
+- `cmx-core/src/types.rs` — shared types (SourceEntry, Artifact, ArtifactKind, LockFile, etc.)
+- `cmx-core/src/platform.rs` — target AI-coding-assistant platform enum used for install-directory resolution
+- `cmx-core/src/platform_iter.rs` — iterator over supported platforms
+- `cmx-core/src/targets.rs` — target resolution helpers
+
+Paths and persistence:
+
+- `cmx-core/src/paths.rs` — ConfigPaths: global/local install dir resolution
+- `cmx-core/src/checksum.rs` — SHA-256 checksums for files and directories
+- `cmx-core/src/lockfile.rs` — lock file read/write
+- `cmx-core/src/config/mod.rs` — config dir paths, sources.json read/write
+- `cmx-core/src/config/installed.rs` — installed-artifact config records
+- `cmx-core/src/json_file.rs` — generic JSON file load/save helpers
+- `cmx-core/src/fs_util.rs` — filesystem utility functions
+
+Skill lifecycle:
+
+- `cmx-core/src/frontmatter.rs` — YAML frontmatter parsing and version stamping (the shared behavior the conformance suite gates)
+- `cmx-core/src/skill_fs.rs` — skill filesystem helpers
+- `cmx-core/src/skill_install/mod.rs` — `SkillInstaller`: install/update/remove a skill on disk
+- `cmx-core/src/skill_install/plan.rs` — installation planning logic
+- `cmx-core/src/skill_install/types.rs` — skill install data types
+- `cmx-core/src/skill_install/display.rs` — output formatting for skill install operations
+
+Status and errors:
+
+- `cmx-core/src/artifact_status.rs` — artifact status determination (current, outdated, drifted, etc.)
+- `cmx-core/src/error_summary.rs` — structured error summary types
 
 Gateway (DI for testability):
 
-- `cmx/src/gateway/mod.rs` — gateway module; re-exports traits and real implementations
-- `cmx/src/gateway/filesystem.rs` — Filesystem trait for file I/O abstraction
-- `cmx/src/gateway/git.rs` — GitClient trait for git operations
-- `cmx/src/gateway/clock.rs` — Clock trait for time abstraction
-- `cmx/src/gateway/llm.rs` — LlmClient trait for LLM access (feature-gated)
-- `cmx/src/gateway/real.rs` — production implementations (RealFilesystem, RealGitClient, SystemClock, MojenticLlmClient)
-- `cmx/src/gateway/fakes.rs` — in-memory fakes for tests (FakeFilesystem, FakeGitClient, etc.)
+- `cmx-core/src/context.rs` — AppContext: bundles all I/O gateway dependencies for command invocations
+- `cmx-core/src/production.rs` — production AppContext construction with real gateways
+- `cmx-core/src/gateway/mod.rs` — gateway module; re-exports traits and real implementations
+- `cmx-core/src/gateway/filesystem.rs` — Filesystem trait for file I/O abstraction
+- `cmx-core/src/gateway/git.rs` — GitClient trait for git operations
+- `cmx-core/src/gateway/clock.rs` — Clock trait for time abstraction
+- `cmx-core/src/gateway/llm.rs` — LlmClient trait for LLM access (feature-gated)
+- `cmx-core/src/gateway/real.rs` — production implementations (RealFilesystem, RealGitClient, SystemClock, MojenticLlmClient)
+- `cmx-core/src/gateway/fakes.rs` — in-memory fakes for tests (FakeFilesystem, FakeGitClient, etc.)
 
-Test support:
+Test support and conformance:
 
-- `cmx/src/test_support.rs` — test helpers shared across integration tests
+- `cmx-core/src/test_support.rs` — test helpers shared across integration tests
+- `cmx-core/src/conformance.rs` — conformance test runner (reads golden fixtures from `cmx-core/conformance/` and drives the Rust port)
+- `cmx-core/src/bin/generate_conformance_fixtures.rs` — binary for regenerating conformance golden fixtures
 
 ## cmf — Context Mixer Forge
 
@@ -289,7 +346,8 @@ Publisher and authoring tool for managing agentic context artifacts.
 - `cmf/src/lib.rs` — crate root; re-exports all public modules
 - `cmf/src/cli.rs` — clap CLI definition (7 commands: facet, recipe, plugin, manifest, marketplace, validate, status)
 - `cmf/src/repo.rs` — Repo root detection (marketplace, plugin, facets-only, unknown)
-- `cmf/src/plugin.rs` — Plugin scanning, initialization, validation
+- `cmf/src/plugin/mod.rs` — Plugin scanning, initialization, validation
+- `cmf/src/plugin/validate.rs` — Plugin validation logic
 - `cmf/src/plugin_types.rs` — thin re-export shim (`pub use cmx::plugin_types::{...}`); the serde types for plugin.json and marketplace.json now live in `cmx/src/plugin_types.rs` (single source of truth)
 - `cmf/src/marketplace.rs` — Marketplace validation and generation
 - `cmf/src/facet.rs` — Facet scanning and validation
@@ -297,7 +355,9 @@ Publisher and authoring tool for managing agentic context artifacts.
 - `cmf/src/recipe.rs` — Recipe assembly and diffing
 - `cmf/src/manifest.rs` — Multi-platform manifest generation
 - `cmf/src/validate.rs` — Aggregate validation
-- `cmf/src/display.rs` — formatting for plugin lists, recipes, facets, manifests, and validation results
+- `cmf/src/display/mod.rs` — formatting for plugin lists, recipes, facets, manifests, and validation results; submodules:
+  `cmf/src/display/facet.rs`, `cmf/src/display/manifest.rs`, `cmf/src/display/plugin.rs`,
+  `cmf/src/display/status.rs`, `cmf/src/display/validation.rs`
 - `cmf/src/validation.rs` — Shared validation types
 - `cmf/src/test_support.rs` — test helpers for generating fake marketplace/plugin JSON
 
