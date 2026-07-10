@@ -173,15 +173,25 @@ pub(crate) fn gather_diff_with(
 
     // Every copy matches the source — nothing to reconcile anywhere.
     let Some(focus_idx) = focus else {
-        return Ok(up_to_date_output(
-            name,
+        return Ok(DiffOutput {
+            artifact_name: name.to_string(),
             kind,
-            &evals,
+            is_up_to_date: true,
+            installed_path: evals[0].copy.path.clone(),
+            installed_version: None,
+            installed_locally_edited: false,
             source_path,
             source_version,
             source_name,
+            file_changes: Vec::new(),
+            diff_text: None,
+            analysis: None,
+            analysis_note: None,
+            reconciliations: Vec::new(),
+            show_full: false,
             copies,
-        ));
+            changed_label: String::new(),
+        });
     };
 
     let multi = copies.len() > 1;
@@ -208,19 +218,26 @@ pub(crate) fn gather_diff_with(
 
     let reconciliations = reconciliations(&cmp, locally_modified, multi.then_some(focus_platform));
 
-    Ok(diverged_output(
-        name,
+    let focus = &evals[focus_idx];
+    Ok(DiffOutput {
+        artifact_name: name.to_string(),
         kind,
-        &evals[focus_idx],
+        is_up_to_date: false,
+        installed_path: focus.copy.path.clone(),
         installed_version,
-        locally_modified,
+        installed_locally_edited: locally_modified,
         source_path,
         source_version,
         source_name,
+        file_changes: focus.dir_diff.changes.clone(),
+        diff_text: Some(focus.dir_diff.unified.clone()),
+        analysis: None,
+        analysis_note: None,
         reconciliations,
+        show_full: false,
         copies,
         changed_label,
-    ))
+    })
 }
 
 /// Select which copy index to focus: prefer the active platform's differing
@@ -247,74 +264,6 @@ fn build_copy_statuses(evals: &[CopyEval], focus: Option<usize>) -> Vec<CopyStat
             is_focus: Some(i) == focus,
         })
         .collect()
-}
-
-/// Construct the `DiffOutput` for the case where every copy matches the source.
-fn up_to_date_output(
-    name: &str,
-    kind: ArtifactKind,
-    evals: &[CopyEval],
-    source_path: PathBuf,
-    source_version: Option<String>,
-    source_name: String,
-    copies: Vec<CopyStatus>,
-) -> DiffOutput {
-    DiffOutput {
-        artifact_name: name.to_string(),
-        kind,
-        is_up_to_date: true,
-        installed_path: evals[0].copy.path.clone(),
-        installed_version: None,
-        installed_locally_edited: false,
-        source_path,
-        source_version,
-        source_name,
-        file_changes: Vec::new(),
-        diff_text: None,
-        analysis: None,
-        analysis_note: None,
-        reconciliations: Vec::new(),
-        show_full: false,
-        copies,
-        changed_label: String::new(),
-    }
-}
-
-/// Construct the `DiffOutput` for the case where the focused copy diverges
-/// from the source.
-#[allow(clippy::too_many_arguments)]
-fn diverged_output(
-    name: &str,
-    kind: ArtifactKind,
-    focus_eval: &CopyEval,
-    installed_version: Option<String>,
-    locally_modified: bool,
-    source_path: PathBuf,
-    source_version: Option<String>,
-    source_name: String,
-    reconciliations: Vec<Reconciliation>,
-    copies: Vec<CopyStatus>,
-    changed_label: String,
-) -> DiffOutput {
-    DiffOutput {
-        artifact_name: name.to_string(),
-        kind,
-        is_up_to_date: false,
-        installed_path: focus_eval.copy.path.clone(),
-        installed_version,
-        installed_locally_edited: locally_modified,
-        source_path,
-        source_version,
-        source_name,
-        file_changes: focus_eval.dir_diff.changes.clone(),
-        diff_text: Some(focus_eval.dir_diff.unified.clone()),
-        analysis: None,
-        analysis_note: None,
-        reconciliations,
-        show_full: false,
-        copies,
-        changed_label,
-    }
 }
 
 // ---------------------------------------------------------------------------

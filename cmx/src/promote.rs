@@ -122,16 +122,19 @@ pub fn promote(
     let file_changes = file_changes_between(kind, &home_path, &installed_path, ctx)?;
 
     if home_cs.as_deref() == Some(installed_cs.as_str()) {
-        return Ok(already_current_result(
-            name,
+        return Ok(PromoteResult {
+            name: name.to_string(),
             kind,
-            installed_path,
+            source_path: installed_path,
             source_platforms,
             home_path,
             apply,
+            already_current: true,
             version,
             file_changes,
-        ));
+            retracked: Vec::new(),
+            still_divergent: Vec::new(),
+        });
     }
 
     if apply {
@@ -144,68 +147,7 @@ pub fn promote(
         refresh_home_baselines(name, scope, &home_tracked, &installed_cs, version.as_deref(), ctx)?;
     }
 
-    Ok(promoted_result(
-        name,
-        kind,
-        installed_path,
-        source_platforms,
-        home_path,
-        apply,
-        version,
-        file_changes,
-        home_tracked,
-        still_divergent,
-    ))
-}
-
-// ---------------------------------------------------------------------------
-// Result assembly helpers
-// ---------------------------------------------------------------------------
-
-/// Build a `PromoteResult` for the case where the home copy is already
-/// identical to the installed copy — nothing to write.
-#[allow(clippy::too_many_arguments)]
-fn already_current_result(
-    name: &str,
-    kind: ArtifactKind,
-    installed_path: PathBuf,
-    source_platforms: Vec<Platform>,
-    home_path: PathBuf,
-    apply: bool,
-    version: Option<String>,
-    file_changes: Vec<FileChange>,
-) -> PromoteResult {
-    PromoteResult {
-        name: name.to_string(),
-        kind,
-        source_path: installed_path,
-        source_platforms,
-        home_path,
-        apply,
-        already_current: true,
-        version,
-        file_changes,
-        retracked: Vec::new(),
-        still_divergent: Vec::new(),
-    }
-}
-
-/// Build a `PromoteResult` for the case where the installed copy was promoted
-/// into the home.
-#[allow(clippy::too_many_arguments)]
-fn promoted_result(
-    name: &str,
-    kind: ArtifactKind,
-    installed_path: PathBuf,
-    source_platforms: Vec<Platform>,
-    home_path: PathBuf,
-    apply: bool,
-    version: Option<String>,
-    file_changes: Vec<FileChange>,
-    home_tracked: Vec<Platform>,
-    still_divergent: Vec<Platform>,
-) -> PromoteResult {
-    PromoteResult {
+    Ok(PromoteResult {
         name: name.to_string(),
         kind,
         source_path: installed_path,
@@ -217,7 +159,7 @@ fn promoted_result(
         file_changes,
         retracked: home_tracked,
         still_divergent,
-    }
+    })
 }
 
 // ---------------------------------------------------------------------------
