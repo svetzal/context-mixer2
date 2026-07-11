@@ -4,7 +4,7 @@
 //! once at startup and use [`ProductionContext::ctx`] to obtain an `AppContext`
 //! for every library call, avoiding the need to know about gateway internals.
 
-use anyhow::Result;
+use crate::error::Result;
 
 use crate::context::AppContext;
 use crate::gateway::real::{RealFilesystem, RealGitClient, SystemClock};

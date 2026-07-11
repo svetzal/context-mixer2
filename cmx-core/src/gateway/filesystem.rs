@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::Result;
 use std::path::{Path, PathBuf};
 
 /// A simplified directory entry for the `Filesystem` trait boundary.

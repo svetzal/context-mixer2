@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::Result;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 

@@ -1,7 +1,7 @@
-use anyhow::{Context, Result};
 use serde::{Serialize, de::DeserializeOwned};
 use std::path::{Path, PathBuf};
 
+use crate::error::{CmxError, Result};
 use crate::gateway::filesystem::Filesystem;
 
 pub fn load_json<T>(path: &Path, fs: &dyn Filesystem) -> Result<T>
@@ -12,9 +12,11 @@ where
         return Ok(T::default());
     }
     let content = fs.read_to_string(path)?;
-    let value: T = serde_json::from_str(&content)
-        .with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(value)
+    serde_json::from_str(&content).map_err(|source| CmxError::Json {
+        context: format!("Failed to parse {}", path.display()),
+        path: path.to_path_buf(),
+        source,
+    })
 }
 
 /// Return the sibling temporary path used during an atomic write of `path`.
@@ -40,7 +42,11 @@ where
     if let Some(parent) = path.parent() {
         fs.create_dir_all(parent)?;
     }
-    let content = serde_json::to_string_pretty(value)?;
+    let content = serde_json::to_string_pretty(value).map_err(|source| CmxError::Json {
+        context: "Failed to serialize JSON".to_string(),
+        path: path.to_path_buf(),
+        source,
+    })?;
     let tmp = tmp_path(path);
     fs.write(&tmp, &content)?;
     fs.rename(&tmp, path)?;
@@ -88,6 +94,8 @@ mod tests {
         fs.add_file(path.clone(), "not json {{{{");
         let result: Result<TestData> = load_json(&path, &fs);
         assert!(result.is_err());
+        // Typed: CmxError::Json
+        assert!(matches!(result.unwrap_err(), CmxError::Json { .. }));
     }
 
     #[test]

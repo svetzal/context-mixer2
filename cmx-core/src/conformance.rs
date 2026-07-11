@@ -163,7 +163,7 @@ fn save_bundled_lock(
         packages,
     };
     let paths = test.paths.with_platform(Platform::Claude);
-    lockfile::save(&lock, scope, &test.fs, &paths)
+    Ok(lockfile::save(&lock, scope, &test.fs, &paths)?)
 }
 
 fn write_bundle_version(

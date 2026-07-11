@@ -143,7 +143,7 @@ pub fn resolve_targets(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Platform>> {
-    crate::targets::resolve_targets(selector, kind, scope, ctx)
+    Ok(crate::targets::resolve_targets(selector, kind, scope, ctx)?)
 }
 
 /// Install several named artifacts in one pass, into each of `targets`.
@@ -396,7 +396,7 @@ fn commit_install(
         if decision.rollback_on_lock_fail {
             let _ = crate::uninstall::remove_installed(kind, &dest_path, ctx.fs);
         }
-        return Err(lock_err);
+        return Err(lock_err.into());
     }
 
     Ok(dest_path)
@@ -464,7 +464,7 @@ fn check_local_modifications(
     let dest_check = ctx.paths.require_installed_artifact_path(kind, artifact_name, scope)?;
     if ctx.fs.exists(&dest_check) {
         if let Some(entry) = lock_entry {
-            return checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs);
+            return Ok(checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs)?);
         }
     }
     Ok(false)

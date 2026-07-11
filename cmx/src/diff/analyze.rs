@@ -39,7 +39,7 @@ pub(super) async fn analyze_focus(
         changed = cmp.changed_label,
     );
     match ctx.llm {
-        Some(llm) => llm.analyze(&system_prompt, &user_prompt).await,
+        Some(llm) => Ok(llm.analyze(&system_prompt, &user_prompt).await?),
         None => bail!("LLM client not configured for diff analysis"),
     }
 }

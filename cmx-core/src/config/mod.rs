@@ -1,6 +1,6 @@
-use anyhow::Result;
 use std::path::PathBuf;
 
+use crate::error::{CmxError, Result};
 use crate::gateway::filesystem::Filesystem;
 use crate::paths::ConfigPaths;
 use crate::types::{CmxConfig, InstallScope, SetsFile, SourceEntry, SourceType, SourcesFile};
@@ -25,9 +25,14 @@ pub fn save_sources(sources: &SourcesFile, fs: &dyn Filesystem, paths: &ConfigPa
 /// `f` is called with a mutable reference to the in-memory sources and may
 /// return `Err` to abort without writing; on success the file is saved and
 /// the value returned by `f` is propagated.
-pub fn mutate_sources<F, T>(fs: &dyn Filesystem, paths: &ConfigPaths, f: F) -> Result<T>
+///
+/// The closure and outer return type are `anyhow::Result` so that application
+/// closures can use `bail!`/`anyhow!` without wrapping.  The leaf calls
+/// (`load_sources`, `save_sources`) return `crate::error::Result` which
+/// auto-converts to `anyhow::Error` via the `?` operator.
+pub fn mutate_sources<F, T>(fs: &dyn Filesystem, paths: &ConfigPaths, f: F) -> anyhow::Result<T>
 where
-    F: FnOnce(&mut SourcesFile) -> Result<T>,
+    F: FnOnce(&mut SourcesFile) -> anyhow::Result<T>,
 {
     let mut sources = load_sources(fs, paths)?;
     let result = f(&mut sources)?;
@@ -57,14 +62,16 @@ pub fn save_sets(
 /// `f` is called with a mutable reference to the in-memory sets and may
 /// return `Err` to abort without writing; on success the file is saved and
 /// the value returned by `f` is propagated.
+///
+/// See [`mutate_sources`] for why the closure and outer return stay `anyhow::Result`.
 pub fn mutate_sets<F, T>(
     scope: InstallScope,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
     f: F,
-) -> Result<T>
+) -> anyhow::Result<T>
 where
-    F: FnOnce(&mut SetsFile) -> Result<T>,
+    F: FnOnce(&mut SetsFile) -> anyhow::Result<T>,
 {
     let mut sets = load_sets(scope, fs, paths)?;
     let result = f(&mut sets)?;
@@ -128,14 +135,14 @@ fn expand_tilde(entry: &str, home_dir: &std::path::Path) -> PathBuf {
 
 pub fn resolve_local_path(entry: &SourceEntry) -> Result<PathBuf> {
     match entry.source_type {
-        SourceType::Local => entry
-            .path
-            .clone()
-            .ok_or_else(|| anyhow::anyhow!("Local source has no path configured")),
-        SourceType::Git => entry
-            .local_clone
-            .clone()
-            .ok_or_else(|| anyhow::anyhow!("Git source has no local clone path configured")),
+        SourceType::Local => entry.path.clone().ok_or(CmxError::SourcePathMissing {
+            msg: "Local source has no path configured",
+            kind: SourceType::Local,
+        }),
+        SourceType::Git => entry.local_clone.clone().ok_or(CmxError::SourcePathMissing {
+            msg: "Git source has no local clone path configured",
+            kind: SourceType::Git,
+        }),
     }
 }
 
@@ -212,7 +219,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
 
-        let result: Result<()> =
+        let result: anyhow::Result<()> =
             mutate_sources(&fs, &paths, |_sources| Err(anyhow::anyhow!("closure error")));
         assert!(result.is_err());
 
@@ -276,7 +283,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
 
-        let result: Result<()> = mutate_sets(InstallScope::Global, &fs, &paths, |_sets| {
+        let result: anyhow::Result<()> = mutate_sets(InstallScope::Global, &fs, &paths, |_sets| {
             Err(anyhow::anyhow!("closure error"))
         });
         assert!(result.is_err());

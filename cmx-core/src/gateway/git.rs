@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::Result;
 use std::path::Path;
 
 /// Abstraction over git operations used by cmx.

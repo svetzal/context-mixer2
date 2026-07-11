@@ -5,8 +5,7 @@
 //! any cmx internals.
 //!
 //! ```no_run
-//! # use anyhow::Result;
-//! # fn main() -> Result<()> {
+//! # fn main() -> anyhow::Result<()> {
 //! use cmx_core::production::ProductionContext;
 //! use cmx_core::skill_install::{BundledSkill, Scope, SkillInstaller, ToolIdentity};
 //!
@@ -32,9 +31,10 @@ mod display;
 mod plan;
 use plan::{build_lock_entry, decide_action_for_entry, prepare_writes};
 
-use anyhow::{Result, bail};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+
+use crate::error::{CmxError, Result};
 
 use crate::checksum;
 use crate::config;
@@ -73,7 +73,9 @@ impl SkillInstaller {
         ctx: &AppContext<'_>,
     ) -> Result<InstallPlan> {
         if !skill.has_skill_md() {
-            bail!("BundledSkill for '{}' is missing SKILL.md", self.tool.name);
+            return Err(CmxError::MissingSkillMd {
+                skill: self.tool.name.clone(),
+            });
         }
 
         // Reconcile the SKILL.md frontmatter's `metadata.version` to this tool's
@@ -167,12 +169,12 @@ impl SkillInstaller {
         skill: &BundledSkill,
         plan: &InstallPlan,
         ctx: &AppContext<'_>,
-    ) -> Result<Report> {
+    ) -> anyhow::Result<Report> {
         if plan.is_blocked() {
-            bail!(
-                "Install plan for '{}' is blocked. Run with force=true to override.",
-                self.tool.name
-            );
+            return Err(CmxError::VersionGuard {
+                tool: self.tool.name.clone(),
+            }
+            .into());
         }
 
         // Reconcile the same way plan() did, so the checksum below and the bytes
@@ -182,10 +184,10 @@ impl SkillInstaller {
         // Parity guard: the skill passed here must match the one that was planned.
         let current_checksum = skill_fs::checksum_bundled(&files);
         if current_checksum != plan.source_checksum {
-            bail!(
-                "Parity check failed for '{}': the BundledSkill has changed since plan() was called.",
-                self.tool.name
-            );
+            return Err(CmxError::Drift {
+                tool: self.tool.name.clone(),
+            }
+            .into());
         }
 
         let PreparedWrites {
@@ -227,7 +229,7 @@ impl SkillInstaller {
         installed_checksum: &str,
         installed_at: &str,
         ctx: &AppContext<'_>,
-    ) -> Result<Vec<TargetOutcome>> {
+    ) -> anyhow::Result<Vec<TargetOutcome>> {
         let mut targets = Vec::new();
         for target in &plan.targets {
             if !target.action.will_write() {
@@ -274,7 +276,7 @@ impl SkillInstaller {
         plan: &InstallPlan,
         files: &[skill_fs::SkillFile],
         ctx: &AppContext<'_>,
-    ) -> Result<bool> {
+    ) -> anyhow::Result<bool> {
         if plan.cmx_present && config::managed_platforms(ctx.fs, ctx.paths)?.is_some() {
             let source_name = format!("bundled:{}", self.tool.name);
             // Materialize a directory under the default artifact home for source tracing.
@@ -348,7 +350,7 @@ impl SkillInstaller {
     }
 
     /// Remove this skill from all relevant platforms.
-    pub fn remove(&self, scope: Scope, ctx: &AppContext<'_>) -> Result<RemoveReport> {
+    pub fn remove(&self, scope: Scope, ctx: &AppContext<'_>) -> anyhow::Result<RemoveReport> {
         let install_scope = scope.to_install_scope();
         let platform_targets = config::managed_or_all_platforms(ctx.fs, ctx.paths)?
             .into_iter()

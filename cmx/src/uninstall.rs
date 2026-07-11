@@ -66,7 +66,7 @@ fn candidate_platforms(selector: Option<Platform>, ctx: &AppContext<'_>) -> Resu
     if let Some(p) = selector {
         return Ok(vec![p]);
     }
-    crate::config::managed_or_all_platforms(ctx.fs, ctx.paths)
+    Ok(crate::config::managed_or_all_platforms(ctx.fs, ctx.paths)?)
 }
 
 /// Uninstall one artifact from the given `candidates`, at the given scope —

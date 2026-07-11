@@ -25,6 +25,7 @@ required-features = ["test-support"]
 
 [dependencies]
 anyhow = "1"
+thiserror = "2"
 clap = { version = "4", features = ["derive"] }
 chrono = "0.4.45"
 dirs = "6"

@@ -4,7 +4,7 @@
 //! [`canonical_files`] filters and sorts them the same way `checksum_dir` does,
 //! so checksums computed from memory match checksums computed from disk.
 
-use anyhow::Result;
+use crate::error::Result;
 use std::path::{Path, PathBuf};
 
 use crate::checksum::checksum_in_memory;

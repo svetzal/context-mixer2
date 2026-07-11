@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use crate::error::Result;
 
 use crate::gateway::filesystem::Filesystem;
 use crate::paths::ConfigPaths;

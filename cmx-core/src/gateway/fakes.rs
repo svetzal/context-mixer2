@@ -1,8 +1,8 @@
-use anyhow::{Result, bail};
 use chrono::{DateTime, Utc};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Mutex;
@@ -11,6 +11,8 @@ use super::clock::Clock;
 use super::filesystem::{DirEntry, Filesystem};
 use super::git::GitClient;
 use super::llm::LlmClient;
+
+use crate::error::{CmxError, GitOp, LlmError, Result};
 
 // ---------------------------------------------------------------------------
 // FakeFilesystem
@@ -99,6 +101,24 @@ impl Default for FakeFilesystem {
     }
 }
 
+/// Build a `CmxError::Io` for a "not found" fake path.
+fn not_found(context: String, path: &Path) -> CmxError {
+    CmxError::Io {
+        context,
+        path: path.to_path_buf(),
+        source: std::io::Error::new(ErrorKind::NotFound, "file not found"),
+    }
+}
+
+/// Build a `CmxError::Io` for a "permission denied / injected failure" fake path.
+fn fake_write_failure(path: &Path) -> CmxError {
+    CmxError::Io {
+        context: format!("Failed to write {}", path.display()),
+        path: path.to_path_buf(),
+        source: std::io::Error::new(ErrorKind::PermissionDenied, "injected write failure"),
+    }
+}
+
 impl Filesystem for FakeFilesystem {
     fn exists(&self, path: &Path) -> bool {
         self.files.borrow().contains_key(path) || self.dirs.borrow().contains(path)
@@ -114,21 +134,25 @@ impl Filesystem for FakeFilesystem {
 
     fn read_to_string(&self, path: &Path) -> Result<String> {
         match self.files.borrow().get(path).cloned() {
-            Some(bytes) => Ok(String::from_utf8(bytes)?),
-            None => bail!("File not found: {}", path.display()),
+            Some(bytes) => String::from_utf8(bytes).map_err(|e| CmxError::Io {
+                context: format!("Failed to read {}", path.display()),
+                path: path.to_path_buf(),
+                source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+            }),
+            None => Err(not_found(format!("File not found: {}", path.display()), path)),
         }
     }
 
     fn read(&self, path: &Path) -> Result<Vec<u8>> {
         match self.files.borrow().get(path).cloned() {
             Some(bytes) => Ok(bytes),
-            None => bail!("File not found: {}", path.display()),
+            None => Err(not_found(format!("File not found: {}", path.display()), path)),
         }
     }
 
     fn write(&self, path: &Path, contents: &str) -> Result<()> {
         if self.fail_on_write.borrow().as_deref() == Some(path) {
-            bail!("Failed to write {}", path.display());
+            return Err(fake_write_failure(path));
         }
         self.add_file(path.to_path_buf(), contents.as_bytes().to_vec());
         Ok(())
@@ -152,28 +176,34 @@ impl Filesystem for FakeFilesystem {
 
     fn copy_file(&self, src: &Path, dest: &Path) -> Result<()> {
         if *self.fail_on_copy.borrow() {
-            bail!(
-                "FakeFilesystem: copy_file configured to fail ({} -> {})",
-                src.display(),
-                dest.display()
-            );
+            return Err(CmxError::Io {
+                context: format!(
+                    "FakeFilesystem: copy_file configured to fail ({} -> {})",
+                    src.display(),
+                    dest.display()
+                ),
+                path: dest.to_path_buf(),
+                source: std::io::Error::new(ErrorKind::PermissionDenied, "injected copy failure"),
+            });
         }
-        let bytes = self
-            .files
-            .borrow()
-            .get(src)
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("Source file not found: {}", src.display()))?;
+        let bytes =
+            self.files.borrow().get(src).cloned().ok_or_else(|| {
+                not_found(format!("Source file not found: {}", src.display()), src)
+            })?;
         self.add_file(dest.to_path_buf(), bytes);
         Ok(())
     }
 
     fn rename(&self, from: &Path, to: &Path) -> Result<()> {
         if self.fail_on_rename.borrow().as_deref() == Some(to) {
-            bail!("FakeFilesystem: rename configured to fail for {}", to.display());
+            return Err(CmxError::Io {
+                context: format!("FakeFilesystem: rename configured to fail for {}", to.display()),
+                path: to.to_path_buf(),
+                source: std::io::Error::new(ErrorKind::PermissionDenied, "injected rename failure"),
+            });
         }
         let bytes = self.files.borrow().get(from).cloned().ok_or_else(|| {
-            anyhow::anyhow!("Source file not found for rename: {}", from.display())
+            not_found(format!("Source file not found for rename: {}", from.display()), from)
         })?;
         self.add_file(to.to_path_buf(), bytes);
         self.files.borrow_mut().remove(from);
@@ -182,7 +212,7 @@ impl Filesystem for FakeFilesystem {
 
     fn remove_file(&self, path: &Path) -> Result<()> {
         if self.files.borrow_mut().remove(path).is_none() {
-            bail!("File not found: {}", path.display());
+            return Err(not_found(format!("File not found: {}", path.display()), path));
         }
         Ok(())
     }
@@ -198,7 +228,11 @@ impl Filesystem for FakeFilesystem {
 
     fn read_dir(&self, path: &Path) -> Result<Vec<DirEntry>> {
         if !self.dirs.borrow().contains(path) && !self.files.borrow().contains_key(path) {
-            bail!("Failed to read directory {}", path.display());
+            return Err(CmxError::Io {
+                context: format!("Failed to read directory {}", path.display()),
+                path: path.to_path_buf(),
+                source: std::io::Error::new(ErrorKind::NotFound, "directory not found"),
+            });
         }
 
         let mut seen: BTreeSet<PathBuf> = BTreeSet::new();
@@ -282,7 +316,10 @@ impl Default for FakeGitClient {
 impl GitClient for FakeGitClient {
     fn clone_repo(&self, url: &str, dest: &Path) -> Result<()> {
         if self.should_fail {
-            bail!("FakeGitClient: clone_repo configured to fail");
+            return Err(CmxError::Git {
+                operation: GitOp::Clone,
+                stderr: "FakeGitClient: clone_repo configured to fail".to_string(),
+            });
         }
         self.cloned.borrow_mut().push((url.to_string(), dest.to_path_buf()));
         Ok(())
@@ -290,7 +327,10 @@ impl GitClient for FakeGitClient {
 
     fn pull(&self, repo_path: &Path) -> Result<()> {
         if self.should_fail {
-            bail!("FakeGitClient: pull configured to fail");
+            return Err(CmxError::Git {
+                operation: GitOp::Pull,
+                stderr: "FakeGitClient: pull configured to fail".to_string(),
+            });
         }
         self.pulled.borrow_mut().push(repo_path.to_path_buf());
         Ok(())
@@ -364,7 +404,9 @@ impl LlmClient for FakeLlmClient {
         let response = self.response.clone();
         Box::pin(async move {
             if should_fail {
-                bail!("FakeLlmClient: analyze configured to fail");
+                return Err(CmxError::Llm(LlmError::Other(
+                    "FakeLlmClient: analyze configured to fail".to_string(),
+                )));
             }
             Ok(response)
         })
@@ -405,7 +447,8 @@ mod tests {
     #[test]
     fn fake_filesystem_read_missing_file_errors() {
         let fs = FakeFilesystem::new();
-        assert!(fs.read_to_string(Path::new("/nonexistent.txt")).is_err());
+        let err = fs.read_to_string(Path::new("/nonexistent.txt")).unwrap_err();
+        assert!(matches!(err, CmxError::Io { .. }));
     }
 
     #[test]
@@ -465,6 +508,44 @@ mod tests {
     }
 
     #[test]
+    fn fake_git_client_clone_fail_returns_typed_git_error() {
+        let git = FakeGitClient {
+            should_fail: true,
+            ..FakeGitClient::new()
+        };
+        let err = git.clone_repo("url", Path::new("/tmp")).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                CmxError::Git {
+                    operation: GitOp::Clone,
+                    ..
+                }
+            ),
+            "expected Git(Clone), got {err:?}"
+        );
+    }
+
+    #[test]
+    fn fake_git_client_pull_fail_returns_typed_git_error() {
+        let git = FakeGitClient {
+            should_fail: true,
+            ..FakeGitClient::new()
+        };
+        let err = git.pull(Path::new("/tmp/repo")).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                CmxError::Git {
+                    operation: GitOp::Pull,
+                    ..
+                }
+            ),
+            "expected Git(Pull), got {err:?}"
+        );
+    }
+
+    #[test]
     fn fake_clock_returns_fixed_time() {
         use chrono::TimeZone;
         let fixed = Utc.with_ymd_and_hms(2024, 6, 1, 12, 0, 0).unwrap();
@@ -506,8 +587,9 @@ mod tests {
 
         fs.set_fail_on_write(fail_path.clone());
 
-        // Write to the configured fail path returns Err
-        assert!(fs.write(&fail_path, "data").is_err());
+        // Write to the configured fail path returns a typed Io error
+        let err = fs.write(&fail_path, "data").unwrap_err();
+        assert!(matches!(err, CmxError::Io { .. }));
 
         // Write to a different path still succeeds
         assert!(fs.write(&other_path, "data").is_ok());
@@ -523,7 +605,8 @@ mod tests {
 
         fs.set_fail_on_copy(true);
 
-        assert!(fs.copy_file(&src, &dest).is_err());
+        let err = fs.copy_file(&src, &dest).unwrap_err();
+        assert!(matches!(err, CmxError::Io { .. }));
         // Verify nothing was copied
         assert!(!fs.file_exists(&dest));
     }
@@ -537,7 +620,13 @@ mod tests {
         };
         let result = client.analyze("system", "user").await;
         assert!(result.is_err());
-        let msg = result.unwrap_err().to_string();
+        let err = result.unwrap_err();
+        // Typed: CmxError::Llm(LlmError::Other(_))
+        assert!(
+            matches!(err, CmxError::Llm(LlmError::Other(_))),
+            "expected Llm(Other), got {err:?}"
+        );
+        let msg = err.to_string();
         assert!(msg.contains("configured to fail"), "unexpected: {msg}");
     }
 
@@ -577,7 +666,8 @@ mod tests {
         fs.add_file(from.clone(), "content");
         fs.set_fail_on_rename(to.clone());
 
-        assert!(fs.rename(&from, &to).is_err());
+        let err = fs.rename(&from, &to).unwrap_err();
+        assert!(matches!(err, CmxError::Io { .. }));
         // Source file should be untouched after failed rename
         assert!(fs.file_exists(&from), "source should remain after failed rename");
     }

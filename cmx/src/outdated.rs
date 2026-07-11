@@ -100,7 +100,7 @@ fn check_locally_modified(
     if !ctx.fs.exists(&install_path) {
         return Ok(false);
     }
-    checksum::is_locally_modified(&install_path, kind, entry, ctx.fs)
+    Ok(checksum::is_locally_modified(&install_path, kind, entry, ctx.fs)?)
 }
 
 fn collect_outdated_for_scope_with(

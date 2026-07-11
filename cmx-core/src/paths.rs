@@ -1,6 +1,6 @@
-use anyhow::{Context, Result, bail};
 use std::path::PathBuf;
 
+use crate::error::{CmxError, Result};
 use crate::gateway::Filesystem;
 use crate::platform::Platform;
 use crate::types::{ArtifactKind, InstallScope};
@@ -19,7 +19,7 @@ pub struct ConfigPaths {
 impl ConfigPaths {
     /// Production constructor — derives paths from the real home and config directories.
     pub fn from_env(platform: Platform) -> Result<Self> {
-        let home = dirs::home_dir().context("Could not determine home directory")?;
+        let home = dirs::home_dir().ok_or(CmxError::HomeDirUnavailable)?;
         let config_dir = home.join(".config").join("context-mixer");
         Ok(Self {
             config_dir,
@@ -175,12 +175,7 @@ impl ConfigPaths {
         if self.platform.supports(kind) {
             Ok(())
         } else {
-            bail!(
-                "The {platform} platform does not support {kind}s. \
-                 {platform} has no native {kind} concept.",
-                platform = self.platform,
-                kind = kind,
-            );
+            Err(unsupported_artifact_error(self.platform, kind))
         }
     }
 
@@ -204,11 +199,8 @@ impl ConfigPaths {
     }
 }
 
-fn unsupported_artifact_error(platform: Platform, kind: ArtifactKind) -> anyhow::Error {
-    anyhow::anyhow!(
-        "The {platform} platform does not support {kind}s. \
-         {platform} has no native {kind} concept."
-    )
+fn unsupported_artifact_error(platform: Platform, kind: ArtifactKind) -> CmxError {
+    CmxError::UnsupportedArtifact { platform, kind }
 }
 
 #[cfg(test)]

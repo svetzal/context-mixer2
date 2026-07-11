@@ -315,6 +315,7 @@ Skill lifecycle:
 
 Status and errors:
 
+- `cmx-core/src/error.rs` — typed domain errors (`CmxError`, `LlmError`, `GitOp`, `Result<T>`) returned by all public cmx-core APIs; stable `.code()` discriminants mirror in the TypeScript port
 - `cmx-core/src/artifact_status.rs` — artifact status determination (current, outdated, drifted, etc.)
 - `cmx-core/src/error_summary.rs` — structured error summary types
 

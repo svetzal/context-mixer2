@@ -1,4 +1,4 @@
-use anyhow::Context as _;
+use crate::error::{CmxError, Result as CmxResult};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -306,8 +306,10 @@ pub fn format_version_prefix(version: Option<&str>) -> String {
 }
 
 impl SourcesFile {
-    pub fn get_source(&self, name: &str) -> anyhow::Result<&SourceEntry> {
-        self.sources.get(name).with_context(|| format!("Source '{name}' not found."))
+    pub fn get_source(&self, name: &str) -> CmxResult<&SourceEntry> {
+        self.sources.get(name).ok_or_else(|| CmxError::SourceNotFound {
+            name: name.to_string(),
+        })
     }
 }
 

@@ -2,6 +2,7 @@ pub mod artifact_status;
 pub mod checksum;
 pub mod config;
 pub mod context;
+pub mod error;
 pub mod error_summary;
 pub mod frontmatter;
 pub mod fs_util;

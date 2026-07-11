@@ -9,7 +9,7 @@
 //! - No managed set → every platform with a non-empty lock file at `scope`
 //!   (i.e. platforms "in use"), falling back to `[Claude]` on a fresh machine.
 
-use anyhow::Result;
+use crate::error::Result;
 
 use crate::context::AppContext;
 use crate::lockfile;
