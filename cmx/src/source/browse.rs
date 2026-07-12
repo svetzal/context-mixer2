@@ -12,6 +12,8 @@ pub struct BrowseArtifact {
     pub version: Option<String>,
     pub description: String,
     pub deprecation: Option<Deprecation>,
+    /// Human-formatted deprecation string — display-only; omitted from `--json`.
+    #[serde(skip_serializing)]
     pub deprecation_display: String,
 }
 
@@ -21,12 +23,16 @@ pub struct BrowseSkill {
     pub version: Option<String>,
     pub description: String,
     pub deprecation: Option<Deprecation>,
+    /// Human-formatted deprecation string — display-only; omitted from `--json`.
+    #[serde(skip_serializing)]
     pub deprecation_display: String,
     pub files: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct SourceBrowseResult {
+    /// In JSON output this appears as `"source"`.
+    #[serde(rename = "source")]
     pub source_name: String,
     pub agents: Vec<BrowseArtifact>,
     pub skills: Vec<BrowseSkill>,

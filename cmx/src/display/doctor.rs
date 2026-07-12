@@ -1,6 +1,7 @@
 use std::fmt;
 
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::doctor::{DoctorArtifact, DoctorReport};
 use crate::table::Table;
@@ -25,80 +26,116 @@ pub fn adopt_all_deprecation_notice() -> &'static str {
      instead (pass `--from-dir <dir>` there in place of doctor's `--from`)."
 }
 
+// ---------------------------------------------------------------------------
+// JSON projection types — the single home for the `cmx doctor --json` contract
+// ---------------------------------------------------------------------------
+
+/// Per-location row in the `"locations"` array.
+#[derive(Serialize)]
+struct DoctorLocationJson {
+    path: String,
+    platform: Option<String>,
+    version: Option<String>,
+    state: &'static str,
+}
+
+/// Per-artifact object in the `"artifacts"` array.
+///
+/// The `version` / `versions` XOR is expressed by the constructor
+/// (`from_artifact`): when the artifact has a single agreed-upon version,
+/// `version` is set and `versions` is left empty (skipped); otherwise
+/// `version` is left `None` (skipped) and `versions` carries all distinct
+/// versions. This encodes the XOR rule in exactly one place.
+#[derive(Serialize)]
+struct DoctorArtifactJson {
+    kind: crate::types::ArtifactKind,
+    name: String,
+    scope: crate::types::InstallScope,
+    state: &'static str,
+    source: Option<String>,
+    tools: Vec<String>,
+    diverged: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    versions: Vec<String>,
+    locations: Vec<DoctorLocationJson>,
+}
+
+impl DoctorArtifactJson {
+    fn from_artifact(a: &DoctorArtifact, rows: &[crate::doctor::DoctorRow]) -> Self {
+        let locations = crate::doctor::location_members(a, rows)
+            .into_iter()
+            .map(|m| DoctorLocationJson {
+                path: m.location.display().to_string(),
+                platform: m.platform.map(|p| p.to_string()),
+                version: m.version,
+                state: m.state_label,
+            })
+            .collect();
+        Self {
+            kind: a.kind,
+            name: a.name.clone(),
+            scope: a.scope,
+            state: a.state.label(),
+            source: a.source.clone(),
+            tools: a.tools.iter().map(ToString::to_string).collect(),
+            diverged: a.diverged,
+            // XOR: emit "version" when all copies agree, "versions" when they differ.
+            version: a.version.clone(),
+            versions: if a.version.is_some() {
+                vec![]
+            } else {
+                a.versions.clone()
+            },
+            locations,
+        }
+    }
+}
+
+/// Top-level `cmx doctor --json` output.
+#[derive(Serialize)]
+struct DoctorJson<'a> {
+    scope: &'static str,
+    platforms_surveyed: usize,
+    showing: &'static str,
+    summary: crate::doctor::StateCounts,
+    artifacts: Vec<DoctorArtifactJson>,
+    set_inconsistencies: &'a [crate::doctor::SetInconsistency],
+}
+
 /// Project the survey to the machine-readable schema documented for
 /// `cmx doctor --json`. Mirrors the human `Display` impl's content and
 /// selection (via [`shown_artifacts`]), but structures divergence as a
 /// `locations` array instead of free-text prose.
+///
+/// Every field-name and value-encoding decision is expressed as serde
+/// attributes on the projection types above — there is exactly one home
+/// for the `--json` contract.
 pub fn doctor_json(report: &DoctorReport) -> Value {
     let shown = shown_artifacts(report);
-    let c = report.counts();
-    let artifacts: Vec<Value> = shown
+    let artifacts = shown
         .iter()
-        .map(|a| {
-            let mut obj = json!({
-                "kind": a.kind.to_string(),
-                "name": a.name.clone(),
-                "scope": a.scope.label(),
-                "state": a.state.label(),
-                "source": a.source.clone(),
-                "tools": a.tools.iter().map(ToString::to_string).collect::<Vec<_>>(),
-                "diverged": a.diverged,
-                "locations": crate::doctor::location_members(a, &report.rows)
-                    .into_iter()
-                    .map(|m| json!({
-                        "path": m.location.display().to_string(),
-                        "platform": m.platform.map(|p| p.to_string()),
-                        "version": m.version,
-                        "state": m.state_label,
-                    }))
-                    .collect::<Vec<_>>(),
-            });
-            let map = obj.as_object_mut().expect("json! object literal");
-            if let Some(version) = &a.version {
-                map.insert("version".to_string(), json!(version));
-            } else {
-                map.insert("versions".to_string(), json!(a.versions));
-            }
-            obj
-        })
+        .map(|a| DoctorArtifactJson::from_artifact(a, &report.rows))
         .collect();
 
-    json!({
-        "scope": if report.included_local { "global+local" } else { "global" },
-        "platforms_surveyed": report.surveyed_platforms,
-        "showing": if report.show_all { "all" } else { "needs_attention" },
-        "summary": {
-            "tracked": c.tracked,
-            "drifted": c.drifted,
-            "untracked": c.untracked,
-            "orphaned": c.orphaned,
-            "external": c.external,
-            "missing": c.missing,
-            "diverged": c.diverged,
-            "set_inconsistent": c.set_inconsistent,
+    serde_json::to_value(DoctorJson {
+        scope: if report.included_local {
+            "global+local"
+        } else {
+            "global"
         },
-        "artifacts": artifacts,
-        "set_inconsistencies": report
-            .set_inconsistencies
-            .iter()
-            .map(|s| json!({
-                "set": s.set_name,
-                "scope": s.scope.label(),
-                "kind": s.kind.to_string(),
-                "member": s.member,
-                "problem": set_problem_label(s.problem),
-            }))
-            .collect::<Vec<_>>(),
+        platforms_surveyed: report.surveyed_platforms,
+        showing: if report.show_all {
+            "all"
+        } else {
+            "needs_attention"
+        },
+        summary: report.counts(),
+        artifacts,
+        set_inconsistencies: &report.set_inconsistencies,
     })
-}
-
-/// Machine-readable label for a [`crate::doctor::SetProblem`] — used by both
-/// `doctor_json` and the human hint text.
-fn set_problem_label(problem: crate::doctor::SetProblem) -> &'static str {
-    match problem {
-        crate::doctor::SetProblem::ActiveMissing => "active_missing",
-        crate::doctor::SetProblem::InactiveLingering => "inactive_lingering",
-    }
+    .expect("DoctorJson is serializable")
 }
 
 fn platform_version_label(

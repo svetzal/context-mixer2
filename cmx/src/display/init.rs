@@ -1,10 +1,11 @@
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use cmx_core::platform::Platform;
 use cmx_core::skill_install::{InstallPlan, Report, TargetAction};
 use cmx_core::types::InstallScope;
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::init::InitOutcome;
 
@@ -212,73 +213,127 @@ fn status_label(action: &TargetAction) -> &'static str {
     }
 }
 
-fn target_json(
-    platform: Platform,
-    dest_dir: &std::path::Path,
-    action: &TargetAction,
+// ---------------------------------------------------------------------------
+// JSON projection types — single home for the `cmx init --json` contract
+// ---------------------------------------------------------------------------
+
+/// Per-platform target object in `"targets"`. The `action` and `status` labels
+/// are computed once here via [`action_label`] / [`status_label`], removing
+/// the parallel string-mapping from `init_json` itself.
+#[derive(Serialize)]
+struct InitTargetJson {
+    platform: String,
+    action: &'static str,
+    status: &'static str,
+    dest: String,
     files_written: usize,
-    installed_checksum: Option<&str>,
-) -> Value {
-    json!({
-        "platform": platform.to_string(),
-        "action": action_label(action),
-        "status": status_label(action),
-        "dest": dest_dir.display().to_string(),
-        "files_written": files_written,
-        "installed_checksum": installed_checksum,
-    })
+    installed_checksum: Option<String>,
+}
+
+impl InitTargetJson {
+    fn from_parts(
+        platform: Platform,
+        dest_dir: &Path,
+        action: &TargetAction,
+        files_written: usize,
+        installed_checksum: Option<&str>,
+    ) -> Self {
+        Self {
+            platform: platform.to_string(),
+            action: action_label(action),
+            status: status_label(action),
+            dest: dest_dir.display().to_string(),
+            files_written,
+            installed_checksum: installed_checksum.map(str::to_string),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct InitInstalledJson<'a> {
+    tool: &'a str,
+    version: &'a str,
+    scope: &'static str,
+    source_registered: bool,
+    targets: Vec<InitTargetJson>,
+}
+
+#[derive(Serialize)]
+struct InitRemovedJson {
+    tool: String,
+    scope: &'static str,
+    removed_dirs: Vec<String>,
+    platforms_cleared: Vec<String>,
+    source_unregistered: bool,
+    was_on_disk: bool,
+    was_tracked: bool,
+}
+
+#[derive(Serialize)]
+struct InitBlockedJson<'a> {
+    tool: &'a str,
+    version: &'a str,
+    scope: &'static str,
+    status: &'static str,
+    targets: Vec<InitTargetJson>,
+    reasons: &'a [String],
 }
 
 /// Build the machine-readable `--json` shape for `cmx init` / `cmx init --remove`.
+///
+/// Every field-name and label decision is encoded in the projection types
+/// above and in [`action_label`] / [`status_label`] — there is exactly one
+/// home for the `--json` contract for each variant.
 pub fn init_json(outcome: &InitOutcome) -> Value {
     match outcome {
         InitOutcome::Installed(report) => {
-            let targets: Vec<Value> = report
+            let targets = report
                 .targets
                 .iter()
-                .map(|target| {
-                    target_json(
-                        target.platform,
-                        &target.dest_dir,
-                        &target.action,
-                        target.files_written,
-                        target.installed_checksum.as_deref(),
+                .map(|t| {
+                    InitTargetJson::from_parts(
+                        t.platform,
+                        &t.dest_dir,
+                        &t.action,
+                        t.files_written,
+                        t.installed_checksum.as_deref(),
                     )
                 })
                 .collect();
-            json!({
-                "tool": report.tool.name,
-                "version": report.tool.version,
-                "scope": scope_label(report.scope),
-                "source_registered": report.source_registered,
-                "targets": targets,
+            serde_json::to_value(InitInstalledJson {
+                tool: &report.tool.name,
+                version: &report.tool.version,
+                scope: scope_label(report.scope),
+                source_registered: report.source_registered,
+                targets,
             })
+            .expect("InitInstalledJson is serializable")
         }
-        InitOutcome::Removed(report) => json!({
-            "tool": report.tool_name,
-            "scope": scope_label(report.scope),
-            "removed_dirs": report.removed_dirs.iter().map(|d| d.display().to_string()).collect::<Vec<_>>(),
-            "platforms_cleared": report.platforms_cleared.iter().map(ToString::to_string).collect::<Vec<_>>(),
-            "source_unregistered": report.source_unregistered,
-            "was_on_disk": report.was_on_disk,
-            "was_tracked": report.was_tracked,
-        }),
+        InitOutcome::Removed(report) => serde_json::to_value(InitRemovedJson {
+            tool: report.tool_name.clone(),
+            scope: scope_label(report.scope),
+            removed_dirs: report.removed_dirs.iter().map(|d| d.display().to_string()).collect(),
+            platforms_cleared: report.platforms_cleared.iter().map(ToString::to_string).collect(),
+            source_unregistered: report.source_unregistered,
+            was_on_disk: report.was_on_disk,
+            was_tracked: report.was_tracked,
+        })
+        .expect("InitRemovedJson is serializable"),
         InitOutcome::Blocked { plan, reasons } => {
-            let targets: Vec<Value> = plan
+            let targets = plan
                 .targets
                 .iter()
-                .map(|target| {
-                    target_json(target.platform, &target.dest_dir, &target.action, 0, None)
-                })
+                .map(|t| InitTargetJson::from_parts(t.platform, &t.dest_dir, &t.action, 0, None))
                 .collect();
-            json!({
-                "tool": plan.tool.name,
-                "version": plan.tool.version,
-                "scope": scope_label(plan.scope),
-                "status": "blocked",
-                "targets": targets,
-                "reasons": reasons,
+            serde_json::to_value(InitBlockedJson {
+                tool: &plan.tool.name,
+                version: &plan.tool.version,
+                scope: scope_label(plan.scope),
+                status: "blocked",
+                targets,
+                reasons,
             })
+            .expect("InitBlockedJson is serializable")
         }
     }
 }

@@ -11,10 +11,17 @@
 //!   reference-counting rule `deactivate` uses, so a member two sets share is
 //!   never flagged while either set is active.
 
+use serde::Serialize;
+
 use crate::types::{ArtifactKind, InstallScope, SetState, SetsFile};
 
 /// The kind of set/installed-state mismatch found.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Derives `Serialize` with `snake_case` so `doctor --json` emits
+/// `"active_missing"` / `"inactive_lingering"` without a parallel string
+/// mapping — one home for the machine-readable label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SetProblem {
     /// The set is `Active` but this member is not installed.
     ActiveMissing,
@@ -24,8 +31,13 @@ pub enum SetProblem {
 }
 
 /// One set/member mismatch surfaced by the consistency check.
-#[derive(Debug, Clone)]
+///
+/// Derives `Serialize` so `doctor --json` can emit it directly; the
+/// `set_name` field is renamed to `"set"` to match the documented contract.
+#[derive(Debug, Clone, Serialize)]
 pub struct SetInconsistency {
+    /// In JSON output this appears as `"set"`.
+    #[serde(rename = "set")]
     pub set_name: String,
     pub scope: InstallScope,
     pub kind: ArtifactKind,

@@ -18,14 +18,25 @@ pub use summary::summarize;
 // Result types
 // ---------------------------------------------------------------------------
 
-#[derive(Debug)]
+fn serialize_path_as_string<S: serde::Serializer>(path: &Path, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str(&path.display().to_string())
+}
+
+/// All details about a single installed artifact — the canonical shape exposed
+/// by `cmx info --json`. Serde attributes encode every field-name decision
+/// here so there is exactly one home for the `--json` contract.
+#[derive(Debug, Serialize)]
 pub struct ArtifactInfo {
     pub name: String,
     pub kind: ArtifactKind,
     pub scope: &'static str,
+    /// Serialized via `Path::display()` for lossless UTF-8 representation.
+    #[serde(serialize_with = "serialize_path_as_string")]
     pub path: PathBuf,
     pub version: Option<String>,
     pub installed_at: Option<String>,
+    /// In JSON output this appears as `"source"`.
+    #[serde(rename = "source")]
     pub source_display: Option<String>,
     pub source_checksum: Option<String>,
     pub installed_checksum: Option<String>,
@@ -34,10 +45,14 @@ pub struct ArtifactInfo {
     pub untracked: bool,
     pub deprecation: Option<Deprecation>,
     pub available_version: Option<String>,
+    /// In JSON output this appears as `"files"`.
+    #[serde(rename = "files")]
     pub skill_files: Vec<SkillFileEntry>,
     /// The artifact's `description` frontmatter — for a skill this is its
     /// **activation trigger** (the "use this when…" the assistant reads to decide
     /// whether to load it); for an agent, its role description.
+    /// In JSON output this appears as `"activation_description"`.
+    #[serde(rename = "activation_description")]
     pub activates_when: Option<String>,
     /// An LLM-generated paragraph describing what the artifact does. Populated
     /// only by an `llm`-feature build (see [`summarize`]); `None` otherwise.
@@ -46,6 +61,10 @@ pub struct ArtifactInfo {
     /// couldn't be read, or the provider failed. `None` in a lean build (no
     /// attempt) or on success. Lets the display name the real reason instead of
     /// always blaming the provider.
+    ///
+    /// Deliberately absent from `--json` output: it is human-display-only
+    /// (the `summary` field is `null` regardless of why it is missing).
+    #[serde(skip_serializing)]
     pub summary_error: Option<String>,
 }
 

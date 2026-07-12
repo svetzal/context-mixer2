@@ -1,27 +1,34 @@
 use std::path::Path;
 
+use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::cmx_config::ConfigShowResult;
 use crate::info::ArtifactInfo;
 use crate::list::{ListKindOutput, ListOutput, Row};
-use crate::outdated::OutdatedReport;
+use crate::outdated::{OutdatedReport, OutdatedRow};
 use crate::search::SearchOutput;
-use crate::sets::{SetListResult, SetShowResult};
+use crate::sets::{SetListEntry, SetListResult, SetShowResult};
 use crate::source::{SourceBrowseResult, SourceListResult};
 use crate::types::{ArtifactKind, InstallScope};
 
+// ---------------------------------------------------------------------------
+// List
+// ---------------------------------------------------------------------------
+
+/// Projection of one list row plus its kind and scope — the single home for
+/// the `cmx list --json` per-artifact contract. `Row` already derives
+/// `Serialize`; this wrapper adds the two fields that live outside `Row`.
+#[derive(Serialize)]
+struct ListRowJson<'a> {
+    kind: ArtifactKind,
+    scope: InstallScope,
+    #[serde(flatten)]
+    row: &'a Row,
+}
+
 fn list_row_json(kind: ArtifactKind, scope: InstallScope, row: &Row) -> Value {
-    json!({
-        "kind": kind.to_string(),
-        "scope": scope.label(),
-        "name": row.name,
-        "installed_version": row.installed_version,
-        "available_version": row.available_version,
-        "source": row.source,
-        "platforms": row.platforms,
-        "status": row.status,
-    })
+    serde_json::to_value(ListRowJson { kind, scope, row }).expect("ListRowJson is serializable")
 }
 
 fn flatten_rows(
@@ -51,104 +58,129 @@ pub fn list_kind_json(output: &ListKindOutput) -> Value {
     })
 }
 
-pub fn outdated_json(report: &OutdatedReport) -> Value {
-    json!({
-        "artifacts": report.0.iter().map(|row| json!({
-            "kind": row.kind.to_string(),
-            "scope": row.scope.label(),
-            "name": row.name,
-            "installed_version": row.installed_version,
-            "available_version": row.available_version,
-            "source": row.source,
-            "status": row.status,
-            "locally_modified": row.locally_modified,
-        })).collect::<Vec<_>>(),
-    })
+// ---------------------------------------------------------------------------
+// Outdated
+// ---------------------------------------------------------------------------
+
+/// Envelope for `OutdatedRow` items so `outdated_json` has a single home for
+/// the `"artifacts"` wrapper key.
+#[derive(Serialize)]
+struct OutdatedJson<'a> {
+    artifacts: &'a [OutdatedRow],
 }
+
+pub fn outdated_json(report: &OutdatedReport) -> Value {
+    serde_json::to_value(OutdatedJson {
+        artifacts: &report.0,
+    })
+    .expect("OutdatedJson is serializable")
+}
+
+// ---------------------------------------------------------------------------
+// Search / Info
+// ---------------------------------------------------------------------------
 
 pub fn search_json(output: &SearchOutput) -> Value {
     serde_json::to_value(output).expect("SearchOutput is serializable")
 }
 
+/// Serialize `ArtifactInfo` to the `cmx info --json` contract.
+///
+/// Field renames (`source_display` → `"source"`, `skill_files` → `"files"`,
+/// `activates_when` → `"activation_description"`) and the deliberate omission
+/// of `summary_error` are encoded as serde attributes on `ArtifactInfo`
+/// itself — this is the single source of truth for those decisions.
 pub fn info_json(info: &ArtifactInfo) -> Value {
-    json!({
-        "name": info.name,
-        "kind": info.kind.to_string(),
-        "scope": info.scope,
-        "path": info.path.display().to_string(),
-        "version": info.version,
-        "installed_at": info.installed_at,
-        "source": info.source_display,
-        "source_checksum": info.source_checksum,
-        "installed_checksum": info.installed_checksum,
-        "disk_checksum": info.disk_checksum,
-        "locally_modified": info.locally_modified,
-        "untracked": info.untracked,
-        "deprecation": info.deprecation,
-        "available_version": info.available_version,
-        "files": info.skill_files,
-        "activation_description": info.activates_when,
-        "summary": info.summary,
-    })
+    serde_json::to_value(info).expect("ArtifactInfo is serializable")
 }
 
+// ---------------------------------------------------------------------------
+// Sources
+// ---------------------------------------------------------------------------
+
+/// Serialize `SourceListResult` to the `cmx source list --json` contract.
+///
+/// The `"sources"` wrapper key and the `"type"` field rename are encoded as
+/// serde attributes on `SourceListResult` / `SourceListEntry`.
 pub fn source_list_json(result: &SourceListResult) -> Value {
-    json!({
-        "sources": result.entries.iter().map(|entry| json!({
-            "name": entry.name,
-            "type": entry.kind,
-            "location": entry.location,
-        })).collect::<Vec<_>>(),
-    })
+    serde_json::to_value(result).expect("SourceListResult is serializable")
 }
 
+/// Serialize `SourceBrowseResult` to the `cmx source browse --json` contract.
+///
+/// The `"source"` rename and the omission of `deprecation_display` are encoded
+/// as serde attributes on `SourceBrowseResult` / `BrowseArtifact` / `BrowseSkill`.
 pub fn source_browse_json(result: &SourceBrowseResult) -> Value {
-    json!({
-        "source": result.source_name,
-        "agents": result.agents.iter().map(|artifact| json!({
-            "name": artifact.name,
-            "version": artifact.version,
-            "description": artifact.description,
-            "deprecation": artifact.deprecation,
-        })).collect::<Vec<_>>(),
-        "skills": result.skills.iter().map(|skill| json!({
-            "name": skill.name,
-            "version": skill.version,
-            "description": skill.description,
-            "deprecation": skill.deprecation,
-            "files": skill.files,
-        })).collect::<Vec<_>>(),
-    })
+    serde_json::to_value(result).expect("SourceBrowseResult is serializable")
+}
+
+// ---------------------------------------------------------------------------
+// Sets
+// ---------------------------------------------------------------------------
+
+/// Projection that adds the `scope` field (not part of `SetListResult`) to the
+/// `cmx set list --json` output. The `"sets"` key rename is declared here.
+#[derive(Serialize)]
+struct SetListJson<'a> {
+    scope: InstallScope,
+    #[serde(rename = "sets")]
+    entries: &'a [SetListEntry],
 }
 
 pub fn set_list_json(result: &SetListResult, scope: InstallScope) -> Value {
-    json!({
-        "scope": scope.label(),
-        "sets": result.entries,
+    serde_json::to_value(SetListJson {
+        scope,
+        entries: &result.entries,
     })
+    .expect("SetListJson is serializable")
+}
+
+/// Projection that adds the `scope` field (not part of `SetShowResult`) to the
+/// `cmx set show --json` output.
+#[derive(Serialize)]
+struct SetShowJson<'a> {
+    scope: InstallScope,
+    #[serde(flatten)]
+    result: &'a SetShowResult,
 }
 
 pub fn set_show_json(result: &SetShowResult, scope: InstallScope) -> Value {
-    json!({
-        "scope": scope.label(),
-        "name": result.name,
-        "description": result.description,
-        "state": result.state,
-        "footprint_chars": result.footprint_chars,
-        "members": result.members,
-    })
+    serde_json::to_value(SetShowJson { scope, result }).expect("SetShowJson is serializable")
+}
+
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+
+/// Projection that adds `platforms_inferred` (a derived field not stored in
+/// `ConfigShowResult`) to the `cmx config show --json` output. Having it here
+/// removes the mutable-json-object mutation from `config_show_json`.
+#[derive(Serialize)]
+struct ConfigShowJson<'a> {
+    #[serde(flatten)]
+    result: &'a ConfigShowResult,
+    platforms_inferred: bool,
 }
 
 pub fn config_show_json(result: &ConfigShowResult) -> Value {
-    let mut value = serde_json::to_value(result).expect("ConfigShowResult is serializable");
-    let map = value.as_object_mut().expect("ConfigShowResult serializes to an object");
-    map.insert("platforms_inferred".to_string(), json!(result.platforms.is_empty()));
-    value
+    serde_json::to_value(ConfigShowJson {
+        platforms_inferred: result.platforms.is_empty(),
+        result,
+    })
+    .expect("ConfigShowJson is serializable")
 }
+
+// ---------------------------------------------------------------------------
+// Home path
+// ---------------------------------------------------------------------------
 
 pub fn home_path_json(path: &Path) -> Value {
     json!({ "path": path.display().to_string() })
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -192,6 +224,33 @@ mod tests {
     }
 
     #[test]
+    fn list_row_json_key_set_is_stable() {
+        let row = Row {
+            name: "n".to_string(),
+            installed_version: Some("1.0.0".to_string()),
+            available_version: Some("1.0.0".to_string()),
+            source: Some("src".to_string()),
+            platforms: vec!["claude".to_string()],
+            status: ListStatus::Ok,
+        };
+        let value = list_row_json(ArtifactKind::Skill, InstallScope::Global, &row);
+        let obj = value.as_object().unwrap();
+        for key in [
+            "kind",
+            "scope",
+            "name",
+            "installed_version",
+            "available_version",
+            "source",
+            "platforms",
+            "status",
+        ] {
+            assert!(obj.contains_key(key), "list row missing key: {key}");
+        }
+        assert_eq!(obj.len(), 8, "unexpected extra keys in list row: {value}");
+    }
+
+    #[test]
     fn outdated_json_uses_null_versions_and_locally_modified_flag() {
         let value = outdated_json(&OutdatedReport(vec![OutdatedRow {
             name: "focus-skill".to_string(),
@@ -207,6 +266,35 @@ mod tests {
         assert!(value["artifacts"][0]["available_version"].is_null());
         assert_eq!(value["artifacts"][0]["status"], "changed");
         assert_eq!(value["artifacts"][0]["locally_modified"], json!(true));
+    }
+
+    #[test]
+    fn outdated_row_key_set_is_stable() {
+        let row = OutdatedRow {
+            name: "n".to_string(),
+            kind: ArtifactKind::Skill,
+            scope: InstallScope::Global,
+            installed_version: None,
+            available_version: None,
+            source: "src".to_string(),
+            status: OutdatedStatus::Changed,
+            locally_modified: false,
+        };
+        let value = outdated_json(&OutdatedReport(vec![row]));
+        let obj = value["artifacts"][0].as_object().unwrap();
+        for key in [
+            "kind",
+            "scope",
+            "name",
+            "installed_version",
+            "available_version",
+            "source",
+            "status",
+            "locally_modified",
+        ] {
+            assert!(obj.contains_key(key), "outdated row missing key: {key}");
+        }
+        assert_eq!(obj.len(), 8, "unexpected extra keys in outdated row: {value}");
     }
 
     #[test]
@@ -241,6 +329,57 @@ mod tests {
         assert!(value["summary"].is_null());
         assert_eq!(value["activation_description"], "Use this skill when you need focus");
         assert!(value.get("summary_error").is_none());
+    }
+
+    #[test]
+    fn info_json_key_set_is_stable() {
+        let value = info_json(&ArtifactInfo {
+            name: "n".to_string(),
+            kind: ArtifactKind::Skill,
+            scope: "global",
+            path: PathBuf::from("/tmp/n"),
+            version: None,
+            installed_at: None,
+            source_display: None,
+            source_checksum: None,
+            installed_checksum: None,
+            disk_checksum: None,
+            locally_modified: false,
+            untracked: false,
+            deprecation: None,
+            available_version: None,
+            skill_files: vec![],
+            activates_when: None,
+            summary: None,
+            summary_error: None,
+        });
+        let obj = value.as_object().unwrap();
+        for key in [
+            "name",
+            "kind",
+            "scope",
+            "path",
+            "version",
+            "installed_at",
+            "source",
+            "source_checksum",
+            "installed_checksum",
+            "disk_checksum",
+            "locally_modified",
+            "untracked",
+            "deprecation",
+            "available_version",
+            "files",
+            "activation_description",
+            "summary",
+        ] {
+            assert!(obj.contains_key(key), "info json missing key: {key}");
+        }
+        assert!(
+            obj.get("summary_error").is_none(),
+            "summary_error must be absent from json output"
+        );
+        assert_eq!(obj.len(), 17, "unexpected extra keys in info json: {value}");
     }
 
     #[test]

@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use serde::Serialize;
+
 use super::set_consistency::SetInconsistency;
 use crate::platform::Platform;
 use crate::types::{ArtifactKind, InstallScope};
@@ -158,7 +160,9 @@ impl DoctorReport {
 }
 
 /// Per-state tallies for the summary line. Counts are over *logical* artifacts.
-#[derive(Debug, Default, PartialEq, Eq)]
+/// Derives `Serialize` so `doctor --json` can emit it directly as the
+/// `"summary"` object without a parallel hand-built mapping.
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct StateCounts {
     pub tracked: usize,
     pub drifted: usize,

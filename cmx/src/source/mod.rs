@@ -32,12 +32,16 @@ pub struct SourceScanResult {
 #[derive(Clone, Debug, Serialize)]
 pub struct SourceListEntry {
     pub name: String,
+    /// In JSON output this appears as `"type"` (matching the `--json` contract).
+    #[serde(rename = "type")]
     pub kind: &'static str,
     pub location: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct SourceListResult {
+    /// In JSON output this appears as `"sources"`.
+    #[serde(rename = "sources")]
     pub entries: Vec<SourceListEntry>,
 }
 
