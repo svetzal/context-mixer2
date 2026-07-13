@@ -26,7 +26,7 @@ pub fn source_artifact_hint(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>
 fn installed_candidates(
     kind: Option<ArtifactKind>,
     ctx: &AppContext<'_>,
-) -> anyhow::Result<BTreeSet<String>> {
+) -> crate::error::Result<BTreeSet<String>> {
     let mut names = BTreeSet::new();
     for platform in Platform::ALL {
         let paths = ctx.paths.with_platform(platform);
@@ -42,7 +42,10 @@ fn installed_candidates(
     Ok(names)
 }
 
-fn source_candidates(kind: ArtifactKind, ctx: &AppContext<'_>) -> anyhow::Result<BTreeSet<String>> {
+fn source_candidates(
+    kind: ArtifactKind,
+    ctx: &AppContext<'_>,
+) -> crate::error::Result<BTreeSet<String>> {
     Ok(source_iter::all_artifacts(ctx)?
         .into_iter()
         .filter(|artifact| artifact.artifact.kind == kind)

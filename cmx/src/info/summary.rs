@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use crate::error::{CliError, Result};
 
 use crate::context::AppContext;
 use crate::types::ArtifactKind;
@@ -13,7 +13,7 @@ use super::ArtifactInfo;
 /// `ctx.llm` to be set (an `llm`-feature build with a configured gateway).
 pub async fn summarize(info: &ArtifactInfo, ctx: &AppContext<'_>) -> Result<String> {
     let Some(llm) = ctx.llm else {
-        bail!("LLM client not configured");
+        return Err(CliError::LlmNotConfigured);
     };
 
     let content = read_summary_source(info, ctx)?;
@@ -29,7 +29,7 @@ pub async fn summarize(info: &ArtifactInfo, ctx: &AppContext<'_>) -> Result<Stri
 
     let summary = llm.analyze(system_prompt, &user_prompt).await?.trim().to_string();
     if summary.is_empty() {
-        bail!("the LLM returned an empty summary");
+        return Err(CliError::LlmEmptySummary);
     }
     Ok(summary)
 }
@@ -64,7 +64,9 @@ fn read_summary_source(info: &ArtifactInfo, ctx: &AppContext<'_>) -> Result<Stri
             return Ok(combined);
         }
     }
-    bail!("no readable content to summarize at {}", info.path.display());
+    Err(CliError::NoReadableContentToSummarize {
+        path: info.path.display().to_string(),
+    })
 }
 
 #[cfg(test)]

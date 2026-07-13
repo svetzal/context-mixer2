@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use crate::error::{CliError, Result};
 use serde::Serialize;
 
 use crate::config;
@@ -147,7 +147,11 @@ pub fn set_gateway(value: &str, ctx: &AppContext<'_>) -> Result<ConfigSetResult>
     cfg.llm.gateway = match value {
         "openai" => LlmGatewayType::OpenAI,
         "ollama" => LlmGatewayType::Ollama,
-        _ => bail!("Unknown gateway '{value}'. Use 'openai' or 'ollama'."),
+        _ => {
+            return Err(CliError::UnknownGateway {
+                value: value.to_string(),
+            });
+        }
     };
     config::save_config(&cfg, ctx.fs, ctx.paths)?;
     Ok(ConfigSetResult {

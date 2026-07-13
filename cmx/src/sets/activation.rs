@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{CliError, Result};
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
@@ -36,7 +36,9 @@ pub fn activate(
     ctx: &AppContext<'_>,
 ) -> Result<SetActivateResult> {
     let sets = config::load_sets(scope, ctx.fs, ctx.paths)?;
-    let def = sets.sets.get(name).ok_or_else(|| anyhow::anyhow!("Set '{name}' not found."))?;
+    let def = sets.sets.get(name).ok_or_else(|| CliError::SetNotFound {
+        name: name.to_string(),
+    })?;
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
     let members_is_empty = def.members.is_empty();
@@ -177,7 +179,8 @@ fn persist_active_state(
                 d.state = SetState::Active;
             }
             Ok(())
-        })?;
+        })
+        .map_err(|e| CliError::Message(e.to_string()))?;
     }
     Ok(())
 }
@@ -204,7 +207,9 @@ pub fn deactivate(
     let def = sets
         .sets
         .get(name)
-        .ok_or_else(|| anyhow::anyhow!("Set '{name}' not found."))?
+        .ok_or_else(|| CliError::SetNotFound {
+            name: name.to_string(),
+        })?
         .clone();
 
     let mut statuses = Vec::new();
@@ -259,7 +264,8 @@ pub fn deactivate(
                 d.state = SetState::Inactive;
             }
             Ok(())
-        })?;
+        })
+        .map_err(|e| CliError::Message(e.to_string()))?;
     }
 
     Ok(SetDeactivateResult {

@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use crate::error::{CliError, Result};
 use std::path::PathBuf;
 
 use crate::checksum;
@@ -157,10 +157,11 @@ pub(crate) fn gather_diff_with(
     // matching source on one platform says nothing about the others).
     let (raw_copies, scope) = discover_copies(name, kind, ctx)?;
     if raw_copies.is_empty() {
-        bail!(
-            "No installed {kind} named '{name}' found on disk. {}",
-            crate::suggestions::installed_artifact_hint(name, Some(kind), ctx)
-        );
+        return Err(CliError::ArtifactNotInstalledOnDisk {
+            kind,
+            name: name.to_string(),
+            hint: crate::suggestions::installed_artifact_hint(name, Some(kind), ctx),
+        });
     }
 
     // Compare each copy to the source; build the per-copy diff for differing ones.
@@ -300,22 +301,15 @@ pub async fn diff_with_analysis(
     if !output.show_full && !output.is_up_to_date {
         match analyze(&output, ctx).await {
             Ok(prose) => output.analysis = Some(prose),
-            Err(e) => output.analysis_note = Some(llm_unavailable_note(&e)),
+            Err(e) => {
+                output.analysis_note = Some(format!(
+                    "note: LLM summary unavailable ({e}). Fix the gateway (`cmx config gateway`, \
+                     `cmx config model`, or set OPENAI_API_KEY), or use --full for the plain diff."
+                ));
+            }
         }
     }
     Ok(output)
-}
-
-/// One-line note shown in place of the analysis when the LLM summary failed
-/// (gateway not configured, auth error, network error, ...). Never surfaces
-/// the raw upstream error body.
-#[cfg(feature = "llm")]
-pub fn llm_unavailable_note(e: &anyhow::Error) -> String {
-    format!(
-        "note: LLM summary unavailable ({}). Fix the gateway (`cmx config gateway`, \
-         `cmx config model`, or set OPENAI_API_KEY), or use --full for the plain diff.",
-        crate::error_summary::summarize_gateway_error(e)
-    )
 }
 
 /// One-line note shown in place of the analysis in a lean build (no `llm`
@@ -334,10 +328,11 @@ fn find_in_sources_with(
     if let Some(sa) = source_iter::find_by_name_and_kind(name, kind, ctx)?.into_iter().next() {
         return Ok((sa.artifact.path, sa.source_name, sa.artifact.version));
     }
-    bail!(
-        "No {kind} named '{name}' found in any registered source. {}",
-        crate::suggestions::source_artifact_hint(name, kind, ctx)
-    );
+    Err(CliError::ArtifactNotInAnySources {
+        kind,
+        name: name.to_string(),
+        hint: crate::suggestions::source_artifact_hint(name, kind, ctx),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -667,20 +662,5 @@ mod tests {
         assert!(note.contains("--full"), "{note}");
         assert!(note.contains("configured to fail"), "condensed reason present: {note}");
         assert!(!note.contains('\n'), "no raw multi-line error body: {note}");
-    }
-
-    #[cfg(feature = "llm")]
-    #[test]
-    fn llm_unavailable_note_strips_provider_json() {
-        let error = anyhow::anyhow!(
-            "LLM analysis failed: LLM gateway error: OpenAI API error: 401 Unauthorized - {{ \
-             \"error\": {{ \"message\": \"missing key\" }} }}"
-        );
-        let note = llm_unavailable_note(&error);
-        assert!(note.contains("OpenAI API error: 401 Unauthorized"), "{note}");
-        assert!(note.contains("Fix the gateway"), "{note}");
-        assert!(!note.contains('{'), "{note}");
-        assert!(!note.contains("\"error\""), "{note}");
-        assert!(!note.contains('\n'), "{note}");
     }
 }

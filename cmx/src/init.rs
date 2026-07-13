@@ -2,7 +2,7 @@
 //! `cmx-core`'s embeddable [`SkillInstaller`], following the fleet-standard
 //! `<tool> init` conventions (see `EMBEDDING.md`).
 
-use anyhow::Result;
+use crate::error::{CliError, Result};
 use std::process::ExitCode;
 
 use cmx_core::context::AppContext;
@@ -87,7 +87,9 @@ pub fn run_init(local: bool, force: bool, ctx: &AppContext<'_>) -> Result<InitOu
         return Ok(InitOutcome::Blocked { plan, reasons });
     }
 
-    let report = installer.apply(&skill, &plan, ctx)?;
+    let report = installer
+        .apply(&skill, &plan, ctx)
+        .map_err(|e| CliError::Message(e.to_string()))?;
     Ok(InitOutcome::Installed(report))
 }
 
@@ -95,7 +97,7 @@ pub fn run_init(local: bool, force: bool, ctx: &AppContext<'_>) -> Result<InitOu
 pub fn run_remove(local: bool, ctx: &AppContext<'_>) -> Result<InitOutcome> {
     let installer = make_installer();
     let scope = scope_from_flags(local);
-    let report = installer.remove(scope, ctx)?;
+    let report = installer.remove(scope, ctx).map_err(|e| CliError::Message(e.to_string()))?;
     Ok(InitOutcome::Removed(report))
 }
 

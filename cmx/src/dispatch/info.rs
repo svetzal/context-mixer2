@@ -5,6 +5,45 @@ use crate::types::ArtifactKind;
 
 use super::print_json;
 
+/// Format a user-facing message when LLM summarization is unavailable.
+///
+/// Distinguishes gateway/auth failures (with actionable guidance) from other
+/// errors (truncated raw message). Lives here because it takes `&anyhow::Error`
+/// — the dispatch layer is the only code that should touch `anyhow`.
+#[cfg(feature = "llm")]
+pub(crate) fn summary_unavailable_message(e: &anyhow::Error) -> String {
+    const MAX: usize = 200;
+
+    if is_gateway_failure(e) {
+        return format!(
+            "summary unavailable — {}. Fix with 'cmx config gateway'/'cmx config model' or set OPENAI_API_KEY.",
+            crate::error_summary::summarize_gateway_error(e)
+        );
+    }
+
+    let flattened = format!("{e:#}").split_whitespace().collect::<Vec<_>>().join(" ");
+    let detail = if flattened.chars().count() > MAX {
+        let head: String = flattened.chars().take(MAX).collect();
+        format!("{head}…")
+    } else {
+        flattened
+    };
+    if detail.ends_with(['.', '!', '?', '…']) {
+        format!("summary unavailable — {detail}")
+    } else {
+        format!("summary unavailable — {detail}.")
+    }
+}
+
+#[cfg(feature = "llm")]
+fn is_gateway_failure(e: &anyhow::Error) -> bool {
+    let rendered = format!("{e:#}");
+    rendered.contains("LLM gateway error")
+        || rendered.contains("OpenAI API error")
+        || rendered.contains("localhost:11434")
+        || rendered.contains("Ollama")
+}
+
 #[cfg(feature = "llm")]
 use crate::gateway::real::MojenticLlmClient;
 
@@ -52,7 +91,9 @@ pub fn handle_info(
             Ok(summary) => info.summary = Some(summary),
             // Best-effort: record *why* so the display reports the real reason
             // rather than always blaming the provider; never fail the command.
-            Err(e) => info.summary_error = Some(crate::info::summary_unavailable_message(&e)),
+            Err(e) => {
+                info.summary_error = Some(summary_unavailable_message(&anyhow::Error::from(e)));
+            }
         }
     }
 

@@ -1,4 +1,4 @@
-use anyhow::{Context as _, Result, bail};
+use crate::error::{CliError, Result};
 use std::path::{Path, PathBuf};
 
 use crate::context::AppContext;
@@ -13,16 +13,14 @@ pub(crate) fn copy_artifact_to(
     source: &Path,
     dest_dir: &Path,
     fs: &dyn Filesystem,
-) -> anyhow::Result<PathBuf> {
-    let name = source
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("Invalid source path: {}", source.display()))?;
+) -> Result<PathBuf> {
+    let name = source.file_name().ok_or_else(|| CliError::InvalidSourcePath {
+        path: source.display().to_string(),
+    })?;
     let dest = dest_dir.join(name);
     match kind {
         ArtifactKind::Agent => {
-            fs.copy_file(source, &dest).with_context(|| {
-                format!("Failed to copy {} to {}", source.display(), dest.display())
-            })?;
+            fs.copy_file(source, &dest)?;
         }
         ArtifactKind::Skill => {
             copy_dir_recursive_with(source, &dest, fs)?;
@@ -53,7 +51,9 @@ pub(crate) fn copy_artifact(
         let skill_md = dest_path.join("SKILL.md");
         if !ctx.fs.exists(&skill_md) {
             let _ = ctx.fs.remove_dir_all(&dest_path);
-            bail!("Skill '{artifact_name}' is missing SKILL.md. Partial install removed.");
+            return Err(CliError::MissingSkillMdOnInstall {
+                name: artifact_name.to_string(),
+            });
         }
     }
 
@@ -68,17 +68,12 @@ fn transform_agent_to_codex_toml(
     name: &str,
     ctx: &AppContext<'_>,
 ) -> Result<PathBuf> {
-    let markdown = ctx
-        .fs
-        .read_to_string(source)
-        .with_context(|| format!("Failed to read agent source {}", source.display()))?;
+    let markdown = ctx.fs.read_to_string(source)?;
     let toml = crate::codex_agent::markdown_to_codex_toml(&markdown, name);
 
     ctx.fs.create_dir_all(dest_dir)?;
     let dest = dest_dir.join(format!("{name}.toml"));
-    ctx.fs
-        .write(&dest, &toml)
-        .with_context(|| format!("Failed to write codex agent {}", dest.display()))?;
+    ctx.fs.write(&dest, &toml)?;
     Ok(dest)
 }
 

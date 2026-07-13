@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::Result;
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -140,14 +140,8 @@ pub(super) fn diff_dirs(
         let in_source = source_files.contains(f);
         match (in_installed, in_source) {
             (true, true) => {
-                let i_content = ctx
-                    .fs
-                    .read_to_string(&installed.join(f))
-                    .with_context(|| format!("Failed to read installed file {f}"))?;
-                let s_content = ctx
-                    .fs
-                    .read_to_string(&source.join(f))
-                    .with_context(|| format!("Failed to read source file {f}"))?;
+                let i_content = ctx.fs.read_to_string(&installed.join(f))?;
+                let s_content = ctx.fs.read_to_string(&source.join(f))?;
                 if let Some((change, block)) =
                     modified_file_block(f, src_label, &s_content, &i_content)
                 {

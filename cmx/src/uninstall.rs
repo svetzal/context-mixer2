@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::error::{CliError, Result};
 
 use crate::context::AppContext;
 use crate::gateway::Filesystem;
@@ -139,11 +139,13 @@ pub fn uninstall(
     };
     let candidates = candidate_platforms(only, ctx)?;
     uninstall_one(name, kind, scope, &candidates, ctx)?.ok_or_else(|| {
-        anyhow::anyhow!(
-            "No {kind} named '{name}' found in {} scope on {where_}. {}",
-            scope.label(),
-            crate::suggestions::installed_artifact_hint(name, Some(kind), ctx)
-        )
+        CliError::ArtifactNotFoundToUninstall {
+            kind,
+            name: name.to_string(),
+            scope: scope.label().to_string(),
+            where_: where_.clone(),
+            hint: crate::suggestions::installed_artifact_hint(name, Some(kind), ctx),
+        }
     })
 }
 

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use crate::error::{CliError, Result};
 use chrono::{DateTime, Utc};
 
 use crate::config;
@@ -27,7 +27,9 @@ pub fn update(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpdateOu
 
     if let Some(n) = name {
         if !sources.sources.contains_key(n) {
-            bail!("Source '{n}' not found.");
+            return Err(CliError::SourceNotFound {
+                name: n.to_string(),
+            });
         }
         let result = perform_pull_with(n, ctx)?;
         Ok(SourceUpdateOutput::SingleUpdate(result))
@@ -55,24 +57,22 @@ pub fn update(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpdateOu
 pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<SourceScanResult> {
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
-    let source_entry = sources
-        .sources
-        .get(name)
-        .with_context(|| format!("Source '{name}' not found."))?;
+    let source_entry = sources.sources.get(name).ok_or_else(|| CliError::SourceNotFound {
+        name: name.to_string(),
+    })?;
     let source_type = source_entry.source_type.clone();
 
     if matches!(source_type, SourceType::Git) {
         let clone_path = source_entry
             .local_clone
             .as_ref()
-            .context("Git source has no local clone path")?
+            .ok_or_else(|| CliError::Message("Git source has no local clone path".to_string()))?
             .clone();
 
         if !ctx.fs.exists(&clone_path) {
-            bail!(
-                "Clone directory {} does not exist. Try removing and re-adding the source.",
-                clone_path.display()
-            );
+            return Err(CliError::CloneDirNotFound {
+                path: clone_path.display().to_string(),
+            });
         }
 
         ctx.git.pull(&clone_path)?;
@@ -83,12 +83,11 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
         if let Some(entry) = sources.sources.get_mut(name) {
             entry.last_updated = Some(now);
         }
-        sources
-            .sources
-            .get(name)
-            .cloned()
-            .with_context(|| format!("Source '{name}' not found."))
-    })?;
+        Ok(sources.sources.get(name).cloned().ok_or_else(|| CliError::SourceNotFound {
+            name: name.to_string(),
+        })?)
+    })
+    .map_err(|e| CliError::Message(e.to_string()))?;
 
     let (agents_found, skills_found, _) = crate::source::scan_and_count(&updated_entry, ctx.fs)?;
 

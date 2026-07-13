@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use crate::error::{CliError, Result};
 
 use crate::context::AppContext;
 
@@ -40,7 +40,7 @@ pub(super) async fn analyze_focus(
     );
     match ctx.llm {
         Some(llm) => Ok(llm.analyze(&system_prompt, &user_prompt).await?),
-        None => bail!("LLM client not configured for diff analysis"),
+        None => Err(CliError::LlmNotConfiguredDiff),
     }
 }
 

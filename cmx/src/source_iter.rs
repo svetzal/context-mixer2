@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anyhow::{Result, bail};
+use crate::error::{CliError, Result};
 
 use crate::checksum;
 use crate::config;
@@ -121,7 +121,7 @@ pub fn find_unique(
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
     if sources.sources.is_empty() {
-        bail!("No sources registered. Add one with: cmx source add <name> <path-or-url>");
+        return Err(CliError::NoSourcesRegistered);
     }
 
     let search_sources: BTreeMap<_, _> = if let Some(src) = source {
@@ -137,15 +137,18 @@ pub fn find_unique(
         .collect();
 
     if found.is_empty() {
-        bail!("No {kind} named '{name}' found in registered sources.");
+        return Err(CliError::ArtifactNotInSources {
+            kind,
+            name: name.to_string(),
+        });
     }
 
     if found.len() > 1 {
         let source_names: Vec<_> = found.iter().map(|sa| sa.source_name.as_str()).collect();
-        bail!(
-            "'{name}' found in multiple sources: {}. Use <source>:{name} to disambiguate.",
-            source_names.join(", ")
-        );
+        return Err(CliError::AmbiguousArtifact {
+            name: name.to_string(),
+            sources: source_names.join(", "),
+        });
     }
 
     Ok(found.remove(0))

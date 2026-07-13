@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use crate::error::{CliError, Result};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -59,7 +59,9 @@ pub fn add(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<Source
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
     if sources.sources.contains_key(name) {
-        bail!("Source '{name}' already exists. Remove it first to re-register.");
+        return Err(CliError::SourceAlreadyExists {
+            name: name.to_string(),
+        });
     }
 
     let entry = if looks_like_url(path_or_url) {
@@ -73,7 +75,8 @@ pub fn add(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<Source
     config::mutate_sources(ctx.fs, ctx.paths, |sources| {
         sources.sources.insert(name.to_string(), entry);
         Ok(())
-    })?;
+    })
+    .map_err(|e| CliError::Message(e.to_string()))?;
 
     Ok(SourceScanResult {
         name: name.to_string(),
@@ -114,20 +117,17 @@ pub fn browse(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
 
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
-    let entry = sources
-        .get_source(name)
-        .context("Run 'cmx source list' to see registered sources.")?;
+    let entry = sources.get_source(name)?;
 
     let local_path = config::resolve_local_path(entry)?;
     if !ctx.fs.exists(&local_path) {
-        bail!(
-            "Source path {} does not exist. {}",
-            local_path.display(),
-            match entry.source_type {
+        return Err(CliError::SourcePathNotFound {
+            path: local_path.display().to_string(),
+            hint: match entry.source_type {
                 SourceType::Git => "Try 'cmx source update' to fetch it.",
                 SourceType::Local => "Check that the directory still exists.",
-            }
-        );
+            },
+        });
     }
 
     let all_artifacts = source_iter::each_source_artifact(&sources.sources, ctx.fs)?;
@@ -156,17 +156,15 @@ pub fn browse(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
 
 pub fn remove(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
     let entry = config::mutate_sources(ctx.fs, ctx.paths, |sources| {
-        sources
-            .sources
-            .remove(name)
-            .with_context(|| format!("Source '{name}' not found."))
-    })?;
+        Ok(sources.sources.remove(name).ok_or_else(|| CliError::SourceNotFound {
+            name: name.to_string(),
+        })?)
+    })
+    .map_err(|e| CliError::Message(e.to_string()))?;
 
     let clone_deleted = if let Some(clone_path) = &entry.local_clone {
         if ctx.fs.exists(clone_path) {
-            ctx.fs.remove_dir_all(clone_path).with_context(|| {
-                format!("Failed to remove cloned repo at {}", clone_path.display())
-            })?;
+            ctx.fs.remove_dir_all(clone_path)?;
             true
         } else {
             false
@@ -187,13 +185,12 @@ pub fn remove(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
 
 fn add_local_source_with(path_str: &str, ctx: &AppContext<'_>) -> Result<SourceEntry> {
     let path = PathBuf::from(path_str);
-    let path = ctx
-        .fs
-        .canonicalize(&path)
-        .with_context(|| format!("Path '{path_str}' does not exist or is not accessible."))?;
+    let path = ctx.fs.canonicalize(&path)?;
 
     if !ctx.fs.is_dir(&path) {
-        bail!("'{}' is not a directory.", path.display());
+        return Err(CliError::SourcePathNotDir {
+            path: path.display().to_string(),
+        });
     }
 
     Ok(SourceEntry {
@@ -210,10 +207,9 @@ fn add_git_source_with(name: &str, url: &str, ctx: &AppContext<'_>) -> Result<So
     let clone_dir = ctx.paths.git_clones_dir().join(name);
 
     if ctx.fs.exists(&clone_dir) {
-        bail!(
-            "Clone directory {} already exists. Remove it or choose a different name.",
-            clone_dir.display()
-        );
+        return Err(CliError::CloneDirAlreadyExists {
+            path: clone_dir.display().to_string(),
+        });
     }
 
     ctx.git.clone_repo(url, &clone_dir)?;

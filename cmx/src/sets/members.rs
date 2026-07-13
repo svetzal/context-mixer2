@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use crate::error::{CliError, Result};
 use std::collections::HashSet;
 
 use crate::config;
@@ -17,10 +17,14 @@ use crate::types::{ArtifactKind, InstallScope, SetMember};
 /// installed yet.
 pub(super) fn seed_from_plugin(spec: &str, ctx: &AppContext<'_>) -> Result<Vec<SetMember>> {
     let Some((source_name, plugin_name)) = spec.split_once(':') else {
-        bail!("Invalid --from-plugin value '{spec}'; expected <source>:<plugin>.");
+        return Err(CliError::InvalidFromPlugin {
+            spec: spec.to_string(),
+        });
     };
     if source_name.is_empty() || plugin_name.is_empty() {
-        bail!("Invalid --from-plugin value '{spec}'; expected <source>:<plugin>.");
+        return Err(CliError::InvalidFromPlugin {
+            spec: spec.to_string(),
+        });
     }
 
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
@@ -29,9 +33,9 @@ pub(super) fn seed_from_plugin(spec: &str, ctx: &AppContext<'_>) -> Result<Vec<S
 
     let marketplace_path = root.join(".claude-plugin").join("marketplace.json");
     if !ctx.fs.exists(&marketplace_path) {
-        bail!(
-            "Source '{source_name}' has no marketplace (.claude-plugin/marketplace.json not found)."
-        );
+        return Err(CliError::SourceNoMarketplace {
+            source_name: source_name.to_string(),
+        });
     }
 
     let mut warnings = Vec::new();
@@ -39,15 +43,14 @@ pub(super) fn seed_from_plugin(spec: &str, ctx: &AppContext<'_>) -> Result<Vec<S
         scan_marketplace_plugin(&root, &marketplace_path, plugin_name, ctx.fs, &mut warnings)?;
 
     match scan {
-        PluginScan::NotFound => {
-            bail!("Plugin '{plugin_name}' not found in marketplace of source '{source_name}'.");
-        }
-        PluginScan::RemoteUnsupported(source_type) => {
-            bail!(
-                "Plugin '{plugin_name}' uses remote source '{source_type}' which is not yet \
-                 supported; cannot seed a set from it."
-            );
-        }
+        PluginScan::NotFound => Err(CliError::PluginNotFound {
+            plugin: plugin_name.to_string(),
+            source_name: source_name.to_string(),
+        }),
+        PluginScan::RemoteUnsupported(source_type) => Err(CliError::PluginRemoteUnsupported {
+            plugin: plugin_name.to_string(),
+            source_type,
+        }),
         PluginScan::Found(artifacts) => Ok(artifacts
             .into_iter()
             .map(|a| SetMember {
@@ -87,11 +90,10 @@ pub(super) fn resolve_member(arg: &str, ctx: &AppContext<'_>) -> Result<SetMembe
     }
 
     if candidates.is_empty() {
-        bail!(
-            "Artifact '{name}' is not installed (no lockfile entry); cannot resolve its \
-             kind/source. {}",
-            crate::suggestions::installed_artifact_hint(name, hint, ctx)
-        );
+        return Err(CliError::ArtifactNotInLockfile {
+            name: name.to_string(),
+            hint: crate::suggestions::installed_artifact_hint(name, hint, ctx),
+        });
     }
 
     let candidates: Vec<(ArtifactKind, String)> = match hint {
@@ -100,14 +102,16 @@ pub(super) fn resolve_member(arg: &str, ctx: &AppContext<'_>) -> Result<SetMembe
     };
 
     if candidates.is_empty() {
-        bail!("Artifact '{name}' has no lockfile entry matching the requested kind.");
+        return Err(CliError::ArtifactNoMatchingKind {
+            name: name.to_string(),
+        });
     }
 
     let distinct_kinds: HashSet<ArtifactKind> = candidates.iter().map(|(k, _)| *k).collect();
     if hint.is_none() && distinct_kinds.len() > 1 {
-        bail!(
-            "'{name}' is ambiguous across kinds — use skill:{name} or agent:{name} to disambiguate."
-        );
+        return Err(CliError::ArtifactAmbiguousKind {
+            name: name.to_string(),
+        });
     }
 
     let (kind, source) = candidates.into_iter().next().expect("non-empty, checked above");

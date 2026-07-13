@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
-use anyhow::Result;
+use crate::error::Result;
 
 use crate::checksum;
 use crate::config;

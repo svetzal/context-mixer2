@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::{CliError, Result};
 use std::path::Path;
 
 use crate::gateway::Filesystem;
@@ -14,7 +14,8 @@ pub(crate) fn scan_marketplace_with(
     warnings: &mut Vec<ScanWarning>,
 ) -> Result<Vec<Artifact>> {
     let content = fs.read_to_string(marketplace_path)?;
-    let manifest: Marketplace = serde_json::from_str(&content)?;
+    let manifest: Marketplace =
+        serde_json::from_str(&content).map_err(|e| CliError::Message(e.to_string()))?;
 
     let mut artifacts = Vec::new();
 
@@ -100,7 +101,8 @@ pub(crate) fn scan_marketplace_plugin(
     warnings: &mut Vec<ScanWarning>,
 ) -> Result<PluginScan> {
     let content = fs.read_to_string(marketplace_path)?;
-    let manifest: Marketplace = serde_json::from_str(&content)?;
+    let manifest: Marketplace =
+        serde_json::from_str(&content).map_err(|e| CliError::Message(e.to_string()))?;
 
     let Some(plugin) = manifest.plugins.iter().find(|p| p.name == plugin_name) else {
         return Ok(PluginScan::NotFound);

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::Result;
 use serde::Serialize;
 
 use crate::context::AppContext;

@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use crate::error::{CliError, Result};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -18,7 +18,10 @@ pub use summary::summarize;
 // Result types
 // ---------------------------------------------------------------------------
 
-fn serialize_path_as_string<S: serde::Serializer>(path: &Path, s: S) -> Result<S::Ok, S::Error> {
+fn serialize_path_as_string<S: serde::Serializer>(
+    path: &Path,
+    s: S,
+) -> core::result::Result<S::Ok, S::Error> {
     s.serialize_str(&path.display().to_string())
 }
 
@@ -87,10 +90,10 @@ pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
         }
     }
 
-    bail!(
-        "No installed artifact named '{name}' found. {}",
-        crate::suggestions::installed_artifact_hint(name, None, ctx)
-    );
+    Err(CliError::ArtifactNotFound {
+        name: name.to_string(),
+        hint: crate::suggestions::installed_artifact_hint(name, None, ctx),
+    })
 }
 
 /// Like [`info`], but scoped to a single kind — backs `cmx skill info` /
@@ -98,10 +101,11 @@ pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
 pub fn info_for_kind(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
     match find_and_gather(name, kind, ctx)? {
         Some(info) => Ok(info),
-        None => bail!(
-            "No installed {kind} named '{name}' found. {}",
-            crate::suggestions::installed_artifact_hint(name, Some(kind), ctx)
-        ),
+        None => Err(CliError::ArtifactNotInstalled {
+            kind,
+            name: name.to_string(),
+            hint: crate::suggestions::installed_artifact_hint(name, Some(kind), ctx),
+        }),
     }
 }
 
@@ -269,40 +273,6 @@ pub(crate) fn collect_skill_files_with(
         }
     }
     Ok(result)
-}
-
-#[cfg(feature = "llm")]
-pub fn summary_unavailable_message(e: &anyhow::Error) -> String {
-    const MAX: usize = 200;
-
-    if is_gateway_failure(e) {
-        return format!(
-            "summary unavailable — {}. Fix with 'cmx config gateway'/'cmx config model' or set OPENAI_API_KEY.",
-            crate::error_summary::summarize_gateway_error(e)
-        );
-    }
-
-    let flattened = format!("{e:#}").split_whitespace().collect::<Vec<_>>().join(" ");
-    let detail = if flattened.chars().count() > MAX {
-        let head: String = flattened.chars().take(MAX).collect();
-        format!("{head}…")
-    } else {
-        flattened
-    };
-    if detail.ends_with(['.', '!', '?', '…']) {
-        format!("summary unavailable — {detail}")
-    } else {
-        format!("summary unavailable — {detail}.")
-    }
-}
-
-#[cfg(feature = "llm")]
-fn is_gateway_failure(e: &anyhow::Error) -> bool {
-    let rendered = format!("{e:#}");
-    rendered.contains("LLM gateway error")
-        || rendered.contains("OpenAI API error")
-        || rendered.contains("localhost:11434")
-        || rendered.contains("Ollama")
 }
 
 // ---------------------------------------------------------------------------
@@ -761,39 +731,6 @@ mod tests {
 
         let skill_md = result.iter().find(|e| e.name == "SKILL.md").unwrap();
         assert!(!skill_md.is_dir, "SKILL.md should not be marked as a directory");
-    }
-
-    // --- summary_unavailable_message ---
-
-    #[cfg(feature = "llm")]
-    #[test]
-    fn summary_unavailable_message_keeps_non_gateway_detail() {
-        assert_eq!(
-            summary_unavailable_message(&anyhow::anyhow!("short error")),
-            "summary unavailable — short error."
-        );
-    }
-
-    #[cfg(feature = "llm")]
-    #[test]
-    fn summary_unavailable_message_truncates_long_non_gateway_detail() {
-        let long_msg: String = "x".repeat(300);
-        let result = summary_unavailable_message(&anyhow::anyhow!("{long_msg}"));
-        assert!(result.ends_with('…'));
-    }
-
-    #[cfg(feature = "llm")]
-    #[test]
-    fn summary_unavailable_message_sanitizes_gateway_failures() {
-        let error = anyhow::anyhow!(
-            "LLM analysis failed: LLM gateway error: OpenAI API error: 401 Unauthorized - {{ \
-             \"error\": {{ \"message\": \"missing key\" }} }}"
-        );
-        let result = summary_unavailable_message(&error);
-        assert!(result.contains("OpenAI API error: 401 Unauthorized"), "{result}");
-        assert!(result.contains("cmx config gateway"), "{result}");
-        assert!(!result.contains('{'), "{result}");
-        assert!(!result.contains("\"error\""), "{result}");
     }
 
     // --- Deprecation struct accessible from tests ---

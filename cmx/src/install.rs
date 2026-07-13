@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use crate::error::{CliError, Result};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -95,10 +95,10 @@ fn install_resolved(
     let facts = gather_install_facts(artifact_name, kind, scope, force, ctx)?;
     let decision = decide_install(facts.already_installed, facts.locally_modified, force);
     if decision.blocked {
-        bail!(
-            "'{artifact_name}' has local modifications. Use --force to overwrite, \
-             or 'cmx {kind} diff {artifact_name}' to review changes first."
-        );
+        return Err(CliError::LocallyModified {
+            name: artifact_name.to_string(),
+            kind,
+        });
     }
     let discarded_paths = if force && facts.locally_modified {
         collect_discarded_paths(
@@ -200,10 +200,11 @@ pub fn update(
     ctx: &AppContext<'_>,
 ) -> Result<UpdateResult> {
     let Some((entry, scope)) = lockfile::find_entry(name, ctx.fs, ctx.paths)? else {
-        bail!(
-            "No installed {kind} named '{name}' found. {}",
-            crate::suggestions::installed_artifact_hint(name, Some(kind), ctx)
-        );
+        return Err(CliError::ArtifactNotInstalled {
+            kind,
+            name: name.to_string(),
+            hint: crate::suggestions::installed_artifact_hint(name, Some(kind), ctx),
+        });
     };
     let updated = install_resolved(Some(&entry.source.repo), name, kind, scope, force, ctx)?;
     let sibling_drifted_platforms = drifted_sibling_platforms(name, kind, scope, &updated, ctx)?;

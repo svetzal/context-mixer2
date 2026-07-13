@@ -17,7 +17,7 @@
 //! (e.g. Codex TOML) are rejected too: the installed copy is no longer the
 //! canonical markdown the home holds.
 
-use anyhow::{Context, Result, anyhow, bail};
+use crate::error::{CliError, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
@@ -86,10 +86,9 @@ pub fn promote(
     ctx: &AppContext<'_>,
 ) -> Result<PromoteResult> {
     if kind == ArtifactKind::Agent && ctx.paths.platform.transforms_agent_to_toml() {
-        bail!(
-            "Can't promote '{name}': the active platform stores agents as transformed TOML, not \
-             the canonical markdown the home holds. Promote from a markdown platform (e.g. claude)."
-        );
+        return Err(CliError::PromoteTomlTransformed {
+            name: name.to_string(),
+        });
     }
 
     // Where the canonical copy lives (and its current bytes, if any), resolved up
@@ -188,15 +187,14 @@ fn select_agent_copy(
         ctx.fs,
         ctx.paths,
     )
-    .with_context(|| {
-        format!(
-            "No installed agent named '{name}' found on disk. {}",
-            crate::suggestions::installed_artifact_hint(name, Some(ArtifactKind::Agent), ctx)
-        )
+    .ok_or_else(|| CliError::ArtifactNotInstalledOnDisk {
+        kind: ArtifactKind::Agent,
+        name: name.to_string(),
+        hint: crate::suggestions::installed_artifact_hint(name, Some(ArtifactKind::Agent), ctx),
     })?;
     let home_tracked = home_tracked_platforms(name, ArtifactKind::Agent, scope, ctx)?;
     if home_tracked.is_empty() {
-        bail!(non_home_guidance(name, ArtifactKind::Agent, scope, ctx)?);
+        return Err(CliError::Message(non_home_guidance(name, ArtifactKind::Agent, scope, ctx)?));
     }
     Ok((installed_path, vec![ctx.paths.platform], scope, home_tracked))
 }
@@ -214,17 +212,16 @@ fn select_skill_copy(
         // pointed guidance (git-sourced → edit clone / update --force; untracked
         // → adopt; missing → not-installed).
         let (_p, s) = config::find_installed_path(name, ArtifactKind::Skill, ctx.fs, ctx.paths)
-            .with_context(|| {
-                format!(
-                    "No installed skill named '{name}' found on disk. {}",
-                    crate::suggestions::installed_artifact_hint(
-                        name,
-                        Some(ArtifactKind::Skill),
-                        ctx
-                    )
-                )
+            .ok_or_else(|| CliError::ArtifactNotInstalledOnDisk {
+                kind: ArtifactKind::Skill,
+                name: name.to_string(),
+                hint: crate::suggestions::installed_artifact_hint(
+                    name,
+                    Some(ArtifactKind::Skill),
+                    ctx,
+                ),
             })?;
-        bail!(non_home_guidance(name, ArtifactKind::Skill, s, ctx)?);
+        return Err(CliError::Message(non_home_guidance(name, ArtifactKind::Skill, s, ctx)?));
     }
     let selected = choose_copy(name, selector, &copies, home_cs, ctx)?;
     let home_tracked = copies.iter().flat_map(|c| c.platforms.iter().copied()).collect();
@@ -289,12 +286,12 @@ fn choose_copy(
 ) -> Result<HomeCopy> {
     if let Some(p) = selector {
         return copies.iter().find(|c| c.platforms.contains(&p)).cloned().ok_or_else(|| {
-            anyhow!(
+            CliError::Message(format!(
                 "'{name}' isn't installed and home-tracked on platform '{p}'. It's \
                      home-tracked on: {}. Promote from one of those, or drop --from to \
                      auto-select the edited copy.",
                 platform_list(copies)
-            )
+            ))
         });
     }
 
@@ -306,22 +303,16 @@ fn choose_copy(
             if home_cs.is_none() || home_cs == Some(rep.checksum.as_str()) {
                 Ok(rep.clone())
             } else {
-                bail!(
-                    "No in-place edits detected on any platform — nothing to promote. The home \
-                     already differs from the installed copies (it was changed elsewhere). Run \
-                     `cmx skill update {name} --force` to pull the home over the installs, or \
-                     `cmx skill promote {name} --from <name>` to force a specific copy into \
-                     the home."
-                )
+                Err(CliError::PromoteNoEdits {
+                    name: name.to_string(),
+                })
             }
         }
         1 => Ok((*drifted[0]).clone()),
-        _ => bail!(
-            "Multiple platforms have diverging in-place edits: {}. cmx can't tell which should \
-             become the canonical home copy. Inspect them with `cmx skill diff {name}`, then \
-             promote the one you want with `cmx skill promote {name} --from <name>`.",
-            drifted_labels(&drifted, ctx.paths.platform)
-        ),
+        _ => Err(CliError::PromoteDiverging {
+            name: name.to_string(),
+            platforms: drifted_labels(&drifted, ctx.paths.platform),
+        }),
     }
 }
 

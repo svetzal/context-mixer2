@@ -11,7 +11,7 @@
 //! cross-platform agent copy is not a byte-for-byte operation and is rejected
 //! at the command layer.
 
-use anyhow::{Result, bail};
+use crate::error::{CliError, Result};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -137,7 +137,9 @@ fn pick_from(copies: &[Copy], p: Platform) -> Result<&Copy> {
     copies
         .iter()
         .find(|c| c.platforms.contains(&p))
-        .ok_or_else(|| anyhow::anyhow!("'{p}' has no copy of this skill to sync from."))
+        .ok_or_else(|| CliError::SyncNoCopy {
+            platform: p.to_string(),
+        })
 }
 
 /// The copy with the strictly-newest version, or `None` when the choice is
@@ -199,7 +201,7 @@ fn ambiguity_error(
     copies: &[Copy],
     managed: Option<&[Platform]>,
     ctx: &AppContext<'_>,
-) -> anyhow::Error {
+) -> CliError {
     let mut msg = format!(
         "Can't tell which copy of '{name}' is newest — the differing copies are unversioned \
          or share a version.\n"
@@ -235,7 +237,7 @@ fn ambiguity_error(
              re-project it:\n  cmx {kind} promote {name}"
         );
     }
-    anyhow::anyhow!(msg)
+    CliError::Message(msg)
 }
 
 /// Gather the distinct physical copies of a skill across the candidate
@@ -332,19 +334,15 @@ pub fn sync(
     ctx: &AppContext<'_>,
 ) -> Result<SyncResult> {
     if kind != ArtifactKind::Skill {
-        bail!(
-            "`sync` currently supports skills only. Agents are reformatted per platform \
-             (e.g. Codex TOML), so cross-platform agent reconciliation needs format-aware \
-             handling (not yet implemented)."
-        );
+        return Err(CliError::SyncAgentsNotSupported);
     }
 
     let copies = gather_copies(name, kind, scope, ctx)?;
     if copies.is_empty() {
-        bail!(
-            "Skill '{name}' is not installed on any managed platform. {}",
-            crate::suggestions::installed_artifact_hint(name, Some(ArtifactKind::Skill), ctx)
-        );
+        return Err(CliError::SyncNotInstalled {
+            name: name.to_string(),
+            hint: crate::suggestions::installed_artifact_hint(name, Some(ArtifactKind::Skill), ctx),
+        });
     }
 
     let external = is_external(name, &copies, ctx)?;

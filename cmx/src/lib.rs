@@ -8,6 +8,7 @@ pub mod diff;
 pub mod dispatch;
 pub mod display;
 pub mod doctor;
+pub mod error;
 pub mod info;
 pub mod init;
 pub mod install;

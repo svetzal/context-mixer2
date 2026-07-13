@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::Result;
 
 /// Outcome of classifying a single name during batch partition.
 pub enum Partitioned<S, E> {
@@ -58,7 +58,7 @@ mod tests {
         let names: Vec<String> = vec!["ok".to_string(), "boom".to_string()];
         let result: Result<(Vec<String>, Vec<String>)> = partition_by(&names, |name| {
             if name == "boom" {
-                anyhow::bail!("hard error")
+                return Err(crate::error::CliError::Message("hard error".to_string()));
             }
             Ok(Partitioned::Kept(name.to_string()))
         });

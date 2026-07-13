@@ -17,7 +17,7 @@ use members::{member_description_chars, parse_prefix, resolve_member, seed_from_
 mod activation;
 pub use activation::{activate, deactivate};
 
-use anyhow::{Result, bail};
+use crate::error::{CliError, Result};
 
 use crate::config;
 use crate::context::AppContext;
@@ -44,7 +44,9 @@ pub fn create(
 
     config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
         if sets.sets.contains_key(name) {
-            bail!("Set '{name}' already exists.");
+            Err(CliError::SetAlreadyExists {
+                name: name.to_string(),
+            })?;
         }
         sets.sets.insert(
             name.to_string(),
@@ -55,7 +57,8 @@ pub fn create(
             },
         );
         Ok(())
-    })?;
+    })
+    .map_err(|e| CliError::Message(e.to_string()))?;
     Ok(SetCreateResult {
         name: name.to_string(),
         member_count,
@@ -84,7 +87,9 @@ pub fn list(scope: InstallScope, ctx: &AppContext<'_>) -> Result<SetListResult> 
 
 pub fn show(name: &str, scope: InstallScope, ctx: &AppContext<'_>) -> Result<SetShowResult> {
     let sets = config::load_sets(scope, ctx.fs, ctx.paths)?;
-    let def = sets.sets.get(name).ok_or_else(|| anyhow::anyhow!("Set '{name}' not found."))?;
+    let def = sets.sets.get(name).ok_or_else(|| CliError::SetNotFound {
+        name: name.to_string(),
+    })?;
 
     let members: Vec<SetMemberStatus> = def
         .members
@@ -128,10 +133,9 @@ pub fn add(
     let mut already = Vec::new();
 
     config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
-        let def = sets
-            .sets
-            .get_mut(name)
-            .ok_or_else(|| anyhow::anyhow!("Set '{name}' not found."))?;
+        let def = sets.sets.get_mut(name).ok_or_else(|| CliError::SetNotFound {
+            name: name.to_string(),
+        })?;
 
         for member in resolved {
             let is_duplicate = def
@@ -146,7 +150,8 @@ pub fn add(
             }
         }
         Ok(())
-    })?;
+    })
+    .map_err(|e| CliError::Message(e.to_string()))?;
 
     Ok(SetAddResult {
         set: name.to_string(),
@@ -168,10 +173,9 @@ pub fn remove(
     let mut not_found = Vec::new();
 
     config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
-        let def = sets
-            .sets
-            .get_mut(name)
-            .ok_or_else(|| anyhow::anyhow!("Set '{name}' not found."))?;
+        let def = sets.sets.get_mut(name).ok_or_else(|| CliError::SetNotFound {
+            name: name.to_string(),
+        })?;
 
         for (hint, artifact_name) in &parsed {
             let before = def.members.len();
@@ -186,7 +190,8 @@ pub fn remove(
             }
         }
         Ok(())
-    })?;
+    })
+    .map_err(|e| CliError::Message(e.to_string()))?;
 
     Ok(SetRemoveResult {
         set: name.to_string(),
@@ -213,11 +218,12 @@ pub fn delete(
         let outcome = deactivate(name, force, apply, scope, ctx)?;
         let deleted = if apply && !outcome.any_blocked {
             config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
-                sets.sets
-                    .remove(name)
-                    .ok_or_else(|| anyhow::anyhow!("Set '{name}' not found."))?;
+                sets.sets.remove(name).ok_or_else(|| CliError::SetNotFound {
+                    name: name.to_string(),
+                })?;
                 Ok(())
-            })?;
+            })
+            .map_err(|e| CliError::Message(e.to_string()))?;
             true
         } else {
             false
@@ -232,11 +238,12 @@ pub fn delete(
     }
 
     config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
-        sets.sets
-            .remove(name)
-            .ok_or_else(|| anyhow::anyhow!("Set '{name}' not found."))?;
+        sets.sets.remove(name).ok_or_else(|| CliError::SetNotFound {
+            name: name.to_string(),
+        })?;
         Ok(())
-    })?;
+    })
+    .map_err(|e| CliError::Message(e.to_string()))?;
     Ok(SetDeleteResult {
         name: name.to_string(),
         purge: false,
@@ -254,12 +261,17 @@ pub fn rename(
 ) -> Result<SetRenameResult> {
     config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
         if sets.sets.contains_key(new) {
-            bail!("Set '{new}' already exists.");
+            Err(CliError::SetAlreadyExists {
+                name: new.to_string(),
+            })?;
         }
-        let def = sets.sets.remove(old).ok_or_else(|| anyhow::anyhow!("Set '{old}' not found."))?;
+        let def = sets.sets.remove(old).ok_or_else(|| CliError::SetNotFound {
+            name: old.to_string(),
+        })?;
         sets.sets.insert(new.to_string(), def);
         Ok(())
-    })?;
+    })
+    .map_err(|e| CliError::Message(e.to_string()))?;
     Ok(SetRenameResult {
         old: old.to_string(),
         new: new.to_string(),

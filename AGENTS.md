@@ -271,6 +271,7 @@ Config & persistence:
 
 Types:
 
+- `cmx/src/error.rs` — `CliError` typed enum and `Result<T>` alias for all cmx command-core modules; transparent pass-through to `CmxError`; `Message(String)` escape hatch for runtime-built messages
 - `cmx/src/plugin_types.rs` — serde types for plugin.json and marketplace.json (single source of truth lifted from cmf)
 - `cmx/src/codex_agent.rs` — transforms a cmx markdown agent into a Codex CLI subagent TOML document
 

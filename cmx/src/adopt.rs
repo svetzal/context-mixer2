@@ -17,7 +17,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use crate::error::{CliError, Result};
 
 use crate::checksum;
 use crate::config;
@@ -85,6 +85,7 @@ pub(crate) fn ensure_home_source(home: &Path, ctx: &AppContext<'_>) -> Result<()
         }
         Ok(())
     })
+    .map_err(|e| CliError::Message(e.to_string()))
 }
 
 /// Copy one orphaned artifact into the home and record provenance for it on
@@ -234,25 +235,28 @@ pub fn adopt_named(
         match row {
             Some(r) => match r.state {
                 ArtifactState::Orphaned => chosen.push(r.clone()),
-                ArtifactState::Untracked => anyhow::bail!(
-                    "'{name}' is available in a registered source — run `cmx {kind} install {name}` to track it. \
-                     (adopt is for hand-authored artifacts that no source provides.)"
-                ),
-                ArtifactState::Tracked => {
-                    anyhow::bail!("'{name}' is already tracked — nothing to adopt.")
+                ArtifactState::Untracked => {
+                    return Err(CliError::AdoptUntracked {
+                        name: name.clone(),
+                        kind,
+                    });
                 }
-                ArtifactState::Drifted => anyhow::bail!(
-                    "'{name}' is tracked but locally modified (drifted), not orphaned — adopt does not yet \
-                     re-home drifted artifacts. Inspect with `cmx info {name}`."
-                ),
-                ArtifactState::External => anyhow::bail!(
-                    "'{name}' is marked external (managed by another tool) — remove it from the external \
-                     list (`cmx config external remove ...`) before adopting it with cmx."
-                ),
+                ArtifactState::Tracked => {
+                    return Err(CliError::AdoptAlreadyTracked { name: name.clone() });
+                }
+                ArtifactState::Drifted => {
+                    return Err(CliError::AdoptDrifted { name: name.clone() });
+                }
+                ArtifactState::External => {
+                    return Err(CliError::AdoptExternal { name: name.clone() });
+                }
             },
-            None => anyhow::bail!(
-                "No {kind} named '{name}' found on disk. Run `cmx doctor` to see what is adoptable."
-            ),
+            None => {
+                return Err(CliError::AdoptNotFoundOnDisk {
+                    kind,
+                    name: name.clone(),
+                });
+            }
         }
     }
     adopt_rows(&chosen, include_local, ctx)
