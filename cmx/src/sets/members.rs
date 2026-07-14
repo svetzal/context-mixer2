@@ -154,3 +154,200 @@ pub(super) fn source_description_chars(m: &SetMember, ctx: &AppContext<'_>) -> O
         .ok()
         .map(|sa| sa.artifact.description.chars().count())
 }
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use crate::error::CliError;
+    use crate::test_support::{
+        TestContext, install_skill_on_disk, make_lock_entry_builder, save_lock_with_entry,
+        setup_empty_sources, skill_content,
+    };
+    use crate::types::{ArtifactKind, InstallScope, SetMember};
+
+    use super::{member_description_chars, parse_prefix, resolve_member, seed_from_plugin};
+
+    // -----------------------------------------------------------------------
+    // parse_prefix
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_prefix_skill_colon_strips_prefix() {
+        let (kind, name) = parse_prefix("skill:my-skill");
+        assert_eq!(kind, Some(ArtifactKind::Skill));
+        assert_eq!(name, "my-skill");
+    }
+
+    #[test]
+    fn parse_prefix_agent_colon_strips_prefix() {
+        let (kind, name) = parse_prefix("agent:my-agent");
+        assert_eq!(kind, Some(ArtifactKind::Agent));
+        assert_eq!(name, "my-agent");
+    }
+
+    #[test]
+    fn parse_prefix_bare_name_returns_none_kind() {
+        let (kind, name) = parse_prefix("my-skill");
+        assert!(kind.is_none());
+        assert_eq!(name, "my-skill");
+    }
+
+    #[test]
+    fn parse_prefix_colon_in_name_not_prefixed_is_left_intact() {
+        // A name like "my:thing" should not be mis-split
+        let (kind, name) = parse_prefix("my:thing");
+        // Neither "my" nor "thing" is a recognized kind prefix
+        assert!(kind.is_none(), "unrecognized prefix must not be parsed as a kind");
+        assert_eq!(name, "my:thing", "unrecognized colon-prefix must be left intact");
+    }
+
+    // -----------------------------------------------------------------------
+    // resolve_member — error branches
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn resolve_member_errors_when_name_not_in_lockfile() {
+        let t = TestContext::new();
+        setup_empty_sources(&t.fs, &t.paths);
+        let ctx = t.ctx();
+        let err = resolve_member("no-such-skill", &ctx).unwrap_err();
+        assert!(
+            matches!(err, CliError::ArtifactNotInLockfile { .. }),
+            "missing artifact must produce ArtifactNotInLockfile, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_member_errors_when_hint_does_not_match_kind() {
+        // Install a skill but ask for it as an agent
+        let t = TestContext::new();
+        let entry = make_lock_entry_builder(ArtifactKind::Skill, "test-source", "skills/alpha");
+        save_lock_with_entry(&t.fs, &t.paths, "alpha", entry, InstallScope::Global);
+        setup_empty_sources(&t.fs, &t.paths);
+        let ctx = t.ctx();
+        // "agent:alpha" asks for the agent kind, but only a skill is in the lock
+        let err = resolve_member("agent:alpha", &ctx).unwrap_err();
+        assert!(
+            matches!(err, CliError::ArtifactNoMatchingKind { .. }),
+            "kind hint mismatch must produce ArtifactNoMatchingKind, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_member_errors_when_same_name_both_kinds_no_hint() {
+        // Both an agent and a skill named "alpha" exist in the lock
+        let t = TestContext::new();
+        let skill_entry =
+            make_lock_entry_builder(ArtifactKind::Skill, "test-source", "skills/alpha");
+        save_lock_with_entry(&t.fs, &t.paths, "alpha", skill_entry, InstallScope::Global);
+
+        // Save the agent entry in the local scope lock so the global scope isn't replaced
+        let agent_entry =
+            make_lock_entry_builder(ArtifactKind::Agent, "test-source", "agents/alpha.md");
+        save_lock_with_entry(&t.fs, &t.paths, "alpha", agent_entry, InstallScope::Local);
+        setup_empty_sources(&t.fs, &t.paths);
+
+        let ctx = t.ctx();
+        let err = resolve_member("alpha", &ctx).unwrap_err();
+        assert!(
+            matches!(err, CliError::ArtifactAmbiguousKind { .. }),
+            "ambiguous name must produce ArtifactAmbiguousKind, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_member_disambiguates_with_skill_hint() {
+        let t = TestContext::new();
+        // Same-name entries in different scopes (to get both kinds into candidates)
+        let skill_entry =
+            make_lock_entry_builder(ArtifactKind::Skill, "test-source", "skills/alpha");
+        save_lock_with_entry(&t.fs, &t.paths, "alpha", skill_entry, InstallScope::Global);
+        let agent_entry =
+            make_lock_entry_builder(ArtifactKind::Agent, "test-source", "agents/alpha.md");
+        save_lock_with_entry(&t.fs, &t.paths, "alpha", agent_entry, InstallScope::Local);
+        setup_empty_sources(&t.fs, &t.paths);
+
+        let ctx = t.ctx();
+        let member = resolve_member("skill:alpha", &ctx).unwrap();
+        assert_eq!(member.kind, ArtifactKind::Skill);
+        assert_eq!(member.name, "alpha");
+        assert_eq!(member.source.as_deref(), Some("test-source"));
+    }
+
+    // -----------------------------------------------------------------------
+    // seed_from_plugin — malformed-spec error branches
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn seed_from_plugin_errors_when_spec_has_no_colon() {
+        let t = TestContext::new();
+        setup_empty_sources(&t.fs, &t.paths);
+        let ctx = t.ctx();
+        let err = seed_from_plugin("no-colon", &ctx).unwrap_err();
+        assert!(
+            matches!(err, CliError::InvalidFromPlugin { .. }),
+            "missing colon must produce InvalidFromPlugin, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn seed_from_plugin_errors_when_source_is_empty() {
+        let t = TestContext::new();
+        setup_empty_sources(&t.fs, &t.paths);
+        let ctx = t.ctx();
+        let err = seed_from_plugin(":plugin", &ctx).unwrap_err();
+        assert!(
+            matches!(err, CliError::InvalidFromPlugin { .. }),
+            "empty source must produce InvalidFromPlugin, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn seed_from_plugin_errors_when_plugin_is_empty() {
+        let t = TestContext::new();
+        setup_empty_sources(&t.fs, &t.paths);
+        let ctx = t.ctx();
+        let err = seed_from_plugin("source:", &ctx).unwrap_err();
+        assert!(
+            matches!(err, CliError::InvalidFromPlugin { .. }),
+            "empty plugin must produce InvalidFromPlugin, got {err:?}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // member_description_chars
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn member_description_chars_returns_installed_description_when_present() {
+        let t = TestContext::new();
+        setup_empty_sources(&t.fs, &t.paths);
+        let content = skill_content("A short description");
+        install_skill_on_disk(&t.fs, &t.paths, "alpha", &content, InstallScope::Global);
+        let ctx = t.ctx();
+        let member = SetMember {
+            kind: ArtifactKind::Skill,
+            name: "alpha".to_string(),
+            source: None,
+        };
+        let chars = member_description_chars(&member, &ctx);
+        assert_eq!(chars, Some("A short description".chars().count()));
+    }
+
+    #[test]
+    fn member_description_chars_returns_none_when_not_installed_and_no_source() {
+        let t = TestContext::new();
+        setup_empty_sources(&t.fs, &t.paths);
+        let ctx = t.ctx();
+        let member = SetMember {
+            kind: ArtifactKind::Skill,
+            name: "not-installed".to_string(),
+            source: None,
+        };
+        let chars = member_description_chars(&member, &ctx);
+        assert!(chars.is_none(), "unresolvable member must return None");
+    }
+}

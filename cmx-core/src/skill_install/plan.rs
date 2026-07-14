@@ -173,3 +173,348 @@ pub(super) fn build_lock_entry(
         installed_checksum: checksum.to_string(),
     }
 }
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use std::cmp::Ordering;
+    use std::path::PathBuf;
+
+    use crate::platform::Platform;
+    use crate::skill_fs::SkillFile;
+    use crate::skill_install::{InstallPlan, TargetAction, TargetPlan, ToolIdentity};
+    use crate::test_support::TestContext;
+    use crate::types::{ArtifactKind, InstallScope, LockEntry, LockSource};
+
+    use super::{build_lock_entry, compare_versions, decide_action_for_entry, prepare_writes};
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    fn make_entry(version: Option<&str>, checksum: &str) -> LockEntry {
+        LockEntry {
+            artifact_type: ArtifactKind::Skill,
+            version: version.map(str::to_string),
+            installed_at: "2024-01-01T00:00:00Z".to_string(),
+            source: LockSource {
+                repo: "bundled:sample".to_string(),
+                path: "skills/sample".to_string(),
+            },
+            source_checksum: checksum.to_string(),
+            installed_checksum: checksum.to_string(),
+        }
+    }
+
+    fn skill_file(rel: &str, content: &str) -> SkillFile {
+        SkillFile {
+            rel_path: PathBuf::from(rel),
+            bytes: content.as_bytes().to_vec(),
+        }
+    }
+
+    fn make_plan(dest_dir: PathBuf, action: TargetAction, force: bool) -> InstallPlan {
+        InstallPlan {
+            tool: ToolIdentity::new("sample", "1.0.0"),
+            scope: InstallScope::Global,
+            source_checksum: "sha256:abc".to_string(),
+            cmx_present: false,
+            force,
+            targets: vec![TargetPlan {
+                platform: Platform::Claude,
+                scope: InstallScope::Global,
+                dest_dir,
+                files: vec![],
+                action,
+                cmx_managed: false,
+            }],
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // compare_versions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compare_versions_none_installed_is_less() {
+        assert_eq!(compare_versions(None, "1.0.0"), Ordering::Less);
+    }
+
+    #[test]
+    fn compare_versions_semver_1_10_0_greater_than_1_9_0() {
+        // String-wise "1.10.0" < "1.9.0" — semver must give Greater, not Less.
+        assert_eq!(
+            compare_versions(Some("1.10.0"), "1.9.0"),
+            Ordering::Greater,
+            "semver ordering must beat lexicographic ordering"
+        );
+    }
+
+    #[test]
+    fn compare_versions_semver_equal_versions() {
+        assert_eq!(compare_versions(Some("1.0.0"), "1.0.0"), Ordering::Equal);
+    }
+
+    #[test]
+    fn compare_versions_semver_older_installed_is_less() {
+        assert_eq!(compare_versions(Some("0.9.0"), "1.0.0"), Ordering::Less);
+    }
+
+    #[test]
+    fn compare_versions_non_semver_equal_strings_is_equal() {
+        assert_eq!(compare_versions(Some("v1-alpha"), "v1-alpha"), Ordering::Equal);
+    }
+
+    #[test]
+    fn compare_versions_non_semver_different_strings_is_less() {
+        assert_eq!(compare_versions(Some("v1-alpha"), "v2-beta"), Ordering::Less);
+    }
+
+    // -----------------------------------------------------------------------
+    // decide_action_for_entry — all seven branches
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn decide_action_older_installed_produces_update_with_from() {
+        let t = TestContext::new();
+        let entry = make_entry(Some("0.9.0"), "sha256:old");
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        let ctx = t.ctx();
+        let action =
+            decide_action_for_entry(&entry, "1.0.0", "sha256:new", false, &dest, &ctx).unwrap();
+        match action {
+            TargetAction::Update { from } => assert_eq!(from.as_deref(), Some("0.9.0")),
+            other => panic!("expected Update, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decide_action_none_version_installed_produces_update_with_none_from() {
+        let t = TestContext::new();
+        let entry = make_entry(None, "sha256:old");
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        let ctx = t.ctx();
+        let action =
+            decide_action_for_entry(&entry, "1.0.0", "sha256:new", false, &dest, &ctx).unwrap();
+        match action {
+            TargetAction::Update { from } => {
+                assert!(from.is_none(), "from must be None when no version was installed");
+            }
+            other => panic!("expected Update, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decide_action_equal_version_dest_absent_produces_install() {
+        let t = TestContext::new();
+        let entry = make_entry(Some("1.0.0"), "sha256:abc");
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        // dest does NOT exist in the fake filesystem
+        let ctx = t.ctx();
+        let action =
+            decide_action_for_entry(&entry, "1.0.0", "sha256:abc", false, &dest, &ctx).unwrap();
+        assert!(matches!(action, TargetAction::Install), "expected Install, got {action:?}");
+    }
+
+    #[test]
+    fn decide_action_equal_version_matching_checksum_produces_skip() {
+        let t = TestContext::new();
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        t.fs.add_file(dest.join("SKILL.md"), "---\ndescription: test\n---\n# skill\n");
+        let on_disk =
+            crate::checksum::checksum_artifact(&dest, ArtifactKind::Skill, &t.fs).unwrap();
+        let entry = make_entry(Some("1.0.0"), &on_disk);
+        let ctx = t.ctx();
+        let action =
+            decide_action_for_entry(&entry, "1.0.0", &on_disk, false, &dest, &ctx).unwrap();
+        assert!(matches!(action, TargetAction::Skip), "expected Skip, got {action:?}");
+    }
+
+    #[test]
+    fn decide_action_equal_version_checksum_mismatch_no_force_produces_drifted_skip() {
+        let t = TestContext::new();
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        t.fs.add_file(dest.join("SKILL.md"), "---\ndescription: modified\n---\n# modified\n");
+        let entry = make_entry(Some("1.0.0"), "sha256:original");
+        let ctx = t.ctx();
+        let action =
+            decide_action_for_entry(&entry, "1.0.0", "sha256:original", false, &dest, &ctx)
+                .unwrap();
+        match action {
+            TargetAction::DriftedSkip { installed } => {
+                assert_eq!(installed, "1.0.0", "installed field must carry the version string");
+            }
+            other => panic!("expected DriftedSkip, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decide_action_equal_version_checksum_mismatch_force_produces_update() {
+        let t = TestContext::new();
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        t.fs.add_file(dest.join("SKILL.md"), "---\ndescription: modified\n---\n# modified\n");
+        let entry = make_entry(Some("1.0.0"), "sha256:original");
+        let ctx = t.ctx();
+        let action =
+            decide_action_for_entry(&entry, "1.0.0", "sha256:original", true, &dest, &ctx).unwrap();
+        match action {
+            TargetAction::Update { from } => {
+                assert_eq!(from.as_deref(), Some("1.0.0"));
+            }
+            other => panic!("expected Update (force), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decide_action_newer_installed_no_force_produces_refuse_newer() {
+        let t = TestContext::new();
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        t.fs.add_dir(dest.clone());
+        let entry = make_entry(Some("2.0.0"), "sha256:new");
+        let ctx = t.ctx();
+        let action =
+            decide_action_for_entry(&entry, "1.0.0", "sha256:old", false, &dest, &ctx).unwrap();
+        match action {
+            TargetAction::RefuseNewer { installed } => {
+                assert_eq!(installed, "2.0.0");
+            }
+            other => panic!("expected RefuseNewer, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decide_action_newer_installed_with_force_produces_downgrade() {
+        let t = TestContext::new();
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        t.fs.add_dir(dest.clone());
+        let entry = make_entry(Some("2.0.0"), "sha256:new");
+        let ctx = t.ctx();
+        let action =
+            decide_action_for_entry(&entry, "1.0.0", "sha256:old", true, &dest, &ctx).unwrap();
+        match action {
+            TargetAction::Downgrade { from } => {
+                assert_eq!(from, "2.0.0");
+            }
+            other => panic!("expected Downgrade, got {other:?}"),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // prepare_writes
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn prepare_writes_skip_target_produces_empty_sets() {
+        let t = TestContext::new();
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        let plan = make_plan(dest, TargetAction::Skip, false);
+        let ctx = t.ctx();
+        let result = prepare_writes(&plan, &[], &ctx).unwrap();
+        assert!(result.dirs_to_write.is_empty(), "Skip must not add to dirs_to_write");
+        assert!(result.discarded_paths_by_dir.is_empty(), "Skip must not add discarded paths");
+    }
+
+    #[test]
+    fn prepare_writes_non_force_update_adds_to_write_but_not_replace() {
+        let t = TestContext::new();
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        let skill_md = dest.join("SKILL.md");
+        t.fs.add_file(&skill_md, "existing content");
+        let plan = make_plan(
+            dest.clone(),
+            TargetAction::Update {
+                from: Some("0.9.0".to_string()),
+            },
+            false, // not force
+        );
+        let files = vec![skill_file("SKILL.md", "new content")];
+        let ctx = t.ctx();
+        let result = prepare_writes(&plan, &files, &ctx).unwrap();
+        assert!(result.dirs_to_write.contains(&dest), "Update must add to dirs_to_write");
+        assert!(
+            result.discarded_paths_by_dir.is_empty(),
+            "non-force Update must not replace the dir"
+        );
+        // Existing file must not have been removed
+        assert!(ctx.fs.exists(&skill_md), "non-force Update must not remove existing files");
+    }
+
+    #[test]
+    fn prepare_writes_force_update_reports_discarded_and_removes_dir() {
+        let t = TestContext::new();
+        let dest = PathBuf::from("/home/testuser/.claude/skills/sample");
+        // Modified file — differs from bundle
+        t.fs.add_file(dest.join("SKILL.md"), "---\ndescription: modified\n---\n# modified\n");
+        // Identical file — matches bundle
+        let identical = "print('hello')";
+        t.fs.add_file(dest.join("scripts/tool.py"), identical);
+        // Installed-only file — not in bundle
+        t.fs.add_file(dest.join("local-notes.md"), "scratch");
+
+        let plan = make_plan(
+            dest.clone(),
+            TargetAction::Update {
+                from: Some("1.0.0".to_string()),
+            },
+            true, // force
+        );
+        let files = vec![
+            skill_file("SKILL.md", "---\ndescription: original\n---\n# original\n"),
+            skill_file("scripts/tool.py", identical),
+        ];
+        let ctx = t.ctx();
+        let result = prepare_writes(&plan, &files, &ctx).unwrap();
+
+        assert!(result.dirs_to_write.contains(&dest));
+        let discarded = result
+            .discarded_paths_by_dir
+            .get(&dest)
+            .expect("force Update must report discarded paths");
+        let discarded: std::collections::BTreeSet<_> = discarded.iter().cloned().collect();
+        assert!(
+            discarded.contains(&dest.join("SKILL.md")),
+            "modified SKILL.md must appear in discarded"
+        );
+        assert!(
+            discarded.contains(&dest.join("local-notes.md")),
+            "installed-only file must appear in discarded"
+        );
+        assert!(
+            !discarded.contains(&dest.join("scripts/tool.py")),
+            "byte-identical file must NOT appear in discarded"
+        );
+        // Dir removed on force
+        assert!(!ctx.fs.exists(&dest.join("SKILL.md")), "force Update must remove the dest dir");
+    }
+
+    // -----------------------------------------------------------------------
+    // build_lock_entry
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn build_lock_entry_repo_uses_bundled_prefix() {
+        let tool = ToolIdentity::new("cmx", "1.2.3");
+        let entry = build_lock_entry(&tool, "sha256:abc", "2024-01-01T00:00:00Z");
+        assert_eq!(
+            entry.source.repo, "bundled:cmx",
+            "repo must be 'bundled:<name>' — a typo here breaks lockfile round-trips"
+        );
+        assert_eq!(entry.source.path, "skills/cmx", "path must be 'skills/<name>'");
+    }
+
+    #[test]
+    fn build_lock_entry_source_and_installed_checksums_match() {
+        let tool = ToolIdentity::new("cmx", "1.0.0");
+        let entry = build_lock_entry(&tool, "sha256:deadbeef", "2024-01-01T00:00:00Z");
+        assert_eq!(entry.source_checksum, "sha256:deadbeef");
+        assert_eq!(
+            entry.installed_checksum, entry.source_checksum,
+            "fresh install: installed_checksum must equal source_checksum"
+        );
+        assert_eq!(entry.artifact_type, ArtifactKind::Skill);
+        assert_eq!(entry.version.as_deref(), Some("1.0.0"));
+    }
+}
