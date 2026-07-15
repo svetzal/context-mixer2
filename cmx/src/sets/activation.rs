@@ -174,13 +174,12 @@ fn persist_active_state(
         )
     });
     if members_is_empty || any_installed_ok {
-        config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+        config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
             if let Some(d) = sets.sets.get_mut(name) {
                 d.state = SetState::Active;
             }
             Ok(())
-        })
-        .map_err(|e| CliError::Message(e.to_string()))?;
+        })?;
     }
     Ok(())
 }
@@ -259,13 +258,12 @@ pub fn deactivate(
     }
 
     if apply && !any_blocked {
-        config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+        config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
             if let Some(d) = sets.sets.get_mut(name) {
                 d.state = SetState::Inactive;
             }
             Ok(())
-        })
-        .map_err(|e| CliError::Message(e.to_string()))?;
+        })?;
     }
 
     Ok(SetDeactivateResult {
@@ -386,7 +384,7 @@ mod tests {
         scope: InstallScope,
         ctx: &AppContext<'_>,
     ) {
-        config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+        config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
             sets.sets.get_mut(set_name).unwrap().members = members;
             Ok(())
         })

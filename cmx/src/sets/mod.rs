@@ -42,11 +42,11 @@ pub fn create(
     };
     let member_count = members.len();
 
-    config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+    config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
         if sets.sets.contains_key(name) {
-            Err(CliError::SetAlreadyExists {
+            return Err(CliError::SetAlreadyExists {
                 name: name.to_string(),
-            })?;
+            });
         }
         sets.sets.insert(
             name.to_string(),
@@ -57,8 +57,7 @@ pub fn create(
             },
         );
         Ok(())
-    })
-    .map_err(|e| CliError::Message(e.to_string()))?;
+    })?;
     Ok(SetCreateResult {
         name: name.to_string(),
         member_count,
@@ -132,7 +131,7 @@ pub fn add(
     let mut added = Vec::new();
     let mut already = Vec::new();
 
-    config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+    config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
         let def = sets.sets.get_mut(name).ok_or_else(|| CliError::SetNotFound {
             name: name.to_string(),
         })?;
@@ -150,8 +149,7 @@ pub fn add(
             }
         }
         Ok(())
-    })
-    .map_err(|e| CliError::Message(e.to_string()))?;
+    })?;
 
     Ok(SetAddResult {
         set: name.to_string(),
@@ -172,7 +170,7 @@ pub fn remove(
     let mut removed = Vec::new();
     let mut not_found = Vec::new();
 
-    config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+    config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
         let def = sets.sets.get_mut(name).ok_or_else(|| CliError::SetNotFound {
             name: name.to_string(),
         })?;
@@ -190,8 +188,7 @@ pub fn remove(
             }
         }
         Ok(())
-    })
-    .map_err(|e| CliError::Message(e.to_string()))?;
+    })?;
 
     Ok(SetRemoveResult {
         set: name.to_string(),
@@ -217,13 +214,12 @@ pub fn delete(
     if purge {
         let outcome = deactivate(name, force, apply, scope, ctx)?;
         let deleted = if apply && !outcome.any_blocked {
-            config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+            config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
                 sets.sets.remove(name).ok_or_else(|| CliError::SetNotFound {
                     name: name.to_string(),
                 })?;
                 Ok(())
-            })
-            .map_err(|e| CliError::Message(e.to_string()))?;
+            })?;
             true
         } else {
             false
@@ -237,13 +233,12 @@ pub fn delete(
         });
     }
 
-    config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+    config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
         sets.sets.remove(name).ok_or_else(|| CliError::SetNotFound {
             name: name.to_string(),
         })?;
         Ok(())
-    })
-    .map_err(|e| CliError::Message(e.to_string()))?;
+    })?;
     Ok(SetDeleteResult {
         name: name.to_string(),
         purge: false,
@@ -259,19 +254,18 @@ pub fn rename(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<SetRenameResult> {
-    config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+    config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
         if sets.sets.contains_key(new) {
-            Err(CliError::SetAlreadyExists {
+            return Err(CliError::SetAlreadyExists {
                 name: new.to_string(),
-            })?;
+            });
         }
         let def = sets.sets.remove(old).ok_or_else(|| CliError::SetNotFound {
             name: old.to_string(),
         })?;
         sets.sets.insert(new.to_string(), def);
         Ok(())
-    })
-    .map_err(|e| CliError::Message(e.to_string()))?;
+    })?;
     Ok(SetRenameResult {
         old: old.to_string(),
         new: new.to_string(),
@@ -762,7 +756,7 @@ mod tests {
         scope: InstallScope,
         ctx: &AppContext<'_>,
     ) {
-        config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| {
+        config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
             sets.sets.get_mut(set_name).unwrap().members = members;
             Ok(())
         })

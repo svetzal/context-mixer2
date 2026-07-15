@@ -26,13 +26,20 @@ pub fn save_sources(sources: &SourcesFile, fs: &dyn Filesystem, paths: &ConfigPa
 /// return `Err` to abort without writing; on success the file is saved and
 /// the value returned by `f` is propagated.
 ///
-/// The closure and outer return type are `anyhow::Result` so that application
-/// closures can use `bail!`/`anyhow!` without wrapping.  The leaf calls
-/// (`load_sources`, `save_sources`) return `crate::error::Result` which
-/// auto-converts to `anyhow::Error` via the `?` operator.
-pub fn mutate_sources<F, T>(fs: &dyn Filesystem, paths: &ConfigPaths, f: F) -> anyhow::Result<T>
+/// The closure and outer return are generic over `E: From<CmxError>`, which
+/// keeps the leaf errors (`load_sources`/`save_sources`) as the crate's typed
+/// `CmxError` while still letting application closures return their own error
+/// type (e.g. `CliError`) via the `From<CmxError>` blanket in cmx.  A pure-
+/// library caller that passes `E = CmxError` gets full `.code()` discriminants
+/// with no type erasure.
+pub fn mutate_sources<F, T, E>(
+    fs: &dyn Filesystem,
+    paths: &ConfigPaths,
+    f: F,
+) -> core::result::Result<T, E>
 where
-    F: FnOnce(&mut SourcesFile) -> anyhow::Result<T>,
+    F: FnOnce(&mut SourcesFile) -> core::result::Result<T, E>,
+    E: From<CmxError>,
 {
     let mut sources = load_sources(fs, paths)?;
     let result = f(&mut sources)?;
@@ -63,15 +70,18 @@ pub fn save_sets(
 /// return `Err` to abort without writing; on success the file is saved and
 /// the value returned by `f` is propagated.
 ///
-/// See [`mutate_sources`] for why the closure and outer return stay `anyhow::Result`.
-pub fn mutate_sets<F, T>(
+/// See [`mutate_sources`] for the `E: From<CmxError>` design rationale: leaf
+/// errors are the crate's typed `CmxError` and are never erased; callers choose
+/// their own error type as `E`.
+pub fn mutate_sets<F, T, E>(
     scope: InstallScope,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
     f: F,
-) -> anyhow::Result<T>
+) -> core::result::Result<T, E>
 where
-    F: FnOnce(&mut SetsFile) -> anyhow::Result<T>,
+    F: FnOnce(&mut SetsFile) -> core::result::Result<T, E>,
+    E: From<CmxError>,
 {
     let mut sets = load_sets(scope, fs, paths)?;
     let result = f(&mut sets)?;
@@ -202,7 +212,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
 
-        mutate_sources(&fs, &paths, |sources| {
+        mutate_sources(&fs, &paths, |sources| -> Result<()> {
             sources
                 .sources
                 .insert("test-source".to_string(), make_local_entry("/path", None));
@@ -261,7 +271,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         let paths = test_paths();
 
-        mutate_sets(InstallScope::Global, &fs, &paths, |sets| {
+        mutate_sets(InstallScope::Global, &fs, &paths, |sets| -> Result<()> {
             sets.sets.insert(
                 "rust-work".to_string(),
                 SetDef {
@@ -400,5 +410,30 @@ mod tests {
         let result = resolve_local_path(&entry);
         assert!(result.is_ok(), "expected Ok for local entry with path");
         assert_eq!(result.unwrap(), std::path::PathBuf::from("/some/path"));
+    }
+
+    // --- typed-error regression: mutate_sources with E = CmxError preserves code() ---
+
+    #[test]
+    fn mutate_sources_typed_error_preserves_code_on_save_failure() {
+        let fs = FakeFilesystem::new();
+        let paths = test_paths();
+        let sources_path = paths.sources_path();
+
+        // Force the save (tmp-file write) to fail so the leaf CmxError propagates.
+        fs.set_fail_on_write(crate::json_file::tmp_path(&sources_path));
+
+        // Use E = CmxError directly — no anyhow erasure.
+        let result: Result<()> = mutate_sources(&fs, &paths, |_sources| -> Result<()> { Ok(()) });
+        assert!(result.is_err(), "expected Err when sources save fails");
+        let err = result.unwrap_err();
+        assert!(
+            !err.code().is_empty(),
+            "CmxError must carry a non-empty .code() discriminant; got: {err:?}"
+        );
+        assert!(
+            matches!(err, CmxError::Io { .. }),
+            "expected CmxError::Io variant for filesystem write failure; got: {err:?}"
+        );
     }
 }

@@ -1031,7 +1031,7 @@ mod set_consistency_survey {
     use crate::types::{SetDef, SetMember, SetState};
 
     fn seed_set(t: &TestContext, name: &str, state: SetState, members: Vec<SetMember>) {
-        config::mutate_sets(InstallScope::Global, &t.fs, &t.paths, |sets| {
+        config::mutate_sets(InstallScope::Global, &t.fs, &t.paths, |sets| -> crate::error::Result<()> {
             sets.sets.insert(
                 name.to_string(),
                 SetDef {

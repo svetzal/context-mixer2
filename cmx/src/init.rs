@@ -97,7 +97,7 @@ pub fn run_init(local: bool, force: bool, ctx: &AppContext<'_>) -> Result<InitOu
 pub fn run_remove(local: bool, ctx: &AppContext<'_>) -> Result<InitOutcome> {
     let installer = make_installer();
     let scope = scope_from_flags(local);
-    let report = installer.remove(scope, ctx).map_err(|e| CliError::Message(e.to_string()))?;
+    let report = installer.remove(scope, ctx)?;
     Ok(InitOutcome::Removed(report))
 }
 

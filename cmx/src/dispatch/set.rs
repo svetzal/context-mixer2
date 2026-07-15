@@ -303,7 +303,7 @@ mod tests {
             &ctx,
         )
         .unwrap();
-        config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| {
+        config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| -> Result<()> {
             sets.sets.get_mut("rust-work").unwrap().members.push(SetMember {
                 kind: ArtifactKind::Agent,
                 name: "rust-craftsperson".to_string(),
@@ -385,7 +385,7 @@ mod tests {
             &ctx,
         )
         .unwrap();
-        config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| {
+        config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| -> Result<()> {
             sets.sets.get_mut("rust-work").unwrap().members.push(SetMember {
                 kind: ArtifactKind::Skill,
                 name: "ghost".to_string(),
@@ -423,7 +423,7 @@ mod tests {
             &ctx,
         )
         .unwrap();
-        config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| {
+        config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| -> Result<()> {
             sets.sets.get_mut("rust-work").unwrap().members.push(SetMember {
                 kind: ArtifactKind::Agent,
                 name: "rust-craftsperson".to_string(),

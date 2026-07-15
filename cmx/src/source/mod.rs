@@ -72,11 +72,10 @@ pub fn add(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<Source
 
     let (agents_found, skills_found, warnings) = scan_and_count(&entry, ctx.fs)?;
 
-    config::mutate_sources(ctx.fs, ctx.paths, |sources| {
+    config::mutate_sources(ctx.fs, ctx.paths, |sources| -> Result<()> {
         sources.sources.insert(name.to_string(), entry);
         Ok(())
-    })
-    .map_err(|e| CliError::Message(e.to_string()))?;
+    })?;
 
     Ok(SourceScanResult {
         name: name.to_string(),
@@ -156,11 +155,10 @@ pub fn browse(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
 
 pub fn remove(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
     let entry = config::mutate_sources(ctx.fs, ctx.paths, |sources| {
-        Ok(sources.sources.remove(name).ok_or_else(|| CliError::SourceNotFound {
+        sources.sources.remove(name).ok_or_else(|| CliError::SourceNotFound {
             name: name.to_string(),
-        })?)
-    })
-    .map_err(|e| CliError::Message(e.to_string()))?;
+        })
+    })?;
 
     let clone_deleted = if let Some(clone_path) = &entry.local_clone {
         if ctx.fs.exists(clone_path) {

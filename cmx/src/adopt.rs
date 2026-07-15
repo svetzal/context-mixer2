@@ -67,7 +67,7 @@ pub(crate) fn resolve_home(ctx: &AppContext<'_>) -> Result<PathBuf> {
 pub(crate) fn ensure_home_source(home: &Path, ctx: &AppContext<'_>) -> Result<()> {
     ctx.fs.create_dir_all(home)?;
     let now = ctx.clock.now().to_rfc3339();
-    config::mutate_sources(ctx.fs, ctx.paths, |sources| {
+    config::mutate_sources(ctx.fs, ctx.paths, |sources| -> Result<()> {
         let needs_write =
             sources.sources.get(HOME_SOURCE).is_none_or(|e| e.path.as_deref() != Some(home));
         if needs_write {
@@ -85,7 +85,6 @@ pub(crate) fn ensure_home_source(home: &Path, ctx: &AppContext<'_>) -> Result<()
         }
         Ok(())
     })
-    .map_err(|e| CliError::Message(e.to_string()))
 }
 
 /// Copy one orphaned artifact into the home and record provenance for it on

@@ -83,11 +83,10 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
         if let Some(entry) = sources.sources.get_mut(name) {
             entry.last_updated = Some(now);
         }
-        Ok(sources.sources.get(name).cloned().ok_or_else(|| CliError::SourceNotFound {
+        sources.sources.get(name).cloned().ok_or_else(|| CliError::SourceNotFound {
             name: name.to_string(),
-        })?)
-    })
-    .map_err(|e| CliError::Message(e.to_string()))?;
+        })
+    })?;
 
     let (agents_found, skills_found, _) = crate::source::scan_and_count(&updated_entry, ctx.fs)?;
 

@@ -285,7 +285,7 @@ impl SkillInstaller {
             let materialized = home.join("skills").join(&self.tool.name);
             skill_fs::write_skill_files(&materialized, files, ctx.fs)?;
 
-            config::mutate_sources(ctx.fs, ctx.paths, |sources| {
+            config::mutate_sources(ctx.fs, ctx.paths, |sources| -> Result<()> {
                 sources.sources.entry(source_name.clone()).or_insert_with(|| SourceEntry {
                     source_type: SourceType::Local,
                     path: Some(materialized.clone()),
@@ -350,7 +350,7 @@ impl SkillInstaller {
     }
 
     /// Remove this skill from all relevant platforms.
-    pub fn remove(&self, scope: Scope, ctx: &AppContext<'_>) -> anyhow::Result<RemoveReport> {
+    pub fn remove(&self, scope: Scope, ctx: &AppContext<'_>) -> Result<RemoveReport> {
         let install_scope = scope.to_install_scope();
         let platform_targets = config::managed_or_all_platforms(ctx.fs, ctx.paths)?
             .into_iter()
@@ -401,7 +401,7 @@ impl SkillInstaller {
                 {
                     ctx.fs.remove_dir_all(path)?;
                 }
-                config::mutate_sources(ctx.fs, ctx.paths, |s| {
+                config::mutate_sources(ctx.fs, ctx.paths, |s| -> Result<()> {
                     s.sources.remove(&source_name);
                     Ok(())
                 })?;
