@@ -387,21 +387,26 @@ mod tests {
         // uninstalled) is a set/installed-state mismatch — Phase 3 of SETS.md
         // wires this into doctor's existing exit-code-2 contract.
         let (fs, git, clock, paths) = fake_trio();
-        cmx::config::mutate_sets(InstallScope::Global, &fs, &paths, |sets| -> cmx::error::Result<()> {
-            sets.sets.insert(
-                "rust-work".to_string(),
-                cmx::types::SetDef {
-                    description: None,
-                    state: cmx::types::SetState::Active,
-                    members: vec![cmx::types::SetMember {
-                        kind: ArtifactKind::Agent,
-                        name: "rust-craftsperson".to_string(),
-                        source: Some("guidelines".to_string()),
-                    }],
-                },
-            );
-            Ok(())
-        })
+        cmx::config::mutate_sets(
+            InstallScope::Global,
+            &fs,
+            &paths,
+            |sets| -> cmx::error::Result<()> {
+                sets.sets.insert(
+                    "rust-work".to_string(),
+                    cmx::types::SetDef {
+                        description: None,
+                        state: cmx::types::SetState::Active,
+                        members: vec![cmx::types::SetMember {
+                            kind: ArtifactKind::Agent,
+                            name: "rust-craftsperson".to_string(),
+                            source: Some("guidelines".to_string()),
+                        }],
+                    },
+                );
+                Ok(())
+            },
+        )
         .unwrap();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let cli = Cli {
