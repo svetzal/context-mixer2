@@ -220,9 +220,9 @@ impl Report {
 }
 
 /// Internal helper: tracks which dirs need writing and which have been cleared.
-pub(super) struct PreparedWrites {
-    pub(super) dirs_to_write: BTreeSet<PathBuf>,
-    pub(super) discarded_paths_by_dir: BTreeMap<PathBuf, Vec<PathBuf>>,
+pub(in crate::skill_install) struct PreparedWrites {
+    pub(in crate::skill_install) dirs_to_write: BTreeSet<PathBuf>,
+    pub(in crate::skill_install) discarded_paths_by_dir: BTreeMap<PathBuf, Vec<PathBuf>>,
 }
 
 // ---------------------------------------------------------------------------

@@ -60,7 +60,7 @@ Releasing is three distinct steps:
      `include_str!`-embedded into the binary and installed to every user (and
      every driving agent) by `cmx init`, so a skill that lags the CLI ships
      wrong instructions to every consumer of the release. Diff the surface
-     against the skill: `git log <last-vX.Y.Z-tag>..HEAD -- cmx/src/cli.rs
+     against the skill: `git log <last-vX.Y.Z-tag>..HEAD -- 'cmx/src/cli/**'
      'cmx/src/**'` shows what moved. For any command whose grammar, flags,
      defaults, deprecations, `--json` coverage, exit codes, or examples changed,
      rebuild and run `cmx --help` / `cmx <sub> --help`, and update the matching
@@ -190,7 +190,9 @@ Entry points:
 
 - `cmx/src/main.rs` — binary entry point; constructs AppContext with real gateways and dispatches CLI commands
 - `cmx/src/lib.rs` — crate root; re-exports all public modules (including all `cmx-core` modules listed in the Re-exports section below)
-- `cmx/src/cli.rs` — clap CLI definition
+- `cmx/src/cli/mod.rs` — clap CLI definition: imports, `COMPLETIONS_LONG_HELP`, `OutputArgs`, `Cli`, `Commands`; re-exports all action enums; submodules:
+  `cmx/src/cli/source.rs`, `cmx/src/cli/set.rs`, `cmx/src/cli/artifact.rs`,
+  `cmx/src/cli/home.rs`, `cmx/src/cli/config.rs`
 - `cmx/src/dispatch/mod.rs` — command dispatch from `main.rs`; one submodule per command family:
   `cmx/src/dispatch/adopt.rs`, `cmx/src/dispatch/artifact.rs`, `cmx/src/dispatch/config.rs`,
   `cmx/src/dispatch/diff.rs`, `cmx/src/dispatch/info.rs`, `cmx/src/dispatch/set.rs`,
@@ -239,7 +241,8 @@ Query & display:
 - `cmx/src/text_diff.rs` — general line-oriented LCS text differ (`split_lines`/`lcs_ops`/`render_hunks`); pure, no coupling to the artifact model
 - `cmx/src/display/mod.rs` — output formatting for all commands; one submodule per command:
   `cmx/src/display/adopt.rs`, `cmx/src/display/config.rs`, `cmx/src/display/diff.rs`,
-  `cmx/src/display/doctor.rs`, `cmx/src/display/info.rs`, `cmx/src/display/init.rs`,
+  `cmx/src/display/doctor/mod.rs`, `cmx/src/display/doctor/json.rs`,
+  `cmx/src/display/info.rs`, `cmx/src/display/init.rs`,
   `cmx/src/display/install.rs`, `cmx/src/display/json.rs`, `cmx/src/display/list.rs`,
   `cmx/src/display/outdated.rs`, `cmx/src/display/promote.rs`, `cmx/src/display/search.rs`,
   `cmx/src/display/sets.rs`, `cmx/src/display/source.rs`, `cmx/src/display/sync.rs`,
@@ -309,10 +312,14 @@ Skill lifecycle:
 
 - `cmx-core/src/frontmatter.rs` — YAML frontmatter parsing and version stamping (the shared behavior the conformance suite gates)
 - `cmx-core/src/skill_fs.rs` — skill filesystem helpers
-- `cmx-core/src/skill_install/mod.rs` — `SkillInstaller`: install/update/remove a skill on disk
-- `cmx-core/src/skill_install/plan.rs` — installation planning logic
+- `cmx-core/src/skill_install/mod.rs` — `SkillInstaller` struct and `new()`; declares submodules; re-exports all public types
+- `cmx-core/src/skill_install/plan.rs` — `plan()` method and planning helpers (`decide_action_for_entry`, `prepare_writes`, `build_lock_entry`)
+- `cmx-core/src/skill_install/apply.rs` — `apply()`, `write_target_outcomes()`, `register_bundled_source()` methods
+- `cmx-core/src/skill_install/status.rs` — `status()` method
+- `cmx-core/src/skill_install/remove.rs` — `remove()` method
 - `cmx-core/src/skill_install/types.rs` — skill install data types
 - `cmx-core/src/skill_install/display.rs` — output formatting for skill install operations
+- `cmx-core/src/skill_install/test_support.rs` — shared test helpers (`make_file`, `sample_skill`, `installer`, `plan_with_locked_version`); `#[cfg(test)]`-gated
 
 Status and errors:
 
