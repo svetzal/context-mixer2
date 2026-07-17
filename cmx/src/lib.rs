@@ -9,6 +9,7 @@ pub mod dispatch;
 pub mod display;
 pub mod doctor;
 pub mod error;
+pub mod flags;
 pub mod info;
 pub mod init;
 pub mod install;

@@ -3,30 +3,26 @@ use std::process::ExitCode;
 
 use crate::cli::ArtifactAction;
 use crate::context::AppContext;
+use crate::dispatch::set::{DRY_RUN_DEPRECATED_WARNING, scope_from};
+use crate::flags::{Force, RunMode, Selection};
 use crate::platform::{Platform, platforms_label};
 use crate::types::{ArtifactKind, InstallScope};
 
-use super::set::apply_from_flags;
 use super::{print_json, usage_error};
 
 pub fn handle_install(
     names: &[String],
-    all: bool,
-    local: bool,
-    force: bool,
+    all: Selection,
+    scope: InstallScope,
+    force: Force,
     kind: ArtifactKind,
     selector: Option<Platform>,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
-    let scope = if local {
-        InstallScope::Local
-    } else {
-        InstallScope::Global
-    };
     crate::source_update::ensure_fresh(ctx)?;
     let targets = crate::install::resolve_targets(selector, kind, scope, ctx)?;
-    if all {
-        let result = crate::install::install_all(kind, scope, force, &targets, ctx)?;
+    if all.is_all() {
+        let result = crate::install::install_all(kind, scope, force.is_yes(), &targets, ctx)?;
         print!("{result}");
         Ok(ExitCode::SUCCESS)
     } else if names.is_empty() {
@@ -35,7 +31,8 @@ pub fn handle_install(
             &format!("cmx {kind} install <name>"),
         ))
     } else {
-        let result = crate::install::install_many(names, kind, scope, force, &targets, ctx)?;
+        let result =
+            crate::install::install_many(names, kind, scope, force.is_yes(), &targets, ctx)?;
         let any_failed = !result.failed.is_empty();
         print!("{result}");
         Ok(if any_failed {
@@ -48,19 +45,19 @@ pub fn handle_install(
 
 pub fn handle_update(
     name: Option<String>,
-    all: bool,
-    force: bool,
+    all: Selection,
+    force: Force,
     kind: ArtifactKind,
     selector: Option<Platform>,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
     crate::source_update::ensure_fresh(ctx)?;
-    if all {
-        let result = crate::install::update_all(kind, force, ctx)?;
+    if all.is_all() {
+        let result = crate::install::update_all(kind, force.is_yes(), ctx)?;
         print!("{result}");
         Ok(ExitCode::SUCCESS)
     } else if let Some(name) = name {
-        let result = crate::install::update(&name, kind, force, ctx)?;
+        let result = crate::install::update(&name, kind, force.is_yes(), ctx)?;
         print!("{result}");
         if selector.is_none() && !result.sibling_drifted_platforms.is_empty() {
             print_update_note(
@@ -140,7 +137,15 @@ pub fn handle_artifact(
             all,
             local,
             force,
-        } => handle_install(&names, all, local, force, kind, selector, ctx),
+        } => handle_install(
+            &names,
+            Selection::from_flag(all),
+            scope_from(local),
+            Force::from_flag(force),
+            kind,
+            selector,
+            ctx,
+        ),
         ArtifactAction::List { all, output } => {
             let report = crate::list::list_kind(kind, all, ctx)?;
             if output.json {
@@ -160,9 +165,14 @@ pub fn handle_artifact(
             print!("{output}");
             Ok(ExitCode::SUCCESS)
         }
-        ArtifactAction::Update { name, all, force } => {
-            handle_update(name, all, force, kind, selector, ctx)
-        }
+        ArtifactAction::Update { name, all, force } => handle_update(
+            name,
+            Selection::from_flag(all),
+            Force::from_flag(force),
+            kind,
+            selector,
+            ctx,
+        ),
         ArtifactAction::Sync {
             name,
             from,
@@ -170,13 +180,14 @@ pub fn handle_artifact(
             dry_run,
             local,
         } => {
-            let scope = if local {
-                InstallScope::Local
+            let scope = scope_from(local);
+            let mode = if dry_run {
+                eprintln!("{DRY_RUN_DEPRECATED_WARNING}");
+                RunMode::Plan
             } else {
-                InstallScope::Global
+                RunMode::from_flag(apply)
             };
-            let result =
-                crate::sync::sync(&name, kind, scope, from, apply_from_flags(apply, dry_run), ctx)?;
+            let result = crate::sync::sync(&name, kind, scope, from, mode.is_apply(), ctx)?;
             print!("{result}");
             Ok(ExitCode::SUCCESS)
         }
@@ -204,9 +215,9 @@ pub fn handle_artifact(
             super::adopt::handle_adopt(
                 &names,
                 kind,
-                all,
+                Selection::from_flag(all),
                 from_dir.as_deref().or(deprecated_from.as_deref()),
-                local,
+                scope_from(local),
                 ctx,
             )
             .map(|()| ExitCode::SUCCESS)

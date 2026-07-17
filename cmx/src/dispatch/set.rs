@@ -3,6 +3,7 @@ use std::process::ExitCode;
 
 use crate::cli::{OutputArgs, SetAction};
 use crate::context::AppContext;
+use crate::flags::{Force, Purge, RunMode};
 use crate::types::InstallScope;
 
 use super::{print_json, usage_error};
@@ -15,15 +16,6 @@ pub fn scope_from(local: bool) -> InstallScope {
         InstallScope::Local
     } else {
         InstallScope::Global
-    }
-}
-
-pub(crate) fn apply_from_flags(apply: bool, dry_run: bool) -> bool {
-    if dry_run {
-        eprintln!("{DRY_RUN_DEPRECATED_WARNING}");
-        false
-    } else {
-        apply
     }
 }
 
@@ -68,14 +60,30 @@ pub fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
             apply,
             dry_run,
             local,
-        } => handle_set_activate(&name, apply_from_flags(apply, dry_run), local, ctx),
+        } => {
+            let mode = if dry_run {
+                eprintln!("{DRY_RUN_DEPRECATED_WARNING}");
+                RunMode::Plan
+            } else {
+                RunMode::from_flag(apply)
+            };
+            handle_set_activate(&name, mode, scope_from(local), ctx)
+        }
         SetAction::Deactivate {
             name,
             apply,
             dry_run,
             force,
             local,
-        } => handle_set_deactivate(&name, apply_from_flags(apply, dry_run), force, local, ctx),
+        } => {
+            let mode = if dry_run {
+                eprintln!("{DRY_RUN_DEPRECATED_WARNING}");
+                RunMode::Plan
+            } else {
+                RunMode::from_flag(apply)
+            };
+            handle_set_deactivate(&name, mode, Force::from_flag(force), scope_from(local), ctx)
+        }
         SetAction::Delete {
             name,
             local,
@@ -83,7 +91,14 @@ pub fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
             apply,
             force,
         } => {
-            let result = crate::sets::delete(&name, purge, force, apply, scope_from(local), ctx)?;
+            let result = crate::sets::delete(
+                &name,
+                Purge::from_flag(purge),
+                Force::from_flag(force),
+                RunMode::from_flag(apply),
+                scope_from(local),
+                ctx,
+            )?;
             let deleted = result.deleted;
             let preview = result.purge && !result.apply;
             print!("{result}");
@@ -172,11 +187,11 @@ fn handle_set_remove(
 
 fn handle_set_activate(
     name: &str,
-    apply: bool,
-    local: bool,
+    mode: RunMode,
+    scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
-    let result = crate::sets::activate(name, apply, scope_from(local), ctx)?;
+    let result = crate::sets::activate(name, mode, scope, ctx)?;
     let any_failed = result.any_failed;
     print!("{result}");
     Ok(if any_failed {
@@ -188,12 +203,12 @@ fn handle_set_activate(
 
 fn handle_set_deactivate(
     name: &str,
-    apply: bool,
-    force: bool,
-    local: bool,
+    mode: RunMode,
+    force: Force,
+    scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
-    let result = crate::sets::deactivate(name, force, apply, scope_from(local), ctx)?;
+    let result = crate::sets::deactivate(name, force, mode, scope, ctx)?;
     let any_blocked = result.any_blocked;
     print!("{result}");
     Ok(if any_blocked {

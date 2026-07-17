@@ -1,4 +1,5 @@
 use crate::error::{CliError, Result};
+use crate::flags::{Force, RunMode};
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
@@ -31,7 +32,7 @@ use super::{
 /// or state writes occur; the command only describes the concrete plan.
 pub fn activate(
     name: &str,
-    apply: bool,
+    mode: RunMode,
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<SetActivateResult> {
@@ -45,7 +46,7 @@ pub fn activate(
     let (resolvable, mut statuses) = partition_members(&def.members, &sources);
 
     for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
-        statuses.extend(activate_kind(kind, &resolvable, scope, apply, ctx)?);
+        statuses.extend(activate_kind(kind, &resolvable, scope, mode, ctx)?);
     }
 
     let any_failed = statuses.iter().any(|s| {
@@ -55,13 +56,13 @@ pub fn activate(
         )
     });
 
-    persist_active_state(name, members_is_empty, &statuses, apply, scope, ctx)?;
+    persist_active_state(name, members_is_empty, &statuses, mode, scope, ctx)?;
 
     Ok(SetActivateResult {
         name: name.to_string(),
         members: statuses,
         any_failed,
-        apply,
+        apply: mode.is_apply(),
     })
 }
 
@@ -103,7 +104,7 @@ fn activate_kind(
     kind: ArtifactKind,
     resolvable: &[SetMember],
     scope: InstallScope,
-    apply: bool,
+    mode: RunMode,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<MemberActivateStatus>> {
     let members: Vec<&SetMember> = resolvable.iter().filter(|m| m.kind == kind).collect();
@@ -122,7 +123,7 @@ fn activate_kind(
         .map(|m| m.name.as_str())
         .collect();
 
-    let failed: HashMap<String, String> = if apply {
+    let failed: HashMap<String, String> = if mode.is_apply() {
         let pinned: Vec<String> = members
             .iter()
             .map(|m| format!("{}:{}", m.source.as_deref().unwrap_or_default(), m.name))
@@ -154,17 +155,17 @@ fn activate_kind(
     Ok(statuses)
 }
 
-/// Persist the `Active` state for the set when `apply` is true and at least
-/// one member installed successfully (or the set is empty).
+/// Persist the `Active` state for the set when `mode` is [`RunMode::Apply`]
+/// and at least one member installed successfully (or the set is empty).
 fn persist_active_state(
     name: &str,
     members_is_empty: bool,
     statuses: &[MemberActivateStatus],
-    apply: bool,
+    mode: RunMode,
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
-    if !apply {
+    if !mode.is_apply() {
         return Ok(());
     }
     let any_installed_ok = statuses.iter().any(|s| {
@@ -197,8 +198,8 @@ fn persist_active_state(
 /// `--apply`, no uninstall calls or state writes occur.
 pub fn deactivate(
     name: &str,
-    force: bool,
-    apply: bool,
+    force: Force,
+    mode: RunMode,
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<SetDeactivateResult> {
@@ -236,7 +237,7 @@ pub fn deactivate(
             });
             continue;
         }
-        if drifted && !force {
+        if drifted && !force.is_yes() {
             any_blocked = true;
             statuses.push(MemberDeactivateStatus {
                 kind: m.kind,
@@ -246,7 +247,7 @@ pub fn deactivate(
             });
             continue;
         }
-        if apply {
+        if mode.is_apply() {
             uninstall::uninstall(&m.name, m.kind, scope, None, ctx)?;
         }
         statuses.push(MemberDeactivateStatus {
@@ -257,7 +258,7 @@ pub fn deactivate(
         });
     }
 
-    if apply && !any_blocked {
+    if mode.is_apply() && !any_blocked {
         config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
             if let Some(d) = sets.sets.get_mut(name) {
                 d.state = SetState::Inactive;
@@ -270,7 +271,7 @@ pub fn deactivate(
         name: name.to_string(),
         members: statuses,
         any_blocked,
-        apply,
+        apply: mode.is_apply(),
     })
 }
 
@@ -375,6 +376,7 @@ fn held_by_other_active_set(
 mod tests {
     use super::*;
     use crate::config;
+    use crate::flags::{Force, RunMode};
     use crate::test_support::TestContext;
     use crate::types::{ArtifactKind, InstallScope, SetMember, SetState};
 
@@ -476,7 +478,7 @@ mod tests {
             &ctx,
         );
 
-        let result = activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
+        let result = activate("rust-work", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
         assert!(!result.any_failed);
         assert!(t.paths.is_installed(
             ArtifactKind::Agent,
@@ -512,8 +514,8 @@ mod tests {
             &ctx,
         );
 
-        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
-        let second = activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
+        let second = activate("rust-work", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
 
         assert!(!second.any_failed);
         assert!(matches!(second.members[0].outcome, MemberActivateOutcome::AlreadyInstalled));
@@ -543,7 +545,7 @@ mod tests {
             &ctx,
         );
 
-        let result = activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
+        let result = activate("rust-work", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
         assert!(result.any_failed);
         assert!(
             t.paths.is_installed(
@@ -581,7 +583,7 @@ mod tests {
             &ctx,
         );
 
-        let result = activate("rust-work", false, InstallScope::Global, &ctx).unwrap();
+        let result = activate("rust-work", RunMode::Plan, InstallScope::Global, &ctx).unwrap();
         assert!(!result.apply);
         assert!(
             !t.paths.is_installed(
@@ -614,9 +616,10 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
 
-        let result = deactivate("rust-work", false, true, InstallScope::Global, &ctx).unwrap();
+        let result =
+            deactivate("rust-work", Force::No, RunMode::Apply, InstallScope::Global, &ctx).unwrap();
         assert!(!result.any_blocked);
         assert!(matches!(result.members[0].outcome, MemberDeactivateOutcome::Uninstalled));
         assert!(!t.paths.is_installed(
@@ -655,10 +658,11 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
-        activate("blog", true, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
+        activate("blog", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
 
-        let result = deactivate("rust-work", false, true, InstallScope::Global, &ctx).unwrap();
+        let result =
+            deactivate("rust-work", Force::No, RunMode::Apply, InstallScope::Global, &ctx).unwrap();
         assert!(!result.any_blocked);
         assert!(matches!(
             result.members[0].outcome,
@@ -689,7 +693,7 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
 
         // Simulate a local hand-edit of the installed copy.
         let installed_path = t
@@ -701,7 +705,8 @@ mod tests {
             "---\nname: rust-craftsperson\n---\nedited by hand\n",
         );
 
-        let blocked = deactivate("rust-work", false, true, InstallScope::Global, &ctx).unwrap();
+        let blocked =
+            deactivate("rust-work", Force::No, RunMode::Apply, InstallScope::Global, &ctx).unwrap();
         assert!(blocked.any_blocked);
         assert!(matches!(blocked.members[0].outcome, MemberDeactivateOutcome::DriftBlocked));
         assert!(t.fs.file_exists(&installed_path), "drifted copy must be left in place");
@@ -712,7 +717,9 @@ mod tests {
             "partial deactivation leaves the set Active"
         );
 
-        let forced = deactivate("rust-work", true, true, InstallScope::Global, &ctx).unwrap();
+        let forced =
+            deactivate("rust-work", Force::Yes, RunMode::Apply, InstallScope::Global, &ctx)
+                .unwrap();
         assert!(!forced.any_blocked);
         assert!(matches!(forced.members[0].outcome, MemberDeactivateOutcome::Uninstalled));
         assert!(!t.fs.file_exists(&installed_path), "--force discards the edits and uninstalls");
@@ -738,9 +745,10 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
 
-        let result = deactivate("rust-work", false, false, InstallScope::Global, &ctx).unwrap();
+        let result =
+            deactivate("rust-work", Force::No, RunMode::Plan, InstallScope::Global, &ctx).unwrap();
         assert!(!result.apply);
         assert!(
             t.paths.is_installed(

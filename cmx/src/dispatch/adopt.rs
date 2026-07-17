@@ -2,7 +2,8 @@ use anyhow::Result;
 use std::path::Path;
 
 use crate::context::AppContext;
-use crate::types::ArtifactKind;
+use crate::flags::Selection;
+use crate::types::{ArtifactKind, InstallScope};
 
 use super::usage_error;
 
@@ -32,12 +33,13 @@ pub fn handle_unadopt(
 pub fn handle_adopt(
     names: &[String],
     kind: ArtifactKind,
-    all: bool,
+    all: Selection,
     from: Option<&Path>,
-    local: bool,
+    scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
-    let outcome = if all {
+    let local = scope == InstallScope::Local;
+    let outcome = if all.is_all() {
         crate::adopt::adopt_all(Some(kind), from, local, ctx)?
     } else if names.is_empty() {
         return Err(usage_error(
@@ -55,6 +57,8 @@ pub fn handle_adopt(
 mod tests {
     use super::*;
     use crate::dispatch::test_support::{fake_trio, make_test_ctx};
+    use crate::flags::Selection;
+    use crate::types::InstallScope;
 
     #[test]
     fn handle_unadopt_empty_names_errors() {
@@ -72,7 +76,14 @@ mod tests {
     fn handle_adopt_empty_names_no_all_errors() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        let result = handle_adopt(&[], ArtifactKind::Agent, false, None, false, &ctx);
+        let result = handle_adopt(
+            &[],
+            ArtifactKind::Agent,
+            Selection::Named,
+            None,
+            InstallScope::Global,
+            &ctx,
+        );
         assert!(result.is_err());
         assert!(
             result.unwrap_err().to_string().contains("try: cmx agent adopt <name>"),

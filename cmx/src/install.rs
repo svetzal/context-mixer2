@@ -1,4 +1,5 @@
 use crate::error::{CliError, Result};
+use crate::flags::Force;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -93,7 +94,8 @@ fn install_resolved(
     let source_checksum = checksum::checksum_artifact(&found.artifact.path, kind, ctx.fs)?;
 
     let facts = gather_install_facts(artifact_name, kind, scope, force, ctx)?;
-    let decision = decide_install(facts.already_installed, facts.locally_modified, force);
+    let decision =
+        decide_install(facts.already_installed, facts.locally_modified, Force::from_flag(force));
     if decision.blocked {
         return Err(CliError::LocallyModified {
             name: artifact_name.to_string(),
@@ -440,15 +442,19 @@ pub(crate) struct InstallDecision {
 
 /// Pure decision function: given pre-gathered facts, return the install decisions.
 /// No gateway access — all I/O must happen in the shell before calling this.
+///
+/// `already_installed` and `locally_modified` are value-carrying state
+/// predicates and stay as `bool`; `force` is an intent flag and takes
+/// [`Force`] to avoid boolean blindness at call sites.
 pub(crate) fn decide_install(
     already_installed: bool,
     locally_modified: bool,
-    force: bool,
+    force: Force,
 ) -> InstallDecision {
     InstallDecision {
-        blocked: locally_modified && !force,
+        blocked: locally_modified && !force.is_yes(),
         rollback_on_lock_fail: !already_installed,
-        replace_existing: force && already_installed,
+        replace_existing: force.is_yes() && already_installed,
     }
 }
 

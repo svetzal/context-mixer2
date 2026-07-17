@@ -7,12 +7,13 @@ use std::process::ExitCode;
 use cmx::cli::{Cli, Commands, OutputArgs};
 use cmx::context::AppContext;
 use cmx::dispatch::{
-    handle_artifact, handle_config, handle_home, handle_info, handle_set, handle_source,
+    handle_artifact, handle_config, handle_home, handle_info, handle_set, handle_source, scope_from,
 };
+use cmx::flags::Force;
 use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use cmx::paths::ConfigPaths;
 use cmx::platform::Platform;
-use cmx::types::ArtifactKind;
+use cmx::types::{ArtifactKind, InstallScope};
 
 fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
@@ -56,7 +57,7 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             from,
             all,
             output,
-        } => handle_doctor(local, adopt_all, from.as_deref(), all, output, ctx),
+        } => handle_doctor(scope_from(local), adopt_all, from.as_deref(), all, output, ctx),
         Commands::Home { action } => handle_home(&action, ctx).map(|()| ExitCode::SUCCESS),
         Commands::Info { name, output } => {
             handle_info(&name, None, output.json, ctx).map(|()| ExitCode::SUCCESS)
@@ -73,8 +74,8 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             output,
         } => handle_init(
             InitArgs {
-                local,
-                force,
+                scope: scope_from(local),
+                force: Force::from_flag(force),
                 remove,
                 output,
             },
@@ -94,13 +95,14 @@ fn handle_list(all: bool, output: OutputArgs, ctx: &AppContext<'_>) -> Result<Ex
 }
 
 fn handle_doctor(
-    local: bool,
+    scope: InstallScope,
     adopt_all: bool,
     from: Option<&std::path::Path>,
     all: bool,
     output: OutputArgs,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
+    let local = scope == InstallScope::Local;
     if adopt_all {
         eprintln!("{}", cmx::display::doctor::adopt_all_deprecation_notice());
         let outcome = cmx::adopt::adopt_all(None, from, local, ctx)?;
@@ -163,28 +165,24 @@ fn print_json<T: Serialize>(value: &T) -> Result<()> {
     Ok(())
 }
 
-/// Flags for `cmx init`, grouped to keep `handle_init`'s signature under
-/// clippy's excessive-bool-parameters threshold. `--global` is destructured-
-/// and-ignored in `run` above: a no-op alias for one release, since global is
-/// already the default scope.
-///
-/// Four independent flags mirroring the clap `Init` variant 1:1 — not a state
-/// machine, so `clippy::struct_excessive_bools` is silenced deliberately here.
+/// Flags for `cmx init`, grouped to keep `handle_init`'s signature focused.
+/// `--global` is destructured-and-ignored in `run` above: a no-op alias for
+/// one release, since global is already the default scope.
 #[derive(Clone, Copy)]
-#[allow(clippy::struct_excessive_bools)]
 struct InitArgs {
-    local: bool,
-    force: bool,
+    scope: InstallScope,
+    force: Force,
     remove: bool,
     output: OutputArgs,
 }
 
 /// `cmx init` — install/remove cmx's own companion skill via cmx-core.
 fn handle_init(args: InitArgs, ctx: &AppContext<'_>) -> Result<ExitCode> {
+    let local = args.scope == InstallScope::Local;
     let outcome = if args.remove {
-        cmx::init::run_remove(args.local, ctx)?
+        cmx::init::run_remove(local, ctx)?
     } else {
-        cmx::init::run_init(args.local, args.force, ctx)?
+        cmx::init::run_init(local, args.force.is_yes(), ctx)?
     };
     if args.output.json {
         print_json(&cmx::display::init::init_json(&outcome))?;
@@ -199,6 +197,7 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use cmx::cli::{Commands, OutputArgs};
+    use cmx::flags::Force;
     use cmx::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use cmx::platform::Platform;
     use cmx::types::{ArtifactKind, InstallScope};
@@ -473,8 +472,8 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let args = InitArgs {
-            local: false,
-            force: false,
+            scope: InstallScope::Global,
+            force: Force::No,
             remove: false,
             output: no_json(),
         };
@@ -488,8 +487,8 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let args = InitArgs {
-            local: false,
-            force: false,
+            scope: InstallScope::Global,
+            force: Force::No,
             remove: false,
             output: OutputArgs { json: true },
         };
@@ -502,15 +501,15 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let install = InitArgs {
-            local: false,
-            force: false,
+            scope: InstallScope::Global,
+            force: Force::No,
             remove: false,
             output: no_json(),
         };
         assert!(handle_init(install, &ctx).is_ok());
         let remove = InitArgs {
-            local: false,
-            force: false,
+            scope: InstallScope::Global,
+            force: Force::No,
             remove: true,
             output: no_json(),
         };
@@ -527,8 +526,8 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let args = InitArgs {
-            local: false,
-            force: true,
+            scope: InstallScope::Global,
+            force: Force::Yes,
             remove: false,
             output: no_json(),
         };
@@ -541,8 +540,8 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let initial_ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let initial_args = InitArgs {
-            local: false,
-            force: false,
+            scope: InstallScope::Global,
+            force: Force::No,
             remove: false,
             output: no_json(),
         };
@@ -558,8 +557,8 @@ mod tests {
 
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let args = InitArgs {
-            local: false,
-            force: false,
+            scope: InstallScope::Global,
+            force: Force::No,
             remove: false,
             output: no_json(),
         };
@@ -572,8 +571,8 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
         let args = InitArgs {
-            local: false,
-            force: false,
+            scope: InstallScope::Global,
+            force: Force::No,
             remove: false,
             output: no_json(),
         };

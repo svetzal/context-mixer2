@@ -18,6 +18,7 @@ mod activation;
 pub use activation::{activate, deactivate};
 
 use crate::error::{CliError, Result};
+use crate::flags::{Force, Purge, RunMode};
 
 use crate::config;
 use crate::context::AppContext;
@@ -197,23 +198,23 @@ pub fn remove(
     })
 }
 
-/// Delete a set's definition. With `purge`, deactivate it first (honouring
-/// reference-counting and the drift guard — `force` forwards to that
-/// deactivation) so members not held by another active set are uninstalled
+/// Delete a set's definition. With [`Purge::Yes`], deactivate it first
+/// (honouring reference-counting and the drift guard — `force` forwards to
+/// that deactivation) so members not held by another active set are uninstalled
 /// before the definition disappears. A drift-blocked member aborts the purge
 /// entirely, leaving the definition (and set state) untouched so the user can
 /// retry with `--force` or resolve the edits manually.
 pub fn delete(
     name: &str,
-    purge: bool,
-    force: bool,
-    apply: bool,
+    purge: Purge,
+    force: Force,
+    mode: RunMode,
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<SetDeleteResult> {
-    if purge {
-        let outcome = deactivate(name, force, apply, scope, ctx)?;
-        let deleted = if apply && !outcome.any_blocked {
+    if purge.is_yes() {
+        let outcome = deactivate(name, force, mode, scope, ctx)?;
+        let deleted = if mode.is_apply() && !outcome.any_blocked {
             config::mutate_sets(scope, ctx.fs, ctx.paths, |sets| -> Result<()> {
                 sets.sets.remove(name).ok_or_else(|| CliError::SetNotFound {
                     name: name.to_string(),
@@ -227,7 +228,7 @@ pub fn delete(
         return Ok(SetDeleteResult {
             name: name.to_string(),
             purge: true,
-            apply,
+            apply: mode.is_apply(),
             deleted,
             deactivate: Some(outcome),
         });
@@ -279,6 +280,7 @@ pub fn rename(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::flags::{Force, Purge, RunMode};
     use crate::lockfile;
     use crate::test_support::{TestContext, make_lock_entry_builder, save_lock_with_entry};
     use std::collections::HashSet;
@@ -697,7 +699,8 @@ mod tests {
         let t = TestContext::new();
         let ctx = t.ctx();
         create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
-        delete("rust-work", false, false, false, InstallScope::Global, &ctx).unwrap();
+        delete("rust-work", Purge::No, Force::No, RunMode::Plan, InstallScope::Global, &ctx)
+            .unwrap();
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert!(!sets.sets.contains_key("rust-work"));
     }
@@ -706,7 +709,8 @@ mod tests {
     fn delete_errors_when_missing() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        let result = delete("nope", false, false, false, InstallScope::Global, &ctx);
+        let result =
+            delete("nope", Purge::No, Force::No, RunMode::Plan, InstallScope::Global, &ctx);
         assert!(result.is_err());
     }
 
@@ -789,9 +793,10 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
 
-        delete("rust-work", true, false, true, InstallScope::Global, &ctx).unwrap();
+        delete("rust-work", Purge::Yes, Force::No, RunMode::Apply, InstallScope::Global, &ctx)
+            .unwrap();
 
         assert!(!t.paths.is_installed(
             ArtifactKind::Agent,
@@ -821,14 +826,16 @@ mod tests {
             InstallScope::Global,
             &ctx,
         );
-        activate("rust-work", true, InstallScope::Global, &ctx).unwrap();
+        activate("rust-work", RunMode::Apply, InstallScope::Global, &ctx).unwrap();
         let installed_path = t
             .paths
             .installed_artifact_path(ArtifactKind::Agent, "rust-craftsperson", InstallScope::Global)
             .unwrap();
         t.fs.add_file(installed_path.clone(), "edited by hand");
 
-        let result = delete("rust-work", true, false, true, InstallScope::Global, &ctx).unwrap();
+        let result =
+            delete("rust-work", Purge::Yes, Force::No, RunMode::Apply, InstallScope::Global, &ctx)
+                .unwrap();
         assert!(!result.deleted);
         assert!(t.fs.file_exists(&installed_path));
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
@@ -838,7 +845,8 @@ mod tests {
         );
 
         // --force forwards through and completes the purge.
-        delete("rust-work", true, true, true, InstallScope::Global, &ctx).unwrap();
+        delete("rust-work", Purge::Yes, Force::Yes, RunMode::Apply, InstallScope::Global, &ctx)
+            .unwrap();
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert!(!sets.sets.contains_key("rust-work"));
     }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::flags::Force;
 use crate::gateway::Filesystem;
 use crate::platform::Platform;
 use crate::source_iter::SourceArtifact;
@@ -14,26 +15,26 @@ use std::collections::BTreeMap;
 
 #[test]
 fn decide_install_clean_fresh_install_not_blocked_and_rolls_back() {
-    let d = decide_install(false, false, false);
+    let d = decide_install(false, false, Force::No);
     assert!(!d.blocked, "clean install must not be blocked");
     assert!(d.rollback_on_lock_fail, "fresh install must roll back on lock failure");
 }
 
 #[test]
 fn decide_install_locally_modified_without_force_is_blocked() {
-    let d = decide_install(false, true, false);
+    let d = decide_install(false, true, Force::No);
     assert!(d.blocked, "locally modified without --force must be blocked");
 }
 
 #[test]
 fn decide_install_locally_modified_with_force_is_not_blocked() {
-    let d = decide_install(false, true, true);
+    let d = decide_install(false, true, Force::Yes);
     assert!(!d.blocked, "--force must override local modification block");
 }
 
 #[test]
 fn decide_install_fresh_install_lock_fail_rolls_back() {
-    let d = decide_install(false, false, false);
+    let d = decide_install(false, false, Force::No);
     assert!(
         d.rollback_on_lock_fail,
         "fresh install (already_installed=false) must roll back"
@@ -42,7 +43,7 @@ fn decide_install_fresh_install_lock_fail_rolls_back() {
 
 #[test]
 fn decide_install_existing_install_lock_fail_does_not_roll_back() {
-    let d = decide_install(true, false, false);
+    let d = decide_install(true, false, Force::No);
     assert!(
         !d.rollback_on_lock_fail,
         "reinstall (already_installed=true) must keep existing copy"
