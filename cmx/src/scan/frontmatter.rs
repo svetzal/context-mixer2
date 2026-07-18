@@ -81,28 +81,21 @@ fn deprecation_from_mapping(m: &Mapping) -> Option<Deprecation> {
 /// Split YAML frontmatter from content. Returns `(Some(frontmatter), body)` when
 /// `---` fences are found at line boundaries, or `(None, full_content)` otherwise.
 /// Handles both LF and CRLF line endings. Unterminated blocks return `(None, full_content)`.
+///
+/// This is a thin wrapper around [`cmx_core::frontmatter::split_frontmatter_spans`],
+/// which owns the single canonical fence-detection implementation.
 pub fn split_frontmatter_and_body(content: &str) -> (Option<String>, &str) {
-    let Some(rest) = content.strip_prefix("---\n").or_else(|| content.strip_prefix("---\r\n"))
-    else {
+    let Some(spans) = cmx_core::frontmatter::split_frontmatter_spans(content) else {
         return (None, content);
     };
-
-    let mut search_start = 0;
-    while let Some(idx) = rest[search_start..].find("---") {
-        let abs = search_start + idx;
-        let at_line_start = abs == 0 || rest.as_bytes()[abs - 1] == b'\n';
-        let after = &rest[abs + 3..];
-        let ends_line = after.is_empty() || after.starts_with('\n') || after.starts_with('\r');
-        if at_line_start && ends_line {
-            let frontmatter = rest[..abs].to_string();
-            let body =
-                after.strip_prefix("\r\n").or_else(|| after.strip_prefix('\n')).unwrap_or(after);
-            return (Some(frontmatter), body);
-        }
-        search_start = abs + 3;
-    }
-
-    (None, content)
+    // Derive the body by stripping "---" and the immediately following line ending
+    // from `closing_and_body`.
+    let after_dashes = spans.closing_and_body.strip_prefix("---").unwrap_or(spans.closing_and_body);
+    let body = after_dashes
+        .strip_prefix("\r\n")
+        .or_else(|| after_dashes.strip_prefix('\n'))
+        .unwrap_or(after_dashes);
+    (Some(spans.inner.to_string()), body)
 }
 
 pub(crate) fn parse_frontmatter_str(content: &str) -> Option<Frontmatter> {

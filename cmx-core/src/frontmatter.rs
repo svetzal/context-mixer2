@@ -31,6 +31,66 @@
 
 use crate::skill_fs::SkillFile;
 
+/// The three spans of a document that has a valid YAML frontmatter fence.
+///
+/// Produced by [`split_frontmatter_spans`]. The original document can be
+/// reconstructed byte-for-byte as `open + inner + closing_and_body`.
+pub struct FrontmatterSpans<'a> {
+    /// The opening fence line, either `"---\n"` or `"---\r\n"`.
+    pub open: &'a str,
+    /// The frontmatter text between the fences (does *not* include either fence
+    /// line itself).
+    pub inner: &'a str,
+    /// Everything from the closing `---` line to the end of the document,
+    /// including the closing `---` itself (e.g. `"---\n# Body\n"`).
+    pub closing_and_body: &'a str,
+}
+
+/// Split `content` into its three frontmatter spans.
+///
+/// Returns `None` when:
+/// - the document does not start with `---\n` or `---\r\n`, or
+/// - there is no closing fence line (`---` alone on a line, optionally followed
+///   by `\r`).
+///
+/// This is the single, canonical implementation of fence detection for this
+/// project. Both the surgical version reconciler ([`set_metadata_version`]) and
+/// the scan-side splitter (`cmx::scan::frontmatter::split_frontmatter_and_body`)
+/// delegate here so that the fence rules live in exactly one place.
+pub fn split_frontmatter_spans(content: &str) -> Option<FrontmatterSpans<'_>> {
+    let (open, after_open) = if let Some(rest) = content.strip_prefix("---\n") {
+        ("---\n", rest)
+    } else if let Some(rest) = content.strip_prefix("---\r\n") {
+        ("---\r\n", rest)
+    } else {
+        return None;
+    };
+
+    // Scan line-by-line for a closing fence: a line that is exactly `---`
+    // (optionally with a trailing `\r` before the `\n`).
+    let mut line_start = 0;
+    let fence_start = loop {
+        let rest = &after_open[line_start..];
+        let (line, has_newline) = match rest.find('\n') {
+            Some(p) => (&rest[..p], true),
+            None => (rest, false),
+        };
+        if line.trim_end_matches('\r') == "---" {
+            break line_start;
+        }
+        if !has_newline {
+            return None;
+        }
+        line_start += line.len() + 1;
+    };
+
+    Some(FrontmatterSpans {
+        open,
+        inner: &after_open[..fence_start],
+        closing_and_body: &after_open[fence_start..],
+    })
+}
+
 /// Return a copy of `files` in which the root `SKILL.md`'s frontmatter carries
 /// `metadata.version = version`. All other files are returned unchanged.
 ///
@@ -60,49 +120,17 @@ pub fn reconcile_skill_version(files: &[SkillFile], version: &str) -> Vec<SkillF
 fn set_metadata_version(content: &str, version: &str) -> String {
     let value = format!("\"{version}\"");
 
-    // The opening fence must be the first line.
-    let (open, after_open) = if let Some(rest) = content.strip_prefix("---\n") {
-        ("---\n", rest)
-    } else if let Some(rest) = content.strip_prefix("---\r\n") {
-        ("---\r\n", rest)
-    } else {
+    let Some(spans) = split_frontmatter_spans(content) else {
         return content.to_string();
     };
 
-    // Find the closing fence: a line that is exactly `---` (ignoring a trailing \r).
-    let Some(fence_start) = find_closing_fence(after_open) else {
-        return content.to_string();
-    };
-
-    let inner = &after_open[..fence_start];
-    let closing_and_rest = &after_open[fence_start..];
-    let new_inner = reconcile_inner(inner, &value);
+    let new_inner = reconcile_inner(spans.inner, &value);
 
     let mut out = String::with_capacity(content.len() + value.len() + 16);
-    out.push_str(open);
+    out.push_str(spans.open);
     out.push_str(&new_inner);
-    out.push_str(closing_and_rest);
+    out.push_str(spans.closing_and_body);
     out
-}
-
-/// Byte offset within `after_open` of the start of the closing `---` line, or
-/// `None` if there is no closing fence.
-fn find_closing_fence(after_open: &str) -> Option<usize> {
-    let mut line_start = 0;
-    loop {
-        let rest = &after_open[line_start..];
-        let (line, has_newline) = match rest.find('\n') {
-            Some(p) => (&rest[..p], true),
-            None => (rest, false),
-        };
-        if line.trim_end_matches('\r') == "---" {
-            return Some(line_start);
-        }
-        if !has_newline {
-            return None;
-        }
-        line_start += line.len() + 1;
-    }
 }
 
 /// Reconcile the frontmatter inner text (between the fences). Each line in `inner`
@@ -184,6 +212,44 @@ fn ensure_trailing_newline(lines: &mut [String]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // --- split_frontmatter_spans ---
+
+    #[test]
+    fn split_spans_lf_opener() {
+        let content = "---\nkey: value\n---\n# body\n";
+        let spans = split_frontmatter_spans(content).expect("should parse");
+        assert_eq!(spans.open, "---\n");
+        assert_eq!(spans.inner, "key: value\n");
+        assert_eq!(spans.closing_and_body, "---\n# body\n");
+    }
+
+    #[test]
+    fn split_spans_crlf_opener() {
+        let content = "---\r\nkey: value\r\n---\r\n# body\r\n";
+        let spans = split_frontmatter_spans(content).expect("should parse");
+        assert_eq!(spans.open, "---\r\n");
+        assert_eq!(spans.inner, "key: value\r\n");
+        assert_eq!(spans.closing_and_body, "---\r\n# body\r\n");
+    }
+
+    #[test]
+    fn split_spans_no_opening_fence_returns_none() {
+        assert!(split_frontmatter_spans("key: value\n---\n# body").is_none());
+    }
+
+    #[test]
+    fn split_spans_unterminated_returns_none() {
+        assert!(split_frontmatter_spans("---\nkey: value\n# no closing fence").is_none());
+    }
+
+    #[test]
+    fn split_spans_roundtrip_reconstructs_original() {
+        let content = "---\nname: foo\ndescription: bar\n---\n# Body\n";
+        let spans = split_frontmatter_spans(content).expect("should parse");
+        let reconstructed = format!("{}{}{}", spans.open, spans.inner, spans.closing_and_body);
+        assert_eq!(reconstructed, content);
+    }
 
     fn version_via_reader(content: &str) -> Option<String> {
         // Mirror the community reader: top-level `version:` first, then
