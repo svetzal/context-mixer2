@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **DRY refactoring (no behavior change except where noted):**
+  - Collapsed `version_label`, `change_counts`, and `write_change_lines` display helpers from `sync.rs` and `promote.rs` display modules into `cmx/src/display/util.rs`.
+  - Extracted `gather_platform_copies` primitive in `cmx/src/platform_copies.rs` — encodes the "iterate managed platforms → filter `supports(kind)` → dedup by physical install path" loop; used by diff discovery, `sync`, and set deactivation.
+  - Migrated `gather_skill_copies` (diff/discovery.rs), `gather_copies` (sync.rs), and `member_deactivate_targets` (sets/activation.rs) onto the primitive. `MemberDeactivateTarget.platform: Platform` → `platforms: Vec<Platform>` to correctly represent platforms sharing a directory.
+  - Added `LockEntry::new()` and `LockSource::new()` canonical constructors in `cmx-core/src/types.rs`; both `build_lock_entry` call sites updated.
+  - Added `installed_is_newer(installed, source) -> bool` to `cmx-core/src/artifact_status.rs` (semver comparison, returns `false` for non-semver or absent versions).
+  - Extracted `remove_artifact_across_platforms` shared primitive in `cmx-core/src/artifact_remove.rs`; `cmx/src/uninstall.rs::uninstall_one` and `cmx-core/src/skill_install/remove.rs::SkillInstaller::remove` both delegate to it.
+
+### Added
+
+- **Version guard in `cmx install`:** installing an older source over a newer-installed artifact now fails with a clear error (`InstalledNewerThanSource`) unless `--force` is passed. Matches the `RefuseNewer` behavior already present in `cmx-core`'s `SkillInstaller`.
+
 ## [3.1.3] - 2026-07-06
 
 ### Changed

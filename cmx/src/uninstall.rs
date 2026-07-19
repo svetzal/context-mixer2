@@ -1,14 +1,12 @@
-use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::error::{CliError, Result};
 
+use crate::artifact_remove::remove_artifact_across_platforms;
 use crate::context::AppContext;
 use crate::gateway::Filesystem;
-use crate::lockfile;
 use crate::partition::{Partitioned, partition_by};
 use crate::platform::Platform;
-use crate::platform_iter;
 use crate::types::{ArtifactKind, InstallScope};
 
 // ---------------------------------------------------------------------------
@@ -85,42 +83,22 @@ fn uninstall_one(
     candidates: &[Platform],
     ctx: &AppContext<'_>,
 ) -> Result<Option<UninstallResult>> {
-    // Distinct physical locations to delete (the shared `.agents/skills` dir
-    // resolves to the same path for several platforms — dedup so we delete once).
-    let mut paths_to_delete: BTreeSet<PathBuf> = BTreeSet::new();
-    let mut removed_from: Vec<Platform> = Vec::new();
+    let removal = remove_artifact_across_platforms(name, kind, scope, candidates, ctx)?;
 
-    for view in platform_iter::views_for(ctx.paths, candidates.iter().copied(), kind) {
-        let path = view.paths.require_installed_artifact_path(kind, name, scope)?;
-        if ctx.fs.exists(&path) {
-            paths_to_delete.insert(path);
-        }
-        if lockfile::load(scope, ctx.fs, &view.paths)?.packages.contains_key(name) {
-            lockfile::mutate(scope, ctx.fs, &view.paths, |lock| {
-                lock.packages.remove(name);
-            })?;
-            removed_from.push(view.platform);
-        }
-    }
-
-    if paths_to_delete.is_empty() && removed_from.is_empty() {
+    if removal.removed_paths.is_empty() && removal.platforms_cleared.is_empty() {
         return Ok(None);
     }
 
-    let was_on_disk = !paths_to_delete.is_empty();
-    for path in &paths_to_delete {
-        remove_installed(kind, path, ctx.fs)?;
-    }
-
-    removed_from.sort_by_key(|p| p.slug());
-    removed_from.dedup();
+    let mut platforms = removal.platforms_cleared;
+    platforms.sort_by_key(|p| p.slug());
+    platforms.dedup();
     Ok(Some(UninstallResult {
         name: name.to_string(),
         kind,
         scope: scope.label(),
-        was_tracked: !removed_from.is_empty(),
-        was_on_disk,
-        platforms: removed_from,
+        was_tracked: removal.was_tracked,
+        was_on_disk: removal.was_on_disk,
+        platforms,
     }))
 }
 
@@ -185,6 +163,7 @@ pub fn uninstall_many(
 mod tests {
     use super::*;
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
+    use crate::lockfile;
     use crate::platform::Platform;
     use crate::test_support::{TestContext, make_ctx, sample_lock_entry, test_paths_for};
     use crate::types::{ArtifactKind, InstallScope, LockFile};

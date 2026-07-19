@@ -156,6 +156,28 @@ pub struct LockEntry {
     pub installed_checksum: String,
 }
 
+impl LockEntry {
+    /// Canonical constructor — prefer this over struct literal syntax so all
+    /// creation sites update when the struct grows.
+    pub fn new(
+        kind: ArtifactKind,
+        version: Option<String>,
+        source: LockSource,
+        source_checksum: String,
+        installed_checksum: String,
+        installed_at: String,
+    ) -> Self {
+        Self {
+            artifact_type: kind,
+            version,
+            installed_at,
+            source,
+            source_checksum,
+            installed_checksum,
+        }
+    }
+}
+
 pub struct InstalledArtifact<'a> {
     pub name: String,
     pub lock_entry: Option<&'a LockEntry>,
@@ -166,6 +188,15 @@ pub struct InstalledArtifact<'a> {
 pub struct LockSource {
     pub repo: String,
     pub path: String,
+}
+
+impl LockSource {
+    pub fn new(repo: impl Into<String>, path: impl Into<String>) -> Self {
+        Self {
+            repo: repo.into(),
+            path: path.into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

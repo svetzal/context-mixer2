@@ -29,6 +29,26 @@ pub fn source_outdated(
     }
 }
 
+/// Returns `true` when the installed artifact's version is **strictly newer**
+/// than the source's version, using semver ordering.
+///
+/// Only fires when both versions are present and parseable as valid semver —
+/// for non-semver strings or a missing version on either side the function
+/// returns `false` (cannot determine ordering, so do not refuse).
+///
+/// Used by `cmx install` to refuse downgrading a newer-installed copy.
+pub fn installed_is_newer(installed: Option<&str>, source: Option<&str>) -> bool {
+    match (installed, source) {
+        (Some(inst), Some(src)) => {
+            match (semver::Version::parse(inst), semver::Version::parse(src)) {
+                (Ok(a), Ok(b)) => a > b,
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------

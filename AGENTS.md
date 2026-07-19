@@ -225,6 +225,7 @@ Install/uninstall:
 - `cmx/src/promote.rs` — `cmx skill promote` / `cmx agent promote`: the mirror of `install::update` — copy the in-place-edited installed copy back into the canonical home and refresh `home`-provenance lock baselines (home target only; git-sourced and reformatted-agent copies rejected)
 - `cmx/src/promote/tests.rs` — promote integration tests
 - `cmx/src/copy.rs` — file copy helpers used by install
+- `cmx/src/platform_copies.rs` — shared primitive `gather_platform_copies` that iterates managed platforms filtered by `supports(kind)`, deduplicates by physical install path (collapsing e.g. Codex+Pi that share `.agents/skills`), and invokes a closure once per distinct copy; used by diff discovery, sync, and set deactivation
 
 Query & display:
 
@@ -325,7 +326,8 @@ Skill lifecycle:
 Status and errors:
 
 - `cmx-core/src/error.rs` — typed domain errors (`CmxError`, `LlmError`, `GitOp`, `Result<T>`) returned by all public cmx-core APIs; stable `.code()` discriminants mirror in the TypeScript port
-- `cmx-core/src/artifact_status.rs` — artifact status determination (current, outdated, drifted, etc.)
+- `cmx-core/src/artifact_status.rs` — artifact status determination: `source_outdated` (current/outdated/drifted logic) and `installed_is_newer` (semver guard for RefuseNewer behavior)
+- `cmx-core/src/artifact_remove.rs` — shared primitive `remove_artifact_across_platforms` that collects distinct physical paths to delete (deduping shared dirs) and clears per-platform lock entries; used by both `cmx/src/uninstall.rs` and `cmx-core/src/skill_install/remove.rs`
 - `cmx-core/src/error_summary.rs` — structured error summary types
 
 Gateway (DI for testability):

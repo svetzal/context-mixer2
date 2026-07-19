@@ -1218,3 +1218,58 @@ fn resolve_targets_managed_set_is_filtered_by_kind_support() {
     let targets = resolve_targets(None, ArtifactKind::Agent, InstallScope::Global, &ctx).unwrap();
     assert!(targets.is_empty(), "a skills-only platform is not an agent target");
 }
+
+// --- Version guard: newer installed than source is refused without --force ---
+
+#[test]
+fn install_newer_installed_than_source_is_refused() {
+    let t = TestContext::new();
+    // Source declares version 1.0.0
+    setup_source_with_skill(
+        &t.fs,
+        &t.paths,
+        "my-source",
+        "/sources/my-source",
+        "my-skill",
+        "1.0.0",
+    );
+
+    let ctx = t.ctx();
+    // First install at 1.0.0
+    install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx).unwrap();
+
+    // Rewrite the lock entry so the recorded installed version is 2.0.0 (simulating
+    // a machine where the user upgraded via cmx init or another mechanism).
+    let skill_dir = t
+        .paths
+        .install_dir(ArtifactKind::Skill, InstallScope::Global)
+        .unwrap()
+        .join("my-skill");
+    let disk_cs =
+        crate::checksum::checksum_artifact(&skill_dir, ArtifactKind::Skill, &t.fs).unwrap();
+    let lock_entry = crate::test_support::make_lock_entry_with_checksum(
+        ArtifactKind::Skill,
+        Some("2.0.0"), // installed version is newer than the source (1.0.0)
+        "my-source",
+        "my-skill",
+        &disk_cs,
+    );
+    crate::test_support::save_lock_with_entry(
+        &t.fs,
+        &t.paths,
+        "my-skill",
+        lock_entry,
+        InstallScope::Global,
+    );
+
+    // Without --force, cmx must refuse installing an older source over a newer installed copy.
+    let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
+    assert!(
+        matches!(result, Err(crate::error::CliError::InstalledNewerThanSource { .. })),
+        "expected InstalledNewerThanSource error, got: {result:?}",
+    );
+
+    // With --force, the install proceeds (downgrade allowed).
+    let forced = install("my-skill", ArtifactKind::Skill, InstallScope::Global, true, &ctx);
+    assert!(forced.is_ok(), "--force must allow downgrade, got: {:?}", forced.err());
+}

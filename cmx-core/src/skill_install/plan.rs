@@ -267,17 +267,14 @@ pub(in crate::skill_install) fn build_lock_entry(
     checksum: &str,
     installed_at: &str,
 ) -> LockEntry {
-    LockEntry {
-        artifact_type: ArtifactKind::Skill,
-        version: Some(tool.version.clone()),
-        installed_at: installed_at.to_string(),
-        source: LockSource {
-            repo: format!("bundled:{}", tool.name),
-            path: format!("skills/{}", tool.name),
-        },
-        source_checksum: checksum.to_string(),
-        installed_checksum: checksum.to_string(),
-    }
+    LockEntry::new(
+        ArtifactKind::Skill,
+        Some(tool.version.clone()),
+        LockSource::new(format!("bundled:{}", tool.name), format!("skills/{}", tool.name)),
+        checksum.to_string(),
+        checksum.to_string(),
+        installed_at.to_string(),
+    )
 }
 
 // ---------------------------------------------------------------------------

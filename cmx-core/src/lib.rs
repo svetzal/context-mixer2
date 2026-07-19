@@ -1,3 +1,4 @@
+pub mod artifact_remove;
 pub mod artifact_status;
 pub mod checksum;
 pub mod config;

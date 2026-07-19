@@ -94,6 +94,24 @@ fn install_resolved(
     let source_checksum = checksum::checksum_artifact(&found.artifact.path, kind, ctx.fs)?;
 
     let facts = gather_install_facts(artifact_name, kind, scope, force, ctx)?;
+
+    // Version guard: refuse to downgrade a newer-installed copy unless forced.
+    if facts.already_installed && !force {
+        let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
+        if let Some(entry) = lock.packages.get(artifact_name) {
+            if artifact_status::installed_is_newer(
+                entry.version.as_deref(),
+                plan.version.as_deref(),
+            ) {
+                return Err(CliError::InstalledNewerThanSource {
+                    name: artifact_name.to_string(),
+                    installed: entry.version.clone().unwrap_or_default(),
+                    source_version: plan.version.clone().unwrap_or_default(),
+                });
+            }
+        }
+    }
+
     let decision =
         decide_install(facts.already_installed, facts.locally_modified, Force::from_flag(force));
     if decision.blocked {
@@ -545,17 +563,14 @@ fn build_lock_entry(
     installed_checksum: String,
     installed_at: String,
 ) -> LockEntry {
-    LockEntry {
-        artifact_type: kind,
-        version: plan.version.clone(),
-        installed_at,
-        source: LockSource {
-            repo: plan.source_name.clone(),
-            path: plan.relative_path.clone(),
-        },
+    LockEntry::new(
+        kind,
+        plan.version.clone(),
+        LockSource::new(&plan.source_name, &plan.relative_path),
         source_checksum,
         installed_checksum,
-    }
+        installed_at,
+    )
 }
 
 fn parse_name_with_sources<'a>(name: &'a str, sources: &SourcesFile) -> (Option<&'a str>, &'a str) {

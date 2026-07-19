@@ -7,7 +7,7 @@ use crate::context::AppContext;
 use crate::diff::file_changes_between;
 use crate::install;
 use crate::platform::Platform;
-use crate::platform_iter;
+use crate::platform_copies::gather_platform_copies;
 use crate::source_iter;
 use crate::types::{ArtifactKind, InstallScope, SetMember, SetState, SetsFile, SourcesFile};
 use crate::uninstall;
@@ -309,45 +309,52 @@ fn member_deactivate_targets(
     let source_artifact = member.source.as_deref().and_then(|source| {
         source_iter::find_unique(&member.name, member.kind, Some(source), ctx).ok()
     });
-    let mut targets = Vec::new();
-    for view in platform_iter::views_for(ctx.paths, candidates, member.kind) {
-        let pctx = ctx.with_paths(&view.paths);
-        let facts = install::gather_install_facts(&member.name, member.kind, scope, false, &pctx)?;
-        if !facts.already_installed {
-            continue;
-        }
-        let artifact_path =
-            view.paths.require_installed_artifact_path(member.kind, &member.name, scope)?;
-        let discarded_paths = if facts.locally_modified {
-            if let Some(source_artifact) = &source_artifact {
-                file_changes_between(
-                    member.kind,
-                    &artifact_path,
-                    &source_artifact.artifact.path,
-                    &pctx,
-                )?
-                .into_iter()
-                .map(|change| {
-                    if artifact_path.is_file() {
-                        artifact_path.clone()
-                    } else {
-                        artifact_path.join(change.path)
-                    }
-                })
-                .collect()
-            } else {
-                vec![artifact_path.clone()]
+    // Use the first platform in each shared-dir group to probe install facts;
+    // platforms sharing a dir share the same physical files, so one probe suffices.
+    gather_platform_copies(
+        &candidates,
+        member.kind,
+        &member.name,
+        scope,
+        ctx,
+        |artifact_path, platforms| {
+            let platform_paths = ctx.paths.with_platform(platforms[0]);
+            let pctx = ctx.with_paths(&platform_paths);
+            let facts =
+                install::gather_install_facts(&member.name, member.kind, scope, false, &pctx)?;
+            if !facts.already_installed {
+                return Ok(None);
             }
-        } else {
-            Vec::new()
-        };
-        targets.push(MemberDeactivateTarget {
-            platform: view.platform,
-            artifact_path,
-            discarded_paths,
-        });
-    }
-    Ok(targets)
+            let discarded_paths = if facts.locally_modified {
+                if let Some(source_artifact) = &source_artifact {
+                    file_changes_between(
+                        member.kind,
+                        &artifact_path,
+                        &source_artifact.artifact.path,
+                        &pctx,
+                    )?
+                    .into_iter()
+                    .map(|change| {
+                        if artifact_path.is_file() {
+                            artifact_path.clone()
+                        } else {
+                            artifact_path.join(change.path)
+                        }
+                    })
+                    .collect()
+                } else {
+                    vec![artifact_path.clone()]
+                }
+            } else {
+                Vec::new()
+            };
+            Ok(Some(MemberDeactivateTarget {
+                platforms,
+                artifact_path,
+                discarded_paths,
+            }))
+        },
+    )
 }
 
 /// The name of another `Active` set that still claims `(kind, member_name)`,

@@ -110,6 +110,16 @@ pub enum CliError {
     )]
     LocallyModified { name: String, kind: ArtifactKind },
 
+    #[error(
+        "Refusing to install '{name}': the installed copy is version {installed}, which is \
+         newer than the source's {source_version}. Use --force to downgrade."
+    )]
+    InstalledNewerThanSource {
+        name: String,
+        installed: String,
+        source_version: String,
+    },
+
     #[error("No installed {kind} named '{name}' found. {hint}")]
     ArtifactNotInstalled {
         kind: ArtifactKind,

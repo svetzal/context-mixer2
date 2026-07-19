@@ -128,7 +128,8 @@ pub enum MemberDeactivateOutcome {
 
 #[derive(Debug)]
 pub struct MemberDeactivateTarget {
-    pub platform: Platform,
+    /// All platforms whose install directory resolves to `artifact_path`.
+    pub platforms: Vec<Platform>,
     pub artifact_path: PathBuf,
     pub discarded_paths: Vec<PathBuf>,
 }

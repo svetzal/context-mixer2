@@ -1,4 +1,40 @@
+use std::fmt;
+
+use crate::diff::{FileChange, FileStatus};
 use crate::table::{empty_state, render_table};
+
+/// Format an optional version string, falling back to `"unversioned"`.
+pub(super) fn version_label(version: Option<&str>) -> &str {
+    version.unwrap_or("unversioned")
+}
+
+/// Count (modified, added, deleted) across a slice of [`FileChange`]s.
+pub(super) fn change_counts(changes: &[FileChange]) -> (usize, usize, usize) {
+    changes
+        .iter()
+        .fold((0, 0, 0), |(modified, added, deleted), change| match change.status {
+            FileStatus::Modified => (modified + 1, added, deleted),
+            FileStatus::OnlyInInstalled => (modified, added, deleted + 1),
+            FileStatus::OnlyInSource => (modified, added + 1, deleted),
+        })
+}
+
+/// Write one line per changed file into `f`, rooted at `target_root`.
+pub(super) fn write_change_lines(
+    f: &mut fmt::Formatter<'_>,
+    target_root: &std::path::Path,
+    changes: &[FileChange],
+) -> fmt::Result {
+    for change in changes {
+        let detail = match change.status {
+            FileStatus::Modified => format!("modified (+{} -{})", change.added, change.removed),
+            FileStatus::OnlyInInstalled => format!("deleted (-{})", change.added),
+            FileStatus::OnlyInSource => format!("added (+{})", change.removed),
+        };
+        writeln!(f, "    {}  {detail}", target_root.join(&change.path).display())?;
+    }
+    Ok(())
+}
 
 pub(super) fn write_each<T: std::fmt::Display>(
     f: &mut std::fmt::Formatter<'_>,

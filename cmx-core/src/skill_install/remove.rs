@@ -1,8 +1,7 @@
+use crate::artifact_remove::remove_artifact_across_platforms;
 use crate::config;
 use crate::context::AppContext;
 use crate::error::Result;
-use crate::lockfile;
-use crate::platform::Platform;
 use crate::types::ArtifactKind;
 
 use super::{RemoveReport, Scope, SkillInstaller};
@@ -16,37 +15,16 @@ impl SkillInstaller {
             .filter(|p| p.supports(ArtifactKind::Skill))
             .collect::<Vec<_>>();
 
-        let mut dirs_to_delete: std::collections::BTreeSet<std::path::PathBuf> =
-            std::collections::BTreeSet::new();
-        let mut platforms_cleared: Vec<Platform> = Vec::new();
-        let mut was_tracked = false;
+        let removal = remove_artifact_across_platforms(
+            &self.tool.name,
+            ArtifactKind::Skill,
+            install_scope,
+            &platform_targets,
+            ctx,
+        )?;
 
-        for &platform in &platform_targets {
-            let pv = ctx.paths.with_platform(platform);
-
-            if let Some(dir) = pv.install_dir(ArtifactKind::Skill, install_scope) {
-                let skill_dir = dir.join(&self.tool.name);
-                if ctx.fs.exists(&skill_dir) {
-                    dirs_to_delete.insert(skill_dir);
-                }
-            }
-
-            let lock = lockfile::load(install_scope, ctx.fs, &pv)?;
-            if lock.packages.contains_key(&self.tool.name) {
-                lockfile::mutate(install_scope, ctx.fs, &pv, |l| {
-                    l.packages.remove(&self.tool.name);
-                })?;
-                platforms_cleared.push(platform);
-                was_tracked = true;
-            }
-        }
-
-        let was_on_disk = !dirs_to_delete.is_empty();
-        let removed_dirs: Vec<std::path::PathBuf> = dirs_to_delete.into_iter().collect();
-        for dir in &removed_dirs {
-            ctx.fs.remove_dir_all(dir)?;
-        }
-
+        // Source unregistration is specific to bundled skills and not part of the
+        // shared remove primitive.
         let source_name = format!("bundled:{}", self.tool.name);
         let source_unregistered = if let Ok(sources) = config::load_sources(ctx.fs, ctx.paths) {
             if sources.sources.contains_key(&source_name) {
@@ -71,11 +49,11 @@ impl SkillInstaller {
         Ok(RemoveReport {
             tool_name: self.tool.name.clone(),
             scope: install_scope,
-            removed_dirs,
-            platforms_cleared,
+            removed_dirs: removal.removed_paths,
+            platforms_cleared: removal.platforms_cleared,
             source_unregistered,
-            was_on_disk,
-            was_tracked,
+            was_on_disk: removal.was_on_disk,
+            was_tracked: removal.was_tracked,
         })
     }
 }

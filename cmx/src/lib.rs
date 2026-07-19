@@ -16,6 +16,7 @@ pub mod install;
 pub mod list;
 pub mod outdated;
 pub mod partition;
+pub mod platform_copies;
 pub mod plugin_types;
 pub mod promote;
 pub mod scan;
@@ -33,6 +34,7 @@ pub mod uninstall;
 
 // Modules extracted to cmx-core — re-exported here to preserve all existing
 // `crate::` paths used throughout this crate's modules and tests.
+pub use cmx_core::artifact_remove;
 pub use cmx_core::artifact_status;
 pub use cmx_core::checksum;
 pub use cmx_core::config;

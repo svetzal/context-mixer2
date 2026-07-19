@@ -13,7 +13,6 @@
 
 use crate::error::{CliError, Result};
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
@@ -250,38 +249,26 @@ fn gather_copies(
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Copy>> {
     let candidates = crate::config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
-    let mut by_dir: BTreeMap<PathBuf, Copy> = BTreeMap::new();
-    for platform in candidates {
-        if !platform.supports(kind) {
-            continue;
-        }
-        let pv = ctx.paths.with_platform(platform);
-        let Some(path) = pv.installed_artifact_path(kind, name, scope) else {
-            continue;
-        };
-        if !ctx.fs.exists(&path) {
-            continue;
-        }
-        let dir = pv.require_install_dir(kind, scope)?;
-        if let Some(existing) = by_dir.get_mut(&dir) {
-            existing.platforms.push(platform);
-        } else {
+    crate::platform_copies::gather_platform_copies(
+        &candidates,
+        kind,
+        name,
+        scope,
+        ctx,
+        |path, platforms| {
+            let dir = path.parent().map_or_else(|| path.clone(), std::borrow::ToOwned::to_owned);
             let content = ctx.fs.read_to_string(&kind.content_path(&path)).ok();
             let version = content.as_deref().and_then(crate::scan::extract_version_from_content);
             let checksum = checksum::checksum_artifact(&path, kind, ctx.fs)?;
-            by_dir.insert(
-                dir.clone(),
-                Copy {
-                    platforms: vec![platform],
-                    dir,
-                    path,
-                    version,
-                    checksum,
-                },
-            );
-        }
-    }
-    Ok(by_dir.into_values().collect())
+            Ok(Some(Copy {
+                platforms,
+                dir,
+                path,
+                version,
+                checksum,
+            }))
+        },
+    )
 }
 
 /// Overwrite each diverging copy with the winner's content, then refresh every

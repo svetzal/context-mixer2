@@ -1,11 +1,11 @@
 use crate::error::Result;
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
 use crate::platform::Platform;
+use crate::platform_copies::gather_platform_copies;
 use crate::types::{ArtifactKind, InstallScope};
 
 use super::structural::ArtifactDiff;
@@ -73,33 +73,14 @@ fn gather_skill_copies(
     ctx: &AppContext<'_>,
 ) -> Result<Vec<InstalledCopy>> {
     let candidates = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
-    let mut by_dir: BTreeMap<PathBuf, InstalledCopy> = BTreeMap::new();
-    for platform in candidates {
-        if !platform.supports(ArtifactKind::Skill) {
-            continue;
-        }
-        let pv = ctx.paths.with_platform(platform);
-        let Some(path) = pv.installed_artifact_path(ArtifactKind::Skill, name, scope) else {
-            continue;
-        };
-        if !ctx.fs.exists(&path) {
-            continue;
-        }
-        if let Some(existing) = by_dir.get_mut(&path) {
-            existing.platforms.push(platform);
-        } else {
-            let checksum = checksum::checksum_artifact(&path, ArtifactKind::Skill, ctx.fs)?;
-            by_dir.insert(
-                path.clone(),
-                InstalledCopy {
-                    platforms: vec![platform],
-                    path,
-                    checksum,
-                },
-            );
-        }
-    }
-    Ok(by_dir.into_values().collect())
+    gather_platform_copies(&candidates, ArtifactKind::Skill, name, scope, ctx, |path, platforms| {
+        let checksum = checksum::checksum_artifact(&path, ArtifactKind::Skill, ctx.fs)?;
+        Ok(Some(InstalledCopy {
+            platforms,
+            path,
+            checksum,
+        }))
+    })
 }
 
 /// Pick the platform to name in reconcile commands for a copy shared by several:

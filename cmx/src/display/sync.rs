@@ -1,22 +1,9 @@
 use std::fmt;
 
-use crate::diff::{FileChange, FileStatus};
 use crate::platform::platforms_label;
 use crate::sync::SyncResult;
 
-fn version_label(version: Option<&str>) -> &str {
-    version.unwrap_or("unversioned")
-}
-
-fn change_counts(changes: &[FileChange]) -> (usize, usize, usize) {
-    changes
-        .iter()
-        .fold((0, 0, 0), |(modified, added, deleted), change| match change.status {
-            FileStatus::Modified => (modified + 1, added, deleted),
-            FileStatus::OnlyInInstalled => (modified, added, deleted + 1),
-            FileStatus::OnlyInSource => (modified, added + 1, deleted),
-        })
-}
+use super::util::{change_counts, version_label, write_change_lines};
 
 impl fmt::Display for SyncResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -49,20 +36,7 @@ impl fmt::Display for SyncResult {
                     winner_v,
                 )?;
                 writeln!(f, "    files: {modified} modified, {added} added, {deleted} deleted")?;
-                for change in &target.file_changes {
-                    let detail = match change.status {
-                        FileStatus::Modified => {
-                            format!("modified (+{} -{})", change.added, change.removed)
-                        }
-                        FileStatus::OnlyInInstalled => format!("deleted (-{})", change.added),
-                        FileStatus::OnlyInSource => format!("added (+{})", change.removed),
-                    };
-                    writeln!(
-                        f,
-                        "    {}  {detail}",
-                        target.artifact_path.join(&change.path).display()
-                    )?;
-                }
+                write_change_lines(f, &target.artifact_path, &target.file_changes)?;
             }
             return writeln!(f, "Re-run with --apply to make these changes.");
         }
