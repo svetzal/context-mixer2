@@ -11,9 +11,16 @@
 //!   reference-counting rule `deactivate` uses, so a member two sets share is
 //!   never flagged while either set is active.
 
+use std::collections::HashSet;
+
 use serde::Serialize;
 
+use crate::config;
+use crate::context::AppContext;
+use crate::error::Result;
 use crate::types::{ArtifactKind, InstallScope, SetState, SetsFile};
+
+use super::types::DoctorArtifact;
 
 /// The kind of set/installed-state mismatch found.
 ///
@@ -95,6 +102,29 @@ pub fn set_inconsistencies(
         }
     }
     found
+}
+
+/// Load every scope's sets and cross-reference each member against what the
+/// survey found installed, read-only (see `SETS.md`, "doctor integration").
+/// `artifacts` already reflects every location/platform the survey walked, so
+/// "installed" here means "present anywhere doctor's survey found it" —
+/// consistent with `sets::show`'s own installed check.
+pub(crate) fn collect_set_inconsistencies(
+    scopes: &[InstallScope],
+    artifacts: &[DoctorArtifact],
+    ctx: &AppContext<'_>,
+) -> Result<Vec<SetInconsistency>> {
+    let installed: HashSet<(ArtifactKind, String)> =
+        artifacts.iter().map(|a| (a.kind, a.name.clone())).collect();
+    let is_installed =
+        |kind: ArtifactKind, name: &str| installed.contains(&(kind, name.to_string()));
+
+    let mut found = Vec::new();
+    for &scope in scopes {
+        let sets = config::load_sets(scope, ctx.fs, ctx.paths)?;
+        found.extend(set_inconsistencies(scope, &sets, &is_installed));
+    }
+    Ok(found)
 }
 
 #[cfg(test)]

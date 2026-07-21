@@ -261,7 +261,10 @@ Sets:
 System survey / adoption:
 
 - `cmx/src/doctor.rs` — `cmx doctor`: read-only system-wide survey of installed artifacts across platforms
-- `cmx/src/doctor/survey.rs` — walks platform install dirs and cross-references lock files
+- `cmx/src/doctor/survey.rs` — thin orchestrator: wires `locations`/`classify`/`aggregate`/`set_consistency` into the read-only `survey()` entry point
+- `cmx/src/doctor/locations.rs` — resolves unique install locations across platforms/scopes and pre-loads lock files and source-provided artifact names
+- `cmx/src/doctor/classify.rs` — classifies each installed artifact's state from its content checksum and assembles the raw per-location rows
+- `cmx/src/doctor/aggregate.rs` — folds per-location rows into logical artifacts, consolidates state severity, sorts rows, and finds missing lock entries
 - `cmx/src/doctor/divergence.rs` — detects divergence between installed artifacts and sources
 - `cmx/src/doctor/set_consistency.rs` — set consistency checks used by `cmx doctor`
 - `cmx/src/doctor/types.rs` — doctor result/report types

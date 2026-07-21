@@ -436,6 +436,30 @@ fn shared_cohort_skill_lists_only_tools_it_is_tracked_for() {
 
 // --- divergence_details (pure, no gateway fakes needed) ---
 
+/// Build a minimal `DoctorRow`. Callers override only the fields under test.
+///
+/// Shared across `doctor`'s submodule test suites (`aggregate`, `divergence`)
+/// so each keeps a single fixture rather than duplicating it.
+pub(crate) fn make_row(
+    kind: ArtifactKind,
+    name: &str,
+    state: ArtifactState,
+    checksum: &str,
+) -> DoctorRow {
+    DoctorRow {
+        kind,
+        name: name.to_string(),
+        scope: InstallScope::Global,
+        location: std::path::PathBuf::from("/home/testuser/.claude/skills"),
+        platforms: vec![Platform::Claude],
+        tracked_for: vec![Platform::Claude],
+        state,
+        version: None,
+        source: None,
+        content_checksum: checksum.to_string(),
+    }
+}
+
 fn make_doctor_artifact(name: &str, diverged: bool) -> DoctorArtifact {
     DoctorArtifact {
         kind: ArtifactKind::Skill,

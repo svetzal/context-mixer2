@@ -15,7 +15,10 @@
 //! An artifact is *tracked* if any attributed platform's lock file records it
 //! with a matching checksum.
 
+mod aggregate;
+mod classify;
 mod divergence;
+mod locations;
 mod set_consistency;
 mod survey;
 mod types;
@@ -27,10 +30,11 @@ pub use types::{ArtifactState, DoctorArtifact, DoctorReport, DoctorRow, MissingR
 
 // Re-export private survey helpers for the test suite.
 #[cfg(test)]
-pub(crate) use survey::{
-    LocationAgg, build_locations, classify_installed, collect_missing, group_rows,
-    read_installed_version, source_of, state_severity, survey_scopes,
-};
+pub(crate) use aggregate::{collect_missing, group_rows, state_severity};
+#[cfg(test)]
+pub(crate) use classify::{classify_installed, read_installed_version, source_of};
+#[cfg(test)]
+pub(crate) use locations::{LocationAgg, build_locations, survey_scopes};
 
 // ---------------------------------------------------------------------------
 // Unit tests

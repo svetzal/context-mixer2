@@ -87,7 +87,7 @@ mod tests {
     use crate::types::{ArtifactKind, InstallScope};
 
     use super::{divergence_details, location_members};
-    use crate::doctor::survey::tests::make_row;
+    use crate::doctor::tests::make_row;
     use crate::doctor::types::{ArtifactState, DoctorArtifact};
 
     fn make_artifact(
