@@ -69,6 +69,14 @@ Releasing is three distinct steps:
      to the cmx binary version at install (`init::stamp_version`), so the skill
      version is locked to the workspace version automatically. **A release that
      changed the surface but not the skill's content is not ready to tag.**
+   - **Reconcile the mdBook documentation.** The same `git log
+     <last-vX.Y.Z-tag>..HEAD -- 'cmx/src/cli/**' 'cmx/src/**'` diff used for
+     `SKILL.md` above must also be checked against `book/src/reference/commands.md`
+     and the relevant `book/src/guide/*.md` pages. A new top-level command or
+     `cmx set`-style subcommand family is covered by `cmx/tests/book_command_coverage.rs`,
+     but flag/behavior changes to already-documented commands are not — update
+     the matching table rows, grammar blocks, and worked examples by hand.
+     **A release that changed the surface but not the book is not ready to tag.**
    - Bump `version` in the root `Cargo.toml` (workspace version; `cmx`/`cmf`
      inherit it via `version.workspace = true`). `cmx-core` versions
      independently on its own tag channel — do not touch it in a cmx-only
@@ -253,7 +261,7 @@ Query & display:
 
 Sets:
 
-- `cmx/src/sets/mod.rs` — `cmx set` subcommands (create, list, show, add, remove, activate, deactivate, delete, rename): locally-defined named groups of installed artifacts with a desired activation state (see `SETS.md`). `activate`/`deactivate` compose `install`/`uninstall` with reference-counting and a drift guard; `create --from <source>:<plugin>` seeds membership from a marketplace plugin's declared agents/skills (via `scan_marketplace::scan_marketplace_plugin`) without installing anything; `list`/`show` report context-footprint, and `doctor` checks set consistency
+- `cmx/src/sets/mod.rs` — `cmx set` subcommands (create, list, show, add, remove, activate, deactivate, delete, rename): locally-defined named groups of installed artifacts with a desired activation state (see `SETS.md`). `activate`/`deactivate` compose `install`/`uninstall` with reference-counting and a drift guard; `create --from-plugin <source>:<plugin>` seeds membership from a marketplace plugin's declared agents/skills (via `scan_marketplace::scan_marketplace_plugin`) without installing anything; `list`/`show` report context-footprint, and `doctor` checks set consistency
 - `cmx/src/sets/types.rs` — set data types
 - `cmx/src/sets/members.rs` — set membership management
 - `cmx/src/sets/activation.rs` — set activation and deactivation logic

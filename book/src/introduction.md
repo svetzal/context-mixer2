@@ -15,6 +15,7 @@ cmx manages the lifecycle of **agents** and **skills** for AI coding assistants 
 - **Install & update** — install agents and skills globally or per-project, across the platforms you use, tracking versions and checksums
 - **Status tracking** — see what's installed, what's outdated, what's deprecated; `cmx doctor` surveys the whole system
 - **Reconcile** — promote in-place edits back to a canonical home, and sync a skill that has diverged across tools
+- **Sets** — group installed artifacts into named, activatable sets so you can switch off the standing context cost of unrelated work without losing track of it
 - **LLM-powered diff** — use AI to analyze differences between installed and source versions, directionally
 - **Cross-platform** — works with Claude Code, GitHub Copilot, Cursor, Windsurf, Gemini CLI, opencode, Codex CLI, Pi, Crush, Amp, Zed, OpenHands, Hermes, and Devin
 
@@ -35,6 +36,10 @@ cmx agent install python-craftsperson
 
 # Install all available agents
 cmx agent install --all
+
+# Group installed artifacts into a set you can switch off later
+cmx set create rust-work
+cmx set add rust-work rust-craftsperson
 
 # Check what needs updating
 cmx outdated

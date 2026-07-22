@@ -13,6 +13,7 @@
 - [Searching](./guide/searching.md)
 - [Installing Artifacts](./guide/installing.md)
 - [Listing & Status](./guide/listing.md)
+- [Managing Context Cost with Sets](./guide/sets.md)
 - [Updating Artifacts](./guide/updating.md)
 - [Promoting Local Edits](./guide/promoting.md)
 - [Reconciling Across Platforms](./guide/reconciling.md)

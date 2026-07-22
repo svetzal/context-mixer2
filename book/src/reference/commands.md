@@ -151,6 +151,140 @@ for a skill — its file tree. Two fields are worth calling out:
 The top-level `cmx info <name>` searches both kinds; the kind-scoped
 `cmx skill info <name>` and `cmx agent info <name>` look only at that kind.
 
+## Sets
+
+A **set** is a locally-defined, named group of installed artifacts (agents
+and/or skills) with a desired activation state — `active` or `inactive`. It is
+the consumer-side lever for standing context cost: an installed skill's
+trigger description is loaded on every turn whether or not it fires, so a
+machine curated to fifty skills carries fifty descriptions of fixed cost.
+Uninstalling to reclaim that cost loses the record that you wanted the
+artifact at all; a set lets you switch a whole group off and back on as a
+unit, fully reversible, with the grouping remembered. See
+[Managing Context Cost with Sets](../guide/sets.md) for the task-oriented
+walkthrough.
+
+```text
+cmx set create <name> [--desc <text>] [--from-plugin <source>:<plugin>] [--local]
+cmx set list [--local] [--json]
+cmx set show <name> [--local] [--json]
+cmx set add <name> <artifact>... [--local]
+cmx set remove <name> <artifact>... [--local]
+cmx set activate <name> [--apply] [--local]
+cmx set deactivate <name> [--apply] [--force] [--local]
+cmx set delete <name> [--purge [--apply] [--force]] [--local]
+cmx set rename <old> <new> [--local]
+```
+
+Every subcommand defaults to **global** scope; pass `--local` to operate on a
+project-scoped set instead (`.context-mixer/sets.json`, symmetric with the
+local lock file). `create`, `add`, `remove`, `activate`, `deactivate`,
+`delete`, and `rename` are the mutating verbs (marked `[Mutates]` in
+`--help`); `list` and `show` are read-only and support `--json`.
+
+| State | Meaning |
+|-------|---------|
+| `active` | Every member is installed; `cmx set activate` made it so |
+| `inactive` | Members are not installed on the set's behalf; either never activated, or `deactivate` uninstalled them |
+
+`activate` installs every member from its pinned source into the normally
+resolved install targets and marks the set active — it is **idempotent**, so
+re-running it safely repairs a set that's only partially installed.
+`deactivate` uninstalls every member **not held by another active set** and
+marks the set inactive. Deactivating does not delete the set's definition —
+only `delete` does that — so a deactivated set can always be reactivated
+later without rediscovering its members.
+
+### Plan-by-default, `--apply` to execute
+
+`activate` and `deactivate` (and `delete --purge`) show the concrete plan —
+which members would be installed or uninstalled, and where — without touching
+disk. Pass `--apply` to execute exactly that plan:
+
+```text
+$ cmx set activate rust-work
+Plan to activate set 'rust-work':
+  agent rust-craftsperson: install
+    ~/guidelines/plugins/rust-ecosystem/agents/rust-craftsperson.md -> ~/.claude/agents/rust-craftsperson.md
+Re-run with --apply to make these changes.
+
+$ cmx set activate rust-work --apply
+Set 'rust-work' activated.
+  agent rust-craftsperson: installed
+    ~/guidelines/plugins/rust-ecosystem/agents/rust-craftsperson.md -> ~/.claude/agents/rust-craftsperson.md
+```
+
+### Reference counting across sets
+
+An artifact can belong to more than one set. `deactivate` only uninstalls a
+member when **no other active set** still claims it — the same rule
+`cmx doctor`'s set-consistency check applies when deciding whether a lingering
+install is a problem. Deactivating one set therefore never yanks an artifact
+out from under a different set that's still active and needs it.
+
+### The drift guard
+
+A member with local edits (installed copy differs from what cmx tracked)
+blocks its own uninstall during `deactivate` — cmx won't silently discard
+edited content. Pass `--force` to discard the drifted copy and uninstall it
+anyway. The same guard and `--force` override apply to `delete --purge`,
+since a purge is a deactivate followed by deleting the definition.
+
+### Seeding from a marketplace plugin
+
+`cmx set create <name> --from-plugin <source>:<plugin>` seeds the new set's
+membership from a marketplace plugin's declared `agents`/`skills` (its
+`marketplace.json` entry) — without installing anything. This is the
+publisher-side plugin grouping handed to you as a starting point for a
+consumer-side set; from there the set is yours to add/remove members from
+regardless of which source or plugin they came from.
+
+### `delete --purge`
+
+`cmx set delete <name>` removes only the set's definition; its members stay
+installed (they may belong to something else). `--purge` also deactivates the
+set first — uninstalling any member not held by another active set — before
+deleting it. Like `activate`/`deactivate`, the purge is previewed by default
+and only executed with `--apply`; `--force` applies the same drift override.
+
+### `cmx set list --json` / `cmx set show --json`
+
+```json
+{
+  "scope": "global",
+  "sets": [
+    { "name": "rust-work", "state": "active", "member_count": 1, "footprint_chars": 1800 }
+  ]
+}
+```
+
+```json
+{
+  "description": "Rust craftsmanship + foundry",
+  "footprint_chars": 1800,
+  "members": [
+    {
+      "footprint_chars": 1800,
+      "installed": true,
+      "kind": "agent",
+      "name": "rust-craftsperson",
+      "source": "guidelines"
+    }
+  ],
+  "name": "rust-work",
+  "scope": "global",
+  "state": "active"
+}
+```
+
+`footprint_chars` is the total character count of the set's members' trigger
+descriptions (the `description` frontmatter an assistant loads on every
+turn) — the context-footprint cost the set carries while active. A member
+whose description can't be resolved (source missing, artifact not found)
+contributes `0` to the set's total and its own `footprint_chars` is `null`
+rather than `0`, so a script can tell "counted as zero" apart from
+"genuinely couldn't resolve."
+
 ### `cmx doctor`
 
 `doctor` is a **read-only** survey of your platforms' install directories and
@@ -208,17 +342,38 @@ case-directed so you can pick the right command by situation:
 - external / source-less → `cmx skill sync <name>` (or `--from <platform>`)
 - not sure? inspect first → `cmx skill diff <name>`
 
+#### Set-consistency checks
+
+`doctor` also cross-references every [set](#sets)'s declared membership
+against what the survey found installed, at every scope it surveys. Two
+mismatches are flagged:
+
+| Problem | Meaning | Remedy |
+|---------|---------|--------|
+| `active_missing` | The set is `active`, but this member isn't installed | `cmx set activate <name>` repairs it (idempotent) |
+| `inactive_lingering` | The set is `inactive`, but this member is still installed and not held by any other `active` set | `cmx set deactivate <name>` — previews first, clears it with `--apply` |
+
+The same reference-counting rule `deactivate` itself uses applies here: a
+member shared by two sets is never flagged `inactive_lingering` while either
+set is still active. In the human view each mismatch appears as its own
+detail line under the summary:
+
+```text
+  • set 'rust-work' (global): agent rust-craftsperson is active but not installed
+```
+
 #### Exit codes
 
-`doctor` exits non-zero (`2`) when it finds drift, untracked, orphaned, missing,
-or diverged artifacts, so it is usable in a pre-commit hook or CI check. A
-*consistent* `tracked` or `external` artifact never fails it — only a genuine
-anomaly does. This holds for both the human and `--json` output:
+`doctor` exits non-zero (`2`) when it finds drift, untracked, orphaned,
+missing, or diverged artifacts, **or a set-consistency mismatch**, so it is
+usable in a pre-commit hook or CI check. A *consistent* `tracked` or
+`external` artifact never fails it — only a genuine anomaly does. This holds
+for both the human and `--json` output:
 
 | Exit code | Meaning |
 |-----------|---------|
 | `0` | no issues found |
-| `2` | actionable issues found (drifted, untracked, orphaned, missing, or diverged artifacts) |
+| `2` | actionable issues found (drifted, untracked, orphaned, missing, or diverged artifacts, or a set-consistency mismatch) |
 
 #### `cmx doctor --json`
 
@@ -234,7 +389,8 @@ The shape mirrors the human view:
   "showing": "needs_attention",
   "summary": {
     "tracked": 40, "drifted": 1, "untracked": 0,
-    "orphaned": 1, "external": 8, "missing": 0, "diverged": 4
+    "orphaned": 1, "external": 8, "missing": 0, "diverged": 4,
+    "set_inconsistent": 1
   },
   "artifacts": [
     {
@@ -251,6 +407,15 @@ The shape mirrors the human view:
         { "path": "~/.claude/skills", "platform": "claude", "version": "3.3.0", "state": "external" }
       ]
     }
+  ],
+  "set_inconsistencies": [
+    {
+      "set": "rust-work",
+      "scope": "global",
+      "kind": "agent",
+      "member": "rust-craftsperson",
+      "problem": "active_missing"
+    }
   ]
 }
 ```
@@ -261,7 +426,8 @@ too. An artifact carries `version` when every copy agrees, or `versions` (an
 array) when they diverge. Every artifact's `locations` array replaces the human
 view's free-text "diverges: ..." line with structured `{path, platform,
 version, state}` entries, so a script never has to parse prose to find where
-copies disagree.
+copies disagree. `set_inconsistencies` mirrors the set-consistency check above
+— `problem` is `"active_missing"` or `"inactive_lingering"`.
 
 ### `cmx init`
 
