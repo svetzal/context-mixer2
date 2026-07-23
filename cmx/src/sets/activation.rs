@@ -128,7 +128,7 @@ fn activate_kind(
             .iter()
             .map(|m| format!("{}:{}", m.source.as_deref().unwrap_or_default(), m.name))
             .collect();
-        let result = install::install_many(&pinned, kind, scope, false, &install_targets, ctx)?;
+        let result = install::install_many(&pinned, kind, scope, Force::No, &install_targets, ctx)?;
         result.failed.into_iter().collect()
     } else {
         HashMap::new()
@@ -321,7 +321,7 @@ fn member_deactivate_targets(
             let platform_paths = ctx.paths.with_platform(platforms[0]);
             let pctx = ctx.with_paths(&platform_paths);
             let facts =
-                install::gather_install_facts(&member.name, member.kind, scope, false, &pctx)?;
+                install::gather_install_facts(&member.name, member.kind, scope, Force::No, &pctx)?;
             if !facts.already_installed {
                 return Ok(None);
             }

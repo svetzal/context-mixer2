@@ -1,6 +1,7 @@
 use crate::config;
 use crate::context::AppContext;
 use crate::error::Result;
+use crate::flags::SurveyScope;
 use crate::platform::Platform;
 
 use super::aggregate::{collect_missing, group_rows, sort_missing, sort_rows};
@@ -12,9 +13,9 @@ use super::types::DoctorReport;
 /// Survey the whole system installation and classify every artifact.
 ///
 /// Read-only: performs no writes. Surveys global scope always, and project
-/// (local) scope when `include_local` is set.
-pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport> {
-    let scopes = survey_scopes(include_local);
+/// (local) scope when `scope` includes local.
+pub fn survey(scope: SurveyScope, ctx: &AppContext<'_>) -> Result<DoctorReport> {
+    let scopes = survey_scopes(scope);
     let cfg = config::load_config(ctx.fs, ctx.paths)?;
     // When the user has declared a managed set, `doctor` surveys only those
     // platforms; otherwise it inspects every supported platform.
@@ -39,7 +40,7 @@ pub fn survey(include_local: bool, ctx: &AppContext<'_>) -> Result<DoctorReport>
         rows,
         artifacts,
         missing,
-        included_local: include_local,
+        included_local: scope.includes_local(),
         surveyed_platforms: platforms.len(),
         scoped_to_managed: !cfg.platforms.is_empty(),
         show_all: false,

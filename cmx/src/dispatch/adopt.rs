@@ -2,8 +2,8 @@ use anyhow::Result;
 use std::path::Path;
 
 use crate::context::AppContext;
-use crate::flags::Selection;
-use crate::types::{ArtifactKind, InstallScope};
+use crate::flags::{Selection, SurveyScope};
+use crate::types::ArtifactKind;
 
 use super::usage_error;
 
@@ -35,19 +35,18 @@ pub fn handle_adopt(
     kind: ArtifactKind,
     all: Selection,
     from: Option<&Path>,
-    scope: InstallScope,
+    scope: SurveyScope,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
-    let local = scope == InstallScope::Local;
     let outcome = if all.is_all() {
-        crate::adopt::adopt_all(Some(kind), from, local, ctx)?
+        crate::adopt::adopt_all(Some(kind), from, scope, ctx)?
     } else if names.is_empty() {
         return Err(usage_error(
             "Provide artifact name(s) to adopt, or use --all",
             &format!("cmx {kind} adopt <name>"),
         ));
     } else {
-        crate::adopt::adopt_named(kind, names, local, ctx)?
+        crate::adopt::adopt_named(kind, names, scope, ctx)?
     };
     print!("{outcome}");
     Ok(())
@@ -58,7 +57,6 @@ mod tests {
     use super::*;
     use crate::dispatch::test_support::{fake_trio, make_test_ctx};
     use crate::flags::Selection;
-    use crate::types::InstallScope;
 
     #[test]
     fn handle_unadopt_empty_names_errors() {
@@ -81,7 +79,7 @@ mod tests {
             ArtifactKind::Agent,
             Selection::Named,
             None,
-            InstallScope::Global,
+            SurveyScope::GlobalOnly,
             &ctx,
         );
         assert!(result.is_err());

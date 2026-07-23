@@ -185,7 +185,7 @@ fn install_many_installs_each_and_collects_failures() {
         ],
         ArtifactKind::Skill,
         InstallScope::Global,
-        false,
+        Force::No,
         &[Platform::Claude],
         &ctx,
     )
@@ -262,7 +262,7 @@ fn install_bails_when_no_sources_registered() {
     setup_empty_sources(&t.fs, &t.paths);
 
     let ctx = t.ctx();
-    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_err());
     let msg = result.unwrap_err().to_string();
     assert!(msg.contains("No sources registered"), "unexpected: {msg}");
@@ -276,7 +276,7 @@ fn install_bails_when_artifact_not_found() {
 
     let ctx = t.ctx();
     let result =
-        install("nonexistent-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+        install("nonexistent-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_err());
     let msg = result.unwrap_err().to_string();
     assert!(msg.contains("nonexistent-agent"), "unexpected: {msg}");
@@ -292,7 +292,7 @@ fn install_bails_on_ambiguous_name() {
     t.fs.add_file("/source2/agents/my-agent.md", agent_content("my-agent", "Agent from source2"));
 
     let ctx = t.ctx();
-    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_err());
     let msg = result.unwrap_err().to_string();
     assert!(msg.contains("multiple sources"), "unexpected: {msg}");
@@ -306,7 +306,7 @@ fn install_succeeds_with_source_prefix_disambiguation() {
 
     let ctx = t.ctx();
     let result =
-        install("my-source:my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+        install("my-source:my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_ok(), "expected ok, got: {:?}", result.err());
 
     // Verify the artifact was installed
@@ -329,7 +329,8 @@ fn install_succeeds_with_source_name_containing_colon() {
     setup_source_with_skill(&t.fs, &t.paths, "bundled:cmx", "/sources/bundled-cmx", "cmx", "1.0.0");
 
     let ctx = t.ctx();
-    let result = install("bundled:cmx:cmx", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
+    let result =
+        install("bundled:cmx:cmx", ArtifactKind::Skill, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_ok(), "expected ok, got: {:?}", result.err());
 
     let installed = t
@@ -352,7 +353,7 @@ fn install_copies_agent_file_to_correct_destination() {
     setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     let expected_dest = t
         .paths
@@ -373,7 +374,7 @@ fn install_records_checksums_in_lock() {
     setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
     let entry = lock.packages.get("my-agent").expect("lock entry must exist");
@@ -392,7 +393,7 @@ fn install_records_timestamp_from_clock() {
     setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
     let entry = lock.packages.get("my-agent").unwrap();
@@ -411,7 +412,7 @@ fn install_bails_on_local_modifications_without_force() {
 
     // First install
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     // Modify the installed file (different content than the recorded checksum)
     let installed_path = t
@@ -423,7 +424,7 @@ fn install_bails_on_local_modifications_without_force() {
         .unwrap();
 
     // Second install should fail without force
-    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_err());
     let msg = result.unwrap_err().to_string();
     assert!(msg.contains("local modifications"), "unexpected: {msg}");
@@ -437,7 +438,7 @@ fn install_proceeds_on_local_modifications_with_force() {
 
     // First install
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     // Modify the installed file
     let installed_path = t
@@ -448,7 +449,7 @@ fn install_proceeds_on_local_modifications_with_force() {
     t.fs.write(&installed_path, "modified content").unwrap();
 
     // Second install with force should succeed
-    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, true, &ctx);
+    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::Yes, &ctx);
     assert!(result.is_ok(), "force install should succeed: {:?}", result.err());
 }
 
@@ -481,7 +482,7 @@ fn install_validates_skill_has_skill_md() {
     t.fs.add_file("/sources/my-source/my-skill/tool.py", "code");
 
     let ctx = t.ctx();
-    let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
+    let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_err());
     // Either "not found in registered sources" or "missing SKILL.md"
     let msg = result.unwrap_err().to_string();
@@ -515,7 +516,7 @@ fn install_removes_partial_skill_on_validation_failure() {
     t.fs.add_file("/sources/my-source/my-skill/tool.py", "code");
 
     let ctx = t.ctx();
-    let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
+    let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_ok(), "skill with SKILL.md should install: {:?}", result.err());
 
     // Verify SKILL.md was copied to dest
@@ -535,7 +536,7 @@ fn install_writes_lock_with_source_repo_name() {
     setup_source_with_agent(&t.fs, &t.paths, "guidelines", "/sources/guidelines", "my-agent");
 
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
     let entry = lock.packages.get("my-agent").unwrap();
@@ -560,7 +561,7 @@ fn perform_install_returns_correct_artifact_name() {
 
     let ctx = t.ctx();
     let result =
-        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     assert_eq!(result.artifact_name, "my-agent");
     assert_eq!(result.kind, ArtifactKind::Agent);
@@ -575,7 +576,7 @@ fn perform_install_dest_dir_matches_install_dir() {
 
     let ctx = t.ctx();
     let result =
-        install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+        install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     let expected_dir = t.paths.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap();
     assert_eq!(result.dest_dir, expected_dir);
@@ -588,7 +589,7 @@ fn perform_install_bails_when_no_sources_registered() {
     setup_empty_sources(&t.fs, &t.paths);
 
     let ctx = t.ctx();
-    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_err());
     let msg = result.err().unwrap().to_string();
     assert!(msg.contains("No sources registered"), "unexpected: {msg}");
@@ -604,7 +605,7 @@ fn install_agent_does_not_update_lock_when_copy_fails() {
     t.fs.set_fail_on_copy(true);
 
     let ctx = t.ctx();
-    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_err(), "expected Err when copy fails");
 
     // Lock file should have no entry for the agent
@@ -625,7 +626,7 @@ fn install_agent_lock_save_failure_rolls_back_copy() {
     t.fs.set_fail_on_rename(t.paths.lock_path(InstallScope::Global));
 
     let ctx = t.ctx();
-    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_err(), "expected Err when lock save fails");
 
     // Because this was a fresh install, the copied agent file should be rolled back
@@ -652,7 +653,7 @@ fn install_skill_lock_save_failure_rolls_back_directory() {
     t.fs.set_fail_on_rename(t.paths.lock_path(InstallScope::Global));
 
     let ctx = t.ctx();
-    let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
+    let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_err(), "expected Err when lock save fails");
 
     // Because this was a fresh install, the copied skill directory should be rolled back
@@ -677,7 +678,7 @@ fn install_agent_with_cursor_platform_places_file_in_cursor_agents() {
     setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     let expected_dest = t
         .paths
@@ -699,7 +700,7 @@ fn install_agent_with_cursor_platform_local_places_file_in_dot_cursor_agents() {
     setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Local, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Local, Force::No, &ctx).unwrap();
 
     let expected_dest = t
         .paths
@@ -721,7 +722,7 @@ fn install_agent_default_platform_places_file_in_dot_claude_agents() {
     setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     let expected_dest = t
         .paths
@@ -744,7 +745,7 @@ fn install_force_reinstall_lock_save_failure_keeps_existing_artifact() {
 
     // First install succeeds
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     let expected_dest = t
         .paths
@@ -756,7 +757,7 @@ fn install_force_reinstall_lock_save_failure_keeps_existing_artifact() {
     // Now force-reinstall with a failing lock save
     t.fs.set_fail_on_rename(t.paths.lock_path(InstallScope::Global));
 
-    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, true, &ctx);
+    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::Yes, &ctx);
     assert!(result.is_err(), "expected Err when lock save fails on reinstall");
 
     // Because the artifact already existed before reinstall, it should NOT be removed
@@ -777,13 +778,18 @@ fn install_all_skips_artifact_when_source_checksum_and_version_match_lock() {
 
     let ctx = t.ctx();
     // First install — records checksum and version
-    install_all(ArtifactKind::Agent, InstallScope::Global, false, &[Platform::Claude], &ctx)
+    install_all(ArtifactKind::Agent, InstallScope::Global, Force::No, &[Platform::Claude], &ctx)
         .unwrap();
 
     // Second install_all — source hasn't changed, so artifact should be skipped
-    let result =
-        install_all(ArtifactKind::Agent, InstallScope::Global, false, &[Platform::Claude], &ctx)
-            .unwrap();
+    let result = install_all(
+        ArtifactKind::Agent,
+        InstallScope::Global,
+        Force::No,
+        &[Platform::Claude],
+        &ctx,
+    )
+    .unwrap();
     assert!(
         result.items.is_empty(),
         "install_all should skip artifact whose lock source_checksum+version match"
@@ -799,7 +805,7 @@ fn install_all_reinstalls_artifact_when_source_checksum_changed() {
 
     let ctx = t.ctx();
     // First install
-    install_all(ArtifactKind::Agent, InstallScope::Global, false, &[Platform::Claude], &ctx)
+    install_all(ArtifactKind::Agent, InstallScope::Global, Force::No, &[Platform::Claude], &ctx)
         .unwrap();
 
     // Now change the source file — checksum will differ
@@ -808,9 +814,14 @@ fn install_all_reinstalls_artifact_when_source_checksum_changed() {
         agent_content("my-agent", "Updated description"),
     );
 
-    let result =
-        install_all(ArtifactKind::Agent, InstallScope::Global, false, &[Platform::Claude], &ctx)
-            .unwrap();
+    let result = install_all(
+        ArtifactKind::Agent,
+        InstallScope::Global,
+        Force::No,
+        &[Platform::Claude],
+        &ctx,
+    )
+    .unwrap();
     assert_eq!(
         result.items.len(),
         1,
@@ -827,9 +838,9 @@ fn update_succeeds_when_lock_source_name_contains_colon() {
     setup_source_with_skill(&t.fs, &t.paths, "bundled:cmx", "/sources/bundled-cmx", "cmx", "1.0.0");
 
     let ctx = t.ctx();
-    install("cmx", ArtifactKind::Skill, InstallScope::Global, false, &ctx).unwrap();
+    install("cmx", ArtifactKind::Skill, InstallScope::Global, Force::No, &ctx).unwrap();
 
-    let result = update("cmx", ArtifactKind::Skill, true, &ctx).unwrap();
+    let result = update("cmx", ArtifactKind::Skill, Force::Yes, &ctx).unwrap();
     assert_eq!(result.updated.artifact_name, "cmx");
     assert_eq!(result.updated.source_name, "bundled:cmx");
 }
@@ -848,10 +859,10 @@ fn update_reports_drifted_sibling_platforms_for_skills() {
     );
 
     let claude = t.ctx();
-    install("focus-skill", ArtifactKind::Skill, InstallScope::Global, false, &claude).unwrap();
+    install("focus-skill", ArtifactKind::Skill, InstallScope::Global, Force::No, &claude).unwrap();
     let codex_paths = t.paths.with_platform(Platform::Codex);
     let codex = claude.with_paths(&codex_paths);
-    install("focus-skill", ArtifactKind::Skill, InstallScope::Global, false, &codex).unwrap();
+    install("focus-skill", ArtifactKind::Skill, InstallScope::Global, Force::No, &codex).unwrap();
 
     t.fs.add_file(
         "/sources/guidelines/focus-skill/SKILL.md",
@@ -862,7 +873,7 @@ fn update_reports_drifted_sibling_platforms_for_skills() {
         crate::test_support::versioned_skill_content("Locally edited", "1.1.0"),
     );
 
-    let result = update("focus-skill", ArtifactKind::Skill, true, &claude).unwrap();
+    let result = update("focus-skill", ArtifactKind::Skill, Force::Yes, &claude).unwrap();
     assert_eq!(result.sibling_drifted_platforms, vec![Platform::Codex]);
 }
 
@@ -880,13 +891,13 @@ fn update_skips_sibling_warning_when_only_default_platform_is_installed() {
     );
 
     let claude = t.ctx();
-    install("focus-skill", ArtifactKind::Skill, InstallScope::Global, false, &claude).unwrap();
+    install("focus-skill", ArtifactKind::Skill, InstallScope::Global, Force::No, &claude).unwrap();
     t.fs.add_file(
         "/sources/guidelines/focus-skill/SKILL.md",
         crate::test_support::versioned_skill_content("A test skill", "2.0.0"),
     );
 
-    let result = update("focus-skill", ArtifactKind::Skill, false, &claude).unwrap();
+    let result = update("focus-skill", ArtifactKind::Skill, Force::No, &claude).unwrap();
     assert!(result.sibling_drifted_platforms.is_empty(), "{result:?}");
 }
 
@@ -896,14 +907,14 @@ fn update_all_succeeds_when_lock_source_name_contains_colon() {
     setup_source_with_skill(&t.fs, &t.paths, "bundled:cmx", "/sources/bundled-cmx", "cmx", "1.0.0");
 
     let ctx = t.ctx();
-    install("cmx", ArtifactKind::Skill, InstallScope::Global, false, &ctx).unwrap();
+    install("cmx", ArtifactKind::Skill, InstallScope::Global, Force::No, &ctx).unwrap();
 
     t.fs.add_file(
         "/sources/bundled-cmx/cmx/SKILL.md",
         crate::test_support::versioned_skill_content("A test skill", "2.0.0"),
     );
 
-    let result = update_all(ArtifactKind::Skill, false, &ctx).unwrap();
+    let result = update_all(ArtifactKind::Skill, Force::No, &ctx).unwrap();
     assert_eq!(result.items.len(), 1);
     assert_eq!(result.items[0].artifact_name, "cmx");
     assert_eq!(result.items[0].source_name, "bundled:cmx");
@@ -920,7 +931,7 @@ fn update_all_picks_up_artifact_when_version_newly_appears_in_source() {
 
     let ctx = t.ctx();
     // Install the artifact so it exists on disk
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     // Manually rewrite the lock entry: same source checksum but no version recorded.
     // We need the actual checksum so let's compute it via checksum_artifact.
@@ -944,7 +955,7 @@ fn update_all_picks_up_artifact_when_version_newly_appears_in_source() {
         crate::test_support::versioned_agent_content("my-agent", "A test agent", "1.0.0"),
     );
 
-    let result = update_all(ArtifactKind::Agent, false, &ctx).unwrap();
+    let result = update_all(ArtifactKind::Agent, Force::No, &ctx).unwrap();
     assert_eq!(
         result.items.len(),
         1,
@@ -962,7 +973,7 @@ fn install_codex_agent_transforms_markdown_to_toml() {
     setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
 
     let dest = PathBuf::from("/home/testuser/.codex/agents/my-agent.toml");
     assert!(
@@ -989,8 +1000,8 @@ fn install_codex_agent_is_idempotent_without_force() {
     setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
     let ctx = t.ctx();
-    install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx).unwrap();
-    let again = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
+    let again = install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx);
     assert!(
         again.is_ok(),
         "reinstalling unchanged codex agent should succeed: {:?}",
@@ -1005,7 +1016,7 @@ fn install_pi_agent_is_rejected_with_clear_error() {
     setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
     let ctx = t.ctx();
-    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, false, &ctx);
+    let result = install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx);
     assert!(result.is_err(), "pi must reject agent installs");
     let msg = result.unwrap_err().to_string();
     assert!(msg.contains("pi"), "error should name the platform: {msg}");
@@ -1026,7 +1037,7 @@ fn install_pi_skill_is_allowed_and_lands_in_dot_agents() {
     );
 
     let ctx = t.ctx();
-    install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx).unwrap();
+    install("my-skill", ArtifactKind::Skill, InstallScope::Global, Force::No, &ctx).unwrap();
 
     let dest = PathBuf::from("/home/testuser/.agents/skills/my-skill/SKILL.md");
     assert!(
@@ -1062,7 +1073,7 @@ fn install_skills_only_cohort_installs_skill_and_rejects_agent() {
         let ctx = t.ctx();
 
         // Skill install lands in the platform's resolved skills dir.
-        install("my-skill", ArtifactKind::Skill, InstallScope::Local, false, &ctx)
+        install("my-skill", ArtifactKind::Skill, InstallScope::Local, Force::No, &ctx)
             .unwrap_or_else(|e| panic!("{platform} skill install should succeed: {e}"));
         let skill_md = t
             .paths
@@ -1077,7 +1088,7 @@ fn install_skills_only_cohort_installs_skill_and_rejects_agent() {
         );
 
         // Agent install is rejected.
-        let agent = install("anything", ArtifactKind::Agent, InstallScope::Local, false, &ctx);
+        let agent = install("anything", ArtifactKind::Agent, InstallScope::Local, Force::No, &ctx);
         assert!(agent.is_err(), "{platform}: agent install must be rejected");
         assert!(
             agent.unwrap_err().to_string().contains(&platform.to_string()),
@@ -1100,7 +1111,7 @@ fn install_opencode_skill_lands_in_shared_dot_agents() {
     );
 
     let ctx = t.ctx();
-    install("my-skill", ArtifactKind::Skill, InstallScope::Local, false, &ctx).unwrap();
+    install("my-skill", ArtifactKind::Skill, InstallScope::Local, Force::No, &ctx).unwrap();
 
     let dest = PathBuf::from(".agents/skills/my-skill/SKILL.md");
     assert!(t.fs.file_exists(&dest), "opencode skill should land in shared .agents/skills");
@@ -1164,7 +1175,7 @@ fn install_many_fans_out_to_every_target_platform() {
         &["shared-skill".to_string()],
         ArtifactKind::Skill,
         InstallScope::Global,
-        false,
+        Force::No,
         &[Platform::Claude, Platform::Codex],
         &ctx,
     )
@@ -1236,7 +1247,7 @@ fn install_newer_installed_than_source_is_refused() {
 
     let ctx = t.ctx();
     // First install at 1.0.0
-    install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx).unwrap();
+    install("my-skill", ArtifactKind::Skill, InstallScope::Global, Force::No, &ctx).unwrap();
 
     // Rewrite the lock entry so the recorded installed version is 2.0.0 (simulating
     // a machine where the user upgraded via cmx init or another mechanism).
@@ -1263,13 +1274,13 @@ fn install_newer_installed_than_source_is_refused() {
     );
 
     // Without --force, cmx must refuse installing an older source over a newer installed copy.
-    let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, false, &ctx);
+    let result = install("my-skill", ArtifactKind::Skill, InstallScope::Global, Force::No, &ctx);
     assert!(
         matches!(result, Err(crate::error::CliError::InstalledNewerThanSource { .. })),
         "expected InstalledNewerThanSource error, got: {result:?}",
     );
 
     // With --force, the install proceeds (downgrade allowed).
-    let forced = install("my-skill", ArtifactKind::Skill, InstallScope::Global, true, &ctx);
+    let forced = install("my-skill", ArtifactKind::Skill, InstallScope::Global, Force::Yes, &ctx);
     assert!(forced.is_ok(), "--force must allow downgrade, got: {:?}", forced.err());
 }

@@ -3,7 +3,8 @@ use std::process::ExitCode;
 
 use crate::cli::ArtifactAction;
 use crate::context::AppContext;
-use crate::dispatch::set::{DRY_RUN_DEPRECATED_WARNING, scope_from};
+use crate::dispatch::scope_from;
+use crate::dispatch::set::DRY_RUN_DEPRECATED_WARNING;
 use crate::flags::{Force, RunMode, Selection};
 use crate::platform::{Platform, platforms_label};
 use crate::types::{ArtifactKind, InstallScope};
@@ -22,7 +23,7 @@ pub fn handle_install(
     crate::source_update::ensure_fresh(ctx)?;
     let targets = crate::install::resolve_targets(selector, kind, scope, ctx)?;
     if all.is_all() {
-        let result = crate::install::install_all(kind, scope, force.is_yes(), &targets, ctx)?;
+        let result = crate::install::install_all(kind, scope, force, &targets, ctx)?;
         print!("{result}");
         Ok(ExitCode::SUCCESS)
     } else if names.is_empty() {
@@ -31,8 +32,7 @@ pub fn handle_install(
             &format!("cmx {kind} install <name>"),
         ))
     } else {
-        let result =
-            crate::install::install_many(names, kind, scope, force.is_yes(), &targets, ctx)?;
+        let result = crate::install::install_many(names, kind, scope, force, &targets, ctx)?;
         let any_failed = !result.failed.is_empty();
         print!("{result}");
         Ok(if any_failed {
@@ -53,11 +53,11 @@ pub fn handle_update(
 ) -> Result<ExitCode> {
     crate::source_update::ensure_fresh(ctx)?;
     if all.is_all() {
-        let result = crate::install::update_all(kind, force.is_yes(), ctx)?;
+        let result = crate::install::update_all(kind, force, ctx)?;
         print!("{result}");
         Ok(ExitCode::SUCCESS)
     } else if let Some(name) = name {
-        let result = crate::install::update(&name, kind, force.is_yes(), ctx)?;
+        let result = crate::install::update(&name, kind, force, ctx)?;
         print!("{result}");
         if selector.is_none() && !result.sibling_drifted_platforms.is_empty() {
             print_update_note(
@@ -99,7 +99,7 @@ fn print_update_note(
 
 pub fn handle_uninstall(
     names: &[String],
-    local: bool,
+    scope: InstallScope,
     kind: ArtifactKind,
     selector: Option<Platform>,
     ctx: &AppContext<'_>,
@@ -110,11 +110,6 @@ pub fn handle_uninstall(
             &format!("cmx {kind} uninstall <name>"),
         ));
     }
-    let scope = if local {
-        InstallScope::Local
-    } else {
-        InstallScope::Global
-    };
     let result = crate::uninstall::uninstall_many(names, kind, scope, selector, ctx)?;
     let none_removed = result.removed.is_empty();
     print!("{result}");
@@ -187,17 +182,18 @@ pub fn handle_artifact(
             } else {
                 RunMode::from_flag(apply)
             };
-            let result = crate::sync::sync(&name, kind, scope, from, mode.is_apply(), ctx)?;
+            let result = crate::sync::sync(&name, kind, scope, from, mode, ctx)?;
             print!("{result}");
             Ok(ExitCode::SUCCESS)
         }
         ArtifactAction::Promote { name, from, apply } => {
-            let result = crate::promote::promote(&name, kind, from.or(selector), apply, ctx)?;
+            let mode = RunMode::from_flag(apply);
+            let result = crate::promote::promote(&name, kind, from.or(selector), mode, ctx)?;
             print!("{result}");
             Ok(ExitCode::SUCCESS)
         }
         ArtifactAction::Uninstall { names, local } => {
-            handle_uninstall(&names, local, kind, selector, ctx)
+            handle_uninstall(&names, scope_from(local), kind, selector, ctx)
         }
         ArtifactAction::Unadopt { names, external } => {
             super::adopt::handle_unadopt(&names, kind, external, ctx).map(|()| ExitCode::SUCCESS)
@@ -217,7 +213,7 @@ pub fn handle_artifact(
                 kind,
                 Selection::from_flag(all),
                 from_dir.as_deref().or(deprecated_from.as_deref()),
-                scope_from(local),
+                crate::flags::SurveyScope::from_flag(local),
                 ctx,
             )
             .map(|()| ExitCode::SUCCESS)

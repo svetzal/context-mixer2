@@ -21,6 +21,7 @@ use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
 use crate::diff::{FileChange, file_changes_between};
+use crate::flags::RunMode;
 use crate::lockfile;
 use crate::platform::{Platform, platforms_label};
 use crate::types::{ArtifactKind, InstallScope};
@@ -317,7 +318,7 @@ pub fn sync(
     kind: ArtifactKind,
     scope: InstallScope,
     from: Option<Platform>,
-    apply: bool,
+    mode: RunMode,
     ctx: &AppContext<'_>,
 ) -> Result<SyncResult> {
     if kind != ArtifactKind::Skill {
@@ -339,7 +340,7 @@ pub fn sync(
     if copies.iter().all(|c| c.checksum == copies[0].checksum) {
         return Ok(SyncResult {
             name: name.to_string(),
-            apply,
+            apply: mode.is_apply(),
             external,
             winner_platforms: copies[0].platforms.clone(),
             winner_path: copies[0].path.clone(),
@@ -363,7 +364,7 @@ pub fn sync(
 
     let result = SyncResult {
         name: name.to_string(),
-        apply,
+        apply: mode.is_apply(),
         external,
         winner_platforms: winner.platforms.clone(),
         winner_path: winner.path.clone(),
@@ -372,7 +373,7 @@ pub fn sync(
         targets: targets.iter().map(|c| c.as_target(winner, ctx)).collect::<Result<_>>()?,
     };
 
-    if apply {
+    if mode.is_apply() {
         apply_winner(name, kind, scope, winner, &targets, ctx)?;
     }
     Ok(result)

@@ -9,7 +9,7 @@ use cmx::context::AppContext;
 use cmx::dispatch::{
     handle_artifact, handle_config, handle_home, handle_info, handle_set, handle_source, scope_from,
 };
-use cmx::flags::Force;
+use cmx::flags::{Force, SurveyScope};
 use cmx::gateway::real::{RealFilesystem, RealGitClient, SystemClock};
 use cmx::paths::ConfigPaths;
 use cmx::platform::Platform;
@@ -57,7 +57,14 @@ fn run(cli: Cli, ctx: &AppContext<'_>, paths: &ConfigPaths) -> Result<ExitCode> 
             from,
             all,
             output,
-        } => handle_doctor(scope_from(local), adopt_all, from.as_deref(), all, output, ctx),
+        } => handle_doctor(
+            SurveyScope::from_flag(local),
+            adopt_all,
+            from.as_deref(),
+            all,
+            output,
+            ctx,
+        ),
         Commands::Home { action } => handle_home(&action, ctx).map(|()| ExitCode::SUCCESS),
         Commands::Info { name, output } => {
             handle_info(&name, None, output.json, ctx).map(|()| ExitCode::SUCCESS)
@@ -95,19 +102,18 @@ fn handle_list(all: bool, output: OutputArgs, ctx: &AppContext<'_>) -> Result<Ex
 }
 
 fn handle_doctor(
-    scope: InstallScope,
+    scope: SurveyScope,
     adopt_all: bool,
     from: Option<&std::path::Path>,
     all: bool,
     output: OutputArgs,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
-    let local = scope == InstallScope::Local;
     if adopt_all {
         eprintln!("{}", cmx::display::doctor::adopt_all_deprecation_notice());
-        let outcome = cmx::adopt::adopt_all(None, from, local, ctx)?;
+        let outcome = cmx::adopt::adopt_all(None, from, scope, ctx)?;
         if output.json {
-            let mut report = cmx::doctor::survey(local, ctx)?;
+            let mut report = cmx::doctor::survey(scope, ctx)?;
             report.show_all = all;
             print_json(&cmx::display::doctor::doctor_json(&report))?;
         } else {
@@ -117,7 +123,7 @@ fn handle_doctor(
     } else if from.is_some() {
         bail!("--from only applies together with --adopt-all")
     } else {
-        let mut report = cmx::doctor::survey(local, ctx)?;
+        let mut report = cmx::doctor::survey(scope, ctx)?;
         report.show_all = all;
         if output.json {
             print_json(&cmx::display::doctor::doctor_json(&report))?;
@@ -178,11 +184,14 @@ struct InitArgs {
 
 /// `cmx init` — install/remove cmx's own companion skill via cmx-core.
 fn handle_init(args: InitArgs, ctx: &AppContext<'_>) -> Result<ExitCode> {
-    let local = args.scope == InstallScope::Local;
+    let scope = match args.scope {
+        InstallScope::Local => cmx_core::skill_install::Scope::Local,
+        InstallScope::Global => cmx_core::skill_install::Scope::Global,
+    };
     let outcome = if args.remove {
-        cmx::init::run_remove(local, ctx)?
+        cmx::init::run_remove(scope, ctx)?
     } else {
-        cmx::init::run_init(local, args.force.is_yes(), ctx)?
+        cmx::init::run_init(scope, args.force, ctx)?
     };
     if args.output.json {
         print_json(&cmx::display::init::init_json(&outcome))?;

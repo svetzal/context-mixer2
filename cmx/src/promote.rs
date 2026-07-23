@@ -27,6 +27,7 @@ use crate::config;
 use crate::context::AppContext;
 use crate::copy;
 use crate::diff::{FileChange, file_changes_between};
+use crate::flags::RunMode;
 use crate::lockfile;
 use crate::platform::Platform;
 use crate::platform_iter;
@@ -82,7 +83,7 @@ pub fn promote(
     name: &str,
     kind: ArtifactKind,
     selector: Option<Platform>,
-    apply: bool,
+    mode: RunMode,
     ctx: &AppContext<'_>,
 ) -> Result<PromoteResult> {
     if kind == ArtifactKind::Agent && ctx.paths.platform.transforms_agent_to_toml() {
@@ -127,7 +128,7 @@ pub fn promote(
             source_path: installed_path,
             source_platforms,
             home_path,
-            apply,
+            apply: mode.is_apply(),
             already_current: true,
             version,
             file_changes,
@@ -136,13 +137,13 @@ pub fn promote(
         });
     }
 
-    if apply {
+    if mode.is_apply() {
         write_home_copy(kind, &home, &home_path, &dest_dir, &installed_path, ctx)?;
     }
 
     let still_divergent =
         planned_still_divergent(name, kind, scope, &home_tracked, &installed_cs, ctx)?;
-    if apply {
+    if mode.is_apply() {
         refresh_home_baselines(name, scope, &home_tracked, &installed_cs, version.as_deref(), ctx)?;
     }
 
@@ -152,7 +153,7 @@ pub fn promote(
         source_path: installed_path,
         source_platforms,
         home_path,
-        apply,
+        apply: mode.is_apply(),
         already_current: false,
         version,
         file_changes,

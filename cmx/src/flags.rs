@@ -1,11 +1,25 @@
-//! Intent-revealing flag types for the `cmx` CLI shell.
+//! Intent-revealing flag types for the `cmx` CLI shell: [`RunMode`], [`Force`],
+//! [`Purge`], [`Selection`], and [`SurveyScope`].
 //!
-//! These enums replace positional `bool` parameters at call sites, making the
-//! purpose of each flag legible without reading the full function signature.
+//! These enums replace positional `bool` parameters, making the purpose of
+//! each flag legible without reading the full function signature — and, more
+//! importantly, they are meant to be threaded all the way through core logic
+//! as the enum, not just constructed at the boundary and immediately
+//! unwrapped back to a `bool` via `.is_yes()`/`.is_apply()`/`.includes_local()`
+//! before being handed to the next function. Unwrapping at the door defeats
+//! the point: it just moves the boolean-blindness one call deeper. The `.is_*`
+//! accessors exist for use *inside* a module that already holds the enum
+//! (e.g. an `if force.is_yes() { .. }` branch), not for converting a
+//! `Force`/`RunMode`/`SurveyScope` parameter back into a `bool` parameter for
+//! the next call.
 //!
 //! Conversion from raw `bool` (as received from clap) happens exactly once at
 //! the dispatch boundary in `cmx/src/dispatch/` and `cmx/src/main.rs`; only
-//! those sites should call the `from_flag` constructors.
+//! those sites should call the `from_flag` constructors. `cmx/tests/flag_boundary.rs`
+//! enforces that a bare `bool` named `force`/`purge`/`apply`/`local`/
+//! `include_local` never appears as a function parameter outside that
+//! boundary (report/serde struct fields are exempt — see that test's doc
+//! comment).
 
 /// Whether a mutating command should execute changes or only preview them.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -91,6 +105,32 @@ impl Selection {
     }
 }
 
+/// Whether a system-wide survey (`cmx doctor`/`cmx adopt`) should also cover
+/// the local (project-scoped) install locations, in addition to global ones.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SurveyScope {
+    /// Survey only the global install locations.
+    GlobalOnly,
+    /// Survey both global and local install locations.
+    GlobalAndLocal,
+}
+
+impl SurveyScope {
+    /// Convert from a raw `--local` flag.
+    pub fn from_flag(include_local: bool) -> Self {
+        if include_local {
+            SurveyScope::GlobalAndLocal
+        } else {
+            SurveyScope::GlobalOnly
+        }
+    }
+
+    /// `true` when local install locations are included in the survey.
+    pub fn includes_local(self) -> bool {
+        self == SurveyScope::GlobalAndLocal
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,5 +165,13 @@ mod tests {
         assert_eq!(Selection::from_flag(false), Selection::Named);
         assert!(Selection::All.is_all());
         assert!(!Selection::Named.is_all());
+    }
+
+    #[test]
+    fn survey_scope_from_flag_round_trips() {
+        assert_eq!(SurveyScope::from_flag(true), SurveyScope::GlobalAndLocal);
+        assert_eq!(SurveyScope::from_flag(false), SurveyScope::GlobalOnly);
+        assert!(SurveyScope::GlobalAndLocal.includes_local());
+        assert!(!SurveyScope::GlobalOnly.includes_local());
     }
 }

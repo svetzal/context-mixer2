@@ -24,6 +24,7 @@ use crate::config;
 use crate::context::AppContext;
 use crate::copy;
 use crate::doctor::{self, ArtifactState, DoctorRow};
+use crate::flags::SurveyScope;
 use crate::lockfile;
 use crate::platform::Platform;
 use crate::platform_iter;
@@ -139,7 +140,7 @@ fn adopt_row(row: &DoctorRow, home: &Path, ctx: &AppContext<'_>) -> Result<Adopt
 /// each. Non-orphan rows are ignored (callers pass orphans only).
 fn adopt_rows(
     rows: &[DoctorRow],
-    include_local: bool,
+    scope: SurveyScope,
     ctx: &AppContext<'_>,
 ) -> Result<AdoptOutcome> {
     let home = resolve_home(ctx)?;
@@ -151,7 +152,7 @@ fn adopt_rows(
     Ok(AdoptOutcome {
         adopted,
         home,
-        included_local: include_local,
+        included_local: scope.includes_local(),
     })
 }
 
@@ -165,10 +166,10 @@ fn adopt_rows(
 pub fn adopt_all(
     kind: Option<ArtifactKind>,
     from: Option<&Path>,
-    include_local: bool,
+    scope: SurveyScope,
     ctx: &AppContext<'_>,
 ) -> Result<AdoptOutcome> {
-    let report = doctor::survey(include_local, ctx)?;
+    let report = doctor::survey(scope, ctx)?;
     let rows: Vec<DoctorRow> = report
         .rows
         .into_iter()
@@ -176,7 +177,7 @@ pub fn adopt_all(
         .filter(|r| kind.is_none_or(|k| r.kind == k))
         .filter(|r| from.is_none_or(|d| r.location.starts_with(d)))
         .collect();
-    adopt_rows(&rows, include_local, ctx)
+    adopt_rows(&rows, scope, ctx)
 }
 
 /// Choose which surveyed row to adopt for `name`.
@@ -220,10 +221,10 @@ fn select_adopt_row<'a>(
 pub fn adopt_named(
     kind: ArtifactKind,
     names: &[String],
-    include_local: bool,
+    scope: SurveyScope,
     ctx: &AppContext<'_>,
 ) -> Result<AdoptOutcome> {
-    let report = doctor::survey(include_local, ctx)?;
+    let report = doctor::survey(scope, ctx)?;
     // When a name spans several diverged install locations, pick the copy from
     // the highest-priority configured platform — not whichever directory sorts
     // first. See `select_adopt_row`.
@@ -258,7 +259,7 @@ pub fn adopt_named(
             }
         }
     }
-    adopt_rows(&chosen, include_local, ctx)
+    adopt_rows(&chosen, scope, ctx)
 }
 
 /// One unadopted artifact.
@@ -418,11 +419,11 @@ mod tests {
         place_orphan_skill(&t, Platform::Claude, "my-skill", "1.0.0");
 
         // Before: doctor sees it as orphaned.
-        let before = doctor::survey(false, &t.ctx()).unwrap();
+        let before = doctor::survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         let row = before.rows.iter().find(|r| r.name == "my-skill").unwrap();
         assert_eq!(row.state, ArtifactState::Orphaned);
 
-        let outcome = adopt_all(None, None, false, &t.ctx()).unwrap();
+        let outcome = adopt_all(None, None, SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         assert_eq!(outcome.adopted.len(), 1);
         let adopted = &outcome.adopted[0];
         assert_eq!(adopted.name, "my-skill");
@@ -432,7 +433,7 @@ mod tests {
         assert!(t.fs.exists(&home_skill), "skill copied into home at {}", home_skill.display());
 
         // After: doctor reclassifies the original as tracked.
-        let after = doctor::survey(false, &t.ctx()).unwrap();
+        let after = doctor::survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         let row = after.rows.iter().find(|r| r.name == "my-skill").unwrap();
         assert_eq!(row.state, ArtifactState::Tracked, "adopted orphan is now tracked");
         assert!(!after.has_issues(), "no issues remain after adopting the only orphan");
@@ -442,7 +443,7 @@ mod tests {
     fn adopt_records_home_provenance_in_lockfile() {
         let t = TestContext::new();
         place_orphan_skill(&t, Platform::Claude, "my-skill", "2.3.4");
-        adopt_all(None, None, false, &t.ctx()).unwrap();
+        adopt_all(None, None, SurveyScope::GlobalOnly, &t.ctx()).unwrap();
 
         let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
         let entry = lock.packages.get("my-skill").expect("lock entry written");
@@ -462,7 +463,7 @@ mod tests {
             .unwrap()
             .join("my-skill")
             .join("SKILL.md");
-        adopt_all(None, None, false, &t.ctx()).unwrap();
+        adopt_all(None, None, SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         assert!(t.fs.exists(&original), "original copy is left in place, not moved");
     }
 
@@ -472,13 +473,18 @@ mod tests {
         place_orphan_skill(&t, Platform::Claude, "keep", "1.0.0");
         place_orphan_skill(&t, Platform::Claude, "other", "1.0.0");
 
-        let outcome =
-            adopt_named(ArtifactKind::Skill, &["keep".to_string()], false, &t.ctx()).unwrap();
+        let outcome = adopt_named(
+            ArtifactKind::Skill,
+            &["keep".to_string()],
+            SurveyScope::GlobalOnly,
+            &t.ctx(),
+        )
+        .unwrap();
         assert_eq!(outcome.adopted.len(), 1);
         assert_eq!(outcome.adopted[0].name, "keep");
 
         // "other" remains orphaned.
-        let report = doctor::survey(false, &t.ctx()).unwrap();
+        let report = doctor::survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         let other = report.rows.iter().find(|r| r.name == "other").unwrap();
         assert_eq!(other.state, ArtifactState::Orphaned);
     }
@@ -494,8 +500,13 @@ mod tests {
         place_orphan_skill(&t, Platform::Claude, "shared", "1.0.0");
         place_orphan_skill(&t, Platform::Codex, "shared", "1.0.0");
 
-        let outcome =
-            adopt_named(ArtifactKind::Skill, &["shared".to_string()], false, &t.ctx()).unwrap();
+        let outcome = adopt_named(
+            ArtifactKind::Skill,
+            &["shared".to_string()],
+            SurveyScope::GlobalOnly,
+            &t.ctx(),
+        )
+        .unwrap();
         assert_eq!(outcome.adopted.len(), 1);
         assert_eq!(
             outcome.adopted[0].platforms,
@@ -513,8 +524,13 @@ mod tests {
         place_orphan_skill(&t, Platform::Claude, "shared", "1.0.0");
         place_orphan_skill(&t, Platform::Codex, "shared", "1.0.0");
 
-        let outcome =
-            adopt_named(ArtifactKind::Skill, &["shared".to_string()], false, &t.ctx()).unwrap();
+        let outcome = adopt_named(
+            ArtifactKind::Skill,
+            &["shared".to_string()],
+            SurveyScope::GlobalOnly,
+            &t.ctx(),
+        )
+        .unwrap();
         assert_eq!(outcome.adopted[0].platforms, vec![Platform::Codex]);
     }
 
@@ -534,7 +550,7 @@ mod tests {
         // A genuine orphan alongside it.
         place_orphan_skill(&t, Platform::Claude, "my-private", "1.0.0");
 
-        let outcome = adopt_all(None, None, false, &t.ctx()).unwrap();
+        let outcome = adopt_all(None, None, SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         let names: Vec<&str> = outcome.adopted.iter().map(|a| a.name.as_str()).collect();
         assert!(names.contains(&"my-private"), "the true orphan is adopted");
         assert!(
@@ -556,8 +572,13 @@ mod tests {
         );
         place_orphan_skill(&t, Platform::Claude, "vis-theory", "1.0.0");
 
-        let err = adopt_named(ArtifactKind::Skill, &["vis-theory".to_string()], false, &t.ctx())
-            .unwrap_err();
+        let err = adopt_named(
+            ArtifactKind::Skill,
+            &["vis-theory".to_string()],
+            SurveyScope::GlobalOnly,
+            &t.ctx(),
+        )
+        .unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("available in a registered source"), "got: {msg}");
         assert!(msg.contains("cmx skill install vis-theory"), "steers to install: {msg}");
@@ -571,8 +592,13 @@ mod tests {
         place_orphan_skill(&t, Platform::Pi, "theirs", "1.0.0");
 
         let claude_skills = t.paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
-        let outcome =
-            adopt_all(Some(ArtifactKind::Skill), Some(&claude_skills), false, &t.ctx()).unwrap();
+        let outcome = adopt_all(
+            Some(ArtifactKind::Skill),
+            Some(&claude_skills),
+            SurveyScope::GlobalOnly,
+            &t.ctx(),
+        )
+        .unwrap();
         let names: Vec<&str> = outcome.adopted.iter().map(|a| a.name.as_str()).collect();
         assert_eq!(names, ["mine"], "only the orphan under the --from-dir location is adopted");
     }
@@ -587,7 +613,7 @@ mod tests {
         let outcome = adopt_named(
             ArtifactKind::Skill,
             &["alpha".to_string(), "gamma".to_string()],
-            false,
+            SurveyScope::GlobalOnly,
             &t.ctx(),
         )
         .unwrap();
@@ -596,7 +622,7 @@ mod tests {
         assert_eq!(names, ["alpha", "gamma"], "exactly the two named orphans");
 
         // beta remains orphaned.
-        let report = doctor::survey(false, &t.ctx()).unwrap();
+        let report = doctor::survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         assert_eq!(
             report.rows.iter().find(|r| r.name == "beta").unwrap().state,
             ArtifactState::Orphaned
@@ -612,12 +638,12 @@ mod tests {
         let result = adopt_named(
             ArtifactKind::Skill,
             &["good".to_string(), "nope".to_string()],
-            false,
+            SurveyScope::GlobalOnly,
             &t.ctx(),
         );
         assert!(result.is_err(), "invalid name should abort the batch");
 
-        let report = doctor::survey(false, &t.ctx()).unwrap();
+        let report = doctor::survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         assert_eq!(
             report.rows.iter().find(|r| r.name == "good").unwrap().state,
             ArtifactState::Orphaned,
@@ -628,7 +654,12 @@ mod tests {
     #[test]
     fn adopt_named_errors_when_no_matching_orphan() {
         let t = TestContext::new();
-        let result = adopt_named(ArtifactKind::Skill, &["ghost".to_string()], false, &t.ctx());
+        let result = adopt_named(
+            ArtifactKind::Skill,
+            &["ghost".to_string()],
+            SurveyScope::GlobalOnly,
+            &t.ctx(),
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("No skill named 'ghost' found on disk"));
     }
@@ -637,7 +668,7 @@ mod tests {
     fn unadopt_reverses_adoption() {
         let t = TestContext::new();
         place_orphan_skill(&t, Platform::Claude, "tool-skill", "1.0.0");
-        adopt_all(None, None, false, &t.ctx()).unwrap();
+        adopt_all(None, None, SurveyScope::GlobalOnly, &t.ctx()).unwrap();
 
         // After adopt: in the home, and the original is tracked.
         let home = home_path(&t.ctx()).unwrap();
@@ -661,7 +692,7 @@ mod tests {
             .join("tool-skill")
             .join("SKILL.md");
         assert!(t.fs.exists(&original), "tool-created original is left in place");
-        let report = doctor::survey(false, &t.ctx()).unwrap();
+        let report = doctor::survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         assert_eq!(
             report.rows.iter().find(|r| r.name == "tool-skill").unwrap().state,
             ArtifactState::Orphaned,
@@ -681,9 +712,9 @@ mod tests {
     fn adopt_is_idempotent() {
         let t = TestContext::new();
         place_orphan_skill(&t, Platform::Claude, "my-skill", "1.0.0");
-        adopt_all(None, None, false, &t.ctx()).unwrap();
+        adopt_all(None, None, SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         // Second run finds no orphans (the original is now tracked).
-        let second = adopt_all(None, None, false, &t.ctx()).unwrap();
+        let second = adopt_all(None, None, SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         assert!(second.adopted.is_empty(), "nothing left to adopt on the second run");
     }
 }

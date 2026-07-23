@@ -1,4 +1,5 @@
 use super::*;
+use crate::flags::RunMode;
 use crate::gateway::Filesystem;
 use crate::test_support::{TestContext, make_lock_entry_builder, save_lock_with_entry};
 
@@ -49,7 +50,7 @@ fn promote_copies_installed_into_home_and_refreshes_lock() {
     place_skill(&t, Platform::Claude, "pf", "edited in place");
     track_from_home(&t, Platform::Claude, "pf");
 
-    let r = promote("pf", ArtifactKind::Skill, None, true, &t.ctx()).unwrap();
+    let r = promote("pf", ArtifactKind::Skill, None, RunMode::Apply, &t.ctx()).unwrap();
 
     assert!(!r.already_current);
     assert_eq!(r.retracked, vec![Platform::Claude]);
@@ -78,10 +79,10 @@ fn promote_is_a_noop_when_home_already_matches() {
     place_skill(&t, Platform::Claude, "pf", "same content");
     track_from_home(&t, Platform::Claude, "pf");
     // Pre-seed the home with identical content.
-    promote("pf", ArtifactKind::Skill, None, true, &t.ctx()).unwrap();
+    promote("pf", ArtifactKind::Skill, None, RunMode::Apply, &t.ctx()).unwrap();
 
     // A second promote finds the home already current.
-    let r = promote("pf", ArtifactKind::Skill, None, false, &t.ctx()).unwrap();
+    let r = promote("pf", ArtifactKind::Skill, None, RunMode::Plan, &t.ctx()).unwrap();
     assert!(r.already_current, "home already matches installed");
     assert!(r.retracked.is_empty());
 }
@@ -93,7 +94,7 @@ fn promote_plan_mode_makes_no_changes() {
     track_from_home(&t, Platform::Claude, "pf");
 
     let before = lock_entry(&t, Platform::Claude, "pf");
-    let r = promote("pf", ArtifactKind::Skill, None, false, &t.ctx()).unwrap();
+    let r = promote("pf", ArtifactKind::Skill, None, RunMode::Plan, &t.ctx()).unwrap();
 
     assert!(!r.apply);
     assert!(!r.file_changes.is_empty(), "plan should name concrete file changes");
@@ -114,7 +115,8 @@ fn promote_flags_other_platforms_that_still_differ() {
     track_from_home(&t, Platform::Codex, "pf");
 
     // Explicitly promote the Claude copy; Codex differs from it and is flagged.
-    let r = promote("pf", ArtifactKind::Skill, Some(Platform::Claude), true, &t.ctx()).unwrap();
+    let r = promote("pf", ArtifactKind::Skill, Some(Platform::Claude), RunMode::Apply, &t.ctx())
+        .unwrap();
 
     assert!(r.retracked.contains(&Platform::Claude));
     assert!(r.retracked.contains(&Platform::Codex));
@@ -152,7 +154,7 @@ fn promote_auto_selects_the_single_drifted_copy() {
 
     // No --from: cmx must pick the drifted Claude copy, not default-to-Claude
     // by luck — Codex being pristine is what makes the choice unambiguous.
-    let r = promote("pf", ArtifactKind::Skill, None, true, &t.ctx()).unwrap();
+    let r = promote("pf", ArtifactKind::Skill, None, RunMode::Apply, &t.ctx()).unwrap();
     assert!(!r.already_current);
     assert!(
         t.fs.read_to_string(&home_skill_md(&t, "pf")).unwrap().contains("claude edits"),
@@ -169,7 +171,7 @@ fn promote_refuses_when_multiple_platforms_drift_differently() {
     track_from_home(&t, Platform::Codex, "pf");
 
     // Both copies were edited in place, differently → cmx can't guess.
-    let err = promote("pf", ArtifactKind::Skill, None, false, &t.ctx())
+    let err = promote("pf", ArtifactKind::Skill, None, RunMode::Plan, &t.ctx())
         .unwrap_err()
         .to_string();
     assert!(err.contains("Multiple platforms"), "explains the ambiguity: {err}");
@@ -188,7 +190,7 @@ fn promote_rejects_git_sourced_artifact_with_guidance() {
     let entry = make_lock_entry_builder(ArtifactKind::Skill, "guidelines", "slidev/SKILL.md");
     save_lock_with_entry(&t.fs, &t.paths, "slidev", entry, InstallScope::Global);
 
-    let err = promote("slidev", ArtifactKind::Skill, None, false, &t.ctx())
+    let err = promote("slidev", ArtifactKind::Skill, None, RunMode::Plan, &t.ctx())
         .unwrap_err()
         .to_string();
     assert!(err.contains("'guidelines' source"), "names the git source: {err}");
@@ -200,7 +202,7 @@ fn promote_rejects_untracked_artifact_with_guidance() {
     let t = TestContext::new();
     place_skill(&t, Platform::Claude, "loose", "hand authored");
 
-    let err = promote("loose", ArtifactKind::Skill, None, false, &t.ctx())
+    let err = promote("loose", ArtifactKind::Skill, None, RunMode::Plan, &t.ctx())
         .unwrap_err()
         .to_string();
     assert!(err.contains("adopt loose"), "steers a hand-authored artifact to adopt: {err}");
@@ -209,7 +211,7 @@ fn promote_rejects_untracked_artifact_with_guidance() {
 #[test]
 fn promote_errors_when_not_installed() {
     let t = TestContext::new();
-    let err = promote("ghost", ArtifactKind::Skill, None, false, &t.ctx())
+    let err = promote("ghost", ArtifactKind::Skill, None, RunMode::Plan, &t.ctx())
         .unwrap_err()
         .to_string();
     assert!(err.contains("No installed skill named 'ghost'"), "got: {err}");

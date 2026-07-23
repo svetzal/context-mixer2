@@ -287,7 +287,7 @@ Config & persistence:
 Types:
 
 - `cmx/src/error.rs` — `CliError` typed enum and `Result<T>` alias for all cmx command-core modules; transparent pass-through to `CmxError`; `Message(String)` escape hatch for runtime-built messages
-- `cmx/src/flags.rs` — intent-revealing flag enums (`Force`, `RunMode`, `Purge`, `Selection`) that replace positional `bool` parameters at internal call sites; each carries a `from_flag(bool)` constructor used exactly once at the clap dispatch boundary
+- `cmx/src/flags.rs` — intent-revealing flag enums (`Force`, `RunMode`, `Purge`, `Selection`, `SurveyScope`) that replace positional `bool` parameters at internal call sites; each carries a `from_flag(bool)` constructor used exactly once at the clap dispatch boundary, and the enum itself (not a bool unwrapped from it) is threaded through core function signatures. `cmx/tests/flag_boundary.rs` is the architectural guard that enforces this — it fails the build if `force`/`purge`/`apply`/`local`/`include_local` reappears as a bare `bool` function parameter outside `cmx/src/cli/` or a report struct field
 - `cmx/src/plugin_types.rs` — serde types for plugin.json and marketplace.json (single source of truth lifted from cmf)
 - `cmx/src/codex_agent.rs` — transforms a cmx markdown agent into a Codex CLI subagent TOML document
 

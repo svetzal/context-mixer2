@@ -70,7 +70,7 @@ pub fn install(
     name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
-    force: bool,
+    force: Force,
     ctx: &AppContext<'_>,
 ) -> Result<InstallResult> {
     let sources = crate::config::load_sources(ctx.fs, ctx.paths)?;
@@ -83,7 +83,7 @@ fn install_resolved(
     artifact_name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
-    force: bool,
+    force: Force,
     ctx: &AppContext<'_>,
 ) -> Result<InstallResult> {
     ctx.paths.ensure_supports(kind)?;
@@ -96,7 +96,7 @@ fn install_resolved(
     let facts = gather_install_facts(artifact_name, kind, scope, force, ctx)?;
 
     // Version guard: refuse to downgrade a newer-installed copy unless forced.
-    if facts.already_installed && !force {
+    if facts.already_installed && !force.is_yes() {
         let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
         if let Some(entry) = lock.packages.get(artifact_name) {
             if artifact_status::installed_is_newer(
@@ -112,15 +112,14 @@ fn install_resolved(
         }
     }
 
-    let decision =
-        decide_install(facts.already_installed, facts.locally_modified, Force::from_flag(force));
+    let decision = decide_install(facts.already_installed, facts.locally_modified, force);
     if decision.blocked {
         return Err(CliError::LocallyModified {
             name: artifact_name.to_string(),
             kind,
         });
     }
-    let discarded_paths = if force && facts.locally_modified {
+    let discarded_paths = if force.is_yes() && facts.locally_modified {
         collect_discarded_paths(
             kind,
             &ctx.paths.require_installed_artifact_path(kind, artifact_name, scope)?,
@@ -179,7 +178,7 @@ pub fn install_many(
     names: &[String],
     kind: ArtifactKind,
     scope: InstallScope,
-    force: bool,
+    force: Force,
     targets: &[Platform],
     ctx: &AppContext<'_>,
 ) -> Result<InstallManyResult> {
@@ -216,7 +215,7 @@ pub fn install_many(
 pub fn update(
     name: &str,
     kind: ArtifactKind,
-    force: bool,
+    force: Force,
     ctx: &AppContext<'_>,
 ) -> Result<UpdateResult> {
     let Some((entry, scope)) = lockfile::find_entry(name, ctx.fs, ctx.paths)? else {
@@ -239,7 +238,7 @@ pub fn update(
 pub fn install_all(
     kind: ArtifactKind,
     scope: InstallScope,
-    force: bool,
+    force: Force,
     targets: &[Platform],
     ctx: &AppContext<'_>,
 ) -> Result<BatchInstallResult> {
@@ -259,7 +258,7 @@ pub fn install_all(
 fn install_all_one(
     kind: ArtifactKind,
     scope: InstallScope,
-    force: bool,
+    force: Force,
     ctx: &AppContext<'_>,
 ) -> Result<BatchInstallResult> {
     ctx.paths.ensure_supports(kind)?;
@@ -296,7 +295,7 @@ fn install_all_one(
 
 pub fn update_all(
     kind: ArtifactKind,
-    force: bool,
+    force: Force,
     ctx: &AppContext<'_>,
 ) -> Result<BatchInstallResult> {
     ctx.paths.ensure_supports(kind)?;
@@ -356,7 +355,7 @@ pub(crate) fn gather_install_facts(
     artifact_name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
-    force: bool,
+    force: Force,
     ctx: &AppContext<'_>,
 ) -> Result<InstallFacts> {
     let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
@@ -369,7 +368,7 @@ pub(crate) fn gather_install_facts(
     )?;
     let already_installed = ctx.paths.is_installed(kind, artifact_name, scope, ctx.fs);
     Ok(InstallFacts {
-        locally_modified: locally_modified && (!force || already_installed),
+        locally_modified: locally_modified && (!force.is_yes() || already_installed),
         already_installed,
     })
 }

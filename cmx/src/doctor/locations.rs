@@ -10,14 +10,15 @@ use std::path::PathBuf;
 
 use crate::context::AppContext;
 use crate::error::Result;
+use crate::flags::SurveyScope;
 use crate::lockfile;
 use crate::platform::Platform;
 use crate::source_iter;
 use crate::types::{ArtifactKind, InstallScope, LockFile};
 
 /// The scopes to survey: global always, plus local when `include_local`.
-pub(crate) fn survey_scopes(include_local: bool) -> Vec<InstallScope> {
-    if include_local {
+pub(crate) fn survey_scopes(scope: SurveyScope) -> Vec<InstallScope> {
+    if scope.includes_local() {
         vec![InstallScope::Global, InstallScope::Local]
     } else {
         vec![InstallScope::Global]

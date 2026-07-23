@@ -3,6 +3,7 @@
 //! `<tool> init` conventions (see `EMBEDDING.md`).
 
 use crate::error::{CliError, Result};
+use crate::flags::Force;
 use std::process::ExitCode;
 
 use cmx_core::context::AppContext;
@@ -16,11 +17,6 @@ use cmx_core::skill_install::{
 /// placeholder in the file is overwritten on write, so it never needs
 /// hand-maintaining here.
 const SKILL_CONTENT: &str = include_str!("../skill/SKILL.md");
-
-/// Map the `--local` flag onto a `cmx-core` [`Scope`]. Global is the default.
-fn scope_from_flags(local: bool) -> Scope {
-    if local { Scope::Local } else { Scope::Global }
-}
 
 fn bundled_skill() -> BundledSkill {
     BundledSkill::single_md(SKILL_CONTENT)
@@ -64,12 +60,11 @@ impl InitOutcome {
 }
 
 /// Install (or update) cmx's companion skill.
-pub fn run_init(local: bool, force: bool, ctx: &AppContext<'_>) -> Result<InitOutcome> {
+pub fn run_init(scope: Scope, force: Force, ctx: &AppContext<'_>) -> Result<InitOutcome> {
     let skill = bundled_skill();
     let installer = make_installer();
-    let scope = scope_from_flags(local);
 
-    let plan = installer.plan(&skill, scope, force, ctx)?;
+    let plan = installer.plan(&skill, scope, force.is_yes(), ctx)?;
     if plan.is_blocked() {
         let reasons = plan
             .targets
@@ -94,9 +89,8 @@ pub fn run_init(local: bool, force: bool, ctx: &AppContext<'_>) -> Result<InitOu
 }
 
 /// Uninstall cmx's companion skill.
-pub fn run_remove(local: bool, ctx: &AppContext<'_>) -> Result<InitOutcome> {
+pub fn run_remove(scope: Scope, ctx: &AppContext<'_>) -> Result<InitOutcome> {
     let installer = make_installer();
-    let scope = scope_from_flags(local);
     let report = installer.remove(scope, ctx)?;
     Ok(InitOutcome::Removed(report))
 }
@@ -126,7 +120,7 @@ mod tests {
         // declare the cmx binary version and leave no placeholder behind.
         let t = TestContext::new();
         let ctx = t.ctx();
-        run_init(false, false, &ctx).unwrap();
+        run_init(Scope::Global, Force::No, &ctx).unwrap();
 
         let skill_md = t
             .paths
@@ -143,12 +137,6 @@ mod tests {
     }
 
     #[test]
-    fn scope_from_flags_maps_local_and_global() {
-        assert_eq!(scope_from_flags(true), Scope::Local);
-        assert_eq!(scope_from_flags(false), Scope::Global);
-    }
-
-    #[test]
     fn bundled_skill_has_skill_md() {
         assert!(bundled_skill().has_skill_md());
     }
@@ -158,7 +146,7 @@ mod tests {
         let t = TestContext::new();
         let ctx = t.ctx();
 
-        let outcome = run_init(false, false, &ctx).unwrap();
+        let outcome = run_init(Scope::Global, Force::No, &ctx).unwrap();
         match outcome {
             InitOutcome::Installed(report) => {
                 assert_eq!(report.tool.name, "cmx");
@@ -175,9 +163,9 @@ mod tests {
     fn run_init_rerun_is_a_skip() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        run_init(false, false, &ctx).unwrap();
+        run_init(Scope::Global, Force::No, &ctx).unwrap();
 
-        let outcome = run_init(false, false, &ctx).unwrap();
+        let outcome = run_init(Scope::Global, Force::No, &ctx).unwrap();
         match outcome {
             InitOutcome::Installed(report) => {
                 assert_eq!(report.applied().count(), 0);
@@ -192,9 +180,9 @@ mod tests {
     fn run_remove_after_install_reports_removal() {
         let t = TestContext::new();
         let ctx = t.ctx();
-        run_init(false, false, &ctx).unwrap();
+        run_init(Scope::Global, Force::No, &ctx).unwrap();
 
-        let outcome = run_remove(false, &ctx).unwrap();
+        let outcome = run_remove(Scope::Global, &ctx).unwrap();
         match outcome {
             InitOutcome::Removed(report) => {
                 assert!(report.was_on_disk);
@@ -213,7 +201,7 @@ mod tests {
         save_lock_with_entry(&t.fs, &t.paths, "cmx", entry, InstallScope::Global);
         let ctx = t.ctx();
 
-        let outcome = run_init(false, false, &ctx).unwrap();
+        let outcome = run_init(Scope::Global, Force::No, &ctx).unwrap();
         match outcome {
             InitOutcome::Blocked { plan, reasons } => {
                 assert_eq!(plan.targets.len(), 1);
@@ -228,7 +216,7 @@ mod tests {
     fn run_init_drifted_copy_without_force_skips_and_fails() {
         let t = TestContext::new();
         let initial_ctx = t.ctx();
-        run_init(false, false, &initial_ctx).unwrap();
+        run_init(Scope::Global, Force::No, &initial_ctx).unwrap();
 
         let claude_paths = t.paths.with_platform(Platform::Claude);
         let skill_dir = claude_paths
@@ -241,7 +229,7 @@ mod tests {
         t.fs.add_file(&skill_md, drifted.as_str());
 
         let ctx = t.ctx();
-        let outcome = run_init(false, false, &ctx).unwrap();
+        let outcome = run_init(Scope::Global, Force::No, &ctx).unwrap();
         let rendered = outcome.to_string();
         assert_eq!(outcome.exit_code(), ExitCode::FAILURE);
         assert!(rendered.contains("Skipped 1 drifted copy (use --force)."));
@@ -264,7 +252,7 @@ mod tests {
     fn run_init_force_overwrites_drifted_copy_and_exits_success() {
         let t = TestContext::new();
         let initial_ctx = t.ctx();
-        run_init(false, false, &initial_ctx).unwrap();
+        run_init(Scope::Global, Force::No, &initial_ctx).unwrap();
 
         let claude_paths = t.paths.with_platform(Platform::Claude);
         let skill_dir = claude_paths
@@ -281,7 +269,7 @@ mod tests {
         t.fs.add_file(&local_only, "scratch notes\n");
 
         let ctx = t.ctx();
-        let outcome = run_init(false, true, &ctx).unwrap();
+        let outcome = run_init(Scope::Global, Force::Yes, &ctx).unwrap();
         let rendered = outcome.to_string();
         assert_eq!(outcome.exit_code(), ExitCode::SUCCESS);
         assert!(rendered.contains("Discarding local modification:"));
@@ -318,7 +306,7 @@ mod tests {
         save_lock_with_entry(&t.fs, &t.paths, "cmx", entry, InstallScope::Global);
         let ctx = t.ctx();
 
-        let outcome = run_init(false, true, &ctx).unwrap();
+        let outcome = run_init(Scope::Global, Force::Yes, &ctx).unwrap();
         assert_eq!(outcome.exit_code(), ExitCode::SUCCESS);
         match outcome {
             InitOutcome::Installed(report) => {

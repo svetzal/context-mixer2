@@ -1,4 +1,5 @@
 use super::*;
+use crate::flags::RunMode;
 use crate::gateway::Filesystem;
 use crate::test_support::{
     TestContext, make_lock_entry_builder, save_lock_with_entry, versioned_skill_content,
@@ -75,8 +76,15 @@ fn sync_newest_version_wins_and_updates_the_older_copy() {
     place_skill(&t, Platform::Claude, "mailctl", "1.1.2");
     place_skill(&t, Platform::Codex, "mailctl", "1.0.3");
 
-    let r =
-        sync("mailctl", ArtifactKind::Skill, InstallScope::Global, None, true, &t.ctx()).unwrap();
+    let r = sync(
+        "mailctl",
+        ArtifactKind::Skill,
+        InstallScope::Global,
+        None,
+        RunMode::Apply,
+        &t.ctx(),
+    )
+    .unwrap();
 
     assert!(!r.already_synced);
     assert_eq!(r.winner_version.as_deref(), Some("1.1.2"));
@@ -96,7 +104,7 @@ fn sync_from_forces_direction_even_against_newest() {
         ArtifactKind::Skill,
         InstallScope::Global,
         Some(Platform::Claude),
-        true,
+        RunMode::Apply,
         &t.ctx(),
     )
     .unwrap();
@@ -111,8 +119,8 @@ fn sync_ambiguous_without_from_errors_but_succeeds_with_from() {
     place_unversioned(&t, Platform::Claude, "s", "alpha");
     place_unversioned(&t, Platform::Codex, "s", "beta");
 
-    let err =
-        sync("s", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx()).unwrap_err();
+    let err = sync("s", ArtifactKind::Skill, InstallScope::Global, None, RunMode::Plan, &t.ctx())
+        .unwrap_err();
     assert!(err.to_string().contains("--from"), "ambiguous case should ask for --from");
 
     sync(
@@ -120,7 +128,7 @@ fn sync_ambiguous_without_from_errors_but_succeeds_with_from() {
         ArtifactKind::Skill,
         InstallScope::Global,
         Some(Platform::Claude),
-        true,
+        RunMode::Apply,
         &t.ctx(),
     )
     .unwrap();
@@ -137,7 +145,7 @@ fn sync_ambiguous_error_lists_candidates_and_from_commands() {
     // suggestion would name some other cohort member (e.g. opencode).
     set_managed(&t, &[Platform::Claude, Platform::Codex]);
 
-    let err = sync("s", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx())
+    let err = sync("s", ArtifactKind::Skill, InstallScope::Global, None, RunMode::Plan, &t.ctx())
         .unwrap_err()
         .to_string();
 
@@ -163,7 +171,7 @@ fn sync_ambiguous_error_suggests_promote_for_home_tracked() {
         InstallScope::Global,
     );
 
-    let err = sync("s", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx())
+    let err = sync("s", ArtifactKind::Skill, InstallScope::Global, None, RunMode::Plan, &t.ctx())
         .unwrap_err()
         .to_string();
 
@@ -187,9 +195,16 @@ fn sync_home_tracked_copy_matching_external_rule_avoids_other_tool_claim() {
         InstallScope::Global,
     );
 
-    let out = sync("mailctl", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx())
-        .unwrap()
-        .to_string();
+    let out = sync(
+        "mailctl",
+        ArtifactKind::Skill,
+        InstallScope::Global,
+        None,
+        RunMode::Plan,
+        &t.ctx(),
+    )
+    .unwrap()
+    .to_string();
 
     assert!(out.contains("matches an external rule"), "got: {out}");
     assert!(!out.contains("managed by another tool"), "got: {out}");
@@ -201,7 +216,8 @@ fn sync_identical_copies_reports_already_synced() {
     place_skill(&t, Platform::Claude, "s", "1.0.0");
     place_skill(&t, Platform::Codex, "s", "1.0.0");
 
-    let r = sync("s", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx()).unwrap();
+    let r = sync("s", ArtifactKind::Skill, InstallScope::Global, None, RunMode::Plan, &t.ctx())
+        .unwrap();
     assert!(r.already_synced);
     assert!(r.targets.is_empty());
 }
@@ -212,7 +228,8 @@ fn sync_dry_run_changes_nothing_on_disk() {
     place_skill(&t, Platform::Claude, "s", "1.1.2");
     place_skill(&t, Platform::Codex, "s", "1.0.3");
 
-    let r = sync("s", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx()).unwrap();
+    let r = sync("s", ArtifactKind::Skill, InstallScope::Global, None, RunMode::Plan, &t.ctx())
+        .unwrap();
     assert!(!r.apply);
     assert_eq!(r.targets.len(), 1);
     // Codex copy is untouched.
@@ -222,15 +239,22 @@ fn sync_dry_run_changes_nothing_on_disk() {
 #[test]
 fn sync_rejects_agents() {
     let t = TestContext::new();
-    let err =
-        sync("a", ArtifactKind::Agent, InstallScope::Global, None, false, &t.ctx()).unwrap_err();
+    let err = sync("a", ArtifactKind::Agent, InstallScope::Global, None, RunMode::Plan, &t.ctx())
+        .unwrap_err();
     assert!(err.to_string().contains("skills only"));
 }
 
 #[test]
 fn sync_uninstalled_skill_errors() {
     let t = TestContext::new();
-    let err = sync("ghost", ArtifactKind::Skill, InstallScope::Global, None, false, &t.ctx())
-        .unwrap_err();
+    let err = sync(
+        "ghost",
+        ArtifactKind::Skill,
+        InstallScope::Global,
+        None,
+        RunMode::Plan,
+        &t.ctx(),
+    )
+    .unwrap_err();
     assert!(err.to_string().contains("not installed"));
 }

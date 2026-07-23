@@ -6,18 +6,10 @@ use crate::context::AppContext;
 use crate::flags::{Force, Purge, RunMode};
 use crate::types::InstallScope;
 
-use super::{print_json, usage_error};
+use super::{print_json, scope_from, usage_error};
 
 pub(crate) const DRY_RUN_DEPRECATED_WARNING: &str =
     "--dry-run is deprecated; the plan is now shown by default — pass --apply to execute";
-
-pub fn scope_from(local: bool) -> InstallScope {
-    if local {
-        InstallScope::Local
-    } else {
-        InstallScope::Global
-    }
-}
 
 pub fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
     match action {
@@ -35,26 +27,26 @@ pub fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
                 &name,
                 desc.as_deref(),
                 from_plugin.as_deref().or(deprecated_from.as_deref()),
-                local,
+                scope_from(local),
                 ctx,
             )
         }
-        SetAction::List { local, output } => handle_set_list(local, output, ctx),
+        SetAction::List { local, output } => handle_set_list(scope_from(local), output, ctx),
         SetAction::Show {
             name,
             local,
             output,
-        } => handle_set_show(&name, local, output, ctx),
+        } => handle_set_show(&name, scope_from(local), output, ctx),
         SetAction::Add {
             name,
             artifacts,
             local,
-        } => handle_set_add(&name, &artifacts, local, ctx),
+        } => handle_set_add(&name, &artifacts, scope_from(local), ctx),
         SetAction::Remove {
             name,
             artifacts,
             local,
-        } => handle_set_remove(&name, &artifacts, local, ctx),
+        } => handle_set_remove(&name, &artifacts, scope_from(local), ctx),
         SetAction::Activate {
             name,
             apply,
@@ -108,7 +100,9 @@ pub fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
                 ExitCode::FAILURE
             })
         }
-        SetAction::Rename { old, new, local } => handle_set_rename(&old, &new, local, ctx),
+        SetAction::Rename { old, new, local } => {
+            handle_set_rename(&old, &new, scope_from(local), ctx)
+        }
     }
 }
 
@@ -116,16 +110,19 @@ fn handle_set_create(
     name: &str,
     desc: Option<&str>,
     from: Option<&str>,
-    local: bool,
+    scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
-    let result = crate::sets::create(name, desc, from, scope_from(local), ctx)?;
+    let result = crate::sets::create(name, desc, from, scope, ctx)?;
     print!("{result}");
     Ok(ExitCode::SUCCESS)
 }
 
-fn handle_set_list(local: bool, output: OutputArgs, ctx: &AppContext<'_>) -> Result<ExitCode> {
-    let scope = scope_from(local);
+fn handle_set_list(
+    scope: InstallScope,
+    output: OutputArgs,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
     let result = crate::sets::list(scope, ctx)?;
     if output.json {
         print_json(&crate::display::json::set_list_json(&result, scope))?;
@@ -137,11 +134,10 @@ fn handle_set_list(local: bool, output: OutputArgs, ctx: &AppContext<'_>) -> Res
 
 fn handle_set_show(
     name: &str,
-    local: bool,
+    scope: InstallScope,
     output: OutputArgs,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
-    let scope = scope_from(local);
     let result = crate::sets::show(name, scope, ctx)?;
     if output.json {
         print_json(&crate::display::json::set_show_json(&result, scope))?;
@@ -154,7 +150,7 @@ fn handle_set_show(
 fn handle_set_add(
     name: &str,
     artifacts: &[String],
-    local: bool,
+    scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
     if artifacts.is_empty() {
@@ -163,7 +159,7 @@ fn handle_set_add(
             &format!("cmx set add {name} <artifact>"),
         ));
     }
-    let result = crate::sets::add(name, artifacts, scope_from(local), ctx)?;
+    let result = crate::sets::add(name, artifacts, scope, ctx)?;
     print!("{result}");
     Ok(ExitCode::SUCCESS)
 }
@@ -171,7 +167,7 @@ fn handle_set_add(
 fn handle_set_remove(
     name: &str,
     artifacts: &[String],
-    local: bool,
+    scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<ExitCode> {
     if artifacts.is_empty() {
@@ -180,7 +176,7 @@ fn handle_set_remove(
             &format!("cmx set remove {name} <artifact>"),
         ));
     }
-    let result = crate::sets::remove(name, artifacts, scope_from(local), ctx)?;
+    let result = crate::sets::remove(name, artifacts, scope, ctx)?;
     print!("{result}");
     Ok(ExitCode::SUCCESS)
 }
@@ -218,8 +214,13 @@ fn handle_set_deactivate(
     })
 }
 
-fn handle_set_rename(old: &str, new: &str, local: bool, ctx: &AppContext<'_>) -> Result<ExitCode> {
-    let result = crate::sets::rename(old, new, scope_from(local), ctx)?;
+fn handle_set_rename(
+    old: &str,
+    new: &str,
+    scope: InstallScope,
+    ctx: &AppContext<'_>,
+) -> Result<ExitCode> {
+    let result = crate::sets::rename(old, new, scope, ctx)?;
     print!("{result}");
     Ok(ExitCode::SUCCESS)
 }
@@ -236,7 +237,7 @@ mod tests {
     fn handle_set_add_empty_artifacts_errors_with_try_line() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        let result = handle_set_add("daily", &[], false, &ctx);
+        let result = handle_set_add("daily", &[], InstallScope::Global, &ctx);
         assert!(result.is_err());
         assert!(
             result.unwrap_err().to_string().contains("try: cmx set add daily <artifact>"),
@@ -248,7 +249,7 @@ mod tests {
     fn handle_set_remove_empty_artifacts_errors_with_try_line() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        let result = handle_set_remove("daily", &[], false, &ctx);
+        let result = handle_set_remove("daily", &[], InstallScope::Global, &ctx);
         assert!(result.is_err());
         assert!(
             result.unwrap_err().to_string().contains("try: cmx set remove daily <artifact>"),

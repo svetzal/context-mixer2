@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::context::AppContext;
 use crate::doctor::{self, ArtifactState};
+use crate::flags::SurveyScope;
 use crate::source_iter::{self, SourceArtifactInfo};
 use crate::table::Table;
 use crate::types::{ArtifactKind, InstallScope};
@@ -177,7 +178,7 @@ fn rows_by_scope(
     include_external: bool,
     ctx: &AppContext<'_>,
 ) -> Result<BTreeMap<InstallScope, Vec<Row>>> {
-    let report = doctor::survey(true, ctx)?;
+    let report = doctor::survey(SurveyScope::GlobalAndLocal, ctx)?;
     let source_versions = source_iter::all_with_checksums(ctx)?;
 
     let mut by_scope: BTreeMap<InstallScope, Vec<Row>> = BTreeMap::new();

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use super::*;
+use crate::flags::SurveyScope;
 use crate::platform::Platform;
 use crate::test_support::{
     TestContext, make_lock_entry_with_checksum, save_lock_with_entry, versioned_skill_content,
@@ -126,7 +127,7 @@ fn counts_tally_tracked_and_drifted() {
     })
     .unwrap();
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let c = report.counts();
     assert_eq!(c.tracked, 1, "one tracked");
     assert_eq!(c.drifted, 1, "one drifted");
@@ -137,12 +138,15 @@ fn counts_tally_tracked_and_drifted() {
 
 #[test]
 fn survey_scopes_global_only_by_default() {
-    assert_eq!(survey_scopes(false), vec![InstallScope::Global]);
+    assert_eq!(survey_scopes(SurveyScope::GlobalOnly), vec![InstallScope::Global]);
 }
 
 #[test]
 fn survey_scopes_includes_local_when_requested() {
-    assert_eq!(survey_scopes(true), vec![InstallScope::Global, InstallScope::Local]);
+    assert_eq!(
+        survey_scopes(SurveyScope::GlobalAndLocal),
+        vec![InstallScope::Global, InstallScope::Local]
+    );
 }
 
 // --- build_locations ---
@@ -179,7 +183,7 @@ fn orphaned_skill_in_claude_dir_is_reported() {
     // A hand-authored skill in ~/.claude/skills with no lock entry anywhere.
     install_skill(&t, Platform::Claude, "my-skill", "1.0.0", InstallScope::Global);
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let row = report.rows.iter().find(|r| r.name == "my-skill").expect("skill surveyed");
     assert_eq!(row.state, ArtifactState::Orphaned);
     assert_eq!(row.version.as_deref(), Some("1.0.0"));
@@ -201,7 +205,7 @@ fn untracked_when_on_disk_no_lock_but_source_provides_it() {
     // ...and it's on disk with no lock entry (installed out-of-band).
     install_skill(&t, Platform::Claude, "vis-theory", "1.0.0", InstallScope::Global);
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let row = report.rows.iter().find(|r| r.name == "vis-theory").expect("surveyed");
     assert_eq!(
         row.state,
@@ -226,7 +230,7 @@ fn survey_with_managed_set_ignores_unmanaged_platforms() {
     };
     crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     assert!(
         report.rows.iter().all(|r| r.name != "codex-only"),
         "doctor must not survey platforms outside the managed set"
@@ -246,7 +250,7 @@ fn external_reclassifies_orphan_by_directory_rule() {
     };
     crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let row = report.rows.iter().find(|r| r.name == "stock-skill").expect("surveyed");
     assert_eq!(row.state, ArtifactState::External);
     assert_eq!(report.counts().external, 1);
@@ -266,7 +270,7 @@ fn external_reclassifies_orphan_by_name_rule() {
     };
     crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     assert_eq!(
         report.rows.iter().find(|r| r.name == "apple").unwrap().state,
         ArtifactState::External
@@ -285,7 +289,7 @@ fn orphaned_only_when_no_source_provides_it() {
     crate::test_support::setup_empty_sources(&t.fs, &t.paths);
     install_skill(&t, Platform::Claude, "my-private", "1.0.0", InstallScope::Global);
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let row = report.rows.iter().find(|r| r.name == "my-private").expect("surveyed");
     assert_eq!(row.state, ArtifactState::Orphaned);
     assert_eq!(report.counts().untracked, 0);
@@ -298,7 +302,7 @@ fn tracked_artifact_reports_its_lock_source() {
     // track_skill records provenance repo "home" in the lock entry.
     track_skill(&t, Platform::Claude, "mine", "1.0.0");
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let art = report.artifacts.iter().find(|a| a.name == "mine").expect("grouped");
     assert_eq!(art.source.as_deref(), Some("home"), "source from the lock entry");
 }
@@ -309,7 +313,7 @@ fn orphan_has_no_source() {
     crate::test_support::setup_empty_sources(&t.fs, &t.paths);
     install_skill(&t, Platform::Claude, "loose", "1.0.0", InstallScope::Global);
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let art = report.artifacts.iter().find(|a| a.name == "loose").expect("grouped");
     assert!(art.source.is_none(), "an orphan has no source");
 }
@@ -323,7 +327,7 @@ fn tracked_skill_matches_lock_checksum() {
         make_lock_entry_with_checksum(ArtifactKind::Skill, Some("1.0.0"), "home", "tracked", &cs);
     save_lock_with_entry(&t.fs, &t.paths, "tracked", entry, InstallScope::Global);
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let row = report.rows.iter().find(|r| r.name == "tracked").expect("skill surveyed");
     assert_eq!(row.state, ArtifactState::Tracked);
     assert!(!report.has_issues(), "a tracked artifact is not an issue");
@@ -342,7 +346,7 @@ fn drifted_skill_has_lock_entry_but_mismatched_checksum() {
     );
     save_lock_with_entry(&t.fs, &t.paths, "drifted", entry, InstallScope::Global);
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let row = report.rows.iter().find(|r| r.name == "drifted").expect("skill surveyed");
     assert_eq!(row.state, ArtifactState::Drifted);
     assert!(report.has_issues());
@@ -360,7 +364,7 @@ fn missing_skill_in_lock_but_not_on_disk() {
     );
     save_lock_with_entry(&t.fs, &t.paths, "ghost", entry, InstallScope::Global);
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     assert!(report.rows.is_empty(), "nothing on disk");
     let m = report
         .missing
@@ -380,7 +384,7 @@ fn same_skill_in_two_tools_is_one_artifact_not_duplicated() {
     track_skill(&t, Platform::Claude, "multi", "1.0.0");
     track_skill(&t, Platform::Pi, "multi", "1.0.0");
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let arts: Vec<&DoctorArtifact> =
         report.artifacts.iter().filter(|a| a.name == "multi").collect();
     assert_eq!(arts.len(), 1, "one logical artifact, not two duplicates");
@@ -404,7 +408,7 @@ fn same_skill_at_different_versions_is_diverged() {
     install_skill(&t, Platform::Claude, "skew", "1.0.0", InstallScope::Global);
     install_skill(&t, Platform::Pi, "skew", "2.0.0", InstallScope::Global);
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let art = report.artifacts.iter().find(|a| a.name == "skew").expect("grouped");
     assert!(art.diverged, "different versions across locations should diverge");
     assert!(art.version.is_none(), "no single agreed version");
@@ -421,7 +425,7 @@ fn shared_cohort_skill_lists_only_tools_it_is_tracked_for() {
     track_skill(&t, Platform::Pi, "shared", "1.0.0");
     track_skill(&t, Platform::Codex, "shared", "1.0.0");
 
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let arts: Vec<&DoctorArtifact> =
         report.artifacts.iter().filter(|a| a.name == "shared").collect();
     assert_eq!(arts.len(), 1, "shared dir reported once");
@@ -545,7 +549,7 @@ fn divergence_details_members_sorted_by_location() {
 #[test]
 fn empty_system_has_no_issues() {
     let t = TestContext::new();
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     assert!(report.rows.is_empty());
     assert!(report.missing.is_empty());
     assert!(!report.has_issues());
@@ -557,7 +561,7 @@ fn counts_tally_each_state() {
     let t = TestContext::new();
     install_skill(&t, Platform::Claude, "orphan-a", "1.0.0", InstallScope::Global);
     install_skill(&t, Platform::Claude, "orphan-b", "1.0.0", InstallScope::Global);
-    let report = survey(false, &t.ctx()).unwrap();
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
     let c = report.counts();
     assert_eq!(c.orphaned, 2);
     assert_eq!(c.tracked, 0);
@@ -1087,7 +1091,7 @@ mod set_consistency_survey {
         let t = TestContext::new();
         seed_set(&t, "rust-work", SetState::Active, vec![agent_member("rust-craftsperson")]);
 
-        let report = survey(false, &t.ctx()).unwrap();
+        let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         assert_eq!(report.set_inconsistencies.len(), 1);
         assert_eq!(report.set_inconsistencies[0].set_name, "rust-work");
         assert!(report.has_issues());
@@ -1106,7 +1110,7 @@ mod set_consistency_survey {
         );
         seed_set(&t, "rust-work", SetState::Inactive, vec![agent_member("rust-craftsperson")]);
 
-        let report = survey(false, &t.ctx()).unwrap();
+        let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         assert_eq!(report.set_inconsistencies.len(), 1);
         assert!(report.has_issues());
     }
@@ -1124,7 +1128,7 @@ mod set_consistency_survey {
         seed_set(&t, "blog", SetState::Inactive, vec![agent_member("rust-craftsperson")]);
         seed_set(&t, "rust-work", SetState::Active, vec![agent_member("rust-craftsperson")]);
 
-        let report = survey(false, &t.ctx()).unwrap();
+        let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         assert!(
             report.set_inconsistencies.is_empty(),
             "member held by an active set must not be flagged: {:?}",
@@ -1144,7 +1148,7 @@ mod set_consistency_survey {
         );
         seed_set(&t, "rust-work", SetState::Active, vec![agent_member("rust-craftsperson")]);
 
-        let report = survey(false, &t.ctx()).unwrap();
+        let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
         assert!(
             report.set_inconsistencies.is_empty(),
             "member installed and claimed by its own active set: {:?}",
