@@ -1,3 +1,6 @@
+//! Shared JSON output formatting helpers, a submodule of
+//! `cmx/src/display/mod.rs`.
+
 use std::path::Path;
 
 use serde::Serialize;
@@ -45,12 +48,15 @@ fn flatten_rows(
         .collect()
 }
 
+/// Serialize `cmx list`'s combined agent/skill output to the `--json` contract.
 pub fn list_json(output: &ListOutput) -> Value {
     let mut artifacts = flatten_rows(&output.agents, ArtifactKind::Agent);
     artifacts.extend(flatten_rows(&output.skills, ArtifactKind::Skill));
     json!({ "artifacts": artifacts })
 }
 
+/// Serialize `cmx agent list` / `cmx skill list`'s single-kind output to the
+/// `--json` contract.
 pub fn list_kind_json(output: &ListKindOutput) -> Value {
     json!({
         "kind": output.kind.to_string(),
@@ -69,6 +75,7 @@ struct OutdatedJson<'a> {
     artifacts: &'a [OutdatedRow],
 }
 
+/// Serialize `cmx outdated`'s report to the `--json` contract.
 pub fn outdated_json(report: &OutdatedReport) -> Value {
     serde_json::to_value(OutdatedJson {
         artifacts: &report.0,
@@ -80,6 +87,7 @@ pub fn outdated_json(report: &OutdatedReport) -> Value {
 // Search / Info
 // ---------------------------------------------------------------------------
 
+/// Serialize `cmx search`'s output to the `--json` contract.
 pub fn search_json(output: &SearchOutput) -> Value {
     serde_json::to_value(output).expect("SearchOutput is serializable")
 }
@@ -127,6 +135,7 @@ struct SetListJson<'a> {
     entries: &'a [SetListEntry],
 }
 
+/// Serialize `cmx set list`'s output to the `--json` contract.
 pub fn set_list_json(result: &SetListResult, scope: InstallScope) -> Value {
     serde_json::to_value(SetListJson {
         scope,
@@ -144,6 +153,7 @@ struct SetShowJson<'a> {
     result: &'a SetShowResult,
 }
 
+/// Serialize `cmx set show`'s output to the `--json` contract.
 pub fn set_show_json(result: &SetShowResult, scope: InstallScope) -> Value {
     serde_json::to_value(SetShowJson { scope, result }).expect("SetShowJson is serializable")
 }
@@ -162,6 +172,7 @@ struct ConfigShowJson<'a> {
     platforms_inferred: bool,
 }
 
+/// Serialize `cmx config show`'s output to the `--json` contract.
 pub fn config_show_json(result: &ConfigShowResult) -> Value {
     serde_json::to_value(ConfigShowJson {
         platforms_inferred: result.platforms.is_empty(),
@@ -174,6 +185,7 @@ pub fn config_show_json(result: &ConfigShowResult) -> Value {
 // Home path
 // ---------------------------------------------------------------------------
 
+/// Serialize `cmx home`'s resolved path to the `--json` contract.
 pub fn home_path_json(path: &Path) -> Value {
     json!({ "path": path.display().to_string() })
 }

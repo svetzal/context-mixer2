@@ -1,3 +1,5 @@
+//! `cmx adopt` command dispatch, a submodule of `cmx/src/dispatch/mod.rs`.
+
 use anyhow::Result;
 use std::path::Path;
 
@@ -7,6 +9,8 @@ use crate::types::ArtifactKind;
 
 use super::usage_error;
 
+/// Dispatch `cmx agent unadopt` / `cmx skill unadopt`: reverse adoption for
+/// one or more named artifacts, optionally marking them `external` afterward.
 pub fn handle_unadopt(
     names: &[String],
     kind: ArtifactKind,
@@ -30,6 +34,8 @@ pub fn handle_unadopt(
     Ok(())
 }
 
+/// Dispatch `cmx agent adopt` / `cmx skill adopt`: bring either every orphaned
+/// artifact of `kind` (`--all`) or the named ones under management.
 pub fn handle_adopt(
     names: &[String],
     kind: ArtifactKind,

@@ -1,3 +1,12 @@
+//! SHA-256 checksums over a skill's canonical files, on disk or in memory.
+//!
+//! This is the highest-stakes parity surface between cmx-core and its TypeScript twin
+//! (see `cmx-core/SPEC.md` §5): the algorithm normalizes relative paths to `/`, filters
+//! out dotfiles/transient directories/`.pyc` files, sorts by path, and hashes
+//! `rel_path` bytes followed by content bytes for each file in order. [`crate::fs_util`]
+//! supplies the underlying file walk; [`crate::skill_install`] relies on this module to
+//! detect drift between a bundle and what is installed on disk.
+
 use crate::error::Result;
 use sha2::{Digest, Sha256};
 use std::path::Path;

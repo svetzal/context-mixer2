@@ -1,3 +1,10 @@
+//! Per-platform lock-file load/save: the on-disk record of every artifact cmx-core
+//! (or another tool sharing the format) has installed, keyed by scope and platform.
+//!
+//! Built on the generic helpers in [`crate::json_file`]; path/naming resolution
+//! (which lockfile belongs to which platform and scope) is [`crate::paths::ConfigPaths`]'s
+//! responsibility, not this module's.
+
 use crate::error::Result;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -22,11 +29,14 @@ pub fn save_to(lock: &LockFile, path: &Path, fs: &dyn Filesystem) -> Result<()> 
     crate::json_file::save_json(lock, path, fs)
 }
 
+/// Load the lock file for `scope` at its default location under `paths`.
+/// Returns a default (empty) lock file if it does not exist.
 pub fn load(scope: InstallScope, fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<LockFile> {
     let path = paths.lock_path(scope);
     load_from(&path, fs)
 }
 
+/// Save the lock file for `scope` to its default location under `paths`.
 pub fn save(
     lock: &LockFile,
     scope: InstallScope,

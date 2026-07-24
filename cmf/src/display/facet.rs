@@ -1,3 +1,5 @@
+//! Output formatting for facets, a submodule of `cmf/src/display/mod.rs`.
+
 use std::fmt;
 
 use cmx::table::render_table;

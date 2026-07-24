@@ -1,9 +1,17 @@
+//! Generic, atomic JSON-file load/save helpers built on the [`Filesystem`] gateway.
+//!
+//! [`crate::config`] and [`crate::lockfile`] both build their document-specific
+//! load/save functions on [`load_json`] and `save_json` rather than reimplementing
+//! parsing and atomic-write logic per document type.
+
 use serde::{Serialize, de::DeserializeOwned};
 use std::path::{Path, PathBuf};
 
 use crate::error::{CmxError, Result};
 use crate::gateway::filesystem::Filesystem;
 
+/// Load and parse `path` as JSON into `T`, or return `T::default()` if the file
+/// does not exist.
 pub fn load_json<T>(path: &Path, fs: &dyn Filesystem) -> Result<T>
 where
     T: DeserializeOwned + Default,

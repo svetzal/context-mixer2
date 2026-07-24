@@ -1,3 +1,6 @@
+//! Thin orchestrator: wires `locations`/`classify`/`aggregate`/
+//! `set_consistency` into the read-only `survey()` entry point.
+
 use crate::config;
 use crate::context::AppContext;
 use crate::error::Result;

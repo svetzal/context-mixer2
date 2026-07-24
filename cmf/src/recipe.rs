@@ -1,3 +1,5 @@
+//! Recipe assembly and diffing.
+
 use std::fmt::Write as _;
 
 use anyhow::Result;

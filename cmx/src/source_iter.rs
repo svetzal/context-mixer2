@@ -1,3 +1,5 @@
+//! Iterator over configured sources.
+
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 

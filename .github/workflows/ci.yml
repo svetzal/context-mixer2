@@ -38,6 +38,20 @@ jobs:
       - name: Tests (all features)
         run: cargo test --all-features
 
+      - name: Docs (workspace, all features)
+        # cmx-core denies missing_docs (see cmx-core/Cargo.toml); cmx/cmf still
+        # warn on missing per-item docs, so this step doesn't use -D warnings
+        # workspace-wide yet — see AGENTS.md
+        run: cargo doc --no-deps --all-features --workspace
+
+      - name: Docs (cmx-core, deny warnings)
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --no-deps --all-features -p cmx-core
+
+      - name: Doctests (workspace, all features)
+        run: cargo test --doc --all-features
+
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked
 

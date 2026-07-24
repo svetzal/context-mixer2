@@ -39,7 +39,9 @@ pub const HOME_SOURCE: &str = "home";
 /// One adopted artifact.
 #[derive(Debug)]
 pub struct AdoptResult {
+    /// Whether the adopted artifact is an agent or a skill.
     pub kind: ArtifactKind,
+    /// Artifact name.
     pub name: String,
     /// Where the canonical copy now lives in the home.
     pub home_path: PathBuf,
@@ -50,7 +52,9 @@ pub struct AdoptResult {
 /// The outcome of an adopt run.
 #[derive(Debug)]
 pub struct AdoptOutcome {
+    /// Every artifact adopted during this run.
     pub adopted: Vec<AdoptResult>,
+    /// Canonical home directory the artifacts were copied into.
     pub home: PathBuf,
     /// Whether project (local) scope was surveyed for orphans.
     pub included_local: bool,
@@ -265,7 +269,9 @@ pub fn adopt_named(
 /// One unadopted artifact.
 #[derive(Debug)]
 pub struct UnadoptResult {
+    /// Whether the unadopted artifact is an agent or a skill.
     pub kind: ArtifactKind,
+    /// Artifact name.
     pub name: String,
     /// Whether the canonical copy was removed from the home.
     pub home_removed: bool,
@@ -276,7 +282,9 @@ pub struct UnadoptResult {
 /// The outcome of an unadopt run.
 #[derive(Debug)]
 pub struct UnadoptOutcome {
+    /// The artifact kind that was targeted by this unadopt run.
     pub kind: ArtifactKind,
+    /// Every artifact successfully unadopted during this run.
     pub unadopted: Vec<UnadoptResult>,
     /// Names that weren't adopted (not in the home, no `home` lock entry).
     pub not_adopted: Vec<String>,

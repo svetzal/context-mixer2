@@ -1,3 +1,5 @@
+//! YAML frontmatter parsing for artifact detection.
+
 use std::path::PathBuf;
 
 use serde_yaml_ng::{Mapping, Value};

@@ -1,3 +1,5 @@
+//! Integration tests for lock file read/write behavior.
+
 use cmx::gateway::real::RealFilesystem;
 use cmx::lockfile::{load_from, save_to};
 use cmx::types::{ArtifactKind, LockEntry, LockFile, LockSource};

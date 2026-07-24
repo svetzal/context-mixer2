@@ -1,3 +1,6 @@
+//! Output formatting for `cmx agent install` / `cmx skill install`, a
+//! submodule of `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::install::{BatchInstallResult, InstallManyResult, InstallResult, UpdateResult};

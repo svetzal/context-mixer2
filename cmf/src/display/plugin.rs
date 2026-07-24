@@ -1,3 +1,6 @@
+//! Output formatting for plugin lists, a submodule of
+//! `cmf/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::plugin::PluginList;

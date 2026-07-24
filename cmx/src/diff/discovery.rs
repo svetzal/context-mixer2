@@ -1,3 +1,6 @@
+//! Installed-copy discovery: `InstalledCopy`, `CopyEval`, `discover_copies`,
+//! `gather_skill_copies`, `evaluate_copies`, `representative_platform`.
+
 use crate::error::Result;
 use std::path::PathBuf;
 

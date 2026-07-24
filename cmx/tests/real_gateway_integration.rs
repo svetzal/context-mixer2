@@ -1,3 +1,5 @@
+//! Integration tests exercising the real filesystem/clock/git gateways.
+
 use cmx::gateway::clock::Clock;
 use cmx::gateway::filesystem::Filesystem;
 use cmx::gateway::git::GitClient;

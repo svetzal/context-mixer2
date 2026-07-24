@@ -1,3 +1,12 @@
+//! Generator and test runner for the language-neutral conformance fixtures under
+//! `cmx-core/conformance/` that pin the behavior described in `cmx-core/SPEC.md`
+//! (checksum, frontmatter, version-guard, paths, target-resolve, install-e2e).
+//!
+//! This crate is the fixtures' oracle: [`generate_conformance_fixtures`] derives them
+//! from the in-memory `test-support` implementation, and `cargo test` re-runs them to
+//! confirm the reference stays a faithful source of truth. The `cmx-core-ts` port runs
+//! the same fixtures via `bun test` to prove behavioral parity.
+
 use anyhow::{Context, Result, bail, ensure};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::Serialize;

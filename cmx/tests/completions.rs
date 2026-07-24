@@ -1,3 +1,5 @@
+//! Integration tests for shell completion generation.
+
 use std::process::Command;
 
 use tempfile::TempDir;

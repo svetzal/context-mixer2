@@ -1,3 +1,5 @@
+//! The [`LlmClient`] gateway trait (feature `llm`) for LLM-powered diff analysis.
+
 use crate::error::Result;
 use std::future::Future;
 use std::pin::Pin;
@@ -8,6 +10,7 @@ use std::pin::Pin;
 /// (usable as `dyn LlmClient`).  Real code uses `MojenticLlmClient`;
 /// tests inject a fake with a canned response.
 pub trait LlmClient: Send + Sync {
+    /// Send `system_prompt`/`user_prompt` to the LLM and return its generated text.
     fn analyze(
         &self,
         system_prompt: &str,

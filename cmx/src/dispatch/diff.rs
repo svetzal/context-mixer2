@@ -1,3 +1,5 @@
+//! `cmx diff` command dispatch, a submodule of `cmx/src/dispatch/mod.rs`.
+
 use anyhow::Result;
 
 use crate::context::AppContext;
@@ -46,6 +48,8 @@ pub fn handle_diff(
     }
 }
 
+/// `cmx {agent,skill} diff` in a lean (no `llm` feature) build: only the
+/// structural diff runs, with a note in place of the LLM summary.
 #[cfg(not(feature = "llm"))]
 pub fn handle_diff(
     name: &str,

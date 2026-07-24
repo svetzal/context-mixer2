@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- Crate-level and module-level rustdoc coverage brought to zero `missing_docs`
+  warnings: a crate overview (plan→apply lifecycle, gateway/`AppContext` DI seam,
+  `llm`/`test-support` feature flags, and the SPEC/conformance contract binding
+  this port to `cmx-core-ts`), `//!` headers on every public module, and doc
+  comments on previously-undocumented public items (including the stable
+  `.code()` discriminants on `CmxError`, which the TypeScript port mirrors).
+  `missing_docs` is now denied at the crate level. Documentation-only — no
+  SPEC or conformance fixture changes, no behavior delta.
+
 ## [0.3.0] - 2026-07-06
 
 ### Added

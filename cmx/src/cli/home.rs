@@ -1,7 +1,11 @@
+//! Canonical-home-related subcommand argument definitions, part of the clap
+//! CLI defined in `cmx/src/cli/mod.rs`.
+
 use clap::Subcommand;
 
 use super::OutputArgs;
 
+/// `cmx home` subcommands.
 #[derive(Subcommand)]
 pub enum HomeAction {
     /// [Mutates] Create the canonical home directory and register it as the `home` source
@@ -9,6 +13,7 @@ pub enum HomeAction {
     /// Print the resolved canonical home directory
     Path {
         #[command(flatten)]
+        /// Shared `--json` output flag.
         output: OutputArgs,
     },
 }

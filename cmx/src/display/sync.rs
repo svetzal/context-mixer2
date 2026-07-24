@@ -1,3 +1,6 @@
+//! Output formatting for `cmx skill sync`, a submodule of
+//! `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::platform::platforms_label;

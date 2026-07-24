@@ -1,3 +1,6 @@
+//! Output formatting for `cmx init`, a submodule of
+//! `cmx/src/display/mod.rs`.
+
 use std::fmt;
 use std::path::{Path, PathBuf};
 

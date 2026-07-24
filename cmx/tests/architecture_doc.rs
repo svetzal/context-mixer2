@@ -1,18 +1,25 @@
-/// Architecture documentation drift guard.
-///
-/// These tests enforce that `AGENTS.md`'s Architecture section stays
-/// synchronized with the actual source tree:
-///
-/// - `every_documented_path_exists`: every backtick-quoted path that looks
-///   like a source file (`cmx/src/…`, `cmx-core/src/…`, or `cmf/src/…`)
-///   must exist on disk.
-///
-/// - `every_source_file_is_documented`: every `*.rs` file under `cmx/src`,
-///   `cmx-core/src`, and `cmf/src` must appear (by its full repo-relative
-///   path) somewhere in `AGENTS.md`.
-///
-/// When you add, move, or delete a module, update the Architecture section in
-/// the same commit. The quality-gate sentence in `AGENTS.md` says so too.
+//! Architecture documentation drift guard.
+//!
+//! These tests enforce that `AGENTS.md`'s Architecture section stays
+//! synchronized with the actual source tree:
+//!
+//! - `every_documented_path_exists`: every backtick-quoted path that looks
+//!   like a source file (`cmx/src/…`, `cmx-core/src/…`, or `cmf/src/…`)
+//!   must exist on disk.
+//!
+//! - `every_source_file_is_documented`: every `*.rs` file under `cmx/src`,
+//!   `cmx-core/src`, and `cmf/src` must appear (by its full repo-relative
+//!   path) somewhere in `AGENTS.md`.
+//!
+//! - `every_documented_module_has_module_docs`: every `*.rs` file under
+//!   `cmx/src` and `cmf/src` (excluding `tests.rs` files) must carry a
+//!   `//!` module-level doc comment as its first substantive line. AGENTS.md
+//!   is the index; the module's own `//!` header is the authoritative
+//!   description of its purpose.
+//!
+//! When you add, move, or delete a module, update the Architecture section in
+//! the same commit. The quality-gate sentence in `AGENTS.md` says so too.
+
 use std::{
     collections::HashSet,
     fs,
@@ -105,6 +112,47 @@ fn every_documented_path_exists() {
          Remove stale bullets or rename them to match the actual file location.",
         missing.len(),
         missing.iter().map(|p| format!("  {p}")).collect::<Vec<_>>().join("\n")
+    );
+}
+
+/// Return the first non-blank line of `content`, or `None` if the file is
+/// entirely blank.
+fn first_non_blank_line(content: &str) -> Option<&str> {
+    content.lines().find(|line| !line.trim().is_empty())
+}
+
+#[test]
+fn every_documented_module_has_module_docs() {
+    let root = workspace_root();
+
+    let mut all_source_files = Vec::new();
+    for subdir in &["cmx/src", "cmf/src"] {
+        all_source_files.extend(walk_source_files(&root, subdir));
+    }
+
+    let mut undocumented: Vec<String> = Vec::new();
+    for rel_path in &all_source_files {
+        if Path::new(rel_path).file_name().and_then(|n| n.to_str()) == Some("tests.rs") {
+            continue;
+        }
+        let full_path = root.join(rel_path);
+        let content = fs::read_to_string(&full_path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", full_path.display(), e));
+        match first_non_blank_line(&content) {
+            Some(line) if line.starts_with("//!") => {}
+            _ => undocumented.push(rel_path.clone()),
+        }
+    }
+    undocumented.sort();
+
+    assert!(
+        undocumented.is_empty(),
+        "{} source file(s) are missing a `//!` module-level doc comment as \
+         their first non-blank line:\n{}\n\n\
+         Add a `//!` header describing the module's purpose (see AGENTS.md's \
+         Architecture section for the stated purpose of each file).",
+        undocumented.len(),
+        undocumented.iter().map(|p| format!("  {p}")).collect::<Vec<_>>().join("\n")
     );
 }
 

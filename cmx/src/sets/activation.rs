@@ -1,3 +1,5 @@
+//! Set activation and deactivation logic.
+
 use crate::error::{CliError, Result};
 use crate::flags::{Force, RunMode};
 use std::collections::{HashMap, HashSet};

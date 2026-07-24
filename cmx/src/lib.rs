@@ -1,3 +1,32 @@
+//! # cmx — Context Mixer
+//!
+//! Crate root for the `cmx` package manager, which manages the lifecycle of
+//! curated agentic context — portable agent definitions and composable
+//! skills — across AI coding assistants, resting on two pillars of equal
+//! weight (see `CHARTER.md`):
+//!
+//! 1. **Marketplace distribution** — git-backed plugin marketplaces with a
+//!    standard manifest format, versioned, checksummed, and tracked through
+//!    install, update, and deprecation.
+//! 2. **Cross-platform curation and reconciliation** — a tool-neutral
+//!    canonical home for hand-authored private artifacts, projected to every
+//!    platform in use, with drift detection, promotion of in-place edits
+//!    back to the canonical copy, and syncing of copies that have diverged
+//!    across platforms.
+//!
+//! This file is the crate root for both the `cmx` binary (`cmx/src/main.rs`)
+//! and a library target: it re-exports every public module, including a set
+//! of modules whose *actual source* lives in the `cmx-core` crate.
+//!
+//! Note: the following modules are re-exported from `cmx-core`, not defined
+//! here: `artifact_status`, `checksum`, `config`, `context`, `error_summary`,
+//! `fs_util`, `gateway`, `json_file`, `lockfile`, `paths`, `platform`,
+//! `platform_iter`, `targets`, `types`. Edits to any of these belong in
+//! `cmx-core/src/`, not `cmx/src/`. Creating a file under `cmx/src/` with the
+//! same name as one of these re-exports (e.g. a new `paths` module) would
+//! silently shadow the re-export and is a mistake — see the Architecture
+//! section of `AGENTS.md` for the full module map.
+
 pub mod adopt;
 pub mod cli;
 pub mod cmx_config;

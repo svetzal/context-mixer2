@@ -1,3 +1,5 @@
+//! LLM-backed prose summary for `cmx info` (feature-gated).
+
 use crate::error::{CliError, Result};
 
 use crate::context::AppContext;

@@ -46,9 +46,13 @@ pub struct SetInconsistency {
     /// In JSON output this appears as `"set"`.
     #[serde(rename = "set")]
     pub set_name: String,
+    /// Global or local install scope the set is defined in.
     pub scope: InstallScope,
+    /// Whether the mismatched member is an agent or a skill.
     pub kind: ArtifactKind,
+    /// Name of the mismatched member artifact.
     pub member: String,
+    /// The kind of mismatch found.
     pub problem: SetProblem,
 }
 

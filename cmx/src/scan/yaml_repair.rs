@@ -1,3 +1,6 @@
+//! Frontmatter normalization (tabs to spaces, quoting stray `>`/`|` values)
+//! applied before YAML parsing to tolerate real-world non-spec artifacts.
+
 use serde_yaml_ng::{Mapping, Value};
 
 /// Normalize frontmatter before YAML parsing to handle common non-spec patterns

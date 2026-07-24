@@ -1,3 +1,7 @@
+//! Reduce noisy, nested error chains (LLM gateway/provider errors in particular) to a
+//! short, single-line phrase suitable for a CLI degradation note, rather than dumping
+//! a raw `anyhow` chain with JSON bodies and wrapper prefixes at the user.
+
 use anyhow::Error;
 
 const MAX_LEN: usize = 120;

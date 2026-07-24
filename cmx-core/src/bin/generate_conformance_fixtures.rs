@@ -1,3 +1,8 @@
+//! Regenerates the golden conformance fixtures under `cmx-core/conformance/` from
+//! the in-memory `test-support` oracle. Run with `cargo run --bin
+//! generate_conformance_fixtures --features test-support` after a behavior change
+//! that the fixtures must reflect.
+
 use anyhow::Result;
 use std::path::PathBuf;
 

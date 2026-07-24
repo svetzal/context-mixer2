@@ -1,8 +1,9 @@
-/// Architectural guard: `anyhow` must not appear in cmx's core modules.
-///
-/// Only `main.rs`, `dispatch/`, and the bridging `error.rs` module are
-/// allowed to use `anyhow` — everything else must use `crate::error::Result`
-/// and the typed `CliError` enum.
+//! Architectural guard: `anyhow` must not appear in cmx's core modules.
+//!
+//! Only `main.rs`, `dispatch/`, and the bridging `error.rs` module are
+//! allowed to use `anyhow` — everything else must use `crate::error::Result`
+//! and the typed `CliError` enum.
+
 use std::path::{Path, PathBuf};
 
 fn collect_rust_files(dir: &Path) -> Vec<PathBuf> {

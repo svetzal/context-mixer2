@@ -1,3 +1,8 @@
+//! In-memory fakes for every gateway trait ([`Filesystem`], [`GitClient`], [`Clock`],
+//! [`LlmClient`]), available under the `test-support` feature. Command logic written
+//! against [`crate::context::AppContext`] runs unchanged against these fakes, so tests
+//! never touch the real filesystem, network, or clock.
+
 use chrono::{DateTime, Utc};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -34,6 +39,7 @@ pub struct FakeFilesystem {
 }
 
 impl FakeFilesystem {
+    /// Create an empty fake filesystem with no files or directories.
     pub fn new() -> Self {
         Self {
             files: RefCell::new(BTreeMap::new()),
@@ -292,12 +298,16 @@ impl Filesystem for FakeFilesystem {
 
 /// Records git operations without executing them.
 pub struct FakeGitClient {
+    /// Every `(url, dest)` pair passed to `clone_repo`, in call order.
     pub cloned: RefCell<Vec<(String, PathBuf)>>,
+    /// Every repo path passed to `pull`, in call order.
     pub pulled: RefCell<Vec<PathBuf>>,
+    /// When `true`, every operation returns a `CmxError::Git` error instead of succeeding.
     pub should_fail: bool,
 }
 
 impl FakeGitClient {
+    /// Create a fake git client with no recorded calls, configured to succeed.
     pub fn new() -> Self {
         Self {
             cloned: RefCell::new(Vec::new()),
@@ -343,10 +353,12 @@ impl GitClient for FakeGitClient {
 
 /// Always returns the same instant.
 pub struct FakeClock {
+    /// The fixed instant `now()` always returns.
     pub now: DateTime<Utc>,
 }
 
 impl FakeClock {
+    /// Create a fake clock fixed at `now`.
     pub fn at(now: DateTime<Utc>) -> Self {
         Self { now }
     }
@@ -365,12 +377,16 @@ impl Clock for FakeClock {
 /// Returns a canned response string, or fails if `should_fail` is set.
 /// Also records every `(system_prompt, user_prompt)` pair passed to `analyze`.
 pub struct FakeLlmClient {
+    /// The canned string `analyze` returns when `should_fail` is `false`.
     pub response: String,
+    /// When `true`, `analyze` returns an error instead of `response`.
     pub should_fail: bool,
+    /// Every `(system_prompt, user_prompt)` pair passed to `analyze`, in call order.
     pub calls: Mutex<Vec<(String, String)>>,
 }
 
 impl FakeLlmClient {
+    /// Create a fake LLM client that succeeds with the given canned `response`.
     pub fn new(response: impl Into<String>) -> Self {
         Self {
             response: response.into(),

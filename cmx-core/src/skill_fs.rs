@@ -1,6 +1,7 @@
 //! In-memory skill file representation and filesystem helpers.
 //!
-//! A [`BundledSkill`]'s files are carried in memory as [`SkillFile`] values.
+//! A [`crate::skill_install::BundledSkill`]'s files are carried in memory as
+//! [`SkillFile`] values.
 //! [`canonical_files`] filters and sorts them the same way `checksum_dir` does,
 //! so checksums computed from memory match checksums computed from disk.
 
@@ -44,7 +45,7 @@ impl SkillFile {
 ///   (matched by [`is_transient`]).
 /// - Sort by the `/`-joined relative-path string for determinism.
 ///
-/// The ordering keys on [`crate::checksum::rel_path_key`] — the same string
+/// The ordering keys on the private `crate::checksum::rel_path_key` — the same string
 /// `checksum_dir` uses — so an in-memory bundle checksum matches the on-disk
 /// checksum after [`write_skill_files`], including at the `.`-vs-`/` boundary
 /// (SPEC §5.1 / §11.4).

@@ -1,3 +1,6 @@
+//! `cmx agent` / `cmx skill` artifact command dispatch, a submodule of
+//! `cmx/src/dispatch/mod.rs`.
+
 use anyhow::Result;
 use std::process::ExitCode;
 
@@ -11,6 +14,8 @@ use crate::types::{ArtifactKind, InstallScope};
 
 use super::{print_json, usage_error};
 
+/// Dispatch `cmx agent install` / `cmx skill install`: refresh stale sources,
+/// then install either every eligible artifact (`--all`) or the named ones.
 pub fn handle_install(
     names: &[String],
     all: Selection,
@@ -43,6 +48,9 @@ pub fn handle_install(
     }
 }
 
+/// Dispatch `cmx agent update` / `cmx skill update`: refresh stale sources,
+/// then update either every eligible artifact (`--all`) or the named one,
+/// warning about sibling platforms left out of sync when relevant.
 pub fn handle_update(
     name: Option<String>,
     all: Selection,
@@ -97,6 +105,8 @@ fn print_update_note(
     }
 }
 
+/// Dispatch `cmx agent uninstall` / `cmx skill uninstall` for one or more
+/// named artifacts.
 pub fn handle_uninstall(
     names: &[String],
     scope: InstallScope,
@@ -120,6 +130,8 @@ pub fn handle_uninstall(
     })
 }
 
+/// Top-level dispatch for `cmx agent <action>` / `cmx skill <action>`, routing
+/// to the matching `handle_*` function for the given kind.
 pub fn handle_artifact(
     action: ArtifactAction,
     kind: ArtifactKind,

@@ -1,3 +1,6 @@
+//! Output formatting for `cmx info`, a submodule of
+//! `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::info::ArtifactInfo;

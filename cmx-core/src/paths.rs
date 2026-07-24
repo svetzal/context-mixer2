@@ -1,3 +1,28 @@
+//! Path resolution for cmx's config root, lock files, and per-platform install
+//! directories.
+//!
+//! Two things vary independently and are easy to conflate:
+//!
+//! - **The config root** (`$HOME/.config/context-mixer/`, held in `config_dir`) is
+//!   always global and always the same directory regardless of which platform or
+//!   scope is active. It holds `sources.json`, `config.json`, `sets.json`, and the
+//!   default artifact home.
+//! - **The platform binding** (`platform`) selects which lock file name and which
+//!   install-directory layout apply — it does not move the config root.
+//!
+//! Orthogonal to both is **scope** ([`InstallScope`]): global-scope paths are
+//! anchored at the OS home directory (`home_dir`); local-scope paths are relative to
+//! the current project (the process's working directory), with lock files living
+//! under a project-local `.context-mixer/` directory instead of the config root.
+//! [`ConfigPaths::with_platform`] lets a caller reuse the same `home_dir`/`config_dir`
+//! while asking a different platform's questions — e.g. `cmx doctor` surveys every
+//! platform's install directories from one base without rebuilding path resolution
+//! per platform.
+//!
+//! Production code constructs this via [`ConfigPaths::from_env`]; tests use
+//! [`ConfigPaths::for_test`] to inject arbitrary root directories and avoid
+//! touching the real home directory.
+
 use std::path::PathBuf;
 
 use crate::error::{CmxError, Result};
@@ -11,8 +36,15 @@ use crate::types::{ArtifactKind, InstallScope};
 /// [`ConfigPaths::for_test`] to inject arbitrary root directories and avoid
 /// touching the real home directory.
 pub struct ConfigPaths {
+    /// The config root, `$HOME/.config/context-mixer/` — global and
+    /// platform-independent; holds `sources.json`, `config.json`, `sets.json`, and
+    /// the default artifact home.
     pub config_dir: PathBuf,
+    /// The OS home directory (`$HOME`), used to anchor global-scope install paths.
+    /// Distinct from `config_dir` (which lives *under* it).
     pub home_dir: PathBuf,
+    /// The active platform binding, which determines the default lock file name
+    /// and install-directory layout used by path resolution.
     pub platform: Platform,
 }
 
@@ -128,6 +160,23 @@ impl ConfigPaths {
     /// Returns `None` for unsupported `(platform, kind)` combinations. Callers
     /// should gate on [`ensure_supports`](Self::ensure_supports) or
     /// [`Platform::supports`] before calling this.
+    ///
+    /// ```
+    /// use cmx_core::paths::ConfigPaths;
+    /// use cmx_core::platform::Platform;
+    /// use cmx_core::types::{ArtifactKind, InstallScope};
+    /// use std::path::PathBuf;
+    ///
+    /// let paths = ConfigPaths::for_test_with_platform(
+    ///     PathBuf::from("/home/alice"),
+    ///     PathBuf::from("/home/alice/.config/context-mixer"),
+    ///     Platform::Claude,
+    /// );
+    /// assert_eq!(
+    ///     paths.install_dir(ArtifactKind::Skill, InstallScope::Global),
+    ///     Some(PathBuf::from("/home/alice/.claude/skills")),
+    /// );
+    /// ```
     pub fn install_dir(&self, kind: ArtifactKind, scope: InstallScope) -> Option<PathBuf> {
         let subpath = self.platform.install_subpath(kind, scope)?;
         Some(if scope.is_local() {

@@ -1,3 +1,5 @@
+//! Integration tests for artifact scanning.
+
 use cmx::gateway::real::RealFilesystem;
 use cmx::scan::scan_source;
 use cmx::types::ArtifactKind;

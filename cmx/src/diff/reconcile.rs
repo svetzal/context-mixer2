@@ -1,3 +1,5 @@
+//! Lock-state reconciliation: `focus_lock_state`, `reconciliations`.
+
 use crate::error::Result;
 
 use crate::context::AppContext;

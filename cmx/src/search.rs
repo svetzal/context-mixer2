@@ -1,3 +1,5 @@
+//! `cmx search` (full-text search across sources).
+
 use crate::error::Result;
 use serde::Serialize;
 
@@ -8,18 +10,27 @@ use crate::source_iter;
 // Result types
 // ---------------------------------------------------------------------------
 
+/// A single artifact whose name or description matched a search query.
 #[derive(Clone, Debug, Serialize)]
 pub struct SearchResult {
+    /// Artifact name.
     pub name: String,
+    /// Artifact kind as a display string (e.g. "agent", "skill").
     pub kind: String,
+    /// Version declared by the source, if any.
     pub version: Option<String>,
+    /// Name of the source the match was found in.
     pub source: String,
+    /// Artifact description, as declared in its frontmatter.
     pub description: String,
 }
 
+/// Full result set for a `cmx search` invocation.
 #[derive(Clone, Debug, Serialize)]
 pub struct SearchOutput {
+    /// Matching artifacts across all configured sources.
     pub results: Vec<SearchResult>,
+    /// The query string that was searched for.
     pub query: String,
 }
 
@@ -27,6 +38,8 @@ pub struct SearchOutput {
 // Public API
 // ---------------------------------------------------------------------------
 
+/// Case-insensitive full-text search over every source's artifact names and
+/// descriptions.
 pub fn search(query: &str, ctx: &AppContext<'_>) -> Result<SearchOutput> {
     let query_lower = query.to_lowercase();
     let mut results = Vec::new();

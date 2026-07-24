@@ -1,3 +1,5 @@
+//! `cmx agent install` / `cmx skill install`.
+
 use crate::error::{CliError, Result};
 use crate::flags::Force;
 use std::collections::BTreeMap;
@@ -18,12 +20,18 @@ use crate::types::{self, ArtifactKind, InstallScope, LockEntry, LockSource, Sour
 // Result types
 // ---------------------------------------------------------------------------
 
+/// Outcome of a single successful install onto one platform.
 #[derive(Debug)]
 pub struct InstallResult {
+    /// Name of the artifact that was installed.
     pub artifact_name: String,
+    /// Version installed, if the source declares one.
     pub version: Option<String>,
+    /// Whether this artifact is an agent or a skill.
     pub kind: ArtifactKind,
+    /// Name of the source the artifact was installed from.
     pub source_name: String,
+    /// Directory the artifact was installed into.
     pub dest_dir: PathBuf,
     /// The platform this copy was installed for.
     pub platform: Platform,
@@ -31,23 +39,34 @@ pub struct InstallResult {
     pub discarded_paths: Vec<PathBuf>,
 }
 
+/// Concatenated per-platform results of installing (or updating) every
+/// available artifact of one kind.
 #[derive(Debug)]
 pub struct BatchInstallResult {
+    /// One entry per artifact/platform combination installed.
     pub items: Vec<InstallResult>,
+    /// Whether these are agents or skills.
     pub kind: ArtifactKind,
+    /// True when this batch was produced by `update_all` rather than `install_all`.
     pub is_update: bool,
 }
 
+/// Outcome of updating a single named artifact.
 #[derive(Debug)]
 pub struct UpdateResult {
+    /// The install result for the platform that was updated.
     pub updated: InstallResult,
+    /// Sibling platforms whose copy of this artifact has now drifted from the
+    /// just-updated copy (e.g. a locally-edited skill on another tool).
     pub sibling_drifted_platforms: Vec<Platform>,
 }
 
 /// Outcome of installing several named artifacts in one pass.
 #[derive(Debug)]
 pub struct InstallManyResult {
+    /// Whether these are agents or skills.
     pub kind: ArtifactKind,
+    /// Install results for every name/platform combination that succeeded.
     pub installed: Vec<InstallResult>,
     /// `(name, reason)` for names that failed (not found, ambiguous, locally
     /// modified without `--force`, …).
@@ -58,14 +77,23 @@ pub struct InstallManyResult {
 /// and path configuration, with no filesystem access.
 #[derive(Debug)]
 pub struct InstallPlan {
+    /// Name of the artifact to install.
     pub artifact_name: String,
+    /// Version to install, if the source declares one.
     pub version: Option<String>,
+    /// Name of the source the artifact resolves to.
     pub source_name: String,
+    /// Root directory of the source repo the artifact was found in.
     pub source_root: PathBuf,
+    /// Directory the artifact will be installed into.
     pub dest_dir: PathBuf,
+    /// Path of the artifact relative to `source_root`.
     pub relative_path: String,
 }
 
+/// Install a single named artifact, resolving `<source>:<name>` syntax and
+/// applying the standard already-installed/locally-modified/version-guard
+/// checks. Backs `cmx {agent,skill} install <name>`.
 pub fn install(
     name: &str,
     kind: ArtifactKind,
@@ -212,6 +240,9 @@ pub fn install_many(
     })
 }
 
+/// Update an already-installed artifact to the latest version from its
+/// pinned source (looked up from the lock file, not re-resolved by name).
+/// Backs `cmx {agent,skill} update <name>`.
 pub fn update(
     name: &str,
     kind: ArtifactKind,
@@ -293,6 +324,9 @@ fn install_all_one(
     })
 }
 
+/// Update every locked artifact of `kind` whose source is outdated relative
+/// to its lock entry, across both global and local scope. Backs
+/// `cmx {agent,skill} update` (no name given).
 pub fn update_all(
     kind: ArtifactKind,
     force: Force,

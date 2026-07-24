@@ -28,6 +28,8 @@ use crate::types::{ArtifactKind, InstallScope, SetDef, SetMember, SetState};
 // Public API
 // ---------------------------------------------------------------------------
 
+/// Create a new, empty set (or one seeded from a marketplace plugin's
+/// declared members via `from`). Fails if a set with `name` already exists.
 pub fn create(
     name: &str,
     description: Option<&str>,
@@ -66,6 +68,8 @@ pub fn create(
     })
 }
 
+/// List every defined set in `scope`, with each set's activation state and
+/// context-footprint estimate.
 pub fn list(scope: InstallScope, ctx: &AppContext<'_>) -> Result<SetListResult> {
     let sets = config::load_sets(scope, ctx.fs, ctx.paths)?;
     let entries = sets
@@ -85,6 +89,8 @@ pub fn list(scope: InstallScope, ctx: &AppContext<'_>) -> Result<SetListResult> 
     Ok(SetListResult { entries })
 }
 
+/// Show a single set's members with each member's install status and
+/// context-footprint estimate. Fails if `name` is not a defined set.
 pub fn show(name: &str, scope: InstallScope, ctx: &AppContext<'_>) -> Result<SetShowResult> {
     let sets = config::load_sets(scope, ctx.fs, ctx.paths)?;
     let def = sets.sets.get(name).ok_or_else(|| CliError::SetNotFound {
@@ -118,6 +124,9 @@ pub fn show(name: &str, scope: InstallScope, ctx: &AppContext<'_>) -> Result<Set
     })
 }
 
+/// Add artifacts to an existing set's member list, resolving each argument to
+/// a kind and source before mutating anything. Members already present are
+/// reported separately rather than duplicated.
 pub fn add(
     name: &str,
     artifacts: &[String],
@@ -159,6 +168,8 @@ pub fn add(
     })
 }
 
+/// Remove artifacts from an existing set's member list by name (optionally
+/// disambiguated with an `agent:`/`skill:` kind prefix).
 pub fn remove(
     name: &str,
     artifacts: &[String],
@@ -249,6 +260,8 @@ pub fn delete(
     })
 }
 
+/// Rename a set's definition in place. Fails if `old` doesn't exist or `new`
+/// already does.
 pub fn rename(
     old: &str,
     new: &str,

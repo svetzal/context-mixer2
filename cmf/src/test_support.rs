@@ -1,3 +1,5 @@
+//! Test helpers for generating fake marketplace/plugin JSON.
+
 use std::path::PathBuf;
 
 use cmx::gateway::fakes::FakeFilesystem;

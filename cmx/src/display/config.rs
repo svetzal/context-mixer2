@@ -1,3 +1,6 @@
+//! Output formatting for `cmx config`, a submodule of
+//! `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::cmx_config::{ConfigSetResult, ConfigShowResult, ExternalResult, PlatformsResult};

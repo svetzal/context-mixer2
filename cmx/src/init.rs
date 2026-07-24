@@ -28,12 +28,16 @@ fn make_installer() -> SkillInstaller {
 
 /// Outcome of `cmx init` / `cmx init --remove`.
 pub enum InitOutcome {
+    /// The companion skill was installed or updated.
     Installed(Report),
+    /// The companion skill was removed.
     Removed(RemoveReport),
     /// The plan was blocked (e.g. a newer version is already installed and
     /// `--force` was not passed).
     Blocked {
+        /// The install plan that would have been applied.
         plan: InstallPlan,
+        /// Human-readable reasons the plan was blocked.
         reasons: Vec<String>,
     },
 }

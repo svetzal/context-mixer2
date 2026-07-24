@@ -1,3 +1,5 @@
+//! `cmx info` command dispatch, a submodule of `cmx/src/dispatch/mod.rs`.
+
 use anyhow::Result;
 
 use crate::context::AppContext;

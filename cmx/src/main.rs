@@ -1,3 +1,6 @@
+//! Binary entry point for the `cmx` CLI: constructs an `AppContext` with real
+//! gateways and dispatches parsed `Commands` to the `cmx::dispatch` handlers.
+
 use anyhow::{Result, bail};
 use clap::Parser;
 use serde::Serialize;

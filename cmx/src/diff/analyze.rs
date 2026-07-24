@@ -1,3 +1,5 @@
+//! LLM-powered analysis (feature-gated path): `analyze_focus`.
+
 use crate::error::{CliError, Result};
 
 use crate::context::AppContext;

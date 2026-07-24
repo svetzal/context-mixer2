@@ -54,7 +54,7 @@ pub struct FrontmatterSpans<'a> {
 ///   by `\r`).
 ///
 /// This is the single, canonical implementation of fence detection for this
-/// project. Both the surgical version reconciler ([`set_metadata_version`]) and
+/// project. Both the surgical version reconciler (the private `set_metadata_version`) and
 /// the scan-side splitter (`cmx::scan::frontmatter::split_frontmatter_and_body`)
 /// delegate here so that the fence rules live in exactly one place.
 pub fn split_frontmatter_spans(content: &str) -> Option<FrontmatterSpans<'_>> {

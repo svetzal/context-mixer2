@@ -1,3 +1,5 @@
+//! Plugin validation logic.
+
 use std::path::Path;
 
 use anyhow::Result;

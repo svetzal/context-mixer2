@@ -1,3 +1,5 @@
+//! Doctor result/report types.
+
 use std::path::PathBuf;
 
 use serde::Serialize;
@@ -28,6 +30,7 @@ pub enum ArtifactState {
 }
 
 impl ArtifactState {
+    /// The lowercase label used in doctor's human-readable and JSON output.
     pub fn label(self) -> &'static str {
         match self {
             ArtifactState::Tracked => "tracked",
@@ -45,8 +48,11 @@ impl ArtifactState {
 /// tools it's installed for).
 #[derive(Debug, Clone)]
 pub struct DoctorRow {
+    /// Whether this is an agent or a skill.
     pub kind: ArtifactKind,
+    /// The artifact's name.
     pub name: String,
+    /// Whether this location is global (user-wide) or local (project-scoped).
     pub scope: InstallScope,
     /// The resolved install directory the artifact was found in.
     pub location: PathBuf,
@@ -57,7 +63,9 @@ pub struct DoctorRow {
     /// tools cmx *manages* it for, a subset of `platforms`. Empty for artifacts
     /// with no lock entry (orphaned/untracked/external).
     pub tracked_for: Vec<Platform>,
+    /// This location's classification relative to the lock files that should track it.
     pub state: ArtifactState,
+    /// The version recorded for this location, if any.
     pub version: Option<String>,
     /// The source this came from: the lock entry's repo when tracked/drifted, or
     /// the providing source when untracked. `None` for orphaned/external.
@@ -75,8 +83,11 @@ pub struct DoctorRow {
 /// `DoctorArtifact` listing all those tools, not N "duplicates".
 #[derive(Debug, Clone)]
 pub struct DoctorArtifact {
+    /// Whether this is an agent or a skill.
     pub kind: ArtifactKind,
+    /// The artifact's name.
     pub name: String,
+    /// Whether this artifact is global (user-wide) or local (project-scoped).
     pub scope: InstallScope,
     /// Consolidated state. When the copies disagree this is the most actionable
     /// one (see [`diverged`](Self::diverged)).
@@ -107,9 +118,13 @@ pub struct DoctorArtifact {
 /// A lock entry whose artifact is no longer present on disk.
 #[derive(Debug, Clone)]
 pub struct MissingRow {
+    /// Whether this is an agent or a skill.
     pub kind: ArtifactKind,
+    /// The artifact's name.
     pub name: String,
+    /// Whether the missing lock entry is global (user-wide) or local (project-scoped).
     pub scope: InstallScope,
+    /// The platform whose lock file records this artifact as installed.
     pub platform: Platform,
 }
 
@@ -120,8 +135,12 @@ pub struct MissingRow {
 /// tools it's installed for) used for display and counts.
 #[derive(Debug, Default)]
 pub struct DoctorReport {
+    /// The raw per-location view: one entry per install location found on disk.
     pub rows: Vec<DoctorRow>,
+    /// The grouped logical view: one entry per `(kind, name, scope)`, listing
+    /// every tool it's installed for.
     pub artifacts: Vec<DoctorArtifact>,
+    /// Lock entries whose artifact is no longer present on disk.
     pub missing: Vec<MissingRow>,
     /// Whether project (local) scope was included in the survey.
     pub included_local: bool,
@@ -164,11 +183,17 @@ impl DoctorReport {
 /// `"summary"` object without a parallel hand-built mapping.
 #[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct StateCounts {
+    /// Count of artifacts tracked and matching their lock checksum.
     pub tracked: usize,
+    /// Count of artifacts tracked but edited after install.
     pub drifted: usize,
+    /// Count of artifacts on disk with no lock entry but a matching source.
     pub untracked: usize,
+    /// Count of hand-authored artifacts with no lock entry and no matching source.
     pub orphaned: usize,
+    /// Count of artifacts declared external (managed by another tool).
     pub external: usize,
+    /// Count of lock entries whose artifact is no longer present on disk.
     pub missing: usize,
     /// Logical artifacts whose copies disagree across locations.
     pub diverged: usize,

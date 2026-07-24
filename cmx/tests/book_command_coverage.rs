@@ -1,17 +1,18 @@
-/// Book documentation-coverage drift guard.
-///
-/// Mirrors the enforcement pattern in `architecture_doc.rs`, but for the
-/// mdBook command reference instead of `AGENTS.md`'s architecture map: every
-/// top-level `cmx` command noun, and every `cmx set` subcommand, must appear
-/// as a literal string somewhere in `book/src/reference/commands.md`.
-///
-/// The command names are read straight from the `clap` `Command` tree (via
-/// `CommandFactory`), not hand-copied, so this test can't itself drift from
-/// the actual CLI surface — only the book can.
-///
-/// This is what actually prevents recurrence: the `cmx set` family shipped
-/// 3,630 lines of implementation with zero book coverage because nothing
-/// failed when it landed undocumented.
+//! Book documentation-coverage drift guard.
+//!
+//! Mirrors the enforcement pattern in `architecture_doc.rs`, but for the
+//! mdBook command reference instead of `AGENTS.md`'s architecture map: every
+//! top-level `cmx` command noun, and every `cmx set` subcommand, must appear
+//! as a literal string somewhere in `book/src/reference/commands.md`.
+//!
+//! The command names are read straight from the `clap` `Command` tree (via
+//! `CommandFactory`), not hand-copied, so this test can't itself drift from
+//! the actual CLI surface — only the book can.
+//!
+//! This is what actually prevents recurrence: the `cmx set` family shipped
+//! 3,630 lines of implementation with zero book coverage because nothing
+//! failed when it landed undocumented.
+
 use clap::CommandFactory;
 use cmx::cli::Cli;
 use std::{fs, path::PathBuf};

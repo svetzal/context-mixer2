@@ -1,3 +1,6 @@
+//! Artifact detection: walks source repos, matches agents/skills by
+//! frontmatter.
+
 use crate::error::Result;
 use std::path::Path;
 
@@ -19,14 +22,20 @@ pub use frontmatter::{
 // Warning types
 // ---------------------------------------------------------------------------
 
+/// A non-fatal issue encountered while scanning a source (e.g. a malformed
+/// artifact that was skipped rather than aborting the whole scan).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScanWarning {
+    /// Human-readable description of the issue.
     pub message: String,
 }
 
+/// Artifacts found in a source repo, plus any non-fatal warnings.
 #[derive(Debug)]
 pub struct ScanResult {
+    /// Agents and skills discovered in the source.
     pub artifacts: Vec<Artifact>,
+    /// Non-fatal issues encountered while scanning (skipped/malformed entries).
     pub warnings: Vec<ScanWarning>,
 }
 
@@ -34,6 +43,8 @@ pub struct ScanResult {
 // Testable variant (accepts injected Filesystem)
 // ---------------------------------------------------------------------------
 
+/// Scan a source repository rooted at `root` for agents and skills, either as
+/// a marketplace-structured plugin repo or a bare directory of artifacts.
 pub fn scan_source(root: &Path, fs: &dyn Filesystem) -> Result<ScanResult> {
     let marketplace = root.join(".claude-plugin").join("marketplace.json");
     let mut warnings = Vec::new();

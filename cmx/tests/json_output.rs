@@ -1,3 +1,5 @@
+//! Integration tests for `--json` output across commands.
+
 use cmx::checksum;
 use cmx::gateway::real::RealFilesystem;
 use cmx::platform::Platform;

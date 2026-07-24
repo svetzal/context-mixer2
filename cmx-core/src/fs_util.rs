@@ -1,3 +1,11 @@
+//! Shared filesystem-walk helpers used when checksumming or copying a skill.
+//!
+//! Both operations must skip the same hidden and transient entries (vendored
+//! dependencies, VCS metadata, compiled artifacts) so that installing a skill's
+//! dependencies never registers as content drift. [`crate::checksum`] and the
+//! copy logic in `crate::copy` (in the `cmx` crate) both build on
+//! [`collect_files_recursive`].
+
 use crate::error::Result;
 use std::path::{Path, PathBuf};
 
@@ -13,7 +21,7 @@ use crate::gateway::filesystem::Filesystem;
 const TRANSIENT_NAMES: &[&str] = &["node_modules", "__pycache__", ".git", ".DS_Store"];
 
 /// Whether a directory entry name is transient and should be skipped when
-/// checksumming or copying a skill. Matches the [`TRANSIENT_NAMES`] set plus
+/// checksumming or copying a skill. Matches the private `TRANSIENT_NAMES` set plus
 /// compiled-Python (`*.pyc`) files.
 pub fn is_transient(file_name: &str) -> bool {
     TRANSIENT_NAMES.contains(&file_name)

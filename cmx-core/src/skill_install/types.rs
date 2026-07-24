@@ -12,7 +12,10 @@ use crate::types::InstallScope;
 /// Identity of the embedding tool — name and semver version string.
 #[derive(Debug, Clone)]
 pub struct ToolIdentity {
+    /// The embedding tool's name (used to derive the artifact name).
     pub name: String,
+    /// The tool's own semver version — stamped into the installed `SKILL.md`'s
+    /// `metadata.version` and recorded in the lock entry.
     pub version: String,
 }
 
@@ -28,6 +31,7 @@ impl ToolIdentity {
 
 /// A skill bundled inside a tool binary (via `include_str!` or similar).
 pub struct BundledSkill {
+    /// The skill's files, each with a path relative to the skill's root directory.
     pub files: Vec<SkillFile>,
 }
 
@@ -61,12 +65,15 @@ impl BundledSkill {
 /// Installation scope — global (user-wide) or local (project-scoped).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Scope {
+    /// User-wide install, anchored at the OS home directory.
     #[default]
     Global,
+    /// Project-scoped install, anchored at the current project directory.
     Local,
 }
 
 impl Scope {
+    /// Convert to the crate-wide [`InstallScope`] used by path resolution and lock files.
     pub fn to_install_scope(self) -> InstallScope {
         match self {
             Scope::Global => InstallScope::Global,
@@ -103,12 +110,21 @@ pub enum TargetAction {
     Skip,
     /// Same version but the on-disk content differs from the bundled content,
     /// and `force` was not requested.
-    DriftedSkip { installed: String },
+    DriftedSkip {
+        /// The installed version whose content diverged from the bundle.
+        installed: String,
+    },
     /// The installed version is newer than the bundled version, and `force` was
     /// not requested.
-    RefuseNewer { installed: String },
+    RefuseNewer {
+        /// The installed version that is newer than the bundled one.
+        installed: String,
+    },
     /// The installed version is newer, but `force` was requested — downgrade.
-    Downgrade { from: String },
+    Downgrade {
+        /// The installed version being downgraded from.
+        from: String,
+    },
 }
 
 impl TargetAction {
@@ -135,10 +151,15 @@ pub struct PlannedFile {
 /// The plan for a single target platform.
 #[derive(Debug)]
 pub struct TargetPlan {
+    /// The target platform this plan applies to.
     pub platform: Platform,
+    /// The install scope (global or local).
     pub scope: InstallScope,
+    /// The destination directory the skill would be written into.
     pub dest_dir: PathBuf,
+    /// The files that would be written, relative and absolute.
     pub files: Vec<PlannedFile>,
+    /// The version-guard decision for this platform.
     pub action: TargetAction,
     /// Whether this platform is in the cmx-managed set.
     pub cmx_managed: bool,
@@ -147,12 +168,18 @@ pub struct TargetPlan {
 /// The full installation plan — computed from source metadata, with no writes.
 #[derive(Debug)]
 pub struct InstallPlan {
+    /// The identity of the tool this plan installs the skill for.
     pub tool: ToolIdentity,
+    /// The install scope (global or local).
     pub scope: InstallScope,
+    /// The checksum of the bundle at plan time, checked again at `apply` time
+    /// (the plan/apply parity guard).
     pub source_checksum: String,
     /// Whether cmx is managing this machine (config or non-empty lock exists).
     pub cmx_present: bool,
+    /// Whether `force` was requested, allowing `RefuseNewer` targets to downgrade.
     pub force: bool,
+    /// The per-platform plans that make up this install.
     pub targets: Vec<TargetPlan>,
 }
 
@@ -179,8 +206,11 @@ impl InstallPlan {
 /// filtered views.
 #[derive(Debug)]
 pub struct TargetOutcome {
+    /// The target platform this outcome applies to.
     pub platform: Platform,
+    /// The destination directory the skill was (or would have been) written into.
     pub dest_dir: PathBuf,
+    /// The version-guard decision that was carried out.
     pub action: TargetAction,
     /// Number of files written to disk (0 for skipped targets).
     pub files_written: usize,
@@ -191,7 +221,7 @@ pub struct TargetOutcome {
     pub discarded_paths: Vec<PathBuf>,
 }
 
-/// The full report returned by [`SkillInstaller::apply`].
+/// The full report returned by [`crate::skill_install::SkillInstaller::apply`].
 ///
 /// All targets — both written and skipped — are captured in `targets` so that
 /// skipped targets retain their `dest_dir` and the `action` discriminant
@@ -199,7 +229,9 @@ pub struct TargetOutcome {
 /// preserved). Use the `applied()` and `skipped()` iterators for filtered views.
 #[derive(Debug)]
 pub struct Report {
+    /// The identity of the tool this report covers.
     pub tool: ToolIdentity,
+    /// The install scope (global or local).
     pub scope: InstallScope,
     /// Every platform that was considered, written or not.
     pub targets: Vec<TargetOutcome>,
@@ -232,18 +264,27 @@ pub(in crate::skill_install) struct PreparedWrites {
 /// Status of a skill on a single platform.
 #[derive(Debug)]
 pub struct TargetStatus {
+    /// The platform this status applies to.
     pub platform: Platform,
+    /// Whether the skill is installed for this platform.
     pub installed: bool,
+    /// The version currently installed, if any.
     pub installed_version: Option<String>,
+    /// Whether the installed content diverges from what the lock entry's
+    /// checksum expects.
     pub drifted: bool,
+    /// Whether this platform has a lock entry for the skill.
     pub tracked: bool,
 }
 
 /// Status of a skill across all relevant platforms.
 #[derive(Debug)]
 pub struct Status {
+    /// The tool (artifact) name this status is for.
     pub tool_name: String,
+    /// The install scope (global or local) this status was queried for.
     pub scope: InstallScope,
+    /// Per-platform status.
     pub targets: Vec<TargetStatus>,
 }
 
@@ -254,11 +295,19 @@ pub struct Status {
 /// The result of removing a skill.
 #[derive(Debug)]
 pub struct RemoveReport {
+    /// The tool (artifact) name that was removed.
     pub tool_name: String,
+    /// The install scope (global or local) the removal was performed for.
     pub scope: InstallScope,
+    /// The distinct directories that were deleted from disk.
     pub removed_dirs: Vec<PathBuf>,
+    /// The platforms whose lock entry for this artifact was cleared.
     pub platforms_cleared: Vec<Platform>,
+    /// Whether the `bundled:<name>` source (and its materialized home copy) was
+    /// unregistered.
     pub source_unregistered: bool,
+    /// Whether the skill was found on disk before removal.
     pub was_on_disk: bool,
+    /// Whether the skill had at least one lock entry before removal.
     pub was_tracked: bool,
 }

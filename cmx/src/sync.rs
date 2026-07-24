@@ -35,7 +35,9 @@ use crate::types::{ArtifactKind, InstallScope};
 pub struct SyncTarget {
     /// Platforms whose install directory resolves to this location.
     pub platforms: Vec<Platform>,
+    /// Directory this install location resolves to on disk.
     pub location: PathBuf,
+    /// Path to the artifact's file(s) within `location`.
     pub artifact_path: PathBuf,
     /// The version this copy carried before the sync.
     pub from_version: Option<String>,
@@ -43,15 +45,20 @@ pub struct SyncTarget {
     pub file_changes: Vec<FileChange>,
 }
 
+/// Outcome of syncing one skill's diverged copies to a single winner.
 #[derive(Debug)]
 pub struct SyncResult {
+    /// Name of the skill that was synced.
     pub name: String,
+    /// `true` if changes were written; `false` if this was a dry-run plan.
     pub apply: bool,
     /// `true` when at least one copy matched an `external` config rule.
     pub external: bool,
     /// Platforms that provided the winning copy.
     pub winner_platforms: Vec<Platform>,
+    /// Path to the winning copy that other locations were synced from.
     pub winner_path: PathBuf,
+    /// Version recorded on the winning copy, if any.
     pub winner_version: Option<String>,
     /// `true` when every copy already matched — nothing to do.
     pub already_synced: bool,

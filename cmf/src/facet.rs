@@ -1,3 +1,5 @@
+//! Facet scanning and validation.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 

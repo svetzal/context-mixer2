@@ -1,3 +1,7 @@
+//! `cmx diff` orchestration: entry point, gather loop, source lookup,
+//! copy-focus selection; public result types (`DiffOutput`, `CopyStatus`,
+//! `FileStatus`, `FileChange`, `Reconciliation`, `FocusedComparison`).
+
 use crate::error::{CliError, Result};
 use std::path::PathBuf;
 
@@ -22,25 +26,35 @@ pub(crate) use structural::file_changes_between;
 // Result types (public surface — unchanged from before)
 // ---------------------------------------------------------------------------
 
+/// Full result of comparing an artifact's installed copy (or copies) against
+/// its source, ready for display.
 #[derive(Debug)]
 pub struct DiffOutput {
+    /// Name of the artifact being compared.
     pub artifact_name: String,
+    /// Whether the artifact is an agent or a skill.
     pub kind: ArtifactKind,
+    /// `true` when every installed copy matches the source — nothing to diff.
     pub is_up_to_date: bool,
     /// Where the installed copy lives (the side `+` lines come from).
     pub installed_path: PathBuf,
+    /// The version recorded for the installed (focused) copy, if tracked.
     pub installed_version: Option<String>,
     /// `true` when the installed copy was edited after install (its bytes no
     /// longer match the lock's recorded checksum).
     pub installed_locally_edited: bool,
     /// Where the source copy lives (the side `−` lines come from).
     pub source_path: PathBuf,
+    /// The version declared by the source artifact, if any.
     pub source_version: Option<String>,
+    /// Name of the source the artifact was found in (e.g. `home`, a git source).
     pub source_name: String,
     /// Per-file summary of what differs, so the direction of each change is
     /// legible without reading the whole diff.
     pub file_changes: Vec<FileChange>,
+    /// The full unified line-by-line diff text, when computed.
     pub diff_text: Option<String>,
+    /// LLM-generated prose summary of the diff, when the `llm` feature produced one.
     pub analysis: Option<String>,
     /// A one-line note shown in place of `analysis` when the LLM summary is
     /// unavailable (gateway not configured, LLM error, or a lean build without
@@ -69,10 +83,13 @@ pub struct CopyStatus {
     /// The platforms whose install directory resolves to this copy (a shared
     /// `.agents/skills` copy lists several).
     pub platforms: Vec<Platform>,
+    /// Filesystem path of this installed copy.
     pub path: PathBuf,
     /// `true` when this copy is byte-identical to the source.
     pub matches: bool,
+    /// Total lines present only in this installed copy, across all files.
     pub added: usize,
+    /// Total lines present only in the source copy, across all files.
     pub removed: usize,
     /// `true` for the copy whose detailed diff/analysis is shown below.
     pub is_focus: bool,
@@ -93,9 +110,13 @@ pub enum FileStatus {
 /// copy (`+`); `removed` counts lines present only in the source copy (`−`).
 #[derive(Debug, Clone)]
 pub struct FileChange {
+    /// Path of the file relative to the artifact root.
     pub path: String,
+    /// How this file differs between the two copies.
     pub status: FileStatus,
+    /// Lines present only in the installed copy (`+`).
     pub added: usize,
+    /// Lines present only in the source copy (`−`).
     pub removed: usize,
 }
 
@@ -103,8 +124,11 @@ pub struct FileChange {
 /// exact command, with an optional caveat.
 #[derive(Debug, Clone)]
 pub struct Reconciliation {
+    /// Human-readable description of what this reconciliation direction does.
     pub description: String,
+    /// The exact cmx command to run to apply this reconciliation.
     pub command: String,
+    /// An optional caveat to display alongside the command.
     pub note: Option<String>,
 }
 
@@ -129,6 +153,9 @@ pub(crate) struct FocusedComparison<'a> {
 // Public entry point
 // ---------------------------------------------------------------------------
 
+/// Compare an artifact's installed copy (or copies) against its source and
+/// return the structural (LLM-free) diff result, with `full` controlling
+/// whether the display renders the complete unified diff.
 pub fn diff(
     name: &str,
     kind: ArtifactKind,

@@ -20,7 +20,7 @@ use std::path::PathBuf;
 
 /// Classification of LLM-gateway failures.
 ///
-/// Produced by [`classify_mojentic_error`](crate::gateway::real::classify_mojentic_error)
+/// Produced by `classify_mojentic_error` (feature `llm`)
 /// at the mojentic boundary in production; constructed directly in fakes.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum LlmError {
@@ -29,18 +29,24 @@ pub enum LlmError {
     /// `status` is available for programmatic matching; it is not included in
     /// the `Display` output because `Option<u16>` does not implement `Display`.
     /// The HTTP status code is already present in `message` when produced by
-    /// [`classify_mojentic_error`](crate::gateway::real::classify_mojentic_error).
+    /// `classify_mojentic_error` (feature `llm`).
     #[error("{provider} API error: {message}")]
     Provider {
+        /// The provider's name (e.g. `"OpenAI"`), used in the `Display` message.
         provider: String,
         /// HTTP status code, when present in the error body.
         status: Option<u16>,
+        /// The provider's error message, already including the status code when
+        /// produced by `classify_mojentic_error` (feature `llm`).
         message: String,
     },
 
     /// The LLM endpoint could not be reached.
     #[error("Ollama unreachable at {endpoint}")]
-    Unreachable { endpoint: String },
+    Unreachable {
+        /// The endpoint that could not be reached (e.g. `"localhost:11434"`).
+        endpoint: String,
+    },
 
     /// Any other LLM error not matching the patterns above.
     #[error("{0}")]
@@ -54,7 +60,9 @@ pub enum LlmError {
 /// The git operation that produced a [`CmxError::Git`] error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GitOp {
+    /// A `git clone` of a new source.
     Clone,
+    /// A `git pull` refreshing an already-cloned source.
     Pull,
 }
 
@@ -77,74 +85,106 @@ impl std::fmt::Display for GitOp {
 /// the TypeScript port mirrors and the conformance suite pins.
 #[derive(Debug, thiserror::Error)]
 pub enum CmxError {
-    /// I/O error on a specific filesystem path.
+    /// I/O error on a specific filesystem path. `.code()` = `"io"`.
     ///
     /// `context` carries the full "Failed to \<verb\> \<path\>" prefix
     /// byte-for-byte identical to the previous `with_context` message, so
     /// CLI output and tests that substring-match do not change.
     #[error("{context}: {source}")]
     Io {
+        /// The "Failed to \<verb\> \<path\>" prefix describing what was attempted.
         context: String,
+        /// The path the operation was attempted on.
         path: PathBuf,
+        /// The underlying `std::io::Error`.
         #[source]
         source: std::io::Error,
     },
 
-    /// JSON parse error while reading a specific file.
+    /// JSON parse error while reading a specific file. `.code()` = `"json"`.
     #[error("{context}: {source}")]
     Json {
+        /// The "Failed to parse \<path\>" prefix describing what was attempted.
         context: String,
+        /// The path of the file that failed to parse.
         path: PathBuf,
+        /// The underlying `serde_json::Error`.
         #[source]
         source: serde_json::Error,
     },
 
-    /// The OS home directory could not be determined.
+    /// The OS home directory could not be determined. `.code()` = `"home-dir-unavailable"`.
     #[error("Could not determine home directory")]
     HomeDirUnavailable,
 
     /// The active platform does not support the requested artifact kind.
+    /// `.code()` = `"unsupported-artifact"`.
     #[error(
         "The {platform} platform does not support {kind}s. \
          {platform} has no native {kind} concept."
     )]
     UnsupportedArtifact {
+        /// The platform that does not support `kind`.
         platform: crate::platform::Platform,
+        /// The unsupported artifact kind.
         kind: crate::types::ArtifactKind,
     },
 
-    /// A named source was not found in the sources file.
+    /// A named source was not found in the sources file. `.code()` = `"source-not-found"`.
     #[error("Source '{name}' not found.")]
-    SourceNotFound { name: String },
+    SourceNotFound {
+        /// The source name that was looked up.
+        name: String,
+    },
 
     /// A source entry is missing its required path configuration.
+    /// `.code()` = `"source-path-missing"`.
     ///
     /// The `msg` field carries the byte-identical legacy message so that
     /// existing test assertions on the string representation still pass.
     #[error("{msg}")]
     SourcePathMissing {
+        /// The byte-identical legacy error message.
         msg: &'static str,
+        /// Which source type (`Local` or `Git`) was missing its path field.
         kind: crate::types::SourceType,
     },
 
     /// A bundled skill does not contain the required `SKILL.md`.
+    /// `.code()` = `"missing-skill-md"`.
     #[error("BundledSkill for '{skill}' is missing SKILL.md")]
-    MissingSkillMd { skill: String },
+    MissingSkillMd {
+        /// The name of the skill missing `SKILL.md`.
+        skill: String,
+    },
 
     /// An install plan is blocked (e.g. trying to install older than what's locked).
+    /// `.code()` = `"version-guard"`.
     #[error("Install plan for '{tool}' is blocked. Run with force=true to override.")]
-    VersionGuard { tool: String },
+    VersionGuard {
+        /// The tool name whose plan is blocked.
+        tool: String,
+    },
 
     /// The `BundledSkill` changed between `plan()` and `apply()` (parity guard).
+    /// `.code()` = `"drift"`.
     #[error(
         "Parity check failed for '{tool}': \
          the BundledSkill has changed since plan() was called."
     )]
-    Drift { tool: String },
+    Drift {
+        /// The tool name whose bundle changed since `plan()`.
+        tool: String,
+    },
 
-    /// A `git` subprocess exited with a non-zero status.
+    /// A `git` subprocess exited with a non-zero status. `.code()` = `"git"`.
     #[error("git {operation} failed: {stderr}")]
-    Git { operation: GitOp, stderr: String },
+    Git {
+        /// Which git operation failed.
+        operation: GitOp,
+        /// The subprocess's captured stderr output.
+        stderr: String,
+    },
 
     /// An LLM gateway error.
     #[error(transparent)]

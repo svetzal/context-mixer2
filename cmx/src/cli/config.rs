@@ -1,14 +1,19 @@
+//! `cmx config` subcommand argument definitions, part of the clap CLI
+//! defined in `cmx/src/cli/mod.rs`.
+
 use clap::Subcommand;
 
 use crate::platform::Platform;
 
 use super::OutputArgs;
 
+/// `cmx config` subcommands.
 #[derive(Subcommand)]
 pub enum ConfigAction {
     /// Show current configuration
     Show {
         #[command(flatten)]
+        /// Shared `--json` output flag.
         output: OutputArgs,
     },
     /// [Mutates] Set LLM gateway (openai or ollama)
@@ -25,6 +30,7 @@ pub enum ConfigAction {
     /// reports as external instead of flagging
     External {
         #[command(subcommand)]
+        /// The external-rule operation to perform.
         action: ExternalAction,
     },
     /// Manage the set of platforms cmx manages. When set, `install`/`uninstall`
@@ -32,10 +38,12 @@ pub enum ConfigAction {
     /// infers the set from the platforms already in use.
     Platforms {
         #[command(subcommand)]
+        /// The managed-platform-set operation to perform.
         action: PlatformsAction,
     },
 }
 
+/// `cmx config platforms` subcommands.
 #[derive(Subcommand)]
 pub enum PlatformsAction {
     /// List the platforms cmx manages
@@ -54,6 +62,7 @@ pub enum PlatformsAction {
     },
 }
 
+/// `cmx config external` subcommands.
 #[derive(Subcommand)]
 pub enum ExternalAction {
     /// List the configured external rules

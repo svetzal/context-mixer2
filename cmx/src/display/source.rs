@@ -1,3 +1,6 @@
+//! Output formatting for `cmx source` subcommands, a submodule of
+//! `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::source::{SourceBrowseResult, SourceListResult, SourceRemoveResult, SourceScanResult};

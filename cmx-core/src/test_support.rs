@@ -4,40 +4,50 @@
 //! - Within `cmx-core` itself: via `#[cfg(test)]`
 //! - In downstream crates (e.g. `cmx`): via the `test-support` feature flag
 
+/// Build minimal agent markdown content with a `name`/`description` frontmatter.
 pub fn agent_content(name: &str, desc: &str) -> String {
     format!("---\nname: {name}\ndescription: {desc}\n---\n# {name}\n")
 }
 
+/// Build minimal `SKILL.md` content with a `description` frontmatter.
 pub fn skill_content(desc: &str) -> String {
     format!("---\ndescription: {desc}\n---\n# skill\n")
 }
 
+/// Build `SKILL.md` content with a top-level `version:` key (the legacy,
+/// shadowing form frontmatter reconciliation removes).
 pub fn versioned_skill_content(desc: &str, version: &str) -> String {
     format!("---\ndescription: {desc}\nversion: {version}\n---\n# skill\n")
 }
 
+/// Build agent markdown content with a top-level `version:` key.
 pub fn versioned_agent_content(name: &str, desc: &str, version: &str) -> String {
     format!("---\nname: {name}\ndescription: {desc}\nversion: {version}\n---\n# {name}\n")
 }
 
+/// Build agent markdown content with the version nested under `metadata.version`
+/// (the community-standard, non-shadowing form).
 pub fn metadata_versioned_agent_content(name: &str, desc: &str, version: &str) -> String {
     format!(
         "---\nname: {name}\ndescription: {desc}\nmetadata:\n  version: \"{version}\"\n  author: Test\n---\n# {name}\n"
     )
 }
 
+/// Build `SKILL.md` content with the version nested under `metadata.version`.
 pub fn metadata_versioned_skill_content(desc: &str, version: &str) -> String {
     format!(
         "---\ndescription: {desc}\nmetadata:\n  version: \"{version}\"\n  author: Test\n---\n# skill\n"
     )
 }
 
+/// Build agent markdown content marked deprecated, with a reason and replacement.
 pub fn deprecated_agent_content(name: &str, desc: &str, reason: &str, replacement: &str) -> String {
     format!(
         "---\nname: {name}\ndescription: {desc}\ndeprecated: true\ndeprecated_reason: {reason}\ndeprecated_replacement: {replacement}\n---\n"
     )
 }
 
+/// Build a [`crate::types::SourceEntry`] for a local-directory source.
 pub fn make_local_entry(
     path: impl Into<std::path::PathBuf>,
     last_updated: Option<String>,
@@ -53,6 +63,7 @@ pub fn make_local_entry(
     }
 }
 
+/// Build a [`crate::types::SourceEntry`] for a git-remote source.
 pub fn make_git_entry(
     url: &str,
     clone_path: impl Into<std::path::PathBuf>,
@@ -70,6 +81,7 @@ pub fn make_git_entry(
     }
 }
 
+/// Build a [`crate::types::LockEntry`] with placeholder checksums and no version.
 pub fn make_lock_entry_builder(
     kind: crate::types::ArtifactKind,
     repo: &str,
@@ -89,6 +101,7 @@ pub fn make_lock_entry_builder(
     }
 }
 
+/// Like [`make_lock_entry_builder`], with an explicit version set.
 pub fn make_lock_entry_versioned(
     kind: crate::types::ArtifactKind,
     version: &str,
@@ -100,6 +113,8 @@ pub fn make_lock_entry_versioned(
     entry
 }
 
+/// Like [`make_lock_entry_builder`], with an explicit version and matching
+/// source/installed checksum.
 pub fn make_lock_entry_with_checksum(
     kind: crate::types::ArtifactKind,
     version: Option<&str>,
@@ -114,6 +129,7 @@ pub fn make_lock_entry_with_checksum(
     entry
 }
 
+/// Save a lock file for `scope` containing a single `name` → `entry` package.
 pub fn save_lock_with_entry(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -132,6 +148,7 @@ pub fn save_lock_with_entry(
     crate::lockfile::save(&lock, scope, fs, paths).unwrap();
 }
 
+/// Write `sources.json` registering a single local source named `source_name`.
 pub fn setup_source(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -157,6 +174,7 @@ pub fn setup_source(
     fs.add_file(paths.sources_path(), sources_json);
 }
 
+/// Write `sources.json` registering multiple local sources from `(name, path)` pairs.
 pub fn setup_sources(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -180,6 +198,7 @@ pub fn setup_sources(
     fs.add_file(paths.sources_path(), sources_json);
 }
 
+/// Register a local source and write one versioned agent file into it.
 pub fn setup_source_with_versioned_agent(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -195,6 +214,7 @@ pub fn setup_source_with_versioned_agent(
     );
 }
 
+/// Register a local source and write one versioned skill into it.
 pub fn setup_source_with_skill(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -210,6 +230,7 @@ pub fn setup_source_with_skill(
     );
 }
 
+/// A representative, fully-populated agent [`crate::types::LockEntry`] for tests.
 pub fn sample_lock_entry() -> crate::types::LockEntry {
     use crate::types::{ArtifactKind, LockEntry, LockSource};
     LockEntry {
@@ -225,6 +246,7 @@ pub fn sample_lock_entry() -> crate::types::LockEntry {
     }
 }
 
+/// A [`crate::types::LockFile`] containing one [`sample_lock_entry`].
 pub fn sample_lock_file() -> crate::types::LockFile {
     use crate::types::LockFile;
     use std::collections::BTreeMap;
@@ -236,6 +258,7 @@ pub fn sample_lock_file() -> crate::types::LockFile {
     }
 }
 
+/// Write `content` to disk at the path an agent named `name` would install to.
 pub fn install_agent_on_disk(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -249,6 +272,7 @@ pub fn install_agent_on_disk(
     fs.add_file(path, content);
 }
 
+/// Write a `SKILL.md` with `content` at the path a skill named `name` would install to.
 pub fn install_skill_on_disk(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -262,6 +286,8 @@ pub fn install_skill_on_disk(
     fs.add_file(dir.join("SKILL.md"), content);
 }
 
+/// Write a `SKILL.md` for `name` directly under `dir` (outside any install-dir
+/// resolution — for building an arbitrary source-repo tree in tests).
 pub fn add_skill(
     fs: &crate::gateway::fakes::FakeFilesystem,
     dir: impl AsRef<std::path::Path>,
@@ -271,6 +297,7 @@ pub fn add_skill(
     fs.add_file(dir.as_ref().join(name).join("SKILL.md"), skill_content(desc));
 }
 
+/// Register a local source and write one unversioned agent file into it.
 pub fn setup_source_with_agent(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -285,6 +312,8 @@ pub fn setup_source_with_agent(
     );
 }
 
+/// A [`crate::paths::ConfigPaths`] rooted at fake `/home/testuser` directories,
+/// bound to [`crate::platform::Platform::Claude`].
 pub fn test_paths() -> crate::paths::ConfigPaths {
     use std::path::PathBuf;
     crate::paths::ConfigPaths::for_test(
@@ -293,6 +322,7 @@ pub fn test_paths() -> crate::paths::ConfigPaths {
     )
 }
 
+/// Like [`test_paths`], bound to an explicit `platform`.
 pub fn test_paths_for(platform: crate::platform::Platform) -> crate::paths::ConfigPaths {
     use std::path::PathBuf;
     crate::paths::ConfigPaths::for_test_with_platform(
@@ -302,6 +332,7 @@ pub fn test_paths_for(platform: crate::platform::Platform) -> crate::paths::Conf
     )
 }
 
+/// Write an empty (default) `sources.json`.
 pub fn setup_empty_sources(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -310,6 +341,7 @@ pub fn setup_empty_sources(
     fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 }
 
+/// Write `sources.json` registering a single git-remote source.
 pub fn setup_source_git(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -326,6 +358,7 @@ pub fn setup_source_git(
     fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 }
 
+/// Write `sources.json` from a slice of pre-built `(name, entry)` pairs.
 pub fn setup_sources_from_entries(
     fs: &crate::gateway::fakes::FakeFilesystem,
     paths: &crate::paths::ConfigPaths,
@@ -338,6 +371,8 @@ pub fn setup_sources_from_entries(
     fs.add_file(paths.sources_path(), serde_json::to_string_pretty(&sources).unwrap());
 }
 
+/// Build an [`crate::context::AppContext`] from fake gateways and `paths`, with
+/// no LLM client.
 pub fn make_ctx<'a>(
     fs: &'a crate::gateway::fakes::FakeFilesystem,
     git: &'a crate::gateway::fakes::FakeGitClient,
@@ -353,18 +388,28 @@ pub fn make_ctx<'a>(
     }
 }
 
+/// An in-memory context for exercising an embedding tool's integration without
+/// touching the real filesystem — bundles fake gateways with test paths, ready to
+/// hand to [`TestContext::ctx`].
 pub struct TestContext {
+    /// The in-memory fake filesystem.
     pub fs: crate::gateway::fakes::FakeFilesystem,
+    /// The fake git client (records calls without running git).
     pub git: crate::gateway::fakes::FakeGitClient,
+    /// The fake clock, fixed at construction time.
     pub clock: crate::gateway::fakes::FakeClock,
+    /// Fake config/install paths rooted under `/home/testuser`.
     pub paths: crate::paths::ConfigPaths,
 }
 
 impl TestContext {
+    /// Build a `TestContext` bound to [`crate::platform::Platform::Claude`], with
+    /// the clock fixed at the current real time.
     pub fn new() -> Self {
         Self::build(test_paths(), crate::gateway::fakes::FakeClock::at(chrono::Utc::now()))
     }
 
+    /// Build a `TestContext` bound to an explicit `platform`.
     pub fn for_platform(platform: crate::platform::Platform) -> Self {
         Self::build(
             test_paths_for(platform),
@@ -372,6 +417,7 @@ impl TestContext {
         )
     }
 
+    /// Build a `TestContext` with the clock fixed at an explicit `time`.
     pub fn at(time: chrono::DateTime<chrono::Utc>) -> Self {
         Self::build(test_paths(), crate::gateway::fakes::FakeClock::at(time))
     }
@@ -385,6 +431,7 @@ impl TestContext {
         }
     }
 
+    /// Borrow an [`crate::context::AppContext`] backed by this context's fakes.
     pub fn ctx(&self) -> crate::context::AppContext<'_> {
         make_ctx(&self.fs, &self.git, &self.clock, &self.paths)
     }

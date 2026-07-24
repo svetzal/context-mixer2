@@ -1,3 +1,5 @@
+//! Shared validation types.
+
 /// Shared validation types used across plugin, marketplace, and facet validation.
 use std::path::Path;
 
@@ -59,20 +61,31 @@ pub fn load_and_validate_json<T: serde::de::DeserializeOwned>(
     Ok(parse_and_validate_json(&raw, context, file_label))
 }
 
+/// Severity of a `ValidationIssue`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IssueLevel {
+    /// A hard failure; makes `ValidationReport::has_errors` return `true`
+    /// and fails `cmf validate`.
     Error,
+    /// A non-fatal concern surfaced to the user but that does not fail
+    /// `cmf validate`.
     Warning,
 }
 
+/// A single validation finding, tied to the context (e.g. plugin or facet
+/// name) it was found in.
 #[derive(Debug, Clone)]
 pub struct ValidationIssue {
+    /// Whether this issue is fatal to validation.
     pub level: IssueLevel,
+    /// The plugin, facet, or file the issue was found in.
     pub context: String,
+    /// Human-readable description of the problem.
     pub message: String,
 }
 
 impl ValidationIssue {
+    /// Construct an `Error`-level issue.
     pub fn error(context: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             level: IssueLevel::Error,
@@ -81,6 +94,7 @@ impl ValidationIssue {
         }
     }
 
+    /// Construct a `Warning`-level issue.
     pub fn warning(context: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             level: IssueLevel::Warning,
@@ -90,6 +104,8 @@ impl ValidationIssue {
     }
 }
 
+/// Wrapper around the full set of issues found by `cmf validate`, used for
+/// summary `Display` output.
 pub struct ValidationReport(pub Vec<ValidationIssue>);
 
 impl ValidationReport {

@@ -1,31 +1,55 @@
+//! Facet and Recipe structs, frontmatter parser.
+
 use std::path::{Path, PathBuf};
 
 use cmx::scan::{extract_field, extract_version, split_frontmatter_and_body};
 use serde::{Deserialize, Serialize};
 
+/// A single facet: a scoped, reusable piece of guidance parsed from a
+/// markdown file's frontmatter and body.
 #[derive(Debug, Clone)]
 pub struct Facet {
+    /// The facet's unique name, from the `name` frontmatter field.
     pub name: String,
+    /// The category the facet belongs to, from the `facet` frontmatter field
+    /// (e.g. `rust`, `git`).
     pub category: String,
+    /// Optional free-text description of what the facet's guidance covers.
     pub scope: Option<String>,
+    /// Optional free-text description of what the facet's guidance
+    /// deliberately excludes.
     pub does_not_cover: Option<String>,
+    /// Optional semver version, from either a top-level `version` field or a
+    /// nested `metadata.version` field.
     pub version: Option<String>,
+    /// Filesystem path the facet was parsed from.
     pub path: PathBuf,
 }
 
+/// A recipe: a named composition of facets assembled into a single output
+/// agent document (e.g. `AGENTS.md`).
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct Recipe {
+    /// The recipe's unique name.
     pub name: String,
+    /// Human-readable description of the assembled agent's purpose.
     #[serde(default)]
     pub description: String,
+    /// Path (relative to the repository) the assembled output is written to.
     pub produces: String,
+    /// Ordered list of facet names to compose, in the order they appear in
+    /// the assembled output.
     pub facets: Vec<String>,
+    /// Names of runtime skills to reference from the assembled agent.
     #[serde(default)]
     pub runtime_skills: Vec<String>,
 }
 
+/// Wrapper around a list of facets, used for grouped-by-category `Display`
+/// output.
 pub struct FacetList(pub Vec<Facet>);
 
+/// Wrapper around a list of recipes, used for summary `Display` output.
 pub struct RecipeList(pub Vec<Recipe>);
 
 /// Parse facet frontmatter from a markdown file.

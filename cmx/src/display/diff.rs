@@ -1,3 +1,6 @@
+//! Output formatting for `cmx diff`, a submodule of
+//! `cmx/src/display/mod.rs`.
+
 use crate::diff::{DiffOutput, FileStatus};
 use crate::platform::platforms_label;
 use std::fmt;

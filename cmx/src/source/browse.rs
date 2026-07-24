@@ -1,3 +1,5 @@
+//! `cmx source browse` interactive browsing.
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -6,35 +8,49 @@ use serde::Serialize;
 use crate::gateway::DirEntry;
 use crate::types::{Artifact, ArtifactKind, Deprecation};
 
+/// A single agent artifact discovered while browsing a source.
 #[derive(Clone, Debug, Serialize)]
 pub struct BrowseArtifact {
+    /// Artifact name.
     pub name: String,
+    /// Declared version, if any.
     pub version: Option<String>,
+    /// Short description from the artifact's frontmatter.
     pub description: String,
+    /// Deprecation metadata, if the artifact has been deprecated.
     pub deprecation: Option<Deprecation>,
     /// Human-formatted deprecation string — display-only; omitted from `--json`.
     #[serde(skip_serializing)]
     pub deprecation_display: String,
 }
 
+/// A single skill artifact discovered while browsing a source.
 #[derive(Clone, Debug, Serialize)]
 pub struct BrowseSkill {
+    /// Skill name.
     pub name: String,
+    /// Declared version, if any.
     pub version: Option<String>,
+    /// Short description from the skill's frontmatter.
     pub description: String,
+    /// Deprecation metadata, if the skill has been deprecated.
     pub deprecation: Option<Deprecation>,
     /// Human-formatted deprecation string — display-only; omitted from `--json`.
     #[serde(skip_serializing)]
     pub deprecation_display: String,
+    /// Relative file paths that make up the skill's directory.
     pub files: Vec<String>,
 }
 
+/// Result of browsing a single source's available agents and skills.
 #[derive(Clone, Debug, Serialize)]
 pub struct SourceBrowseResult {
     /// In JSON output this appears as `"source"`.
     #[serde(rename = "source")]
     pub source_name: String,
+    /// Agents available in the source.
     pub agents: Vec<BrowseArtifact>,
+    /// Skills available in the source.
     pub skills: Vec<BrowseSkill>,
 }
 

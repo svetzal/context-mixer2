@@ -1,3 +1,6 @@
+//! Shared test helpers for command dispatch tests, a submodule of
+//! `cmx/src/dispatch/mod.rs`.
+
 use chrono::Utc;
 
 use crate::cli::OutputArgs;

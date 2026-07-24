@@ -1,3 +1,5 @@
+//! Suggestion helpers for commands.
+
 use std::collections::BTreeSet;
 
 use crate::context::AppContext;
@@ -6,6 +8,9 @@ use crate::platform::Platform;
 use crate::source_iter;
 use crate::types::{ArtifactKind, InstallScope};
 
+/// Build a "did you mean" hint for a name that wasn't found among installed
+/// artifacts, falling back to a generic pointer to `cmx list` when no close
+/// match exists.
 pub fn installed_artifact_hint(
     name: &str,
     kind: Option<ArtifactKind>,
@@ -18,6 +23,9 @@ pub fn installed_artifact_hint(
     })
 }
 
+/// Build a "did you mean" hint for a name that wasn't found among source
+/// artifacts, falling back to a generic pointer to `cmx search` when no close
+/// match exists.
 pub fn source_artifact_hint(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> String {
     let candidates = source_candidates(kind, ctx).unwrap_or_default();
     hint_from_candidates(name, &candidates).unwrap_or_else(|| format!("See 'cmx search {name}'."))

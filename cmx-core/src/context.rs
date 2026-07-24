@@ -1,3 +1,11 @@
+//! The dependency-injection seam: [`AppContext`] bundles every I/O gateway a
+//! command needs, and [`LoadedState`] pre-loads the config-root documents that
+//! almost every command reads at startup.
+//!
+//! Production code builds an `AppContext` from real gateways via
+//! [`crate::production::ProductionContext`]; tests build one from
+//! [`crate::gateway::fakes`] so command logic runs against an in-memory filesystem.
+
 use crate::error::Result;
 use std::collections::BTreeMap;
 
@@ -12,10 +20,16 @@ use crate::types::{InstallScope, LockFile, SourcesFile};
 /// Production code constructs one `AppContext` in `main` with real
 /// implementations and passes it down.  Tests construct it with fakes.
 pub struct AppContext<'a> {
+    /// The filesystem gateway used for all file reads/writes.
     pub fs: &'a dyn Filesystem,
+    /// The git client gateway used for clone/pull operations on git sources.
     pub git: &'a dyn GitClient,
+    /// The clock gateway, so timestamps (e.g. `installed_at`) are injectable in tests.
     pub clock: &'a dyn Clock,
+    /// The resolved config-root and install-directory paths for this invocation.
     pub paths: &'a ConfigPaths,
+    /// The LLM gateway, when the caller has one available (feature `llm`); `None`
+    /// for commands that never need LLM-powered analysis.
     pub llm: Option<&'a dyn LlmClient>,
 }
 
@@ -57,11 +71,14 @@ impl<'a> AppContext<'a> {
 /// [`LoadedState::load`] once and then pass the plain data to pure logic
 /// functions that accept no `&AppContext`.
 pub struct LoadedState {
+    /// The parsed `sources.json` contents.
     pub sources: SourcesFile,
+    /// The parsed lock file for every [`InstallScope`] (global and local).
     pub locks: BTreeMap<InstallScope, LockFile>,
 }
 
 impl LoadedState {
+    /// Load `sources.json` and both scopes' lock files via `ctx`'s gateways.
     pub fn load(ctx: &AppContext<'_>) -> Result<Self> {
         let sources = config::load_sources(ctx.fs, ctx.paths)?;
         let locks = lockfile::load_both(ctx.fs, ctx.paths)?;

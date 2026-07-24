@@ -1,3 +1,8 @@
+//! Production gateway implementations that perform real I/O: [`RealFilesystem`]
+//! (delegates to `std::fs`), [`RealGitClient`] (shells out to `git`), [`SystemClock`]
+//! (wall-clock time), and, under feature `llm`, `MojenticLlmClient` (the mojentic
+//! crate's LLM broker). Wired together by [`crate::production::ProductionContext`].
+
 use chrono::{DateTime, Utc};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -198,6 +203,7 @@ pub struct MojenticLlmClient {
 
 #[cfg(feature = "llm")]
 impl MojenticLlmClient {
+    /// Build a client for the gateway and model described by `config`.
     pub fn new(config: LlmConfig) -> Self {
         Self { config }
     }

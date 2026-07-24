@@ -1,3 +1,5 @@
+//! `cmx agent uninstall` / `cmx skill uninstall`.
+
 use std::path::Path;
 
 use crate::error::{CliError, Result};
@@ -13,10 +15,14 @@ use crate::types::{ArtifactKind, InstallScope};
 // Result types
 // ---------------------------------------------------------------------------
 
+/// Outcome of uninstalling a single named artifact.
 #[derive(Debug)]
 pub struct UninstallResult {
+    /// Artifact name.
     pub name: String,
+    /// Whether the removed artifact is an agent or a skill.
     pub kind: ArtifactKind,
+    /// Display label for the scope the artifact was removed from (e.g. "global", "local").
     pub scope: &'static str,
     /// Whether any lock entry was removed (the artifact was tracked somewhere).
     pub was_tracked: bool,
@@ -30,7 +36,9 @@ pub struct UninstallResult {
 /// Result of uninstalling one or more named artifacts.
 #[derive(Debug)]
 pub struct BatchUninstallResult {
+    /// The artifact kind that was targeted by this uninstall run.
     pub kind: ArtifactKind,
+    /// Every artifact successfully removed during this run.
     pub removed: Vec<UninstallResult>,
     /// Names that were not installed anywhere (nothing to remove).
     pub not_found: Vec<(String, String)>,

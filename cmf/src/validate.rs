@@ -1,3 +1,5 @@
+//! Aggregate validation.
+
 use anyhow::Result;
 use cmx::gateway::Filesystem;
 

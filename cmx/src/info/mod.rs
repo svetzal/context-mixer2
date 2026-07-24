@@ -1,3 +1,5 @@
+//! `cmx info` (artifact detail view).
+
 use crate::error::{CliError, Result};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -30,23 +32,35 @@ fn serialize_path_as_string<S: serde::Serializer>(
 /// here so there is exactly one home for the `--json` contract.
 #[derive(Debug, Serialize)]
 pub struct ArtifactInfo {
+    /// The artifact's name.
     pub name: String,
+    /// Whether this is an agent or a skill.
     pub kind: ArtifactKind,
+    /// The install scope label (`"global"` or `"local"`) this copy was found in.
     pub scope: &'static str,
     /// Serialized via `Path::display()` for lossless UTF-8 representation.
     #[serde(serialize_with = "serialize_path_as_string")]
     pub path: PathBuf,
+    /// The version recorded in the lock file, if tracked.
     pub version: Option<String>,
+    /// Timestamp the artifact was installed, from the lock entry.
     pub installed_at: Option<String>,
     /// In JSON output this appears as `"source"`.
     #[serde(rename = "source")]
     pub source_display: Option<String>,
+    /// The checksum recorded for the source copy at install time.
     pub source_checksum: Option<String>,
+    /// The checksum recorded for the installed copy at install time.
     pub installed_checksum: Option<String>,
+    /// The artifact's current on-disk checksum, computed when locally modified.
     pub disk_checksum: Option<String>,
+    /// `true` when the on-disk copy no longer matches the lock's recorded checksum.
     pub locally_modified: bool,
+    /// `true` when no lock entry exists for this artifact.
     pub untracked: bool,
+    /// Deprecation notice declared by the source, if any.
     pub deprecation: Option<Deprecation>,
+    /// A newer version available from the source, if one exists.
     pub available_version: Option<String>,
     /// In JSON output this appears as `"files"`.
     #[serde(rename = "files")]
@@ -71,10 +85,15 @@ pub struct ArtifactInfo {
     pub summary_error: Option<String>,
 }
 
+/// One file or directory within a skill's directory tree, used to render the
+/// `--files` listing.
 #[derive(Debug, Serialize)]
 pub struct SkillFileEntry {
+    /// The file or directory's name.
     pub name: String,
+    /// `true` when this entry is a directory.
     pub is_dir: bool,
+    /// Depth within the skill's directory tree, for indenting the display.
     pub indent_level: usize,
 }
 
@@ -82,6 +101,8 @@ pub struct SkillFileEntry {
 // Public entry point
 // ---------------------------------------------------------------------------
 
+/// Find an installed artifact by name (searching both agents and skills across
+/// every platform) and gather its full detail view for `cmx info`.
 pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
     // Search both kinds across every platform.
     for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {

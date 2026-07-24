@@ -13,12 +13,20 @@ MANDATORY pre-commit quality checks — run ALL before committing:
 cargo fmt --check && \
 cargo clippy --all-targets -- -D warnings && \
 cargo test && \
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace && \
 cargo deny check
 
 # Full build (with LLM diff support)
 cargo clippy --all-targets --all-features -- -D warnings && \
 cargo test --all-features
 ```
+
+Note: `cmx-core` denies `missing_docs` at the crate level (see
+`cmx-core/Cargo.toml`) and is fully documented; `cmx`/`cmf` currently only
+warn on missing per-item docs (module-level `//!` headers are complete, but
+not every `pub` item yet has a doc comment), so this workspace-wide
+`-D warnings` doc command may still fail until that backlog is cleared —
+track it as a follow-up, not a regression.
 
 Additional recommended checks:
 
@@ -193,6 +201,8 @@ this and cut a normal cmx-only `v*` release.
   - Async-only (requires tokio runtime)
 
 ## Architecture
+
+Each module's own `//!` header is the authoritative description of its purpose; the map below is an index, kept in sync with those headers and enforced by `cmx/tests/architecture_doc.rs`.
 
 Entry points:
 

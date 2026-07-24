@@ -1,3 +1,6 @@
+//! JSON output formatting for `cmx doctor`, a submodule of
+//! `cmx/src/display/doctor/mod.rs`.
+
 use serde::Serialize;
 use serde_json::Value;
 

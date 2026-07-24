@@ -1,3 +1,5 @@
+//! Source update logic (git pull for registered sources).
+
 use crate::error::{CliError, Result};
 use chrono::{DateTime, Utc};
 
@@ -12,9 +14,14 @@ const AUTO_UPDATE_MINUTES: i64 = 60;
 // Result types
 // ---------------------------------------------------------------------------
 
+/// Outcome of `cmx source update`, shaped by whether a specific source was
+/// named.
 pub enum SourceUpdateOutput {
+    /// Result of updating the single named source.
     SingleUpdate(SourceScanResult),
+    /// Results of updating every git-backed source, in registration order.
     BatchUpdate(Vec<SourceScanResult>),
+    /// No git-backed sources are registered, so there was nothing to update.
     NoGitSources,
 }
 
@@ -22,6 +29,8 @@ pub enum SourceUpdateOutput {
 // Public API
 // ---------------------------------------------------------------------------
 
+/// Update a single named git source, or every registered git source when
+/// `name` is `None`. Fails if `name` is given but not a registered source.
 pub fn update(name: Option<&str>, ctx: &AppContext<'_>) -> Result<SourceUpdateOutput> {
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
 

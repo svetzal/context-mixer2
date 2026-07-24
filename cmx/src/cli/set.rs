@@ -1,7 +1,11 @@
+//! `cmx set` subcommand argument definitions, part of the clap CLI defined
+//! in `cmx/src/cli/mod.rs`.
+
 use clap::Subcommand;
 
 use super::OutputArgs;
 
+/// `cmx set` subcommands.
 #[derive(Subcommand)]
 pub enum SetAction {
     /// [Mutates] Create an empty, inactive set
@@ -31,6 +35,7 @@ pub enum SetAction {
         #[arg(long)]
         local: bool,
         #[command(flatten)]
+        /// Shared `--json` output flag.
         output: OutputArgs,
     },
     /// Show a set's description, state, and members
@@ -41,6 +46,7 @@ pub enum SetAction {
         #[arg(long)]
         local: bool,
         #[command(flatten)]
+        /// Shared `--json` output flag.
         output: OutputArgs,
     },
     /// [Mutates] Add installed artifact(s) to a set, resolving kind and source from the

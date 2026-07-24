@@ -1,8 +1,12 @@
+//! Repo root detection (marketplace, plugin, facets-only, unknown).
+
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use cmx::gateway::Filesystem;
 
+/// The kind of repository root detected by [`detect_repo`], based on which
+/// marker files/directories are present.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RepoKind {
     /// Has `.claude-plugin/marketplace.json`
@@ -15,11 +19,16 @@ pub enum RepoKind {
     Unknown,
 }
 
+/// Result of detecting a repository's kind and structure at a given path.
 #[derive(Debug, Clone)]
 pub struct RepoRoot {
+    /// Absolute path to the repository root that was inspected.
     pub path: PathBuf,
+    /// The detected repository kind.
     pub kind: RepoKind,
+    /// Whether a `facets/` directory exists at the root.
     pub has_facets: bool,
+    /// Whether a `plugins/` directory exists at the root.
     pub has_plugins_dir: bool,
 }
 

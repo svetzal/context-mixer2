@@ -1,9 +1,15 @@
+//! Serde types for plugin.json and marketplace.json (single source of
+//! truth lifted from cmf).
+
 use serde::{Deserialize, Serialize};
 
+/// Author (or owner) identity as recorded in `plugin.json`/`marketplace.json`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct Author {
+    /// Display name of the author.
     #[serde(default)]
     pub name: String,
+    /// Contact email of the author.
     #[serde(default)]
     pub email: String,
 }
@@ -18,8 +24,10 @@ pub type Owner = Author;
 /// must ingest those files without aborting, so neither field is required.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MarketplaceMetadata {
+    /// Human-readable description of the marketplace.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Marketplace manifest version, if the publisher declares one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }
@@ -32,11 +40,15 @@ pub struct MarketplaceMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum PluginSource {
+    /// A relative path within the marketplace repo, e.g. `./plugins/foo`.
     Local(String),
+    /// A remote source descriptor (e.g. `{"source": "github", ...}`), not yet
+    /// supported by the scanner but preserved for round-tripping.
     Remote(serde_json::Value),
 }
 
 impl PluginSource {
+    /// Return the local relative path, or `None` if this is a `Remote` source.
     pub fn as_local(&self) -> Option<&str> {
         match self {
             PluginSource::Local(s) => Some(s.as_str()),
@@ -44,6 +56,8 @@ impl PluginSource {
         }
     }
 
+    /// Short name for this source's kind: `"local"`, or the remote source's
+    /// declared `source` field (e.g. `"github"`), falling back to `"unknown"`.
     pub fn source_type_name(&self) -> &str {
         match self {
             PluginSource::Local(_) => "local",
@@ -63,45 +77,66 @@ impl std::fmt::Display for PluginSource {
     }
 }
 
+/// One plugin's listing within a `marketplace.json`'s `plugins` array.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct MarketplaceEntry {
+    /// Plugin name.
     #[serde(default)]
     pub name: String,
+    /// Human-readable description of the plugin.
     #[serde(default)]
     pub description: String,
+    /// Where the plugin's files live, relative to the marketplace or a remote
+    /// location; `None` when only `agents`/`skills` arrays are declared.
     #[serde(default)]
     pub source: Option<PluginSource>,
+    /// Optional publisher-assigned category, e.g. `"development"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<String>,
+    /// Explicit list of agent artifact paths, when not inferred from `source`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub agents: Vec<String>,
+    /// Explicit list of skill artifact paths, when not inferred from `source`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<String>,
 }
 
+/// Deserialized form of a repo's `marketplace.json` — the plugin listing
+/// consumed by `cmx source browse`/`cmx set create --from-plugin`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Marketplace {
+    /// Name of the marketplace.
     #[serde(default)]
     pub name: String,
+    /// Marketplace owner/maintainer identity.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<Owner>,
+    /// Optional descriptive metadata block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<MarketplaceMetadata>,
+    /// Plugins listed by this marketplace.
     #[serde(default)]
     pub plugins: Vec<MarketplaceEntry>,
 }
 
+/// Deserialized form of a plugin's own `plugin.json` manifest.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct PluginManifest {
+    /// Plugin name.
     pub name: String,
+    /// Plugin version, if the publisher declares one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// Human-readable description of the plugin.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Plugin author identity.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<Author>,
+    /// SPDX license identifier, if declared.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub license: Option<String>,
+    /// Free-text search keywords.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub keywords: Vec<String>,
 }

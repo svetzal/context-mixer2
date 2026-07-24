@@ -1,3 +1,8 @@
+//! clap CLI definition: imports, `COMPLETIONS_LONG_HELP`, `OutputArgs`, `Cli`,
+//! `Commands`; re-exports all action enums from its submodules
+//! (`cmx/src/cli/source.rs`, `cmx/src/cli/set.rs`, `cmx/src/cli/artifact.rs`,
+//! `cmx/src/cli/home.rs`, `cmx/src/cli/config.rs`).
+
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
@@ -29,6 +34,7 @@ Examples:
   cmx completions bash | sudo tee /etc/bash_completion.d/cmx >/dev/null
 ";
 
+/// Shared `--json` flag flattened into commands that support machine-readable output.
 #[derive(Args, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OutputArgs {
     /// Emit machine-readable JSON instead of human-formatted output
@@ -43,6 +49,7 @@ pub struct OutputArgs {
     after_long_help = PLATFORM_HELP_VALUES,
     version
 )]
+/// Top-level parsed command line: the target platform override and the chosen subcommand.
 pub struct Cli {
     #[arg(
         long,
@@ -53,33 +60,40 @@ pub struct Cli {
         help = "Target AI coding assistant platform (see 'cmx --help' for the full list)",
         long_help = "Target AI coding assistant platform (see 'cmx --help' for the full list)"
     )]
+    /// Global target AI coding assistant platform override.
     pub platform: Option<Platform>,
 
     #[command(subcommand)]
+    /// The subcommand to execute.
     pub command: Commands,
 }
 
+/// All top-level cmx subcommands.
 #[derive(Subcommand)]
 pub enum Commands {
     /// Manage source repositories
     Source {
         #[command(subcommand)]
+        /// The source subcommand to run.
         action: SourceAction,
     },
     /// Manage sets — named groups of installed artifacts with a desired
     /// activation state, activated/deactivated together
     Set {
         #[command(subcommand)]
+        /// The set subcommand to run.
         action: SetAction,
     },
     /// Manage agents
     Agent {
         #[command(subcommand)]
+        /// The agent subcommand to run.
         action: ArtifactAction,
     },
     /// Manage skills
     Skill {
         #[command(subcommand)]
+        /// The skill subcommand to run.
         action: ArtifactAction,
     },
     /// List all installed agents and skills
@@ -88,6 +102,7 @@ pub enum Commands {
         #[arg(long)]
         all: bool,
         #[command(flatten)]
+        /// Output formatting flags.
         output: OutputArgs,
     },
     /// Survey the whole system installation across every platform
@@ -117,16 +132,19 @@ pub enum Commands {
         #[arg(long)]
         all: bool,
         #[command(flatten)]
+        /// Output formatting flags.
         output: OutputArgs,
     },
     /// Manage the canonical home for hand-authored artifacts
     Home {
         #[command(subcommand)]
+        /// The home subcommand to run.
         action: HomeAction,
     },
     /// Show installed artifacts that have updates available
     Outdated {
         #[command(flatten)]
+        /// Output formatting flags.
         output: OutputArgs,
     },
     /// Search all sources for agents and skills by keyword
@@ -134,6 +152,7 @@ pub enum Commands {
         /// Keyword to search for in artifact names and descriptions
         query: String,
         #[command(flatten)]
+        /// Output formatting flags.
         output: OutputArgs,
     },
     /// Show detailed metadata for an installed artifact
@@ -141,12 +160,14 @@ pub enum Commands {
         /// Artifact name
         name: String,
         #[command(flatten)]
+        /// Output formatting flags.
         output: OutputArgs,
     },
     #[command(
         about = "Generate shell completion script",
         long_about = COMPLETIONS_LONG_HELP
     )]
+    /// Emit a shell completion script for the requested shell.
     Completions {
         /// Shell to generate completions for
         shell: Shell,
@@ -154,6 +175,7 @@ pub enum Commands {
     /// View or modify cmx configuration
     Config {
         #[command(subcommand)]
+        /// The config subcommand to run.
         action: ConfigAction,
     },
     /// [Mutates] Install cmx's own companion agent skill (global scope by default).
@@ -174,6 +196,7 @@ pub enum Commands {
         #[arg(long)]
         remove: bool,
         #[command(flatten)]
+        /// Output formatting flags.
         output: OutputArgs,
     },
 }

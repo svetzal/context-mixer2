@@ -1,3 +1,5 @@
+//! Set membership management.
+
 use crate::error::{CliError, Result};
 use std::collections::HashSet;
 

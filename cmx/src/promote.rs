@@ -38,9 +38,13 @@ use crate::types::{ArtifactKind, InstallScope};
 // Result type
 // ---------------------------------------------------------------------------
 
+/// Outcome of promoting an in-place-edited installed copy back to the
+/// canonical home.
 #[derive(Debug)]
 pub struct PromoteResult {
+    /// Name of the promoted artifact.
     pub name: String,
+    /// Whether the promoted artifact is an agent or a skill.
     pub kind: ArtifactKind,
     /// The installed copy selected as the source of truth.
     pub source_path: PathBuf,

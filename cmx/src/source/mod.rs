@@ -1,3 +1,5 @@
+//! `cmx source` subcommands (add, list, browse, update, remove).
+
 use crate::error::{CliError, Result};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -21,23 +23,33 @@ pub(crate) use browse::{build_browse_result, count_artifacts, dir_entry_names};
 
 pub use crate::scan::ScanWarning;
 
+/// Result of registering and scanning a newly added source — how many
+/// artifacts it provides and any warnings encountered while scanning it.
 #[derive(Clone, Debug)]
 pub struct SourceScanResult {
+    /// The name the source was registered under.
     pub name: String,
+    /// Number of agents found in the source.
     pub agents_found: usize,
+    /// Number of skills found in the source.
     pub skills_found: usize,
+    /// Warnings encountered while scanning the source.
     pub warnings: Vec<ScanWarning>,
 }
 
+/// One registered source, as reported by `cmx source list`.
 #[derive(Clone, Debug, Serialize)]
 pub struct SourceListEntry {
+    /// The source's registered name.
     pub name: String,
     /// In JSON output this appears as `"type"` (matching the `--json` contract).
     #[serde(rename = "type")]
     pub kind: &'static str,
+    /// Where the source lives — a local path or a git URL.
     pub location: String,
 }
 
+/// Result of `cmx source list`.
 #[derive(Clone, Debug, Serialize)]
 pub struct SourceListResult {
     /// In JSON output this appears as `"sources"`.
@@ -45,9 +57,12 @@ pub struct SourceListResult {
     pub entries: Vec<SourceListEntry>,
 }
 
+/// Result of `cmx source remove`.
 #[derive(Clone, Debug)]
 pub struct SourceRemoveResult {
+    /// The name of the source that was removed.
     pub name: String,
+    /// `true` when a local git clone directory was deleted as part of removal.
     pub clone_deleted: bool,
 }
 
@@ -55,6 +70,8 @@ pub struct SourceRemoveResult {
 // Public API
 // ---------------------------------------------------------------------------
 
+/// Register a new source (local directory or git URL) under `name`, cloning
+/// it if it's a git URL, then scan it and report what it provides.
 pub fn add(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<SourceScanResult> {
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
@@ -85,6 +102,7 @@ pub fn add(name: &str, path_or_url: &str, ctx: &AppContext<'_>) -> Result<Source
     })
 }
 
+/// List every registered source with its type and location.
 pub fn list(ctx: &AppContext<'_>) -> Result<SourceListResult> {
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
 
@@ -111,6 +129,8 @@ pub fn list(ctx: &AppContext<'_>) -> Result<SourceListResult> {
     Ok(SourceListResult { entries })
 }
 
+/// Auto-update the named source, then list the agents/skills it provides for
+/// interactive browsing.
 pub fn browse(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
     source_update::auto_update_source(name, ctx)?;
 
@@ -153,6 +173,7 @@ pub fn browse(name: &str, ctx: &AppContext<'_>) -> Result<SourceBrowseResult> {
     Ok(build_browse_result(name, &artifacts, &skill_dirs))
 }
 
+/// Unregister the named source, deleting its local git clone directory if it has one.
 pub fn remove(name: &str, ctx: &AppContext<'_>) -> Result<SourceRemoveResult> {
     let entry = config::mutate_sources(ctx.fs, ctx.paths, |sources| {
         sources.sources.remove(name).ok_or_else(|| CliError::SourceNotFound {
@@ -232,6 +253,8 @@ pub(crate) fn scan_and_count(
     Ok((agents_found, skills_found, scan_result.warnings))
 }
 
+/// Whether the given string looks like a git URL (`https://`, `http://`,
+/// `git@`, or `ssh://`) rather than a local filesystem path.
 pub fn looks_like_url(s: &str) -> bool {
     s.starts_with("https://")
         || s.starts_with("http://")

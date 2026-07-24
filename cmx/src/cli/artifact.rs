@@ -1,3 +1,6 @@
+//! `cmx agent` / `cmx skill` artifact subcommand argument definitions, part
+//! of the clap CLI defined in `cmx/src/cli/mod.rs`.
+
 use std::path::PathBuf;
 
 use clap::Subcommand;
@@ -6,6 +9,7 @@ use crate::platform::Platform;
 
 use super::OutputArgs;
 
+/// `cmx agent` / `cmx skill` subcommands.
 #[derive(Subcommand)]
 pub enum ArtifactAction {
     /// [Mutates] Install artifact(s) from a source
@@ -28,6 +32,7 @@ pub enum ArtifactAction {
         #[arg(long)]
         all: bool,
         #[command(flatten)]
+        /// Shared `--json` output flag.
         output: OutputArgs,
     },
     /// Show key details for an installed artifact: source, version, when it
@@ -36,6 +41,7 @@ pub enum ArtifactAction {
         /// Artifact name
         name: String,
         #[command(flatten)]
+        /// Shared `--json` output flag.
         output: OutputArgs,
     },
     /// Compare an installed artifact against its source and other installed

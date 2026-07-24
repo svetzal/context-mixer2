@@ -1,3 +1,6 @@
+//! Output formatting for all commands; one submodule per command family
+//! (see `cmx/src/display/*` and `cmx/src/display/doctor/`).
+
 mod adopt;
 mod config;
 mod diff;

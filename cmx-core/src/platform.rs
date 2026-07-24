@@ -1,3 +1,22 @@
+//! The [`Platform`] enum: the fourteen AI-coding-assistant targets cmx-core knows how
+//! to install agents and skills for.
+//!
+//! Each variant governs, through its private `PlatformSpec`:
+//! - its install-directory layout, at both scopes ([`Platform::install_subpath`],
+//!   consumed by [`crate::paths::ConfigPaths::install_dir`]);
+//! - which artifact kinds it supports at all ([`Platform::supports`]) — several
+//!   platforms are skills-only, with no file-droppable agent concept;
+//! - its lock-file slug ([`Platform::slug`]), which names the per-platform
+//!   `cmx-lock-<slug>.json` (Claude alone keeps the bare `cmx-lock.json` for
+//!   backward compatibility); and
+//! - whether it needs its bundled markdown agent transformed into another format at
+//!   install time ([`Platform::transforms_agent_to_toml`] — currently only Codex).
+//!
+//! **Adding a new platform** means adding a variant, filling in its entry in the
+//! exhaustive `spec()` match (the compiler rejects a build that omits one), and
+//! adding a line to [`PLATFORM_HELP_VALUES`] — no other file needs a matching
+//! per-platform match arm, by design.
+
 use std::fmt;
 use std::path::PathBuf;
 
@@ -22,6 +41,8 @@ struct PlatformSpec {
     agent_format: Option<AgentFormat>,
 }
 
+/// Human-readable, per-platform help text for the `--platform` CLI flag, one line
+/// per [`Platform`] variant.
 pub const PLATFORM_HELP_VALUES: &str = concat!(
     "Platform values:\n",
     "  claude     Claude Code — markdown agents and skills in `.claude/`.\n",
@@ -61,20 +82,42 @@ pub const PLATFORM_HELP_VALUES: &str = concat!(
 )]
 #[serde(rename_all = "lowercase")]
 pub enum Platform {
+    /// Claude Code — markdown agents and skills under `.claude/`. The default
+    /// platform binding, and the only one whose lock file omits a slug
+    /// (`cmx-lock.json`, for backward compatibility).
     #[default]
     Claude,
+    /// GitHub Copilot — markdown agents and skills; local scope under `.github/`,
+    /// global scope under `~/.copilot/`.
     Copilot,
+    /// Cursor — markdown agents and skills under `.cursor/`.
     Cursor,
+    /// Windsurf — markdown agents and skills; global scope nests under
+    /// `~/.codeium/windsurf/`.
     Windsurf,
+    /// Gemini CLI — markdown agents and skills under `.gemini/`.
     Gemini,
+    /// opencode — markdown agents (singular `agent/` leaf); skills in the shared
+    /// `.agents` directory.
     Opencode,
+    /// Codex CLI — agents installed as TOML (transformed from the bundled
+    /// markdown at install time); skills in the shared `.agents` directory.
     Codex,
+    /// Pi — skills only; no native agent concept.
     Pi,
+    /// Crush — skills only; reads the shared `.agents` directory.
     Crush,
+    /// Amp — skills only; global scope diverges to `~/.config/agents/skills`.
     Amp,
+    /// Zed — skills only; agents are settings-embedded profiles cmx does not manage.
     Zed,
+    /// `OpenHands` — skills only; agents are trigger-activated skills.
     Openhands,
+    /// Hermes — skills only; global scope diverges to `~/.hermes/skills`; no agent
+    /// files.
     Hermes,
+    /// Devin — skills only; discovers `SKILL.md` in connected repos and reads the
+    /// shared `.agents` directory.
     Devin,
 }
 
@@ -278,8 +321,8 @@ impl Platform {
     ///
     /// Skills-only tools (Pi, Crush, Amp, Zed, `OpenHands`, Hermes) have no
     /// file-droppable agent concept; `(platform, Agent)` is unsupported for
-    /// them. Derived from [`spec`](Self::spec) — a `None` `agent_format` means
-    /// skills-only.
+    /// them. Derived from the private `spec()` table — a `None` `agent_format`
+    /// means skills-only.
     pub fn supports(self, kind: ArtifactKind) -> bool {
         kind == ArtifactKind::Skill || self.spec().agent_format.is_some()
     }

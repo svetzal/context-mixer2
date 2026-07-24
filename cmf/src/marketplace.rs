@@ -1,3 +1,5 @@
+//! Marketplace validation and generation.
+
 use anyhow::Result;
 use cmx::gateway::Filesystem;
 use cmx::json_file::{load_json, save_json};

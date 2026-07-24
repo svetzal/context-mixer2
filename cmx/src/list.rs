@@ -1,3 +1,5 @@
+//! `cmx agent list` / `cmx skill list` / `cmx list`.
+
 use crate::error::Result;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -11,15 +13,22 @@ use crate::types::{ArtifactKind, InstallScope};
 
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+/// How an installed artifact's version compares to what its source currently offers.
 pub enum ListStatus {
+    /// Installed version matches the source's current version.
     Ok,
+    /// The source offers a newer version than what's installed.
     Outdated,
+    /// The source provides no version for this artifact.
     Unversioned,
+    /// No registered source currently provides this artifact.
     SourceMissing,
+    /// The source has marked this artifact deprecated.
     Deprecated,
 }
 
 impl ListStatus {
+    /// The lowercase label used in list's human-readable and JSON output.
     pub fn label(self) -> &'static str {
         match self {
             Self::Ok => "ok",
@@ -42,25 +51,37 @@ enum AvailableVersion {
 /// it's installed for, via [`crate::doctor`]).
 #[derive(Clone, Debug, Serialize)]
 pub struct Row {
+    /// The artifact's name.
     pub name: String,
+    /// The version currently installed, if tracked.
     pub installed_version: Option<String>,
+    /// The version currently offered by the source, if any.
     pub available_version: Option<String>,
     /// The source it came from (repo name only, no path).
     pub source: Option<String>,
     /// The platforms cmx tracks it for.
     pub platforms: Vec<String>,
+    /// How the installed version compares to what the source offers.
     pub status: ListStatus,
 }
 
+/// Listing rows for a single artifact kind, grouped by install scope — the
+/// result of `cmx agent list` / `cmx skill list`.
 #[derive(Clone, Debug, Serialize)]
 pub struct ListKindOutput {
+    /// Whether these rows are agents or skills.
     pub kind: ArtifactKind,
+    /// Rows grouped by install scope (global/local).
     pub rows: BTreeMap<InstallScope, Vec<Row>>,
 }
 
+/// Listing rows for both artifact kinds, grouped by install scope — the
+/// result of `cmx list`.
 #[derive(Clone, Debug, Serialize)]
 pub struct ListOutput {
+    /// Agent rows grouped by install scope (global/local).
     pub agents: BTreeMap<InstallScope, Vec<Row>>,
+    /// Skill rows grouped by install scope (global/local).
     pub skills: BTreeMap<InstallScope, Vec<Row>>,
 }
 
@@ -149,6 +170,8 @@ fn list_status(
     }
 }
 
+/// List installed artifacts of a single kind, grouped by install scope.
+/// Backs `cmx agent list` / `cmx skill list`.
 pub fn list_kind(
     kind: ArtifactKind,
     include_external: bool,
@@ -160,6 +183,7 @@ pub fn list_kind(
     })
 }
 
+/// List installed agents and skills, grouped by install scope. Backs `cmx list`.
 pub fn list_all(include_external: bool, ctx: &AppContext<'_>) -> Result<ListOutput> {
     Ok(ListOutput {
         agents: rows_by_scope(ArtifactKind::Agent, include_external, ctx)?,

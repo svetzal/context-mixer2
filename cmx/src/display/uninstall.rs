@@ -1,3 +1,6 @@
+//! Output formatting for `cmx agent uninstall` / `cmx skill uninstall`, a
+//! submodule of `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::platform::platforms_label;

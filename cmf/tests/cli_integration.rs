@@ -1,3 +1,5 @@
+//! Integration tests for cmf's CLI argument parsing.
+
 use clap::Parser;
 use cmf::cli::{
     Cli, Commands, FacetAction, ManifestAction, MarketplaceAction, PluginAction, RecipeAction,

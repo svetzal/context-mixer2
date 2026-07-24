@@ -1,3 +1,5 @@
+//! Scans marketplace-structured plugin repos.
+
 use crate::error::{CliError, Result};
 use std::path::Path;
 

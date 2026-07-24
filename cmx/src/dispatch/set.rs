@@ -1,3 +1,5 @@
+//! `cmx set` command dispatch, a submodule of `cmx/src/dispatch/mod.rs`.
+
 use anyhow::Result;
 use std::process::ExitCode;
 
@@ -11,6 +13,8 @@ use super::{print_json, scope_from, usage_error};
 pub(crate) const DRY_RUN_DEPRECATED_WARNING: &str =
     "--dry-run is deprecated; the plan is now shown by default — pass --apply to execute";
 
+/// Dispatch `cmx set` subcommands (create, list, show, add, remove, activate,
+/// deactivate, delete, rename).
 pub fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
     match action {
         SetAction::Create {

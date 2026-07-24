@@ -1,3 +1,5 @@
+//! `cmx config` command dispatch, a submodule of `cmx/src/dispatch/mod.rs`.
+
 use anyhow::Result;
 
 use crate::cli::{ConfigAction, ExternalAction, HomeAction, PlatformsAction};
@@ -5,6 +7,7 @@ use crate::context::AppContext;
 
 use super::print_json;
 
+/// Dispatch `cmx home` subcommands (`init`, `path`).
 pub fn handle_home(action: &HomeAction, ctx: &AppContext<'_>) -> Result<()> {
     match action {
         HomeAction::Init => {
@@ -25,6 +28,7 @@ pub fn handle_home(action: &HomeAction, ctx: &AppContext<'_>) -> Result<()> {
     }
 }
 
+/// Dispatch `cmx config` subcommands (show, gateway, model, external, platforms).
 pub fn handle_config(action: ConfigAction, ctx: &AppContext<'_>) -> Result<()> {
     match action {
         ConfigAction::Show { output } => {

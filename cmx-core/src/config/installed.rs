@@ -30,6 +30,11 @@ pub fn matches_external(
     })
 }
 
+/// List artifact names currently installed for `kind`/`scope`, sorted, by reading
+/// the platform's install directory directly (no lock file lookup).
+///
+/// Returns an empty list if the platform has no install directory for this kind
+/// or the directory does not exist yet.
 pub fn installed_names(
     kind: ArtifactKind,
     scope: InstallScope,
@@ -59,6 +64,8 @@ pub fn installed_names(
     Ok(names)
 }
 
+/// Pair each installed artifact name (from [`installed_names`]) with its matching
+/// entry in `lock`, if any, as an [`InstalledArtifact`].
 pub fn installed_with_lock_data<'a>(
     kind: ArtifactKind,
     scope: InstallScope,

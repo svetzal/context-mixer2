@@ -1,3 +1,5 @@
+//! Table rendering helpers.
+
 /// A generic columnar table renderer that prints an indented, padded table to stdout.
 ///
 /// Columns `0..padded_cols` are right-padded to their maximum width. Any columns

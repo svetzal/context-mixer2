@@ -1,3 +1,5 @@
+//! `cmx source` command dispatch, a submodule of `cmx/src/dispatch/mod.rs`.
+
 use anyhow::Result;
 
 use crate::cli::SourceAction;
@@ -6,6 +8,7 @@ use crate::paths::ConfigPaths;
 
 use super::print_json;
 
+/// Dispatch `cmx source` subcommands (add, list, browse, update, remove).
 pub fn handle_source(
     action: SourceAction,
     paths: &ConfigPaths,

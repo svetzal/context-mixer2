@@ -1,3 +1,6 @@
+//! Per-file structural diff: `ArtifactDiff`, `diff_artifact`, `diff_files`,
+//! `diff_dirs`, `modified_file_block`, `collect_relative_files_with`.
+
 use crate::error::Result;
 use std::fmt::Write as _;
 use std::path::Path;

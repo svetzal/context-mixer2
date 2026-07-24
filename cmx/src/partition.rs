@@ -1,3 +1,5 @@
+//! Batch classification of artifact names during adoption/partitioning.
+
 use crate::error::Result;
 
 /// Outcome of classifying a single name during batch partition.

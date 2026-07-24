@@ -1,3 +1,6 @@
+//! `cmx config` subcommands (show, set, external, platforms — the
+//! managed-platform allowlist that scopes install/uninstall/doctor).
+
 use crate::error::{CliError, Result};
 use serde::Serialize;
 
@@ -6,11 +9,16 @@ use crate::context::AppContext;
 use crate::platform::Platform;
 use crate::types::LlmGatewayType;
 
+/// Snapshot of the current cmx configuration, as reported by `cmx config show`.
 #[derive(Clone, Debug, Serialize)]
 pub struct ConfigShowResult {
+    /// Configured LLM gateway (e.g. "openai", "ollama").
     pub gateway: String,
+    /// Configured LLM model name.
     pub model: String,
+    /// Configured external rules (paths/names excluded from management).
     pub external: Vec<String>,
+    /// Currently managed platform allowlist.
     pub platforms: Vec<Platform>,
 }
 
@@ -19,13 +27,17 @@ pub struct PlatformsResult {
     /// Human-facing verb: "Added", "Removed", "Already managed", "Not managed",
     /// or "Managed platforms" for a plain listing.
     pub action: &'static str,
+    /// The platform that was added/removed, or `None` for a plain listing.
     pub platform: Option<Platform>,
     /// The resulting (or current) managed set.
     pub platforms: Vec<Platform>,
 }
 
+/// Result of updating a single scalar config field (gateway or model).
 pub struct ConfigSetResult {
+    /// Name of the field that was updated (e.g. "gateway", "model").
     pub field: &'static str,
+    /// The new value that was persisted.
     pub value: String,
 }
 
@@ -34,11 +46,13 @@ pub struct ExternalResult {
     /// Human-facing verb: "Added", "Removed", "Already present", "Not present",
     /// or "External rules" for a plain listing.
     pub action: &'static str,
+    /// The entry that was added/removed, or `None` for a plain listing.
     pub entry: Option<String>,
     /// The resulting (or current) external list.
     pub external: Vec<String>,
 }
 
+/// Load the current cmx configuration for display by `cmx config show`.
 pub fn show(ctx: &AppContext<'_>) -> Result<ConfigShowResult> {
     let cfg = config::load_config(ctx.fs, ctx.paths)?;
     Ok(ConfigShowResult {
@@ -142,6 +156,8 @@ pub fn external_remove(entry: &str, ctx: &AppContext<'_>) -> Result<ExternalResu
     })
 }
 
+/// Set the configured LLM gateway (`"openai"` or `"ollama"`). Returns
+/// [`CliError::UnknownGateway`] for any other value.
 pub fn set_gateway(value: &str, ctx: &AppContext<'_>) -> Result<ConfigSetResult> {
     let mut cfg = config::load_config(ctx.fs, ctx.paths)?;
     cfg.llm.gateway = match value {
@@ -160,6 +176,7 @@ pub fn set_gateway(value: &str, ctx: &AppContext<'_>) -> Result<ConfigSetResult>
     })
 }
 
+/// Set the configured LLM model name.
 pub fn set_model(value: &str, ctx: &AppContext<'_>) -> Result<ConfigSetResult> {
     let mut cfg = config::load_config(ctx.fs, ctx.paths)?;
     cfg.llm.model = value.to_string();

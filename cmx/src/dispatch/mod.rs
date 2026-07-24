@@ -1,3 +1,9 @@
+//! Command dispatch from `main.rs`; one submodule per command family:
+//! `cmx/src/dispatch/adopt.rs`, `cmx/src/dispatch/artifact.rs`,
+//! `cmx/src/dispatch/config.rs`, `cmx/src/dispatch/diff.rs`,
+//! `cmx/src/dispatch/info.rs`, `cmx/src/dispatch/set.rs`,
+//! `cmx/src/dispatch/source.rs`, `cmx/src/dispatch/test_support.rs`.
+
 pub mod adopt;
 pub mod artifact;
 pub mod config;

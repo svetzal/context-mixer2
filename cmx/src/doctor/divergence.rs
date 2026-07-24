@@ -1,3 +1,5 @@
+//! Detects divergence between installed artifacts and sources.
+
 use std::path::PathBuf;
 
 use crate::platform::Platform;
@@ -7,6 +9,7 @@ use super::types::{DoctorArtifact, DoctorRow};
 /// Per-location data for one copy of a diverged artifact.
 #[derive(Debug, Clone)]
 pub struct DivergenceMember {
+    /// Install directory this copy lives in.
     pub location: PathBuf,
     /// A deterministic representative for the location, used by
     /// `doctor --json`'s singular `platform` field.
@@ -14,7 +17,9 @@ pub struct DivergenceMember {
     /// Every surveyed platform that reads this install location. The human
     /// doctor table renders one `platform@version` pair per entry here.
     pub platforms: Vec<Platform>,
+    /// Version recorded for this copy, if any.
     pub version: Option<String>,
+    /// Display label for this copy's classified state (e.g. "current", "drifted").
     pub state_label: &'static str,
 }
 
@@ -22,9 +27,11 @@ pub struct DivergenceMember {
 /// lines under the summary. Pure: no I/O, computed from borrowed report data.
 #[derive(Debug, Clone)]
 pub struct DivergenceDetail {
+    /// Name of the diverged artifact.
     pub name: String,
     /// True when the copies also differ in *state* (not just version).
     pub states_differ: bool,
+    /// The diverged artifact's per-location copies.
     pub members: Vec<DivergenceMember>,
 }
 

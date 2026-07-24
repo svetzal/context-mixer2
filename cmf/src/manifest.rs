@@ -1,3 +1,5 @@
+//! Multi-platform manifest generation.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -6,6 +8,8 @@ use cmx::platform::Platform;
 
 use crate::repo::RepoRoot;
 
+/// Wrapper around the list of manifest files written by `cmf manifest
+/// generate`, used for summary `Display` output.
 pub struct ManifestSummary(pub Vec<PathBuf>);
 
 /// Collect all source files to replicate across platforms.

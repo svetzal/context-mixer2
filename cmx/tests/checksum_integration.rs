@@ -1,3 +1,5 @@
+//! Integration tests for artifact and file checksumming.
+
 use cmx::checksum::{checksum_artifact, checksum_dir, checksum_file};
 use cmx::gateway::real::RealFilesystem;
 use cmx::types::ArtifactKind;

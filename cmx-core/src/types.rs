@@ -1,17 +1,29 @@
+//! Shared serde types persisted in the config root and lock files: registered
+//! sources ([`SourcesFile`]), global settings ([`CmxConfig`]), a scanned artifact
+//! ([`Artifact`]), lock entries ([`LockFile`], [`LockEntry`]), and named artifact
+//! groups ([`SetsFile`]). These are the data cmx-core reads and writes; the I/O
+//! itself lives in [`crate::config`] and [`crate::lockfile`].
+
 use crate::error::{CmxError, Result as CmxResult};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+/// The persisted `sources.json` document: every registered source repo, keyed by name.
 #[derive(Serialize, Deserialize)]
 pub struct SourcesFile {
+    /// Schema version, currently always `1`.
     pub version: u32,
+    /// Registered sources, keyed by source name.
     pub sources: BTreeMap<String, SourceEntry>,
 }
 
+/// The persisted `config.json` document: cmx's global settings.
 #[derive(Serialize, Deserialize)]
 pub struct CmxConfig {
+    /// Schema version, currently always `1`.
     pub version: u32,
+    /// LLM gateway settings for `llm`-gated features (e.g. `cmx diff` analysis).
     #[serde(default)]
     pub llm: LlmConfig,
     /// Optional override for the canonical home directory that holds
@@ -50,9 +62,13 @@ impl Default for CmxConfig {
     }
 }
 
+/// LLM gateway settings persisted in [`CmxConfig::llm`], used by the `llm`-gated
+/// diff-analysis feature.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LlmConfig {
+    /// Which LLM provider to talk to.
     pub gateway: LlmGatewayType,
+    /// The model identifier to request from that provider.
     pub model: String,
 }
 
@@ -65,10 +81,13 @@ impl Default for LlmConfig {
     }
 }
 
+/// The supported LLM providers.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum LlmGatewayType {
+    /// `OpenAI`'s hosted API.
     OpenAI,
+    /// A local Ollama server.
     Ollama,
 }
 
@@ -90,48 +109,73 @@ impl Default for SourcesFile {
     }
 }
 
+/// A registered source repo — either a local directory or a git remote.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SourceEntry {
+    /// Whether this is a [`SourceType::Local`] directory or a [`SourceType::Git`] remote.
     #[serde(rename = "type")]
     pub source_type: SourceType,
+    /// The local directory path, for [`SourceType::Local`] sources.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<PathBuf>,
+    /// The remote URL, for [`SourceType::Git`] sources.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    /// Where this git source has been cloned to locally, for [`SourceType::Git`] sources.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub local_clone: Option<PathBuf>,
+    /// The git branch to track, for [`SourceType::Git`] sources.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
+    /// RFC 3339 timestamp of the last successful `cmx source update` for this source.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_updated: Option<String>,
 }
 
+/// Whether a [`SourceEntry`] reads from a local directory or a cloned git remote.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum SourceType {
+    /// A plain local directory, configured with `path`.
     Local,
+    /// A git remote, cloned to `local_clone` and tracked via `url`/`branch`.
     Git,
 }
 
+/// An agent or skill discovered by scanning a source repo, with the metadata
+/// needed to display, install, and version-track it.
 #[derive(Debug, Serialize)]
 pub struct Artifact {
+    /// Whether this is an agent or a skill.
     pub kind: ArtifactKind,
+    /// The artifact's name (file stem for agents, directory name for skills).
     pub name: String,
+    /// A short human-readable description, parsed from frontmatter.
     pub description: String,
+    /// The artifact's path within the source repo.
     pub path: PathBuf,
+    /// The artifact's declared semver version, if any.
     pub version: Option<String>,
+    /// Deprecation metadata, if the artifact's frontmatter marks it deprecated.
     pub deprecation: Option<Deprecation>,
 }
 
+/// Deprecation metadata for an [`Artifact`], parsed from frontmatter.
 #[derive(Debug, Clone, Serialize)]
 pub struct Deprecation {
+    /// A human-readable reason the artifact is deprecated.
     pub reason: Option<String>,
+    /// The name of the artifact that replaces it, if any.
     pub replacement: Option<String>,
 }
 
+/// A per-platform lock file: every artifact installed for that platform/scope,
+/// keyed by name (see `cmx-core/SPEC.md` §3).
 #[derive(Serialize, Deserialize)]
 pub struct LockFile {
+    /// Schema version, currently always `1`.
     pub version: u32,
+    /// Installed artifacts, keyed by artifact name.
     pub packages: BTreeMap<String, LockEntry>,
 }
 
@@ -144,15 +188,24 @@ impl Default for LockFile {
     }
 }
 
+/// A single artifact's entry in a [`LockFile`] — what was installed, from where,
+/// and its checksums (see `cmx-core/SPEC.md` §3.1).
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LockEntry {
+    /// Whether the tracked artifact is an agent or a skill.
     #[serde(rename = "type")]
     pub artifact_type: ArtifactKind,
+    /// The installed version string, when the artifact declares one. Omitted
+    /// entirely (not `null`) when absent, per the lock-file contract.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// RFC 3339 timestamp of when this entry was written.
     pub installed_at: String,
+    /// Where the artifact came from.
     pub source: LockSource,
+    /// The checksum of the artifact at the source, at install time.
     pub source_checksum: String,
+    /// The checksum of the artifact as installed on disk.
     pub installed_checksum: String,
 }
 
@@ -178,19 +231,30 @@ impl LockEntry {
     }
 }
 
+/// An artifact found installed on disk, paired with its lock entry (if tracked)
+/// and its version as read back from the installed content.
 pub struct InstalledArtifact<'a> {
+    /// The artifact's name.
     pub name: String,
+    /// The matching entry in the platform's lock file, if this artifact is tracked.
     pub lock_entry: Option<&'a LockEntry>,
+    /// The version parsed from the installed content itself (frontmatter), which
+    /// may disagree with `lock_entry`'s version if the two have drifted.
     pub installed_version: Option<String>,
 }
 
+/// Where a [`LockEntry`]'s artifact came from — a source name and its path within
+/// that source.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LockSource {
+    /// The source name (or `bundled:<name>` for a tool's own bundled skill).
     pub repo: String,
+    /// The artifact's path within that source.
     pub path: String,
 }
 
 impl LockSource {
+    /// Construct a `LockSource` from a repo name and path.
     pub fn new(repo: impl Into<String>, path: impl Into<String>) -> Self {
         Self {
             repo: repo.into(),
@@ -199,14 +263,20 @@ impl LockSource {
     }
 }
 
+/// Whether an artifact is installed user-wide (`$HOME`) or project-local (the
+/// current working directory), which selects both the install directory and the
+/// lock file location (see `cmx-core/SPEC.md` §2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum InstallScope {
+    /// User-wide: anchored at the OS home directory.
     Global,
+    /// Project-local: anchored at the current project's working directory.
     Local,
 }
 
 impl InstallScope {
+    /// The lowercase display label (`"global"` or `"local"`).
     pub fn label(&self) -> &'static str {
         match self {
             InstallScope::Global => "global",
@@ -214,17 +284,26 @@ impl InstallScope {
         }
     }
 
+    /// Whether this scope is [`InstallScope::Local`].
     pub fn is_local(&self) -> bool {
         matches!(self, InstallScope::Local)
     }
 
+    /// Both scopes, global first — the canonical iteration order used when a
+    /// command considers all scopes.
     pub const ALL: [InstallScope; 2] = [InstallScope::Global, InstallScope::Local];
 }
 
+/// Whether an artifact is a file-droppable agent or a directory-based skill —
+/// the two kinds cmx-core installs and tracks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ArtifactKind {
+    /// A single file (markdown, or TOML for Codex) dropped into a platform's
+    /// agent directory.
     Agent,
+    /// A directory named after the artifact, containing `SKILL.md` and any
+    /// bundled files.
     Skill,
 }
 
@@ -316,6 +395,7 @@ impl ArtifactKind {
 }
 
 impl Artifact {
+    /// Whether this artifact's frontmatter marks it as deprecated.
     pub fn is_deprecated(&self) -> bool {
         self.deprecation.is_some()
     }
@@ -332,11 +412,15 @@ pub fn display_version(v: Option<&str>) -> &str {
     v.unwrap_or("-")
 }
 
+/// Render an optional version as a leading `" vX.Y.Z"` suffix for display, or an
+/// empty string when absent.
 pub fn format_version_prefix(version: Option<&str>) -> String {
     version.map(|v| format!(" v{v}")).unwrap_or_default()
 }
 
 impl SourcesFile {
+    /// Look up a registered source by name, or [`CmxError::SourceNotFound`] if it
+    /// is not registered.
     pub fn get_source(&self, name: &str) -> CmxResult<&SourceEntry> {
         self.sources.get(name).ok_or_else(|| CmxError::SourceNotFound {
             name: name.to_string(),
@@ -350,7 +434,9 @@ impl SourcesFile {
 /// Phase 2.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SetsFile {
+    /// Schema version, currently always `1`.
     pub version: u32,
+    /// Defined sets, keyed by set name.
     pub sets: BTreeMap<String, SetDef>,
 }
 
@@ -363,18 +449,26 @@ impl Default for SetsFile {
     }
 }
 
+/// A single named set: a curated group of installed artifacts with a desired
+/// activation state.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SetDef {
+    /// An optional human-readable description of what this set is for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Whether the set's members are currently installed (activated) or not.
     pub state: SetState,
+    /// The artifacts that belong to this set.
     pub members: Vec<SetMember>,
 }
 
+/// Whether a [`SetDef`]'s members are installed (`Active`) or not (`Inactive`).
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum SetState {
+    /// The set's members are installed.
     Active,
+    /// The set's members are not installed.
     Inactive,
 }
 
@@ -393,9 +487,13 @@ impl std::fmt::Display for SetState {
 /// deterministically even after the lock entry is gone.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SetMember {
+    /// Whether the member is an agent or a skill.
     #[serde(rename = "type")]
     pub kind: ArtifactKind,
+    /// The member artifact's name.
     pub name: String,
+    /// The source repo name this member was installed from, snapshotted at
+    /// `set add` time so it survives the source or lock entry disappearing later.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
 }

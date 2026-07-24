@@ -1,3 +1,10 @@
+//! Pure decision logic for comparing an installed artifact against its source.
+//!
+//! These helpers implement the version-guard comparisons (see `cmx-core/SPEC.md` §7)
+//! shared by `cmx skill install`/`cmx agent install` (in the `cmx` crate) and by
+//! [`crate::skill_install`]'s planning step: is the installed copy outdated relative to
+//! the source, and is a newer-than-source installed version a guard violation.
+
 use crate::types::LockEntry;
 
 /// Returns `true` if an installed artifact is considered outdated relative to

@@ -1,3 +1,6 @@
+//! Output formatting for `cmx agent list` / `cmx skill list` / `cmx list`,
+//! a submodule of `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::list::{ListKindOutput, ListOutput, section_str, table_str};

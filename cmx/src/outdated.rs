@@ -1,3 +1,5 @@
+//! `cmx outdated` (compare installed vs source).
+
 use crate::error::Result;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -15,15 +17,20 @@ use crate::types::{ArtifactKind, InstallScope, LockFile};
 // Result types
 // ---------------------------------------------------------------------------
 
+/// How an installed artifact relates to what's available from its source.
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum OutdatedStatus {
+    /// Installed without a recorded version, but a newer source copy exists.
     Untracked,
+    /// The installed version differs from the source's available version.
     Outdated,
+    /// The source checksum has moved even though the recorded version matches.
     Changed,
 }
 
 impl OutdatedStatus {
+    /// Short, stable string label used in table and JSON output.
     pub fn label(self) -> &'static str {
         match self {
             Self::Untracked => "untracked",
@@ -33,18 +40,28 @@ impl OutdatedStatus {
     }
 }
 
+/// One installed artifact that is out of date relative to a matching source.
 #[derive(Clone, Debug, Serialize)]
 pub struct OutdatedRow {
+    /// Artifact name.
     pub name: String,
+    /// Whether this is an agent or a skill.
     pub kind: ArtifactKind,
+    /// Global or local install scope this row was found in.
     pub scope: InstallScope,
+    /// Version recorded in the lock file, if any.
     pub installed_version: Option<String>,
+    /// Version currently offered by the source, if any.
     pub available_version: Option<String>,
+    /// Name of the source that offers the newer copy.
     pub source: String,
+    /// Classification of how the installed copy differs from the source.
     pub status: OutdatedStatus,
+    /// Whether the installed copy has been hand-edited since installation.
     pub locally_modified: bool,
 }
 
+/// The full set of outdated rows produced by [`outdated`].
 #[derive(Clone, Debug, Serialize)]
 pub struct OutdatedReport(pub Vec<OutdatedRow>);
 
@@ -52,6 +69,8 @@ pub struct OutdatedReport(pub Vec<OutdatedRow>);
 // Public API
 // ---------------------------------------------------------------------------
 
+/// Compare every installed agent/skill against its matching source(s) and
+/// report which copies are untracked, outdated, or changed.
 pub fn outdated(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
     let loaded = LoadedState::load(ctx)?;
     let source_artifacts = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;

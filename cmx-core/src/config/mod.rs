@@ -1,3 +1,12 @@
+//! Global config-root JSON documents: `sources.json`, `sets.json`, and `config.json`.
+//!
+//! Every function here loads or saves one of these documents through the
+//! [`Filesystem`] gateway and [`ConfigPaths`] location resolver, via the generic
+//! helpers in [`crate::json_file`]. `mutate_sources`/`mutate_sets` compose a
+//! load-mutate-save round trip so callers never forget to persist a change. The
+//! `installed` submodule (re-exported here) holds the per-artifact installed-config
+//! record type.
+
 use std::path::PathBuf;
 
 use crate::error::{CmxError, Result};
@@ -12,10 +21,12 @@ pub use installed::*;
 // Testable variants (accept injected Filesystem + ConfigPaths)
 // ---------------------------------------------------------------------------
 
+/// Load `sources.json`, or the default empty [`SourcesFile`] if it does not exist.
 pub fn load_sources(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<SourcesFile> {
     crate::json_file::load_json(&paths.sources_path(), fs)
 }
 
+/// Write `sources.json`, replacing its previous contents.
 pub fn save_sources(sources: &SourcesFile, fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<()> {
     crate::json_file::save_json(sources, &paths.sources_path(), fs)
 }
@@ -47,6 +58,8 @@ where
     Ok(result)
 }
 
+/// Load the `sets.json` for the given scope, or the default empty [`SetsFile`] if
+/// it does not exist.
 pub fn load_sets(
     scope: InstallScope,
     fs: &dyn Filesystem,
@@ -55,6 +68,7 @@ pub fn load_sets(
     crate::json_file::load_json(&paths.sets_path(scope), fs)
 }
 
+/// Write the `sets.json` for the given scope, replacing its previous contents.
 pub fn save_sets(
     sets: &SetsFile,
     scope: InstallScope,
@@ -89,10 +103,12 @@ where
     Ok(result)
 }
 
+/// Load `config.json`, or the default [`CmxConfig`] if it does not exist.
 pub fn load_config(fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<CmxConfig> {
     crate::json_file::load_json(&paths.config_path(), fs)
 }
 
+/// Write `config.json`, replacing its previous contents.
 pub fn save_config(config: &CmxConfig, fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<()> {
     crate::json_file::save_json(config, &paths.config_path(), fs)
 }
@@ -143,6 +159,10 @@ fn expand_tilde(entry: &str, home_dir: &std::path::Path) -> PathBuf {
     }
 }
 
+/// Resolve the on-disk path a local or git-cloned source entry reads from.
+///
+/// Returns [`CmxError::SourcePathMissing`] if the entry's type-specific path field
+/// (`path` for [`SourceType::Local`], `local_clone` for [`SourceType::Git`]) is unset.
 pub fn resolve_local_path(entry: &SourceEntry) -> Result<PathBuf> {
     match entry.source_type {
         SourceType::Local => entry.path.clone().ok_or(CmxError::SourcePathMissing {

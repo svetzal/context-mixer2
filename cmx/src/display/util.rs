@@ -1,3 +1,6 @@
+//! Shared display formatting utilities, a submodule of
+//! `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::diff::{FileChange, FileStatus};

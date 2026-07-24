@@ -1,3 +1,5 @@
+//! Plugin scanning, initialization, validation.
+
 use std::path::PathBuf;
 
 use anyhow::{Result, bail};
@@ -27,17 +29,27 @@ fn partition_artifacts(
     (agents, skills)
 }
 
+/// A single plugin discovered in a marketplace repository: its
+/// `plugin.json` metadata plus the agents and skills it contains.
 #[derive(Debug)]
 pub struct PluginInfo {
+    /// The plugin's name, from `plugin.json`.
     pub name: String,
+    /// The plugin's semver version, if declared in `plugin.json`.
     pub version: Option<String>,
+    /// The plugin's description, if declared in `plugin.json`.
     pub description: Option<String>,
+    /// The plugin's category, if declared in `plugin.json`.
     pub category: Option<String>,
+    /// Filesystem path to the plugin's directory.
     pub path: PathBuf,
+    /// Agent artifacts discovered inside the plugin.
     pub agents: Vec<cmx::types::Artifact>,
+    /// Skill artifacts discovered inside the plugin.
     pub skills: Vec<cmx::types::Artifact>,
 }
 
+/// Wrapper around a list of plugins, used for summary `Display` output.
 pub struct PluginList(pub Vec<PluginInfo>);
 
 /// Scan all plugins in a marketplace repo.

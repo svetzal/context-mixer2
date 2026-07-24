@@ -1,3 +1,6 @@
+//! Output formatting for the `status` command, a submodule of
+//! `cmf/src/display/mod.rs`.
+
 use std::collections::BTreeMap;
 
 use cmx::gateway::Filesystem;
@@ -10,6 +13,8 @@ use crate::repo::{RepoKind, RepoRoot};
 use crate::validate::validate_all;
 use crate::validation::IssueLevel;
 
+/// Render the full `cmf status` report: repo identity, plugin summary,
+/// facet summary, and validation summary, in that order.
 pub fn status_report(root: &RepoRoot, fs: &dyn Filesystem) -> String {
     let mut out = String::new();
     out.push_str(&repo_identity_str(root, fs));

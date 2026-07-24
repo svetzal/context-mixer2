@@ -1,3 +1,6 @@
+//! Output formatting for `cmx skill promote` / `cmx agent promote`, a
+//! submodule of `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::platform::platforms_label;

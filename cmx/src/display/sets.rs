@@ -1,3 +1,6 @@
+//! Output formatting for `cmx set` subcommands, a submodule of
+//! `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::sets::{

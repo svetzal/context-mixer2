@@ -1,3 +1,5 @@
+//! File copy helpers used by install.
+
 use crate::error::{CliError, Result};
 use std::path::{Path, PathBuf};
 

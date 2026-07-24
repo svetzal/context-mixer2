@@ -1,3 +1,6 @@
+//! Output formatting for `cmx doctor`, a submodule of
+//! `cmx/src/display/mod.rs`.
+
 use std::fmt;
 
 use crate::doctor::{DoctorArtifact, DoctorReport};

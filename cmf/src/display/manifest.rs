@@ -1,3 +1,6 @@
+//! Output formatting for manifests, a submodule of
+//! `cmf/src/display/mod.rs`.
+
 use std::fmt;
 
 use cmx::platform::Platform;

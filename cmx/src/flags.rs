@@ -45,7 +45,9 @@ impl RunMode {
 /// Whether to force-overwrite a locally modified artifact.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Force {
+    /// Overwrite even if the artifact has local modifications.
     Yes,
+    /// Refuse to overwrite a locally modified artifact.
     No,
 }
 
@@ -64,7 +66,9 @@ impl Force {
 /// Whether to also uninstall artifacts when deleting a set.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Purge {
+    /// Uninstall member artifacts (subject to reference-counting) before deleting.
     Yes,
+    /// Delete only the set definition; leave installed artifacts untouched.
     No,
 }
 

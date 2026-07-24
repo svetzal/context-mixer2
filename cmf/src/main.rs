@@ -1,3 +1,6 @@
+//! Binary entry point for the `cmf` CLI: dispatches CLI commands (including
+//! status).
+
 use std::env;
 use std::process::ExitCode;
 

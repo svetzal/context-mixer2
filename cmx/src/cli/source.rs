@@ -1,7 +1,11 @@
+//! `cmx source` subcommand argument definitions, part of the clap CLI
+//! defined in `cmx/src/cli/mod.rs`.
+
 use clap::Subcommand;
 
 use super::OutputArgs;
 
+/// `cmx source` subcommands.
 #[derive(Subcommand)]
 pub enum SourceAction {
     /// [Mutates] Register a source repository (local path or git URL)
@@ -14,6 +18,7 @@ pub enum SourceAction {
     /// List registered sources
     List {
         #[command(flatten)]
+        /// Shared `--json` output flag.
         output: OutputArgs,
     },
     /// Show available agents and skills in a source
@@ -21,6 +26,7 @@ pub enum SourceAction {
         /// Name of the source to browse
         name: String,
         #[command(flatten)]
+        /// Shared `--json` output flag.
         output: OutputArgs,
     },
     /// [Mutates] Fetch latest changes for git-backed sources

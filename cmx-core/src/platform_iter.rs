@@ -29,7 +29,9 @@ use crate::types::ArtifactKind;
 /// Callers use `view.paths` wherever a platform-specific `ConfigPaths` is
 /// needed, and `view.platform` for display or comparisons.
 pub struct PlatformView {
+    /// The platform this view is scoped to.
     pub platform: Platform,
+    /// A `ConfigPaths` bound to `platform`, sharing the same `home_dir`/`config_dir`.
     pub paths: ConfigPaths,
 }
 
