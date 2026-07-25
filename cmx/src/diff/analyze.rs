@@ -14,8 +14,8 @@ pub(super) async fn analyze_focus(
     unified: &str,
     ctx: &AppContext<'_>,
 ) -> Result<String> {
-    let source_ver = cmp.source_version.unwrap_or("unversioned");
-    let changed_ver = cmp.changed_version.unwrap_or("unversioned");
+    let source_ver = crate::display::util::version_label(cmp.source_version);
+    let changed_ver = crate::display::util::version_label(cmp.changed_version);
     let system_prompt = format!(
         "You are a technical analyst comparing two copies of an AI coding assistant {kind} \
         (written in markdown). You are given a unified diff: lines prefixed with `-` belong to \

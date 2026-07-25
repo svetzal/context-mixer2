@@ -43,6 +43,7 @@ pub mod info;
 pub mod init;
 pub mod install;
 pub mod list;
+pub mod lock_baseline;
 pub mod outdated;
 pub mod partition;
 pub mod platform_copies;

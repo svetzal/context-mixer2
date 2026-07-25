@@ -4,11 +4,21 @@
 use std::fmt;
 
 use crate::diff::{FileChange, FileStatus};
-use crate::table::{empty_state, render_table};
 
 /// Format an optional version string, falling back to `"unversioned"`.
-pub(super) fn version_label(version: Option<&str>) -> &str {
+pub(crate) fn version_label(version: Option<&str>) -> &str {
     version.unwrap_or("unversioned")
+}
+
+/// The standard plan-mode footer: reminds the user how to actually apply the
+/// change plan just shown.
+pub(crate) const APPLY_HINT: &str = "Re-run with --apply to make these changes.";
+
+/// Format `count` with an irregular singular/plural word pair, e.g.
+/// `count_label(1, "copy", "copies")` -> `"1 copy"`. For the regular `"s"`
+/// suffix, see `crate::table::plural_s`.
+pub(crate) fn count_label(count: usize, singular: &str, plural: &str) -> String {
+    format!("{count} {}", if count == 1 { singular } else { plural })
 }
 
 /// Count (modified, added, deleted) across a slice of [`FileChange`]s.
@@ -39,6 +49,21 @@ pub(super) fn write_change_lines(
     Ok(())
 }
 
+/// Write one "Discarding local modification: <path>" line per distinct path in
+/// `paths`, in first-seen order deduplicated by path.
+pub(super) fn write_discarded_paths<'a>(
+    f: &mut fmt::Formatter<'_>,
+    paths: impl IntoIterator<Item = &'a std::path::PathBuf>,
+) -> fmt::Result {
+    let mut seen = std::collections::BTreeSet::<&std::path::PathBuf>::new();
+    for path in paths {
+        if seen.insert(path) {
+            writeln!(f, "Discarding local modification: {}", path.display())?;
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn write_each<T: std::fmt::Display>(
     f: &mut std::fmt::Formatter<'_>,
     items: &[T],
@@ -47,19 +72,6 @@ pub(super) fn write_each<T: std::fmt::Display>(
         write!(f, "{item}")?;
     }
     Ok(())
-}
-
-pub(super) fn table_or_empty(
-    empty_msg: &str,
-    headers: Vec<&'static str>,
-    padded_cols: usize,
-    rows: Vec<Vec<String>>,
-) -> String {
-    if rows.is_empty() {
-        empty_state(empty_msg)
-    } else {
-        render_table(headers, padded_cols, rows)
-    }
 }
 
 #[cfg(test)]
@@ -88,18 +100,5 @@ mod tests {
         }
         let w = Wrapper(vec![]);
         assert_eq!(w.to_string(), "");
-    }
-
-    #[test]
-    fn table_or_empty_returns_newline_terminated_message_when_no_rows() {
-        let result = table_or_empty("Nothing here.", vec!["Name"], 1, vec![]);
-        assert_eq!(result, "Nothing here.\n");
-    }
-
-    #[test]
-    fn table_or_empty_returns_table_containing_data_when_rows_present() {
-        let result =
-            table_or_empty("Nothing here.", vec!["Name"], 1, vec![vec!["my-item".to_string()]]);
-        assert!(result.contains("my-item"));
     }
 }

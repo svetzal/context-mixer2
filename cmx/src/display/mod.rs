@@ -17,4 +17,4 @@ mod sets;
 mod source;
 mod sync;
 mod uninstall;
-mod util;
+pub(crate) mod util;

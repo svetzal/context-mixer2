@@ -282,7 +282,9 @@ fn gather_copies(
 /// Overwrite each diverging copy with the winner's content, then refresh every
 /// tracked lock entry (winner + targets) so they agree on checksum and version.
 /// Copies with no lock entry (external) are left untracked — only their files
-/// are equalized.
+/// are equalized. Unlike `promote`'s equivalent, `source_checksum` is left
+/// untouched: sync reconciles installed copies against one another, not
+/// against the source.
 fn apply_winner(
     name: &str,
     kind: ArtifactKind,
@@ -297,21 +299,23 @@ fn apply_winner(
     }
     let winner_checksum = checksum::checksum_artifact(&winner.path, kind, ctx.fs)?;
     let now = ctx.clock.now().to_rfc3339();
-    for copy_ in targets.iter().chain(std::iter::once(&winner)) {
-        for &platform in &copy_.platforms {
-            let pv = ctx.paths.with_platform(platform);
-            if lockfile::load(scope, ctx.fs, &pv)?.packages.contains_key(name) {
-                lockfile::mutate(scope, ctx.fs, &pv, |lock| {
-                    if let Some(entry) = lock.packages.get_mut(name) {
-                        entry.installed_checksum.clone_from(&winner_checksum);
-                        entry.version.clone_from(&winner.version);
-                        entry.installed_at.clone_from(&now);
-                    }
-                })?;
-            }
-        }
-    }
-    Ok(())
+    let platforms: Vec<Platform> = targets
+        .iter()
+        .chain(std::iter::once(&winner))
+        .flat_map(|copy_| copy_.platforms.iter().copied())
+        .collect();
+    crate::lock_baseline::refresh_baseline(
+        name,
+        scope,
+        &platforms,
+        &crate::lock_baseline::BaselineUpdate {
+            checksum: &winner_checksum,
+            version: winner.version.as_deref(),
+            source_checksum: None,
+            now: &now,
+        },
+        ctx,
+    )
 }
 
 // ---------------------------------------------------------------------------

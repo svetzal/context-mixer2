@@ -7,17 +7,11 @@ use crate::install::{BatchInstallResult, InstallManyResult, InstallResult, Updat
 use crate::types::format_version_prefix;
 
 use super::util;
-
-fn write_discarded_paths(f: &mut fmt::Formatter<'_>, result: &InstallResult) -> fmt::Result {
-    for path in &result.discarded_paths {
-        writeln!(f, "Discarding local modification: {}", path.display())?;
-    }
-    Ok(())
-}
+use super::util::write_discarded_paths;
 
 impl fmt::Display for InstallResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_discarded_paths(f, self)?;
+        write_discarded_paths(f, &self.discarded_paths)?;
         let version_info = format_version_prefix(self.version.as_deref());
         writeln!(
             f,

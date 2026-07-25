@@ -5,6 +5,8 @@ use crate::diff::{DiffOutput, FileStatus};
 use crate::platform::platforms_label;
 use std::fmt;
 
+use super::util;
+
 impl DiffOutput {
     /// Render the "which copy" header: a per-platform matrix when several copies
     /// exist (so a match on one platform can't mask a drift on another), or the
@@ -16,8 +18,8 @@ impl DiffOutput {
             ""
         };
         let changed = &self.changed_label;
-        let changed_ver = self.installed_version.as_deref().unwrap_or("unversioned");
-        let source_ver = self.source_version.as_deref().unwrap_or("unversioned");
+        let changed_ver = util::version_label(self.installed_version.as_deref());
+        let source_ver = util::version_label(self.source_version.as_deref());
         if self.copies.len() > 1 {
             for c in &self.copies {
                 let status = if c.matches {

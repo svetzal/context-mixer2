@@ -5,6 +5,7 @@ use std::fmt;
 
 use crate::search::SearchOutput;
 use crate::search::truncate_description;
+use crate::table::table_or_empty;
 
 use super::util;
 
@@ -19,14 +20,14 @@ impl fmt::Display for SearchOutput {
                 vec![
                     r.name.clone(),
                     r.kind.clone(),
-                    r.version.as_deref().unwrap_or("unversioned").to_string(),
+                    util::version_label(r.version.as_deref()).to_string(),
                     r.source.clone(),
                     truncate_description(&r.description, 80),
                 ]
             })
             .collect();
 
-        let table = util::table_or_empty(
+        let table = table_or_empty(
             &format!("No results for '{query}'."),
             vec!["Name", "Type", "Version", "Source", "Description"],
             4,

@@ -2,7 +2,6 @@
 
 use crate::error::{CliError, Result};
 use crate::flags::Force;
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::artifact_status;
@@ -535,21 +534,6 @@ fn drifted_sibling_platforms(
     updated: &InstallResult,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Platform>> {
-    let mut sibling_paths: BTreeMap<PathBuf, Vec<Platform>> = BTreeMap::new();
-    for platform in crate::config::managed_or_all_platforms(ctx.fs, ctx.paths)? {
-        if platform == updated.platform || !platform.supports(kind) {
-            continue;
-        }
-        let pv = ctx.paths.with_platform(platform);
-        let Some(path) = pv.installed_artifact_path(kind, artifact_name, scope) else {
-            continue;
-        };
-        if !ctx.fs.exists(&path) {
-            continue;
-        }
-        sibling_paths.entry(path).or_default().push(platform);
-    }
-
     let updated_checksum = if kind == ArtifactKind::Skill {
         let updated_path = ctx.paths.require_installed_artifact_path(kind, artifact_name, scope)?;
         Some(checksum::checksum_artifact(&updated_path, kind, ctx.fs)?)
@@ -557,32 +541,44 @@ fn drifted_sibling_platforms(
         None
     };
 
-    let mut drifted = Vec::new();
-    for (path, platforms) in sibling_paths {
-        let mut tracked_platforms = Vec::new();
-        let mut lock_entry = None;
-        for platform in platforms {
-            let pv = ctx.paths.with_platform(platform);
-            if let Some(entry) = lockfile::load(scope, ctx.fs, &pv)?.packages.get(artifact_name)
-                && entry.artifact_type == kind
-            {
-                tracked_platforms.push(platform);
-                lock_entry.get_or_insert_with(|| entry.clone());
-            }
-        }
-        if tracked_platforms.is_empty() {
-            continue;
-        }
+    let candidates: Vec<Platform> = crate::config::managed_or_all_platforms(ctx.fs, ctx.paths)?
+        .into_iter()
+        .filter(|&platform| platform != updated.platform)
+        .collect();
 
-        let sibling_checksum = checksum::checksum_artifact(&path, kind, ctx.fs)?;
-        let lock_drifted =
-            lock_entry.is_some_and(|entry| entry.installed_checksum != sibling_checksum);
-        let diverged_from_updated =
-            updated_checksum.as_ref().is_some_and(|checksum| checksum != &sibling_checksum);
-        if lock_drifted || diverged_from_updated {
-            drifted.extend(tracked_platforms);
-        }
-    }
+    let drifted = crate::platform_copies::gather_platform_copies(
+        &candidates,
+        kind,
+        artifact_name,
+        scope,
+        ctx,
+        |path, platforms| {
+            let mut tracked_platforms = Vec::new();
+            let mut lock_entry = None;
+            for platform in platforms {
+                let pv = ctx.paths.with_platform(platform);
+                if let Some(entry) = lockfile::load(scope, ctx.fs, &pv)?.packages.get(artifact_name)
+                    && entry.artifact_type == kind
+                {
+                    tracked_platforms.push(platform);
+                    lock_entry.get_or_insert_with(|| entry.clone());
+                }
+            }
+            if tracked_platforms.is_empty() {
+                return Ok(None);
+            }
+
+            let sibling_checksum = checksum::checksum_artifact(&path, kind, ctx.fs)?;
+            let lock_drifted =
+                lock_entry.is_some_and(|entry| entry.installed_checksum != sibling_checksum);
+            let diverged_from_updated =
+                updated_checksum.as_ref().is_some_and(|checksum| checksum != &sibling_checksum);
+            Ok((lock_drifted || diverged_from_updated).then_some(tracked_platforms))
+        },
+    )?
+    .into_iter()
+    .flatten()
+    .collect();
 
     Ok(drifted)
 }

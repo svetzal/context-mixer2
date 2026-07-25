@@ -15,6 +15,20 @@
 //! Callers supply the closure that computes the per-copy result (checksum,
 //! version, drift flag, etc.); the primitive handles only the iteration and
 //! collapse.
+//!
+//! ## Known un-unified sibling: `cmx-core/src/artifact_remove.rs`
+//!
+//! `cmx-core::artifact_remove::remove_artifact_across_platforms` has a similar
+//! hand-rolled "dedup distinct physical paths across platforms" sequence that
+//! could in principle share this primitive. It deliberately has **not** been
+//! folded in here: `gather_platform_copies` lives in `cmx` (a path-dependent
+//! binary crate), while `artifact_remove` lives in `cmx-core`, which is
+//! published to crates.io/npm on its own `cmx-core-v*`/`cmx-core-ts-v*` release
+//! channel (see `AGENTS.md`, "cmx-core & cmx-core-ts"). Moving this primitive
+//! down into `cmx-core` would add a new public item to that crate's surface and
+//! put it on the coordinated release lockstep — that's a real decision, not a
+//! silent refactor, and needs explicit authorization before it happens. Treat
+//! this as a flagged follow-up, not a TODO to pick up unprompted.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;

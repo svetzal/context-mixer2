@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`cmx skill promote` / `cmx agent promote` now respect `cmx config platforms`.** Promote previously iterated every supported platform (`platform_iter::all()`) instead of the configured managed-platform allowlist, unlike every sibling command (`install`/`uninstall`/`sync`/`diff`/`sets`). This meant a platform explicitly excluded from `cmx config platforms` could still have its lock baseline refreshed, or be reported as "still divergent," by `promote`. `promote.rs` now resolves platforms via `config::managed_or_all_platforms` like the rest of the command set.
+
 ### Changed
 
 - **DRY refactoring (no behavior change except where noted):**

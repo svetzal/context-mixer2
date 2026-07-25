@@ -165,6 +165,13 @@ pub fn empty_state(msg: &str) -> String {
     format!("{msg}\n")
 }
 
+/// The English regular plural suffix for `count`: `""` for exactly one, `"s"`
+/// otherwise. For irregular plurals (e.g. "copy"/"copies"), see the
+/// `singular`/`plural` pair taken by `crate::display::util::count_label`.
+pub fn plural_s(count: usize) -> &'static str {
+    if count == 1 { "" } else { "s" }
+}
+
 /// Returns a formatted section: title on its own line followed by each item
 /// indented by two spaces. Produces byte-identical output to the inline
 /// `writeln!(f, "Title:")` + `writeln!(f, "  item")` pattern.
@@ -176,6 +183,21 @@ pub fn section(title: &str, indented_lines: &[String]) -> String {
         out.push('\n');
     }
     out
+}
+
+/// Renders `rows` as a table, or falls back to [`empty_state`] with `empty_msg`
+/// when there are no rows to show.
+pub fn table_or_empty(
+    empty_msg: &str,
+    headers: Vec<&'static str>,
+    padded_cols: usize,
+    rows: Vec<Vec<String>>,
+) -> String {
+    if rows.is_empty() {
+        empty_state(empty_msg)
+    } else {
+        render_table(headers, padded_cols, rows)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -392,5 +414,33 @@ mod tests {
         let out = t.render();
         let lines: Vec<&str> = out.lines().collect();
         assert_eq!(lines.len(), 2);
+    }
+
+    // --- table_or_empty ---
+
+    #[test]
+    fn table_or_empty_returns_newline_terminated_message_when_no_rows() {
+        let result = table_or_empty("Nothing here.", vec!["Name"], 1, vec![]);
+        assert_eq!(result, "Nothing here.\n");
+    }
+
+    #[test]
+    fn table_or_empty_returns_table_containing_data_when_rows_present() {
+        let result =
+            table_or_empty("Nothing here.", vec!["Name"], 1, vec![vec!["my-item".to_string()]]);
+        assert!(result.contains("my-item"));
+    }
+
+    // --- plural_s ---
+
+    #[test]
+    fn plural_s_empty_for_exactly_one() {
+        assert_eq!(plural_s(1), "");
+    }
+
+    #[test]
+    fn plural_s_s_for_zero_and_many() {
+        assert_eq!(plural_s(0), "s");
+        assert_eq!(plural_s(2), "s");
     }
 }

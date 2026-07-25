@@ -4,7 +4,7 @@
 use std::fmt;
 
 use cmx::platform::Platform;
-use cmx::table::empty_state;
+use cmx::table::table_or_empty;
 
 use crate::manifest::ManifestSummary;
 
@@ -15,7 +15,12 @@ impl fmt::Display for ManifestSummary {
             return write!(
                 f,
                 "{}",
-                empty_state("No .claude-plugin/ sources found — nothing to generate.")
+                table_or_empty(
+                    "No .claude-plugin/ sources found — nothing to generate.",
+                    vec![],
+                    0,
+                    vec![]
+                )
             );
         }
 
@@ -38,7 +43,7 @@ impl fmt::Display for ManifestSummary {
             if plugin_count > 0 {
                 parts.push(format!(
                     "{plugin_count} plugin manifest{}",
-                    if plugin_count == 1 { "" } else { "s" }
+                    cmx::table::plural_s(plugin_count)
                 ));
             }
 

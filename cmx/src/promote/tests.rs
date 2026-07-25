@@ -209,6 +209,38 @@ fn promote_rejects_untracked_artifact_with_guidance() {
 }
 
 #[test]
+fn promote_ignores_platforms_outside_managed_set() {
+    let t = TestContext::new();
+    place_skill(&t, Platform::Claude, "pf", "edited in place");
+    place_skill(&t, Platform::Codex, "pf", "pristine codex copy");
+    track_from_home(&t, Platform::Claude, "pf");
+    track_from_home(&t, Platform::Codex, "pf");
+
+    // Only Claude is managed; Codex is outside the allowlist and must be left
+    // untouched by promote, just as install/uninstall/sync/diff already do.
+    let config = crate::types::CmxConfig {
+        platforms: vec![Platform::Claude],
+        ..Default::default()
+    };
+    config::save_config(&config, &t.fs, &t.paths).unwrap();
+
+    let codex_before = lock_entry(&t, Platform::Codex, "pf");
+    let r = promote("pf", ArtifactKind::Skill, Some(Platform::Claude), RunMode::Apply, &t.ctx())
+        .unwrap();
+    assert!(r.retracked.contains(&Platform::Claude));
+
+    let codex_after = lock_entry(&t, Platform::Codex, "pf");
+    assert_eq!(
+        codex_before.installed_checksum, codex_after.installed_checksum,
+        "Codex is outside the managed platform set and must not be touched by promote"
+    );
+    assert!(
+        !r.retracked.contains(&Platform::Codex),
+        "unmanaged platform must not be retracked"
+    );
+}
+
+#[test]
 fn promote_errors_when_not_installed() {
     let t = TestContext::new();
     let err = promote("ghost", ArtifactKind::Skill, None, RunMode::Plan, &t.ctx())

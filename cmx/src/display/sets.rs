@@ -11,6 +11,8 @@ use crate::sets::{
 use crate::table::render_table;
 use crate::types::SetState;
 
+use super::util::APPLY_HINT;
+
 /// Render a character count as an approximate, human-scaled footprint (e.g.
 /// `~2.1k chars`) — see `SETS.md`, "Context-footprint reporting". Ships as a
 /// character count in Phase 3; a token estimate may follow later.
@@ -168,7 +170,7 @@ impl fmt::Display for SetActivateResult {
             }
         }
         if !self.apply {
-            writeln!(f, "Re-run with --apply to make these changes.")?;
+            writeln!(f, "{APPLY_HINT}")?;
         }
         Ok(())
     }
@@ -217,7 +219,7 @@ impl fmt::Display for SetDeactivateResult {
             }
         }
         if !self.apply {
-            writeln!(f, "Re-run with --apply to make these changes.")?;
+            writeln!(f, "{APPLY_HINT}")?;
         }
         Ok(())
     }

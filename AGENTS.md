@@ -243,7 +243,8 @@ Install/uninstall:
 - `cmx/src/promote.rs` — `cmx skill promote` / `cmx agent promote`: the mirror of `install::update` — copy the in-place-edited installed copy back into the canonical home and refresh `home`-provenance lock baselines (home target only; git-sourced and reformatted-agent copies rejected)
 - `cmx/src/promote/tests.rs` — promote integration tests
 - `cmx/src/copy.rs` — file copy helpers used by install
-- `cmx/src/platform_copies.rs` — shared primitive `gather_platform_copies` that iterates managed platforms filtered by `supports(kind)`, deduplicates by physical install path (collapsing e.g. Codex+Pi that share `.agents/skills`), and invokes a closure once per distinct copy; used by diff discovery, sync, and set deactivation
+- `cmx/src/platform_copies.rs` — shared primitive `gather_platform_copies` that iterates managed platforms filtered by `supports(kind)`, deduplicates by physical install path (collapsing e.g. Codex+Pi that share `.agents/skills`), and invokes a closure once per distinct copy; used by diff discovery, sync, promote, and set deactivation
+- `cmx/src/lock_baseline.rs` — shared primitive `refresh_baseline` that rewrites a lock entry's `installed_checksum`/`version`/`installed_at` (and, when given, `source_checksum`) across a set of platforms, skipping platforms with no existing entry; used by both `promote::refresh_home_baselines` (which also refreshes `source_checksum`) and `sync::apply_winner` (which does not)
 
 Query & display:
 

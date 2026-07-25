@@ -6,7 +6,7 @@ use std::fmt;
 use crate::platform::platforms_label;
 use crate::sync::SyncResult;
 
-use super::util::{change_counts, version_label, write_change_lines};
+use super::util::{APPLY_HINT, change_counts, version_label, write_change_lines};
 
 impl fmt::Display for SyncResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -41,7 +41,7 @@ impl fmt::Display for SyncResult {
                 writeln!(f, "    files: {modified} modified, {added} added, {deleted} deleted")?;
                 write_change_lines(f, &target.artifact_path, &target.file_changes)?;
             }
-            return writeln!(f, "Re-run with --apply to make these changes.");
+            return writeln!(f, "{APPLY_HINT}");
         }
 
         writeln!(
@@ -49,7 +49,7 @@ impl fmt::Display for SyncResult {
             "Reconciled '{}' from {winner} ({winner_v}); {} target{} changed.",
             self.name,
             self.targets.len(),
-            if self.targets.len() == 1 { "" } else { "s" }
+            crate::table::plural_s(self.targets.len())
         )?;
         writeln!(f, "  source: {}", self.winner_path.display())?;
         for target in &self.targets {

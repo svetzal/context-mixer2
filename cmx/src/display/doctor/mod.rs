@@ -6,6 +6,8 @@ use std::fmt;
 use crate::doctor::{DoctorArtifact, DoctorReport};
 use crate::table::Table;
 
+use super::util;
+
 mod json;
 pub use json::doctor_json;
 
@@ -34,7 +36,7 @@ fn platform_version_label(
     version: Option<&str>,
 ) -> String {
     let platform = platform.map_or_else(|| "unmapped".to_string(), |p| p.to_string());
-    let version = version.unwrap_or("unversioned");
+    let version = util::version_label(version);
     format!("{platform}@{version}")
 }
 
@@ -195,7 +197,7 @@ fn doctor_divergence_details(
             .members
             .iter()
             .map(|m| {
-                let ver = m.version.as_deref().unwrap_or("unversioned");
+                let ver = util::version_label(m.version.as_deref());
                 if d.states_differ {
                     format!("{} @ {ver} ({})", m.location.display(), m.state_label)
                 } else {

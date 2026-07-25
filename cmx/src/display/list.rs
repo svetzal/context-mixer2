@@ -4,7 +4,7 @@
 use std::fmt;
 
 use crate::list::{ListKindOutput, ListOutput, section_str, table_str};
-use crate::table::empty_state;
+use crate::table::table_or_empty;
 use crate::types::InstallScope;
 
 impl fmt::Display for ListKindOutput {
@@ -48,7 +48,7 @@ impl fmt::Display for ListOutput {
             && global_skills.is_empty()
             && local_skills.is_empty()
         {
-            return write!(f, "{}", empty_state("Nothing installed."));
+            return write!(f, "{}", table_or_empty("Nothing installed.", vec![], 0, vec![]));
         }
 
         write!(f, "{}", section_str("Global agents", global_agents))?;

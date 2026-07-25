@@ -6,7 +6,7 @@ use std::fmt;
 use crate::platform::platforms_label;
 use crate::promote::PromoteResult;
 
-use super::util::{change_counts, version_label, write_change_lines};
+use super::util::{APPLY_HINT, change_counts, version_label, write_change_lines};
 
 impl fmt::Display for PromoteResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -34,7 +34,7 @@ impl fmt::Display for PromoteResult {
                     platforms_label(&self.still_divergent)
                 )?;
             }
-            return writeln!(f, "Re-run with --apply to make these changes.");
+            return writeln!(f, "{APPLY_HINT}");
         }
 
         let changed_files = self.file_changes.len();
@@ -42,7 +42,7 @@ impl fmt::Display for PromoteResult {
             f,
             "Promoted {source_platforms} copy of '{}' into home; {changed_files} file{} changed.",
             self.name,
-            if changed_files == 1 { "" } else { "s" }
+            crate::table::plural_s(changed_files)
         )?;
         writeln!(f, "  source: {}", self.source_path.display())?;
         writeln!(f, "  target: {}", self.home_path.display())?;

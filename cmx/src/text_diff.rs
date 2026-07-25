@@ -102,7 +102,7 @@ pub(crate) fn render_hunks(ops: &[(Op, &str)], context: usize) -> String {
                 i += 1;
             }
             let skipped = i - start;
-            let plural = if skipped == 1 { "" } else { "s" };
+            let plural = crate::table::plural_s(skipped);
             let _ = writeln!(out, "     ⋮ ({skipped} unchanged line{plural})");
             continue;
         }

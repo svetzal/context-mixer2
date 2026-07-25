@@ -2,7 +2,7 @@
 //! `cmx/src/display/mod.rs`.
 
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use cmx_core::platform::Platform;
 use cmx_core::skill_install::{InstallPlan, Report, TargetAction};
@@ -11,6 +11,8 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::init::InitOutcome;
+
+use super::util::{count_label, write_discarded_paths};
 
 struct ActionCounts {
     installed: usize,
@@ -57,7 +59,10 @@ impl fmt::Display for InitOutcome {
 
 fn render_report(f: &mut fmt::Formatter<'_>, report: &Report) -> fmt::Result {
     let counts = ActionCounts::from_actions(report.targets.iter().map(|target| &target.action));
-    write_discarded_paths(f, report)?;
+    write_discarded_paths(
+        f,
+        report.targets.iter().flat_map(|target| target.discarded_paths.iter()),
+    )?;
     writeln!(f, "{}", report_summary(&counts))?;
     if counts.skipped_up_to_date > 0
         && (counts.installed > 0 || counts.updated > 0 || counts.skipped_drifted > 0)
@@ -83,16 +88,6 @@ fn render_report(f: &mut fmt::Formatter<'_>, report: &Report) -> fmt::Result {
     Ok(())
 }
 
-fn write_discarded_paths(f: &mut fmt::Formatter<'_>, report: &Report) -> fmt::Result {
-    let mut seen = std::collections::BTreeSet::<PathBuf>::new();
-    for path in report.targets.iter().flat_map(|target| target.discarded_paths.iter()) {
-        if seen.insert(path.clone()) {
-            writeln!(f, "Discarding local modification: {}", path.display())?;
-        }
-    }
-    Ok(())
-}
-
 fn render_blocked(
     f: &mut fmt::Formatter<'_>,
     plan: &InstallPlan,
@@ -103,9 +98,8 @@ fn render_blocked(
     if counts.skipped_newer > 0 {
         writeln!(
             f,
-            "Skipped {} newer {} (use --force).",
-            counts.skipped_newer,
-            copy_word(counts.skipped_newer)
+            "Skipped {} (use --force).",
+            count_label(counts.skipped_newer, "newer copy", "newer copies")
         )?;
     }
     for target in &plan.targets {
@@ -133,9 +127,8 @@ fn report_summary(counts: &ActionCounts) -> String {
     }
     if counts.skipped_drifted > 0 {
         lines.push(format!(
-            "Skipped {} drifted {} (use --force).",
-            counts.skipped_drifted,
-            copy_word(counts.skipped_drifted)
+            "Skipped {} (use --force).",
+            count_label(counts.skipped_drifted, "drifted copy", "drifted copies")
         ));
     }
     if lines.is_empty() {
@@ -146,9 +139,8 @@ fn report_summary(counts: &ActionCounts) -> String {
             )
         } else if counts.skipped_newer > 0 {
             format!(
-                "Skipped {} newer {} (use --force).",
-                counts.skipped_newer,
-                copy_word(counts.skipped_newer)
+                "Skipped {} (use --force).",
+                count_label(counts.skipped_newer, "newer copy", "newer copies")
             )
         } else {
             "No copies changed.".to_string()
@@ -174,14 +166,6 @@ fn describe_action(action: &TargetAction) -> String {
         TargetAction::Downgrade { from } => format!("downgrade from {from}"),
         _ => "unknown".to_string(),
     }
-}
-
-fn count_label(count: usize, singular: &str, plural: &str) -> String {
-    format!("{count} {}", if count == 1 { singular } else { plural })
-}
-
-fn copy_word(count: usize) -> &'static str {
-    if count == 1 { "copy" } else { "copies" }
 }
 
 fn scope_label(scope: InstallScope) -> &'static str {

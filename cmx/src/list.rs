@@ -104,7 +104,7 @@ pub(crate) fn table_str(rows: &[Row]) -> String {
             .map(|r| {
                 vec![
                     r.name.clone(),
-                    display_installed_version(r.installed_version.as_deref()),
+                    crate::display::util::version_label(r.installed_version.as_deref()).to_string(),
                     display_available_version(r.available_version.as_deref(), r.status),
                     display_source(r.source.as_deref()),
                     display_platforms(&r.platforms),
@@ -127,6 +127,9 @@ pub(crate) fn display_platforms(platforms: &[String]) -> String {
 pub(crate) fn section_str(label: &str, rows: &[Row]) -> String {
     let mut out = format!("{label}:\n");
     if rows.is_empty() {
+        // Deliberately not `table::empty_state`: the section label/colon is
+        // already written above, so this is a short indented in-section
+        // placeholder, not a standalone empty-state message.
         out.push_str("  (none)\n");
     } else {
         out.push_str(&table_str(rows));
@@ -135,15 +138,11 @@ pub(crate) fn section_str(label: &str, rows: &[Row]) -> String {
     out
 }
 
-fn display_installed_version(version: Option<&str>) -> String {
-    version.unwrap_or("unversioned").to_string()
-}
-
 fn display_available_version(version: Option<&str>, status: ListStatus) -> String {
     match version {
         Some(version) => version.to_string(),
         None if status == ListStatus::SourceMissing => "source missing".to_string(),
-        None => "unversioned".to_string(),
+        None => crate::display::util::version_label(None).to_string(),
     }
 }
 

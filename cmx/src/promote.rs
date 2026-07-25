@@ -18,7 +18,7 @@
 //! canonical markdown the home holds.
 
 use crate::error::{CliError, Result};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use crate::adopt::{HOME_SOURCE, ensure_home_source, resolve_home};
@@ -237,42 +237,43 @@ fn select_skill_copy(
 /// directory among the home-tracked platforms (the shared `.agents` dir
 /// collapses several platforms into one). Global scope wins over local.
 fn resolve_home_copies(name: &str, ctx: &AppContext<'_>) -> Result<(InstallScope, Vec<HomeCopy>)> {
+    let managed = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
     for scope in InstallScope::ALL {
-        let mut by_dir: BTreeMap<PathBuf, HomeCopy> = BTreeMap::new();
-        for view in platform_iter::views_for(ctx.paths, platform_iter::all(), ArtifactKind::Skill) {
-            let lock = lockfile::load(scope, ctx.fs, &view.paths)?;
-            let Some(entry) = lock.packages.get(name) else {
-                continue;
-            };
-            if entry.source.repo != HOME_SOURCE {
-                continue;
-            }
-            let Some(path) = view.paths.installed_artifact_path(ArtifactKind::Skill, name, scope)
-            else {
-                continue;
-            };
-            if !ctx.fs.exists(&path) {
-                continue;
-            }
-            if let Some(existing) = by_dir.get_mut(&path) {
-                existing.platforms.push(view.platform);
-                existing.drifted |= existing.checksum != entry.installed_checksum;
-            } else {
+        let copies = crate::platform_copies::gather_platform_copies(
+            &managed,
+            ArtifactKind::Skill,
+            name,
+            scope,
+            ctx,
+            |path, platforms| {
+                let home_tracked: Vec<(Platform, String)> = platforms
+                    .into_iter()
+                    .filter_map(|platform| {
+                        let pv = ctx.paths.with_platform(platform);
+                        let entry =
+                            lockfile::load(scope, ctx.fs, &pv).ok()?.packages.get(name)?.clone();
+                        (entry.source.repo == HOME_SOURCE)
+                            .then_some((platform, entry.installed_checksum))
+                    })
+                    .collect();
+                if home_tracked.is_empty() {
+                    return Ok(None);
+                }
                 let checksum = checksum::checksum_artifact(&path, ArtifactKind::Skill, ctx.fs)?;
-                let drifted = checksum != entry.installed_checksum;
-                by_dir.insert(
-                    path.clone(),
-                    HomeCopy {
-                        path,
-                        checksum,
-                        platforms: vec![view.platform],
-                        drifted,
-                    },
-                );
-            }
-        }
-        if !by_dir.is_empty() {
-            return Ok((scope, by_dir.into_values().collect()));
+                let drifted = home_tracked
+                    .iter()
+                    .any(|(_, installed_checksum)| checksum != *installed_checksum);
+                let platforms = home_tracked.into_iter().map(|(p, _)| p).collect();
+                Ok(Some(HomeCopy {
+                    path,
+                    checksum,
+                    platforms,
+                    drifted,
+                }))
+            },
+        )?;
+        if !copies.is_empty() {
+            return Ok((scope, copies));
         }
     }
     Ok((InstallScope::Global, Vec::new()))
@@ -399,6 +400,10 @@ fn planned_still_divergent(
 }
 
 /// Refresh every home-provenance lock baseline to the promoted content.
+///
+/// Unlike `sync`'s equivalent, promote also refreshes `source_checksum`: the
+/// home *is* the source for a home-provenance artifact, so canonicalizing the
+/// installed copy into it means the source baseline now matches too.
 fn refresh_home_baselines(
     name: &str,
     scope: InstallScope,
@@ -408,18 +413,18 @@ fn refresh_home_baselines(
     ctx: &AppContext<'_>,
 ) -> Result<()> {
     let now = ctx.clock.now().to_rfc3339();
-    for &platform in home_tracked {
-        let pv = ctx.paths.with_platform(platform);
-        lockfile::mutate(scope, ctx.fs, &pv, |lock| {
-            if let Some(entry) = lock.packages.get_mut(name) {
-                entry.source_checksum = installed_cs.to_string();
-                entry.installed_checksum = installed_cs.to_string();
-                entry.version = version.map(str::to_string);
-                entry.installed_at.clone_from(&now);
-            }
-        })?;
-    }
-    Ok(())
+    crate::lock_baseline::refresh_baseline(
+        name,
+        scope,
+        home_tracked,
+        &crate::lock_baseline::BaselineUpdate {
+            checksum: installed_cs,
+            version,
+            source_checksum: Some(installed_cs),
+            now: &now,
+        },
+        ctx,
+    )
 }
 
 /// Platforms whose lock entry for `name` (at `scope`) records `home` provenance.
@@ -430,7 +435,11 @@ fn home_tracked_platforms(
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Platform>> {
     let mut platforms = Vec::new();
-    for view in platform_iter::views_for(ctx.paths, platform_iter::all(), kind) {
+    for view in platform_iter::views_for(
+        ctx.paths,
+        config::managed_or_all_platforms(ctx.fs, ctx.paths)?,
+        kind,
+    ) {
         let tracked_from_home = lockfile::load(scope, ctx.fs, &view.paths)?
             .packages
             .get(name)
@@ -451,7 +460,11 @@ fn non_home_guidance(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<String> {
-    for view in platform_iter::views_for(ctx.paths, platform_iter::all(), kind) {
+    for view in platform_iter::views_for(
+        ctx.paths,
+        config::managed_or_all_platforms(ctx.fs, ctx.paths)?,
+        kind,
+    ) {
         if let Some(entry) = lockfile::load(scope, ctx.fs, &view.paths)?.packages.get(name) {
             return Ok(format!(
                 "'{name}' is tracked from the '{repo}' source, not the home. Promoting edits into a \

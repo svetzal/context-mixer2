@@ -4,6 +4,7 @@
 use std::fmt;
 
 use crate::outdated::OutdatedReport;
+use crate::table::table_or_empty;
 
 use super::util;
 
@@ -20,8 +21,8 @@ impl fmt::Display for OutdatedReport {
                 vec![
                     r.name.clone(),
                     r.kind.to_string(),
-                    r.installed_version.as_deref().unwrap_or("unversioned").to_string(),
-                    r.available_version.as_deref().unwrap_or("unversioned").to_string(),
+                    util::version_label(r.installed_version.as_deref()).to_string(),
+                    util::version_label(r.available_version.as_deref()).to_string(),
                     r.source.clone(),
                     if r.locally_modified {
                         format!("{} (modified)", r.status.label())
@@ -34,7 +35,7 @@ impl fmt::Display for OutdatedReport {
         writeln!(
             f,
             "{}Update with: cmx <kind> update <name> (or cmx skill update --all)",
-            util::table_or_empty(
+            table_or_empty(
                 "Everything is up to date.",
                 vec!["Name", "Type", "Installed", "Available", "Source", "Status"],
                 6,
