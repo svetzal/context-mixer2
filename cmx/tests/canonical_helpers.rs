@@ -26,6 +26,21 @@
 //! into `cmx/src/home_provenance.rs` as the one definition every caller shares
 //! — see that module's header for the full account.
 //!
+//! A third recurrence, same root cause again: `doctor/survey.rs` inlined its
+//! own `if cfg.platforms.is_empty() { Platform::ALL.to_vec() } else { ... }`
+//! instead of calling `config::managed_or_all_platforms`, and both
+//! `suggestions.rs` and `info/mod.rs` iterated `Platform::ALL` directly with
+//! no allowlist check at all. None of these were caught by this guard at the
+//! time, because the guard only scanned a *path-scoped allowlist*
+//! (`guarded_paths`, a fixed list of module paths) and only matched the
+//! literal string `platform_iter::all()` — a new module bypassing the
+//! allowlist a different way (inlining the fallback, or iterating
+//! `Platform::ALL` instead of calling `platform_iter::all()`) could always
+//! slip through both restrictions. The guard now scans every production file
+//! under `cmx/src` and matches both `platform_iter::all()` and
+//! `Platform::ALL`, so there is no module path and no spelling left for this
+//! bug to hide behind.
+//!
 //! This test walks `cmx/src/**/*.rs` (excluding `tests.rs` files, inline
 //! `#[cfg(test)] mod tests` blocks, and the modules that legitimately define
 //! each canonical item) and fails if:
@@ -37,10 +52,12 @@
 //!     for why that's a different decision);
 //! (b) the `"Re-run with --apply to make these changes."` literal appears
 //!     outside `display/util.rs` (its one definition, `APPLY_HINT`);
-//! (c) `platform_iter::all()` appears in any of the cross-platform command
-//!     modules that must instead resolve platforms via
-//!     `config::managed_or_all_platforms` — `promote.rs`, `install.rs`,
-//!     `uninstall.rs`, `sync.rs`, `diff/`, `sets/`, `adopt.rs`;
+//! (c) `platform_iter::all()` or `Platform::ALL` appears anywhere under
+//!     `cmx/src` outside the modules that legitimately define platform
+//!     enumeration itself — every cross-platform command must instead resolve
+//!     platforms via `config::managed_or_all_platforms` (or, for an
+//!     active-platform-first search, `platform_iter::active_first_of` fed by
+//!     that same call);
 //! (d) a second `fn write_discarded_paths` is declared anywhere but
 //!     `display/util.rs`;
 //! (e) the home-provenance check (`== HOME_SOURCE` or `HOME_SOURCE ==`)
@@ -182,20 +199,20 @@ fn apply_hint_literal_stays_in_its_canonical_spot() {
 }
 
 #[test]
-fn cross_platform_commands_never_bypass_the_managed_platform_allowlist() {
-    // These modules front commands whose whole point is to act only on the
-    // platforms the user configured via `cmx config platforms` (or, absent a
-    // config, every supported platform). `platform_iter::all()` skips that
-    // allowlist entirely — that's exactly the bug this guard exists to catch.
-    let guarded_paths = [
-        "promote.rs",
-        "install.rs",
-        "uninstall.rs",
-        "sync.rs",
-        "diff/",
-        "sets/",
-        "adopt.rs",
-    ];
+fn platform_enumeration_always_goes_through_the_managed_allowlist() {
+    // Every command that acts across platforms must resolve its candidate set
+    // via `config::managed_or_all_platforms` (the platforms the user
+    // configured via `cmx config platforms`, or every supported platform
+    // absent a config) — never by iterating `platform_iter::all()` or
+    // `Platform::ALL` directly, which silently bypasses that allowlist.
+    //
+    // This used to be a *path-scoped* allowlist of "guarded" command modules,
+    // matching only the literal `platform_iter::all()`. That was itself the
+    // defect: a new module could always bypass cross-platform scoping outside
+    // the listed paths, or by iterating `Platform::ALL` directly instead of
+    // calling `platform_iter::all()` — both of which happened (see the module
+    // header). So this guard now scans every production file under `cmx/src`
+    // and matches both spellings, with no path list left to fall outside of.
     let root = src_root();
     let mut violations = Vec::new();
     for file in collect_rust_files(&root) {
@@ -203,14 +220,11 @@ fn cross_platform_commands_never_bypass_the_managed_platform_allowlist() {
             continue;
         };
         let rel = file.strip_prefix(&root).unwrap_or(&file).to_string_lossy().to_string();
-        if !guarded_paths.iter().any(|p| rel == *p || rel.starts_with(p)) {
-            continue;
-        }
         for (i, line) in content.lines().enumerate() {
-            if line.contains("platform_iter::all()") {
+            if line.contains("platform_iter::all()") || line.contains("Platform::ALL") {
                 violations.push(format!(
-                    "{rel}:{}: platform_iter::all() bypasses the managed-platform allowlist — \
-                     use config::managed_or_all_platforms instead",
+                    "{rel}:{}: bypasses the managed-platform allowlist — use \
+                     config::managed_or_all_platforms instead",
                     i + 1
                 ));
             }

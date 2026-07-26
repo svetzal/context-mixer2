@@ -2,9 +2,9 @@
 
 use std::collections::BTreeSet;
 
+use crate::config;
 use crate::context::AppContext;
 use crate::lockfile;
-use crate::platform::Platform;
 use crate::source_iter;
 use crate::types::{ArtifactKind, InstallScope};
 
@@ -36,7 +36,7 @@ fn installed_candidates(
     ctx: &AppContext<'_>,
 ) -> crate::error::Result<BTreeSet<String>> {
     let mut names = BTreeSet::new();
-    for platform in Platform::ALL {
+    for platform in config::managed_or_all_platforms(ctx.fs, ctx.paths)? {
         let paths = ctx.paths.with_platform(platform);
         for scope in InstallScope::ALL {
             let lock = lockfile::load(scope, ctx.fs, &paths)?;
@@ -103,9 +103,11 @@ fn levenshtein(left: &str, right: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::{installed_artifact_hint, levenshtein};
+    use crate::config;
     use crate::lockfile;
+    use crate::platform::Platform;
     use crate::test_support::{TestContext, sample_lock_entry};
-    use crate::types::{ArtifactKind, InstallScope, LockFile};
+    use crate::types::{ArtifactKind, CmxConfig, InstallScope, LockFile};
     use std::collections::BTreeMap;
 
     #[test]
@@ -133,5 +135,34 @@ mod tests {
 
         let hint = installed_artifact_hint("focus-skll", Some(ArtifactKind::Skill), &t.ctx());
         assert_eq!(hint, "Did you mean 'focus-skill'?");
+    }
+
+    #[test]
+    fn installed_hint_ignores_unmanaged_platforms() {
+        let t = TestContext::new();
+        let cursor_paths = t.paths.with_platform(Platform::Cursor);
+        let mut packages = BTreeMap::new();
+        let mut entry = sample_lock_entry();
+        entry.artifact_type = ArtifactKind::Skill;
+        packages.insert("focus-skill".to_string(), entry);
+        lockfile::save(
+            &LockFile {
+                version: 1,
+                packages,
+            },
+            InstallScope::Global,
+            &t.fs,
+            &cursor_paths,
+        )
+        .unwrap();
+
+        let cfg = CmxConfig {
+            platforms: vec![Platform::Claude],
+            ..Default::default()
+        };
+        config::save_config(&cfg, &t.fs, &t.paths).unwrap();
+
+        let hint = installed_artifact_hint("focus-skll", Some(ArtifactKind::Skill), &t.ctx());
+        assert_eq!(hint, "See 'cmx skill list'.");
     }
 }

@@ -258,41 +258,25 @@ pub fn classify_mojentic_error(e: &anyhow::Error) -> LlmError {
     let text = format!("{e:#}");
 
     // Strip any wrapper context like "LLM analysis failed: LLM gateway error: "
-    let stripped = strip_wrapper_prefixes(&text);
+    // — same predicate `error_summary` uses for its CLI degradation notes, so
+    // this classifier and that summary must not diverge on what counts as a
+    // wrapper prefix.
+    let stripped = crate::error_summary::strip_wrappers(&text);
 
     // Provider error: look for "OpenAI API error: 401 Unauthorized" style
     if let Some(provider_err) = extract_provider_error(stripped) {
         return provider_err;
     }
 
-    // Ollama unreachable
-    if looks_like_ollama_unreachable(stripped) {
+    // Ollama unreachable — classifies the same provider-error shape as
+    // `error_summary::summarize_gateway_error`, so it must not diverge either.
+    if crate::error_summary::looks_like_ollama_unreachable(stripped) {
         let endpoint =
             extract_ollama_endpoint(stripped).unwrap_or_else(|| "localhost:11434".to_string());
         return LlmError::Unreachable { endpoint };
     }
 
-    LlmError::Other(truncate(stripped, 200))
-}
-
-#[cfg(feature = "llm")]
-const WRAPPER_PREFIXES: &[&str] = &["LLM analysis failed:", "LLM gateway error:"];
-
-#[cfg(feature = "llm")]
-fn strip_wrapper_prefixes(mut text: &str) -> &str {
-    loop {
-        let mut stripped = false;
-        for prefix in WRAPPER_PREFIXES {
-            if let Some(rest) = text.strip_prefix(prefix) {
-                text = rest.trim_start();
-                stripped = true;
-                break;
-            }
-        }
-        if !stripped {
-            return text;
-        }
-    }
+    LlmError::Other(crate::error_summary::truncate_summary(stripped))
 }
 
 #[cfg(feature = "llm")]
@@ -315,16 +299,6 @@ fn extract_provider_error(text: &str) -> Option<LlmError> {
 }
 
 #[cfg(feature = "llm")]
-fn looks_like_ollama_unreachable(text: &str) -> bool {
-    let lower = text.to_ascii_lowercase();
-    (lower.contains("localhost:11434") || lower.contains("ollama"))
-        && (lower.contains("connection refused")
-            || lower.contains("failed to connect")
-            || lower.contains("error sending request")
-            || lower.contains("tcp connect error"))
-}
-
-#[cfg(feature = "llm")]
 fn extract_ollama_endpoint(text: &str) -> Option<String> {
     // Try to find "localhost:NNNNN" in the message
     let lower = text.to_ascii_lowercase();
@@ -337,16 +311,6 @@ fn extract_ollama_endpoint(text: &str) -> Option<String> {
         Some(format!("localhost:{}", &text[port_start..port_end]))
     } else {
         Some("localhost:11434".to_string())
-    }
-}
-
-#[cfg(feature = "llm")]
-fn truncate(text: &str, max: usize) -> String {
-    if text.chars().count() <= max {
-        text.to_string()
-    } else {
-        let head: String = text.chars().take(max).collect();
-        format!("{head}…")
     }
 }
 

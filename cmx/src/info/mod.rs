@@ -102,7 +102,7 @@ pub struct SkillFileEntry {
 // ---------------------------------------------------------------------------
 
 /// Find an installed artifact by name (searching both agents and skills across
-/// every platform) and gather its full detail view for `cmx info`.
+/// the managed platform set) and gather its full detail view for `cmx info`.
 pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
     // Search both kinds across every platform.
     for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
@@ -130,18 +130,25 @@ pub fn info_for_kind(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Re
     }
 }
 
-/// Locate an installed artifact across **every** platform (active platform
-/// first, then the rest), returning its gathered info. This mirrors `cmx doctor`,
-/// which surveys all platforms — without it, `info` only sees the active
-/// `--platform` (Claude by default) and can't describe a skill that lives in,
-/// say, another tool's directory (e.g. an `external` skill under `~/.hermes`).
+/// Locate an installed artifact across the managed platform set (active
+/// platform first, then the rest — or every supported platform when no
+/// managed set is configured), returning its gathered info. Without this,
+/// `info` would only see the active `--platform` (Claude by default) and
+/// couldn't describe a skill that lives in, say, another tool's directory
+/// (e.g. an `external` skill under `~/.hermes`). This mirrors `cmx doctor`,
+/// `cmx list`, and `cmx uninstall`, which all scope cross-platform lookups to
+/// `config::managed_or_all_platforms` rather than searching every supported
+/// platform unconditionally.
 fn find_and_gather(
     name: &str,
     kind: ArtifactKind,
     ctx: &AppContext<'_>,
 ) -> Result<Option<ArtifactInfo>> {
     let active = ctx.paths.platform;
-    for view in platform_iter::views_for(ctx.paths, platform_iter::active_first(active), kind) {
+    let platforms = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
+    for view in
+        platform_iter::views_for(ctx.paths, platform_iter::active_first_of(active, platforms), kind)
+    {
         if let Some((path, scope)) = config::find_installed_path(name, kind, ctx.fs, &view.paths) {
             // Gather against the platform the artifact actually lives in, so its
             // (per-platform) lock file is the one consulted.
@@ -372,6 +379,56 @@ mod tests {
         let result = info("my-agent", &ctx);
 
         assert!(result.is_ok(), "expected Ok for local agent: {:?}", result.err());
+    }
+
+    #[test]
+    fn info_ignores_unmanaged_platforms() {
+        let t = TestContext::new();
+        setup_empty_sources(&t.fs, &t.paths);
+
+        // A skill installed only on Codex.
+        let codex_paths = t.paths.with_platform(Platform::Codex);
+        let dir = codex_paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
+        t.fs.add_file(
+            dir.join("codex-only").join("SKILL.md"),
+            crate::test_support::versioned_skill_content("A codex-only skill", "1.0.0"),
+        );
+
+        // The user manages Claude only, so `info` must not find it there.
+        let cfg = crate::types::CmxConfig {
+            platforms: vec![Platform::Claude],
+            ..Default::default()
+        };
+        crate::config::save_config(&cfg, &t.fs, &t.paths).unwrap();
+
+        let ctx = t.ctx();
+        let result = info_for_kind("codex-only", ArtifactKind::Skill, &ctx);
+        assert!(
+            matches!(result, Err(CliError::ArtifactNotInstalled { .. })),
+            "expected ArtifactNotInstalled, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn info_finds_artifact_when_no_managed_set() {
+        let t = TestContext::new();
+        setup_empty_sources(&t.fs, &t.paths);
+
+        // Same fixture as above, but with no managed-platform config at all.
+        let codex_paths = t.paths.with_platform(Platform::Codex);
+        let dir = codex_paths.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
+        t.fs.add_file(
+            dir.join("codex-only").join("SKILL.md"),
+            crate::test_support::versioned_skill_content("A codex-only skill", "1.0.0"),
+        );
+
+        let ctx = t.ctx();
+        let result = info_for_kind("codex-only", ArtifactKind::Skill, &ctx);
+        assert!(
+            result.is_ok(),
+            "expected Ok when no managed set is configured: {:?}",
+            result.err()
+        );
     }
 
     #[test]

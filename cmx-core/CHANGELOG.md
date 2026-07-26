@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`error_summary::truncate_summary(text: &str) -> String`.** Collapses three
+  independent copies of "truncate this error message to a short CLI-note
+  length" (`error_summary`'s own 120-char `MAX_LEN`, `gateway::real`'s
+  200-char `truncate`, and `cmx`'s 200-char `MAX` in `dispatch/info.rs`) into
+  one canonical definition at 120 chars, the value `error_summary` already
+  used for its CLI degradation notes. `LlmError::Other`'s message and the
+  `cmx info` "summary unavailable" note both now elide at 120 chars instead
+  of 200. Additive to the public API (minor bump).
+
+### Changed
+
+- `error_summary::looks_like_ollama_unreachable` and `strip_wrappers` (plus the
+  `WRAPPER_PREFIXES` list) are now `pub(crate)` so `gateway::real`'s
+  `classify_mojentic_error` calls the same predicates `error_summary` uses for
+  CLI degradation notes, instead of maintaining byte-identical copies of both.
+  No behavior change — same classification rules, one definition each.
+
 ### Documentation
 
 - Crate-level and module-level rustdoc coverage brought to zero `missing_docs`

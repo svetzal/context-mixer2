@@ -21,8 +21,8 @@
 //! here once, and every caller gets the same (correct) behavior.
 //!
 //! `adopt.rs`'s `unadopt_one` had a second, independent bug from the same root
-//! cause: because it hand-rolled its own platform loop, it iterated
-//! [`crate::platform_iter::all()`] instead of the user's managed-platform
+//! cause: because it hand-rolled its own platform loop, it iterated the
+//! unfiltered [`crate::platform_iter::all`] iterator instead of the user's managed-platform
 //! allowlist (`cmx config platforms`) — unlike every sibling cross-platform
 //! command, which resolves candidates via
 //! [`crate::config::managed_or_all_platforms`]. Routing `unadopt` through

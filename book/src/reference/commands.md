@@ -509,11 +509,14 @@ just `install --all --platform <tool>`.
 ### Managed platforms
 
 By default cmx **infers** which platforms to act on: a bare `install` targets the
-platforms already in use, while `uninstall` and `doctor` consider every supported
-platform. Declaring a managed set makes that explicit and authoritative — when it
-is non-empty, a default (no `--platform`) `install`/`uninstall` acts on exactly
-those platforms and `doctor` surveys only those, so cmx ignores tools you don't
-use instead of scanning all fourteen:
+platforms already in use, while every other cross-platform command — `uninstall`,
+`doctor`, `info` (and its "did you mean" hints), `sync`, `diff`, `promote`, `set
+activate`/`deactivate`, and `adopt` — considers every supported platform.
+Declaring a managed set makes that explicit and authoritative — when it is
+non-empty, a default (no `--platform`) `install`/`uninstall` acts on exactly those
+platforms, `doctor` surveys only those, and `info`/the did-you-mean hints only
+look for artifacts on those platforms too, so cmx ignores tools you don't use
+instead of scanning all fourteen:
 
 ```bash
 cmx config platforms add claude

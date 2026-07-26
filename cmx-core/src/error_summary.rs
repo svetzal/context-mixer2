@@ -5,7 +5,7 @@
 use anyhow::Error;
 
 const MAX_LEN: usize = 120;
-const WRAPPER_PREFIXES: &[&str] = &["LLM analysis failed:", "LLM gateway error:"];
+pub(crate) const WRAPPER_PREFIXES: &[&str] = &["LLM analysis failed:", "LLM gateway error:"];
 
 /// Reduce a nested gateway/provider error chain to a short, one-line phrase
 /// suitable for CLI degradation notes.
@@ -30,7 +30,7 @@ fn collapse_whitespace(input: &str) -> String {
     input.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn strip_wrappers(mut text: &str) -> &str {
+pub(crate) fn strip_wrappers(mut text: &str) -> &str {
     loop {
         let mut stripped = false;
         for prefix in WRAPPER_PREFIXES {
@@ -56,13 +56,24 @@ fn provider_phrase(text: &str, marker: &str) -> Option<String> {
     Some(text[start..].trim().to_string())
 }
 
-fn looks_like_ollama_unreachable(text: &str) -> bool {
+pub(crate) fn looks_like_ollama_unreachable(text: &str) -> bool {
     let lower = text.to_ascii_lowercase();
     (lower.contains("localhost:11434") || lower.contains("ollama"))
         && (lower.contains("connection refused")
             || lower.contains("failed to connect")
             || lower.contains("error sending request")
             || lower.contains("tcp connect error"))
+}
+
+/// Elide `text` to a short, single-line phrase suitable for a CLI degradation
+/// note, appending `…` when truncated. The one definition of "how long is too
+/// long" for these notes — see the module header for why this must not be
+/// re-duplicated per call site.
+///
+/// Text at or under the limit is returned unchanged (`MAX_LEN` chars →
+/// unchanged); anything longer is cut to `MAX_LEN` chars with `…` appended.
+pub fn truncate_summary(text: &str) -> String {
+    truncate(text)
 }
 
 fn truncate(text: &str) -> String {
@@ -76,11 +87,26 @@ fn truncate(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::summarize_gateway_error;
+    use super::{MAX_LEN, summarize_gateway_error, truncate_summary};
 
     #[test]
     fn summarize_gateway_error_keeps_short_message() {
         assert_eq!(summarize_gateway_error(&anyhow::anyhow!("short error")), "short error");
+    }
+
+    #[test]
+    fn truncate_summary_leaves_exact_boundary_unchanged() {
+        let text: String = "a".repeat(MAX_LEN);
+        assert_eq!(truncate_summary(&text), text);
+    }
+
+    #[test]
+    fn truncate_summary_elides_past_boundary() {
+        let text: String = "a".repeat(MAX_LEN + 1);
+        let result = truncate_summary(&text);
+        assert_eq!(result.chars().count(), MAX_LEN + 1);
+        assert!(result.ends_with('…'));
+        assert_eq!(&result[..result.len() - '…'.len_utf8()], "a".repeat(MAX_LEN));
     }
 
     #[test]

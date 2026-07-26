@@ -14,8 +14,6 @@ use super::print_json;
 /// — the dispatch layer is the only code that should touch `anyhow`.
 #[cfg(feature = "llm")]
 pub(crate) fn summary_unavailable_message(e: &anyhow::Error) -> String {
-    const MAX: usize = 200;
-
     if is_gateway_failure(e) {
         return format!(
             "summary unavailable — {}. Fix with 'cmx config gateway'/'cmx config model' or set OPENAI_API_KEY.",
@@ -24,12 +22,7 @@ pub(crate) fn summary_unavailable_message(e: &anyhow::Error) -> String {
     }
 
     let flattened = format!("{e:#}").split_whitespace().collect::<Vec<_>>().join(" ");
-    let detail = if flattened.chars().count() > MAX {
-        let head: String = flattened.chars().take(MAX).collect();
-        format!("{head}…")
-    } else {
-        flattened
-    };
+    let detail = crate::error_summary::truncate_summary(&flattened);
     if detail.ends_with(['.', '!', '?', '…']) {
         format!("summary unavailable — {detail}")
     } else {

@@ -5,7 +5,6 @@ use crate::config;
 use crate::context::AppContext;
 use crate::error::Result;
 use crate::flags::SurveyScope;
-use crate::platform::Platform;
 
 use super::aggregate::{collect_missing, group_rows, sort_missing, sort_rows};
 use super::classify::build_rows;
@@ -22,11 +21,7 @@ pub fn survey(scope: SurveyScope, ctx: &AppContext<'_>) -> Result<DoctorReport> 
     let cfg = config::load_config(ctx.fs, ctx.paths)?;
     // When the user has declared a managed set, `doctor` surveys only those
     // platforms; otherwise it inspects every supported platform.
-    let platforms = if cfg.platforms.is_empty() {
-        Platform::ALL.to_vec()
-    } else {
-        cfg.platforms.clone()
-    };
+    let platforms = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
     let locations = build_locations(ctx, &scopes, &platforms)?;
     let locks = load_all_locks(ctx, &scopes, &platforms)?;
     let available = available_in_sources(ctx)?;

@@ -14,8 +14,10 @@
 //! // Iterate every platform that supports `kind`:
 //! // for view in platform_iter::views_for(ctx, platform_iter::all(), kind) { ... }
 //! //
-//! // Put the active platform first:
-//! // for view in platform_iter::views_for(ctx, platform_iter::active_first(active), kind) { ... }
+//! // Put the active platform first, searching only a caller-supplied candidate
+//! // set (normally `config::managed_or_all_platforms`, never `Platform::ALL`
+//! // directly, so the managed-platform allowlist is always honoured):
+//! // for view in platform_iter::views_for(ctx, platform_iter::active_first_of(active, platforms), kind) { ... }
 //! ```
 
 use std::iter;
@@ -68,10 +70,18 @@ pub fn all() -> impl Iterator<Item = Platform> {
     Platform::ALL.iter().copied()
 }
 
-/// Iterate `active` first, then every other platform in canonical order.
+/// Iterate `active` first, then every other platform in `platforms`, in the
+/// order `platforms` yields them.
 ///
 /// Mirrors the pattern in `info/mod.rs`: the active platform is searched first
-/// so a locally-installed artifact is found without scanning every tool.
-pub fn active_first(active: Platform) -> impl Iterator<Item = Platform> {
-    iter::once(active).chain(Platform::ALL.iter().copied().filter(move |&p| p != active))
+/// so a locally-installed artifact is found without scanning every tool. The
+/// caller supplies the candidate set — normally
+/// `config::managed_or_all_platforms` — rather than `Platform::ALL` directly,
+/// so callers honour the managed-platform allowlist instead of silently
+/// searching every supported platform.
+pub fn active_first_of(
+    active: Platform,
+    platforms: impl IntoIterator<Item = Platform>,
+) -> impl Iterator<Item = Platform> {
+    iter::once(active).chain(platforms.into_iter().filter(move |&p| p != active))
 }
