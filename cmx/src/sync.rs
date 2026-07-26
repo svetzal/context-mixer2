@@ -16,13 +16,12 @@ use std::cmp::Ordering;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use crate::adopt::HOME_SOURCE;
 use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
 use crate::diff::{FileChange, file_changes_between};
 use crate::flags::RunMode;
-use crate::lockfile;
+use crate::home_provenance;
 use crate::platform::{Platform, platforms_label};
 use crate::types::{ArtifactKind, InstallScope};
 
@@ -183,19 +182,12 @@ fn is_home_tracked(
     copies: &[Copy],
     ctx: &AppContext<'_>,
 ) -> Result<bool> {
-    for c in copies {
-        for &platform in &c.platforms {
-            let pv = ctx.paths.with_platform(platform);
-            let tracked_from_home = lockfile::load(scope, ctx.fs, &pv)?
-                .packages
-                .get(name)
-                .is_some_and(|e| e.source.repo == HOME_SOURCE);
-            if tracked_from_home {
-                return Ok(true);
-            }
-        }
-    }
-    Ok(false)
+    let candidates: Vec<Platform> =
+        copies.iter().flat_map(|c| c.platforms.iter().copied()).collect();
+    Ok(
+        !home_provenance::home_tracked_entries(name, ArtifactKind::Skill, scope, &candidates, ctx)?
+            .is_empty(),
+    )
 }
 
 /// Build the actionable error for an ambiguous auto-pick: list each diverging
@@ -223,17 +215,16 @@ fn ambiguity_error(
             human_size(size)
         );
     }
-    // Prefer a managed platform when naming the `--from` for a copy shared by
-    // several platforms (the `.agents/skills` cohort), so the suggestion reads
-    // in terms of a tool the user actually uses (e.g. `codex`, not `opencode`).
-    let representative = |c: &Copy| -> Option<Platform> {
-        managed
-            .and_then(|m| c.platforms.iter().find(|p| m.contains(p)).copied())
-            .or_else(|| c.platforms.first().copied())
-    };
+    // Name the platform via the shared representative-platform decision (active
+    // platform if it reads the copy, else a managed one, else the first) — see
+    // `crate::platform_copies::representative_platform`.
     let _ = writeln!(msg, "Choose which copy wins:");
     for c in copies {
-        if let Some(p) = representative(c) {
+        if let Some(p) = crate::platform_copies::representative_platform(
+            &c.platforms,
+            ctx.paths.platform,
+            managed,
+        ) {
             let _ = writeln!(msg, "  cmx {kind} sync {name} --from {p}");
         }
     }

@@ -40,7 +40,7 @@ pub(super) fn reconciliations(
     platform: Option<Platform>,
 ) -> Vec<Reconciliation> {
     let mut out = Vec::new();
-    let source_is_home = cmp.source_name == crate::adopt::HOME_SOURCE;
+    let source_is_home = cmp.source_name == crate::home_provenance::HOME_SOURCE;
     let promote_plat = platform.map(|p| format!(" --from {p}")).unwrap_or_default();
     let update_plat = platform.map(|p| format!(" --platform {p}")).unwrap_or_default();
     let name = cmp.name;

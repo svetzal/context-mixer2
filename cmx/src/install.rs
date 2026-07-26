@@ -8,7 +8,7 @@ use crate::artifact_status;
 use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
-use crate::diff::{FileChange, FileStatus, file_changes_between};
+use crate::diff::file_changes_between;
 use crate::lockfile;
 use crate::paths::ConfigPaths;
 use crate::platform::Platform;
@@ -623,20 +623,8 @@ fn collect_discarded_paths(
     let changes = file_changes_between(kind, installed_path, source_path, ctx)?;
     Ok(changes
         .into_iter()
-        .map(|change| changed_target_path(installed_path, &change))
+        .map(|change| crate::diff::changed_target_path(installed_path, &change, ctx.fs))
         .collect())
-}
-
-fn changed_target_path(installed_path: &Path, change: &FileChange) -> PathBuf {
-    match change.status {
-        FileStatus::Modified | FileStatus::OnlyInInstalled | FileStatus::OnlyInSource => {
-            if installed_path.is_file() {
-                installed_path.to_path_buf()
-            } else {
-                installed_path.join(&change.path)
-            }
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------

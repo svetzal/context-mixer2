@@ -1,5 +1,5 @@
 //! Installed-copy discovery: `InstalledCopy`, `CopyEval`, `discover_copies`,
-//! `gather_skill_copies`, `evaluate_copies`, `representative_platform`.
+//! `gather_skill_copies`, `evaluate_copies`.
 
 use crate::error::Result;
 use std::path::PathBuf;
@@ -86,23 +86,6 @@ fn gather_skill_copies(
     })
 }
 
-/// Pick the platform to name in reconcile commands for a copy shared by several:
-/// the active platform if it reads this copy, else a managed platform, else the
-/// first — so `--from codex` is suggested over `--from opencode` for `promote`.
-pub(super) fn representative_platform(
-    copy: &InstalledCopy,
-    active: Platform,
-    managed: Option<&[Platform]>,
-) -> Platform {
-    if copy.platforms.contains(&active) {
-        return active;
-    }
-    managed
-        .and_then(|m| copy.platforms.iter().find(|p| m.contains(p)).copied())
-        .or_else(|| copy.platforms.first().copied())
-        .unwrap_or(active)
-}
-
 /// Compare each discovered copy to the source, computing the per-copy diff (and
 /// its +/- totals) for the ones that differ.
 pub(super) fn evaluate_copies(
@@ -145,45 +128,6 @@ mod tests {
     use crate::platform::Platform;
     use crate::test_support::{TestContext, agent_content, install_agent_on_disk, skill_content};
     use crate::types::{ArtifactKind, CmxConfig, InstallScope};
-
-    // --- representative_platform ---
-
-    fn make_copy(platforms: Vec<Platform>) -> InstalledCopy {
-        InstalledCopy {
-            platforms,
-            path: std::path::PathBuf::from("/some/path"),
-            checksum: "sha256:abc".to_string(),
-        }
-    }
-
-    #[test]
-    fn representative_platform_returns_active_when_present() {
-        let copy = make_copy(vec![Platform::Claude, Platform::Codex]);
-        assert_eq!(representative_platform(&copy, Platform::Claude, None), Platform::Claude);
-    }
-
-    #[test]
-    fn representative_platform_prefers_managed_over_first_when_active_absent() {
-        // Active (Gemini) not in platforms; managed includes Codex which is in platforms.
-        let copy = make_copy(vec![Platform::Opencode, Platform::Codex]);
-        let managed = vec![Platform::Codex];
-        assert_eq!(
-            representative_platform(&copy, Platform::Gemini, Some(&managed)),
-            Platform::Codex
-        );
-    }
-
-    #[test]
-    fn representative_platform_falls_back_to_first_when_no_managed() {
-        let copy = make_copy(vec![Platform::Opencode, Platform::Codex]);
-        assert_eq!(representative_platform(&copy, Platform::Gemini, None), Platform::Opencode);
-    }
-
-    #[test]
-    fn representative_platform_falls_back_to_active_when_platforms_empty() {
-        let copy = make_copy(vec![]);
-        assert_eq!(representative_platform(&copy, Platform::Claude, None), Platform::Claude);
-    }
 
     // --- discover_copies: agent path ---
 

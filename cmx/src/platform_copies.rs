@@ -38,6 +38,28 @@ use crate::error::Result;
 use crate::platform::Platform;
 use crate::types::{ArtifactKind, InstallScope};
 
+/// The platform to name in a reconcile command (`--from <platform>`) for a copy
+/// shared by several platforms: the active platform if it reads this copy,
+/// else a managed platform, else the first — so `--from codex` is suggested
+/// over `--from opencode`.
+///
+/// Every reconcile command (`diff`, `sync`, `promote`) that names a platform in
+/// a suggested command for a shared physical copy answers this the same way;
+/// see `cmx/src/home_provenance.rs` for the cautionary tale about what happens
+/// when a decision like this gets hand-rolled at each call site instead.
+pub(crate) fn representative_platform(
+    platforms: &[Platform],
+    active: Platform,
+    managed: Option<&[Platform]>,
+) -> Option<Platform> {
+    if platforms.contains(&active) {
+        return Some(active);
+    }
+    managed
+        .and_then(|m| platforms.iter().find(|p| m.contains(p)).copied())
+        .or_else(|| platforms.first().copied())
+}
+
 /// Iterate distinct physical copies of `name` across `candidates`, collapsing
 /// platforms that share the same install directory into one entry, and call
 /// `f(path, platforms) -> Result<Option<T>>` for each.
@@ -111,6 +133,42 @@ mod tests {
             ..Default::default()
         };
         crate::config::save_config(&config, fs, paths).unwrap();
+    }
+
+    // --- representative_platform ---
+
+    #[test]
+    fn representative_platform_returns_active_when_present() {
+        let platforms = vec![Platform::Claude, Platform::Codex];
+        assert_eq!(
+            representative_platform(&platforms, Platform::Claude, None),
+            Some(Platform::Claude)
+        );
+    }
+
+    #[test]
+    fn representative_platform_prefers_managed_over_first_when_active_absent() {
+        // Active (Gemini) not in platforms; managed includes Codex which is in platforms.
+        let platforms = vec![Platform::Opencode, Platform::Codex];
+        let managed = vec![Platform::Codex];
+        assert_eq!(
+            representative_platform(&platforms, Platform::Gemini, Some(&managed)),
+            Some(Platform::Codex)
+        );
+    }
+
+    #[test]
+    fn representative_platform_falls_back_to_first_when_no_managed() {
+        let platforms = vec![Platform::Opencode, Platform::Codex];
+        assert_eq!(
+            representative_platform(&platforms, Platform::Gemini, None),
+            Some(Platform::Opencode)
+        );
+    }
+
+    #[test]
+    fn representative_platform_returns_none_when_platforms_empty() {
+        assert_eq!(representative_platform(&[], Platform::Claude, None), None);
     }
 
     #[test]

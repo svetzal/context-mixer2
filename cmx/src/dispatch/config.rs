@@ -13,7 +13,7 @@ pub fn handle_home(action: &HomeAction, ctx: &AppContext<'_>) -> Result<()> {
         HomeAction::Init => {
             let home = crate::adopt::home_init(ctx)?;
             println!("Canonical home ready at {}", home.display());
-            println!("Registered as source '{}'.", crate::adopt::HOME_SOURCE);
+            println!("Registered as source '{}'.", crate::home_provenance::HOME_SOURCE);
             Ok(())
         }
         HomeAction::Path { output } => {

@@ -15,6 +15,17 @@
 //! updated in the canonical spot while a copy-pasted duplicate silently keeps
 //! the old (or wrong) behavior.
 //!
+//! A second cautionary tale, same root cause: `adopt.rs`'s `unadopt_one` used
+//! to hand-roll its own "which platforms track this artifact from home"
+//! lookup, and — independently from the `promote` bug above — iterated every
+//! supported platform (`platform_iter::all()`) instead of the managed
+//! allowlist too. It also disagreed on error handling with the other two
+//! hand-rolled copies of that same lookup (`promote.rs`, `sync.rs`): one used
+//! `.ok()?` to silently skip a platform whose lock file failed to parse, the
+//! others propagated with `?`. Both problems went away once the lookup moved
+//! into `cmx/src/home_provenance.rs` as the one definition every caller shares
+//! — see that module's header for the full account.
+//!
 //! This test walks `cmx/src/**/*.rs` (excluding `tests.rs` files, inline
 //! `#[cfg(test)] mod tests` blocks, and the modules that legitimately define
 //! each canonical item) and fails if:
@@ -29,9 +40,17 @@
 //! (c) `platform_iter::all()` appears in any of the cross-platform command
 //!     modules that must instead resolve platforms via
 //!     `config::managed_or_all_platforms` — `promote.rs`, `install.rs`,
-//!     `uninstall.rs`, `sync.rs`, `diff/`, `sets/`;
+//!     `uninstall.rs`, `sync.rs`, `diff/`, `sets/`, `adopt.rs`;
 //! (d) a second `fn write_discarded_paths` is declared anywhere but
-//!     `display/util.rs`.
+//!     `display/util.rs`;
+//! (e) the home-provenance check (`== HOME_SOURCE` or `HOME_SOURCE ==`)
+//!     appears anywhere but `home_provenance.rs`;
+//! (f) `.is_file()` (the zero-arg inherent `Path::is_file` call) appears
+//!     anywhere under `cmx/src` — every path-kind check must go through the
+//!     `Filesystem` gateway (`fs.is_file(path)`) instead;
+//! (g) a second `fn representative_platform` is declared anywhere but
+//!     `platform_copies.rs`;
+//! (h) a second `fn changed_target_path` is declared anywhere but `diff/mod.rs`.
 //!
 //! To retire one of these checks, first satisfy yourself the underlying
 //! duplication has been re-justified as a genuinely different decision (as
@@ -175,6 +194,7 @@ fn cross_platform_commands_never_bypass_the_managed_platform_allowlist() {
         "sync.rs",
         "diff/",
         "sets/",
+        "adopt.rs",
     ];
     let root = src_root();
     let mut violations = Vec::new();
@@ -222,5 +242,113 @@ fn write_discarded_paths_has_exactly_one_definition() {
     assert!(
         definitions[0].starts_with("display/util.rs"),
         "the one definition should live in display/util.rs, found: {definitions:?}"
+    );
+}
+
+#[test]
+fn home_provenance_check_has_one_implementation() {
+    // "which platforms track this artifact from the canonical home" is
+    // answered by comparing a lock entry's `source.repo` against
+    // `HOME_SOURCE`. That comparison must live only in home_provenance.rs —
+    // see its module header for the bug this guard exists to catch.
+    let root = src_root();
+    let mut violations = Vec::new();
+    for file in collect_rust_files(&root) {
+        let Some(content) = production_content(&file) else {
+            continue;
+        };
+        let rel = file.strip_prefix(&root).unwrap_or(&file).to_string_lossy().to_string();
+        if rel == "home_provenance.rs" {
+            continue;
+        }
+        for (i, line) in content.lines().enumerate() {
+            if line.contains("== HOME_SOURCE") || line.contains("HOME_SOURCE ==") {
+                violations.push(format!(
+                    "{rel}:{}: hand-rolled home-provenance check outside home_provenance.rs — use \
+                     home_provenance::home_tracked_entries instead",
+                    i + 1
+                ));
+            }
+        }
+    }
+    assert!(violations.is_empty(), "{}", violations.join("\n"));
+}
+
+#[test]
+fn path_is_file_is_never_called_directly() {
+    // Every path-kind check must go through the `Filesystem` gateway
+    // (`fs.is_file(path)`), never `std::path::Path::is_file()` directly — the
+    // gateway is the only path-kind oracle in this codebase's
+    // functional-core/imperative-shell architecture.
+    let root = src_root();
+    let mut violations = Vec::new();
+    for file in collect_rust_files(&root) {
+        let Some(content) = production_content(&file) else {
+            continue;
+        };
+        let rel = file.strip_prefix(&root).unwrap_or(&file).to_string_lossy().to_string();
+        for (i, line) in content.lines().enumerate() {
+            if line.contains(".is_file()") {
+                violations.push(format!(
+                    "{rel}:{}: bare Path::is_file() call — use fs.is_file(path) via the \
+                     Filesystem gateway instead",
+                    i + 1
+                ));
+            }
+        }
+    }
+    assert!(violations.is_empty(), "{}", violations.join("\n"));
+}
+
+#[test]
+fn representative_platform_has_exactly_one_definition() {
+    let root = src_root();
+    let mut definitions = Vec::new();
+    for file in collect_rust_files(&root) {
+        let Some(content) = production_content(&file) else {
+            continue;
+        };
+        let rel = file.strip_prefix(&root).unwrap_or(&file).to_string_lossy().to_string();
+        for (i, line) in content.lines().enumerate() {
+            if line.contains("fn representative_platform") {
+                definitions.push(format!("{rel}:{}", i + 1));
+            }
+        }
+    }
+    assert_eq!(
+        definitions.len(),
+        1,
+        "expected exactly one fn representative_platform (in platform_copies.rs), found: \
+         {definitions:?}"
+    );
+    assert!(
+        definitions[0].starts_with("platform_copies.rs"),
+        "the one definition should live in platform_copies.rs, found: {definitions:?}"
+    );
+}
+
+#[test]
+fn changed_target_path_has_exactly_one_definition() {
+    let root = src_root();
+    let mut definitions = Vec::new();
+    for file in collect_rust_files(&root) {
+        let Some(content) = production_content(&file) else {
+            continue;
+        };
+        let rel = file.strip_prefix(&root).unwrap_or(&file).to_string_lossy().to_string();
+        for (i, line) in content.lines().enumerate() {
+            if line.contains("fn changed_target_path") {
+                definitions.push(format!("{rel}:{}", i + 1));
+            }
+        }
+    }
+    assert_eq!(
+        definitions.len(),
+        1,
+        "expected exactly one fn changed_target_path (in diff/mod.rs), found: {definitions:?}"
+    );
+    assert!(
+        definitions[0].starts_with("diff/mod.rs"),
+        "the one definition should live in diff/mod.rs, found: {definitions:?}"
     );
 }

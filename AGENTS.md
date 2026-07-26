@@ -243,8 +243,9 @@ Install/uninstall:
 - `cmx/src/promote.rs` — `cmx skill promote` / `cmx agent promote`: the mirror of `install::update` — copy the in-place-edited installed copy back into the canonical home and refresh `home`-provenance lock baselines (home target only; git-sourced and reformatted-agent copies rejected)
 - `cmx/src/promote/tests.rs` — promote integration tests
 - `cmx/src/copy.rs` — file copy helpers used by install
-- `cmx/src/platform_copies.rs` — shared primitive `gather_platform_copies` that iterates managed platforms filtered by `supports(kind)`, deduplicates by physical install path (collapsing e.g. Codex+Pi that share `.agents/skills`), and invokes a closure once per distinct copy; used by diff discovery, sync, promote, and set deactivation
+- `cmx/src/platform_copies.rs` — shared primitives `gather_platform_copies` (iterates managed platforms filtered by `supports(kind)`, deduplicates by physical install path — collapsing e.g. Codex+Pi that share `.agents/skills` — and invokes a closure once per distinct copy; used by diff discovery, sync, promote, and set deactivation) and `representative_platform` (which platform to name in a reconcile command's suggested `--from <platform>` for a copy shared by several platforms; used by diff, sync, and promote)
 - `cmx/src/lock_baseline.rs` — shared primitive `refresh_baseline` that rewrites a lock entry's `installed_checksum`/`version`/`installed_at` (and, when given, `source_checksum`) across a set of platforms, skipping platforms with no existing entry; used by both `promote::refresh_home_baselines` (which also refreshes `source_checksum`) and `sync::apply_winner` (which does not)
+- `cmx/src/home_provenance.rs` — shared primitives `lock_entries_for`/`home_tracked_entries` and the `HOME_SOURCE` constant answering one decision, "which platforms track this artifact from the canonical home?"; used by `promote`, `sync`, and `adopt`'s `unadopt` so the answer (and its error-handling policy) can't drift between call sites
 
 Query & display:
 
@@ -253,8 +254,8 @@ Query & display:
 - `cmx/src/search.rs` — `cmx search` (full-text search across sources)
 - `cmx/src/info/mod.rs` — `cmx info` (artifact detail view)
 - `cmx/src/info/summary.rs` — LLM-backed prose summary for `cmx info` (feature-gated)
-- `cmx/src/diff/mod.rs` — `cmx diff` orchestration: entry point, gather loop, source lookup, copy-focus selection; public result types (`DiffOutput`, `CopyStatus`, `FileStatus`, `FileChange`, `Reconciliation`, `FocusedComparison`)
-- `cmx/src/diff/discovery.rs` — installed-copy discovery: `InstalledCopy`, `CopyEval`, `discover_copies`, `gather_skill_copies`, `evaluate_copies`, `representative_platform`
+- `cmx/src/diff/mod.rs` — `cmx diff` orchestration: entry point, gather loop, source lookup, copy-focus selection; public result types (`DiffOutput`, `CopyStatus`, `FileStatus`, `FileChange`, `Reconciliation`, `FocusedComparison`); also the one definition of `changed_target_path`, the shared "which on-disk path does this file change touch" decision used by both `install.rs` (discarding local edits) and `sets/activation.rs` (reporting a set deactivation's discarded paths)
+- `cmx/src/diff/discovery.rs` — installed-copy discovery: `InstalledCopy`, `CopyEval`, `discover_copies`, `gather_skill_copies`, `evaluate_copies`
 - `cmx/src/diff/structural.rs` — per-file structural diff: `ArtifactDiff`, `diff_artifact`, `diff_files`, `diff_dirs`, `modified_file_block`, `collect_relative_files_with`
 - `cmx/src/diff/reconcile.rs` — lock-state reconciliation: `focus_lock_state`, `reconciliations`
 - `cmx/src/diff/analyze.rs` — LLM-powered analysis (feature-gated path): `analyze_focus`

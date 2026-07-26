@@ -21,16 +21,15 @@ use crate::error::{CliError, Result};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use crate::adopt::{HOME_SOURCE, ensure_home_source, resolve_home};
+use crate::adopt::{ensure_home_source, resolve_home};
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
 use crate::copy;
 use crate::diff::{FileChange, file_changes_between};
 use crate::flags::RunMode;
-use crate::lockfile;
+use crate::home_provenance;
 use crate::platform::Platform;
-use crate::platform_iter;
 use crate::scan;
 use crate::types::{ArtifactKind, InstallScope};
 
@@ -239,31 +238,31 @@ fn select_skill_copy(
 fn resolve_home_copies(name: &str, ctx: &AppContext<'_>) -> Result<(InstallScope, Vec<HomeCopy>)> {
     let managed = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
     for scope in InstallScope::ALL {
+        let home_tracked =
+            home_provenance::home_tracked_entries(name, ArtifactKind::Skill, scope, &managed, ctx)?;
+        if home_tracked.is_empty() {
+            continue;
+        }
+        // Preserve `managed`'s order for `candidates` (it drives the physical-copy
+        // iteration order below); the lookup map itself doesn't need to be ordered.
+        let candidates: Vec<Platform> =
+            home_tracked.iter().map(|(platform, _)| *platform).collect();
+        let by_platform: std::collections::HashMap<Platform, String> = home_tracked
+            .into_iter()
+            .map(|(platform, entry)| (platform, entry.installed_checksum))
+            .collect();
         let copies = crate::platform_copies::gather_platform_copies(
-            &managed,
+            &candidates,
             ArtifactKind::Skill,
             name,
             scope,
             ctx,
             |path, platforms| {
-                let home_tracked: Vec<(Platform, String)> = platforms
-                    .into_iter()
-                    .filter_map(|platform| {
-                        let pv = ctx.paths.with_platform(platform);
-                        let entry =
-                            lockfile::load(scope, ctx.fs, &pv).ok()?.packages.get(name)?.clone();
-                        (entry.source.repo == HOME_SOURCE)
-                            .then_some((platform, entry.installed_checksum))
-                    })
-                    .collect();
-                if home_tracked.is_empty() {
-                    return Ok(None);
-                }
                 let checksum = checksum::checksum_artifact(&path, ArtifactKind::Skill, ctx.fs)?;
-                let drifted = home_tracked
+                let drifted = platforms
                     .iter()
-                    .any(|(_, installed_checksum)| checksum != *installed_checksum);
-                let platforms = home_tracked.into_iter().map(|(p, _)| p).collect();
+                    .filter_map(|p| by_platform.get(p))
+                    .any(|installed_checksum| checksum != *installed_checksum);
                 Ok(Some(HomeCopy {
                     path,
                     checksum,
@@ -305,9 +304,9 @@ fn choose_copy(
     let distinct: BTreeSet<&str> = drifted.iter().map(|c| c.checksum.as_str()).collect();
     match distinct.len() {
         0 => {
-            let rep = representative(copies, ctx.paths.platform);
-            if home_cs.is_none() || home_cs == Some(rep.checksum.as_str()) {
-                Ok(rep.clone())
+            let active = active_copy(copies, ctx.paths.platform);
+            if home_cs.is_none() || home_cs == Some(active.checksum.as_str()) {
+                Ok(active.clone())
             } else {
                 Err(CliError::PromoteNoEdits {
                     name: name.to_string(),
@@ -322,8 +321,19 @@ fn choose_copy(
     }
 }
 
-/// The copy read by the active platform, else the first (deterministic by path).
-fn representative(copies: &[HomeCopy], active: Platform) -> &HomeCopy {
+/// Which copy's *content* is canonical when nothing has drifted: the one read
+/// by the active platform, else the first (deterministic by path).
+///
+/// This is a different decision from
+/// [`representative_platform`](crate::platform_copies::representative_platform)
+/// even though both start from "the active platform if it reads a copy, else
+/// a fallback": that helper picks which *platform to name* in a message about
+/// a copy that's already chosen. This picks which *copy's bytes* to treat as
+/// the source of truth in the first place. Folding them into one function
+/// would make a caller that only wants a display label accidentally depend on
+/// content-selection semantics (and vice versa) — so they stay separate on
+/// purpose.
+fn active_copy(copies: &[HomeCopy], active: Platform) -> &HomeCopy {
     copies.iter().find(|c| c.platforms.contains(&active)).unwrap_or(&copies[0])
 }
 
@@ -337,18 +347,15 @@ fn platform_list(copies: &[HomeCopy]) -> String {
         .join(", ")
 }
 
-/// One representative platform label per drifted copy, for the ambiguity message
-/// (the active platform when it reads a copy, else that copy's first platform).
+/// One representative platform label per drifted copy, for the ambiguity
+/// message — `managed` is `None` here because `resolve_home_copies` already
+/// restricted candidates to managed platforms, so filtering again would be a
+/// no-op.
 fn drifted_labels(drifted: &[&HomeCopy], active: Platform) -> String {
     drifted
         .iter()
-        .map(|c| {
-            if c.platforms.contains(&active) {
-                active.to_string()
-            } else {
-                c.platforms[0].to_string()
-            }
-        })
+        .filter_map(|c| crate::platform_copies::representative_platform(&c.platforms, active, None))
+        .map(|p| p.to_string())
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -434,21 +441,11 @@ fn home_tracked_platforms(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<Platform>> {
-    let mut platforms = Vec::new();
-    for view in platform_iter::views_for(
-        ctx.paths,
-        config::managed_or_all_platforms(ctx.fs, ctx.paths)?,
-        kind,
-    ) {
-        let tracked_from_home = lockfile::load(scope, ctx.fs, &view.paths)?
-            .packages
-            .get(name)
-            .is_some_and(|e| e.source.repo == HOME_SOURCE);
-        if tracked_from_home {
-            platforms.push(view.platform);
-        }
-    }
-    Ok(platforms)
+    let candidates = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
+    Ok(home_provenance::home_tracked_entries(name, kind, scope, &candidates, ctx)?
+        .into_iter()
+        .map(|(platform, _)| platform)
+        .collect())
 }
 
 /// Build a pointed error for an artifact that isn't tracked from `home`,
@@ -460,19 +457,18 @@ fn non_home_guidance(
     scope: InstallScope,
     ctx: &AppContext<'_>,
 ) -> Result<String> {
-    for view in platform_iter::views_for(
-        ctx.paths,
-        config::managed_or_all_platforms(ctx.fs, ctx.paths)?,
-        kind,
-    ) {
-        if let Some(entry) = lockfile::load(scope, ctx.fs, &view.paths)?.packages.get(name) {
-            return Ok(format!(
-                "'{name}' is tracked from the '{repo}' source, not the home. Promoting edits into a \
-                 registered source isn't supported yet — edit the source clone directly, or run \
-                 `cmx {kind} update {name} --force` to discard the local edits.",
-                repo = entry.source.repo
-            ));
-        }
+    let candidates = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
+    if let Some((_, entry)) =
+        home_provenance::lock_entries_for(name, kind, scope, &candidates, ctx)?
+            .into_iter()
+            .next()
+    {
+        return Ok(format!(
+            "'{name}' is tracked from the '{repo}' source, not the home. Promoting edits into a \
+             registered source isn't supported yet — edit the source clone directly, or run \
+             `cmx {kind} update {name} --force` to discard the local edits.",
+            repo = entry.source.repo
+        ));
     }
     Ok(format!(
         "'{name}' isn't tracked by cmx, so there's nothing to promote it into. If it's \

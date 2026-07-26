@@ -25,16 +25,13 @@ use crate::context::AppContext;
 use crate::copy;
 use crate::doctor::{self, ArtifactState, DoctorRow};
 use crate::flags::SurveyScope;
+use crate::home_provenance::{self, HOME_SOURCE};
 use crate::lockfile;
 use crate::platform::Platform;
-use crate::platform_iter;
 use crate::types::{
     self, ArtifactKind, InstallScope, LockEntry, LockSource, SourceEntry, SourceType,
 };
 use crate::uninstall;
-
-/// The canonical source name under which the home is registered.
-pub const HOME_SOURCE: &str = "home";
 
 /// One adopted artifact.
 #[derive(Debug)]
@@ -305,19 +302,17 @@ fn unadopt_one(
         kind.installed_path(name, &home.join(kind.subdir_name()), ArtifactKind::HOME_AGENT_EXT);
     let home_present = ctx.fs.exists(&home_path);
 
+    let candidates = config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
     let mut untracked_from: Vec<Platform> = Vec::new();
-    for view in platform_iter::views_for(ctx.paths, platform_iter::all(), kind) {
-        for scope in InstallScope::ALL {
-            let tracked_from_home = lockfile::load(scope, ctx.fs, &view.paths)?
-                .packages
-                .get(name)
-                .is_some_and(|e| e.source.repo == HOME_SOURCE);
-            if tracked_from_home {
-                lockfile::mutate(scope, ctx.fs, &view.paths, |lock| {
-                    lock.packages.remove(name);
-                })?;
-                untracked_from.push(view.platform);
-            }
+    for scope in InstallScope::ALL {
+        let home_tracked =
+            home_provenance::home_tracked_entries(name, kind, scope, &candidates, ctx)?;
+        for (platform, _) in home_tracked {
+            let pv = ctx.paths.with_platform(platform);
+            lockfile::mutate(scope, ctx.fs, &pv, |lock| {
+                lock.packages.remove(name);
+            })?;
+            untracked_from.push(platform);
         }
     }
 
@@ -705,6 +700,63 @@ mod tests {
             report.rows.iter().find(|r| r.name == "tool-skill").unwrap().state,
             ArtifactState::Orphaned,
             "reverts to orphaned"
+        );
+    }
+
+    #[test]
+    fn unadopt_only_clears_lock_entries_on_managed_platforms() {
+        // Regression test for a real bug: `unadopt_one` used to iterate every
+        // supported platform (`platform_iter::all()`) instead of the user's
+        // managed-platform allowlist (`cmx config platforms`), unlike every
+        // other cross-platform command. With the allowlist restricted to
+        // Claude, a home-provenance lock entry on an unmanaged platform
+        // (Cursor) must survive `unadopt` untouched.
+        let t = TestContext::new();
+        set_managed_platforms(&t, &[Platform::Claude]);
+
+        let entry = crate::test_support::make_lock_entry_builder(
+            ArtifactKind::Skill,
+            HOME_SOURCE,
+            "skills/tool-skill",
+        );
+        crate::test_support::save_lock_with_entry(
+            &t.fs,
+            &t.paths.with_platform(Platform::Claude),
+            "tool-skill",
+            entry.clone(),
+            InstallScope::Global,
+        );
+        crate::test_support::save_lock_with_entry(
+            &t.fs,
+            &t.paths.with_platform(Platform::Cursor),
+            "tool-skill",
+            entry,
+            InstallScope::Global,
+        );
+
+        let outcome =
+            unadopt_many(&["tool-skill".to_string()], ArtifactKind::Skill, &t.ctx()).unwrap();
+        assert_eq!(outcome.unadopted.len(), 1);
+        assert_eq!(
+            outcome.unadopted[0].untracked_from,
+            vec![Platform::Claude],
+            "only the managed platform's entry is cleared"
+        );
+
+        let claude_lock =
+            lockfile::load(InstallScope::Global, &t.fs, &t.paths.with_platform(Platform::Claude))
+                .unwrap();
+        assert!(
+            !claude_lock.packages.contains_key("tool-skill"),
+            "Claude's home-provenance entry was cleared"
+        );
+
+        let cursor_lock =
+            lockfile::load(InstallScope::Global, &t.fs, &t.paths.with_platform(Platform::Cursor))
+                .unwrap();
+        assert!(
+            cursor_lock.packages.contains_key("tool-skill"),
+            "Cursor's entry must survive because Cursor is not in the managed set"
         );
     }
 

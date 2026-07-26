@@ -359,7 +359,7 @@ mod tests {
                         version: Some("1.0.0".to_string()),
                         installed_at: "2026-07-05T00:00:00Z".to_string(),
                         source: crate::types::LockSource {
-                            repo: crate::adopt::HOME_SOURCE.to_string(),
+                            repo: crate::home_provenance::HOME_SOURCE.to_string(),
                             path: "skills/pf/SKILL.md".to_string(),
                         },
                         source_checksum: "sha256:stale".to_string(),

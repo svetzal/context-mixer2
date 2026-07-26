@@ -3,11 +3,12 @@
 //! `FileStatus`, `FileChange`, `Reconciliation`, `FocusedComparison`).
 
 use crate::error::{CliError, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
+use crate::gateway::Filesystem;
 use crate::platform::Platform;
 use crate::source_iter;
 use crate::types::ArtifactKind;
@@ -18,7 +19,8 @@ mod discovery;
 mod reconcile;
 mod structural;
 
-use discovery::{CopyEval, discover_copies, evaluate_copies, representative_platform};
+use crate::platform_copies::representative_platform;
+use discovery::{CopyEval, discover_copies, evaluate_copies};
 use reconcile::{focus_lock_state, reconciliations};
 pub(crate) use structural::file_changes_between;
 
@@ -225,7 +227,8 @@ pub(crate) fn gather_diff_with(
     let multi = copies.len() > 1;
     let managed = config::managed_platforms(ctx.fs, ctx.paths)?;
     let focus_platform =
-        representative_platform(&evals[focus_idx].copy, active, managed.as_deref());
+        representative_platform(&evals[focus_idx].copy.platforms, active, managed.as_deref())
+            .unwrap_or(active);
     // The two labels the whole output uses: `home`/<repo> on the `−` side, the
     // platform name on the `+` side.
     let changed_label = focus_platform.to_string();
@@ -347,6 +350,28 @@ pub fn llm_lean_note() -> String {
         .to_string()
 }
 
+/// The on-disk path a `change` (from [`file_changes_between`]) actually
+/// touches: `installed_path` itself for a single-file artifact (an agent), or
+/// `installed_path.join(change.path)` for a directory artifact (a skill).
+///
+/// Both `install.rs` (discarding local edits on update) and `sets/activation.rs`
+/// (reporting what a set deactivation would discard) need this — see
+/// `crate::home_provenance` for why letting a decision like this drift into two
+/// copies is dangerous. Uses the [`Filesystem`] gateway (never
+/// `std::path::Path::is_file` directly) so it stays testable against the fake
+/// filesystem like every other path-kind check in this codebase.
+pub(crate) fn changed_target_path(
+    installed_path: &Path,
+    change: &FileChange,
+    fs: &dyn Filesystem,
+) -> PathBuf {
+    if fs.is_file(installed_path) {
+        installed_path.to_path_buf()
+    } else {
+        installed_path.join(&change.path)
+    }
+}
+
 fn find_in_sources_with(
     name: &str,
     kind: ArtifactKind,
@@ -431,6 +456,41 @@ mod tests {
             make_eval(vec![Platform::Codex], true),
         ];
         assert_eq!(select_focus(&evals, Platform::Claude), None, "None when all match");
+    }
+
+    // --- changed_target_path ---
+
+    #[test]
+    fn changed_target_path_single_file_artifact_returns_the_path_itself() {
+        let t = TestContext::new();
+        t.fs.add_file("/installed/my-agent.md", "content");
+        let installed_path = PathBuf::from("/installed/my-agent.md");
+        let change = FileChange {
+            path: "irrelevant.md".to_string(),
+            status: FileStatus::Modified,
+            added: 1,
+            removed: 1,
+        };
+
+        let result = changed_target_path(&installed_path, &change, &t.fs);
+        assert_eq!(result, installed_path, "single-file artifact: the path itself");
+    }
+
+    #[test]
+    fn changed_target_path_directory_artifact_joins_the_change_path() {
+        let t = TestContext::new();
+        t.fs.add_file("/installed/my-skill/SKILL.md", "content");
+        t.fs.add_file("/installed/my-skill/extra.md", "content");
+        let installed_path = PathBuf::from("/installed/my-skill");
+        let change = FileChange {
+            path: "extra.md".to_string(),
+            status: FileStatus::OnlyInInstalled,
+            added: 1,
+            removed: 0,
+        };
+
+        let result = changed_target_path(&installed_path, &change, &t.fs);
+        assert_eq!(result, installed_path.join("extra.md"), "directory artifact: joined path");
     }
 
     // --- find_in_sources_with ---

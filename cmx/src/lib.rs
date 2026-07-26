@@ -39,6 +39,7 @@ pub mod display;
 pub mod doctor;
 pub mod error;
 pub mod flags;
+pub(crate) mod home_provenance;
 pub mod info;
 pub mod init;
 pub mod install;

@@ -1,6 +1,7 @@
 use super::*;
 use crate::flags::RunMode;
 use crate::gateway::Filesystem;
+use crate::home_provenance::HOME_SOURCE;
 use crate::test_support::{TestContext, make_lock_entry_builder, save_lock_with_entry};
 
 /// Place a skill copy for `platform` at its global install dir with the given

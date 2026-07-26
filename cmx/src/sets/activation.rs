@@ -337,11 +337,7 @@ fn member_deactivate_targets(
                     )?
                     .into_iter()
                     .map(|change| {
-                        if artifact_path.is_file() {
-                            artifact_path.clone()
-                        } else {
-                            artifact_path.join(change.path)
-                        }
+                        crate::diff::changed_target_path(&artifact_path, &change, pctx.fs)
                     })
                     .collect()
                 } else {
