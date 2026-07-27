@@ -8,6 +8,7 @@ use crate::artifact_status;
 use crate::checksum;
 use crate::config;
 use crate::context::AppContext;
+use crate::local_modification;
 use crate::lockfile;
 use crate::platform_iter;
 use crate::source_iter;
@@ -186,16 +187,15 @@ pub(crate) fn gather_info(
     let lock_entry = installed.as_ref().and_then(|ia| ia.lock_entry);
 
     let ld = if let Some(entry) = lock_entry {
-        let (locally_modified, disk_checksum) =
-            checksum::current_checksum_if_modified(path, kind, entry, ctx.fs)?;
+        let modification = local_modification::for_path(path, kind, Some(entry), ctx)?;
         LockDerived {
             version: entry.version.clone(),
             installed_at: Some(entry.installed_at.clone()),
             source_display: Some(format!("{} ({})", entry.source.repo, entry.source.path)),
             source_checksum: Some(entry.source_checksum.clone()),
             installed_checksum: Some(entry.installed_checksum.clone()),
-            disk_checksum,
-            locally_modified,
+            disk_checksum: modification.disk_checksum,
+            locally_modified: modification.modified,
             untracked: false,
         }
     } else {

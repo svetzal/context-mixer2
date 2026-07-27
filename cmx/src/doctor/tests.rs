@@ -55,6 +55,7 @@ fn is_problem_matrix() {
         versions: vec![],
         tools: vec![],
         source: None,
+        source_checksum: None,
         locations: vec![],
         diverged,
     };
@@ -460,6 +461,7 @@ pub(crate) fn make_row(
         state,
         version: None,
         source: None,
+        source_checksum: None,
         content_checksum: checksum.to_string(),
     }
 }
@@ -474,6 +476,7 @@ fn make_doctor_artifact(name: &str, diverged: bool) -> DoctorArtifact {
         versions: vec![],
         tools: vec![],
         source: None,
+        source_checksum: None,
         locations: vec![],
         diverged,
     }
@@ -493,6 +496,7 @@ fn make_doctor_row(name: &str, loc: &str, ver: &str, state: ArtifactState) -> Do
         state,
         version: Some(ver.to_string()),
         source: None,
+        source_checksum: None,
         content_checksum: format!("sha256:{ver}"),
     }
 }
@@ -703,6 +707,7 @@ fn group_rows_tools_is_union_of_tracked_for() {
             state: ArtifactState::Tracked,
             version: Some("1.0.0".to_string()),
             source: None,
+            source_checksum: None,
             content_checksum: "sha256:1.0.0".to_string(),
         },
         DoctorRow {
@@ -715,6 +720,7 @@ fn group_rows_tools_is_union_of_tracked_for() {
             state: ArtifactState::Tracked,
             version: Some("1.0.0".to_string()),
             source: None,
+            source_checksum: None,
             content_checksum: "sha256:1.0.0".to_string(),
         },
     ];
@@ -736,6 +742,7 @@ fn group_rows_source_joins_distinct_provenance() {
             state: ArtifactState::Tracked,
             version: Some("1.0.0".to_string()),
             source: Some("repo-a".to_string()),
+            source_checksum: None,
             content_checksum: "sha256:1.0.0".to_string(),
         },
         DoctorRow {
@@ -748,6 +755,7 @@ fn group_rows_source_joins_distinct_provenance() {
             state: ArtifactState::Tracked,
             version: Some("1.0.0".to_string()),
             source: Some("repo-b".to_string()),
+            source_checksum: None,
             content_checksum: "sha256:1.0.0".to_string(),
         },
     ];

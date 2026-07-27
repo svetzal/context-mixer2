@@ -3,15 +3,12 @@
 use anyhow::Result;
 use std::process::ExitCode;
 
-use crate::cli::{OutputArgs, SetAction};
+use crate::cli::{self, OutputArgs, SetAction};
 use crate::context::AppContext;
 use crate::flags::{Force, Purge, RunMode};
 use crate::types::InstallScope;
 
 use super::{print_json, scope_from, usage_error};
-
-pub(crate) const DRY_RUN_DEPRECATED_WARNING: &str =
-    "--dry-run is deprecated; the plan is now shown by default — pass --apply to execute";
 
 /// Dispatch `cmx set` subcommands (create, list, show, add, remove, activate,
 /// deactivate, delete, rename).
@@ -57,12 +54,7 @@ pub fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
             dry_run,
             local,
         } => {
-            let mode = if dry_run {
-                eprintln!("{DRY_RUN_DEPRECATED_WARNING}");
-                RunMode::Plan
-            } else {
-                RunMode::from_flag(apply)
-            };
+            let mode = cli::run_mode(dry_run, apply);
             handle_set_activate(&name, mode, scope_from(local), ctx)
         }
         SetAction::Deactivate {
@@ -72,12 +64,7 @@ pub fn handle_set(action: SetAction, ctx: &AppContext<'_>) -> Result<ExitCode> {
             force,
             local,
         } => {
-            let mode = if dry_run {
-                eprintln!("{DRY_RUN_DEPRECATED_WARNING}");
-                RunMode::Plan
-            } else {
-                RunMode::from_flag(apply)
-            };
+            let mode = cli::run_mode(dry_run, apply);
             handle_set_deactivate(&name, mode, Force::from_flag(force), scope_from(local), ctx)
         }
         SetAction::Delete {

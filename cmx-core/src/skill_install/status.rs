@@ -30,6 +30,12 @@ impl SkillInstaller {
 
             let drifted = if installed && tracked {
                 if let (Some(dir), Some(entry)) = (&skill_dir, lock_entry) {
+                    // Deliberately narrower and separate from `cmx/src/local_modification.rs`:
+                    // this loop already resolved `skill_dir` (with its own `installed`
+                    // check above) and has no kind/platform-support guard to apply, so
+                    // calling the lower-level checksum comparison directly here is
+                    // correct — cmx-core cannot depend on the cmx-crate helper anyway
+                    // (see AGENTS.md, "cmx-core & cmx-core-ts").
                     checksum::is_locally_modified(dir, ArtifactKind::Skill, entry, ctx.fs)
                         .unwrap_or(false)
                 } else {

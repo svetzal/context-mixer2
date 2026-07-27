@@ -44,6 +44,7 @@ pub mod info;
 pub mod init;
 pub mod install;
 pub mod list;
+pub mod local_modification;
 pub mod lock_baseline;
 pub mod outdated;
 pub mod partition;

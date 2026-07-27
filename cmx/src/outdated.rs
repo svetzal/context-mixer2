@@ -5,10 +5,10 @@ use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::artifact_status::source_outdated;
-use crate::checksum;
 use crate::config;
 use crate::config::InstalledWithSources;
 use crate::context::{AppContext, LoadedState};
+use crate::local_modification;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
 use crate::types::{ArtifactKind, InstallScope, LockFile};
@@ -102,26 +102,6 @@ fn outdated_status(installed_v: Option<&str>, available_v: Option<&str>) -> Outd
     }
 }
 
-/// Determine whether an installed artifact has been locally modified since
-/// installation. Returns `false` if there is no lock entry or the file is not
-/// present on disk.
-fn check_locally_modified(
-    lock_entry: Option<&crate::types::LockEntry>,
-    kind: ArtifactKind,
-    name: &str,
-    scope: InstallScope,
-    ctx: &AppContext<'_>,
-) -> Result<bool> {
-    let Some(entry) = lock_entry else {
-        return Ok(false);
-    };
-    let install_path = ctx.paths.require_installed_artifact_path(kind, name, scope)?;
-    if !ctx.fs.exists(&install_path) {
-        return Ok(false);
-    }
-    Ok(checksum::is_locally_modified(&install_path, kind, entry, ctx.fs)?)
-}
-
 fn collect_outdated_for_scope_with(
     kind: ArtifactKind,
     scope: InstallScope,
@@ -149,7 +129,8 @@ fn compute_modification_status(
         .iter()
         .map(|&name| {
             let lock_entry = lock.packages.get(name);
-            let modified = check_locally_modified(lock_entry, kind, name, scope, ctx)?;
+            let modified =
+                local_modification::for_artifact(name, kind, scope, lock_entry, ctx)?.modified;
             Ok((name.to_string(), modified))
         })
         .collect()

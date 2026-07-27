@@ -87,6 +87,25 @@ pub(crate) fn source_of(
     }
 }
 
+/// The lock entry's recorded `source_checksum` for a tracked/drifted
+/// artifact — `None` for states with no lock entry to read one from.
+pub(crate) fn source_checksum_of(
+    name: &str,
+    agg: &LocationAgg,
+    state: ArtifactState,
+    locks: &HashMap<(Platform, InstallScope), LockFile>,
+) -> Option<String> {
+    match state {
+        ArtifactState::Tracked | ArtifactState::Drifted => agg.platforms.iter().find_map(|p| {
+            locks
+                .get(&(*p, agg.scope))
+                .and_then(|l| l.packages.get(name))
+                .map(|e| e.source_checksum.clone())
+        }),
+        ArtifactState::Untracked | ArtifactState::Orphaned | ArtifactState::External => None,
+    }
+}
+
 /// Read an installed artifact's declared version from its content file.
 pub(crate) fn read_installed_version(
     kind: ArtifactKind,
@@ -141,6 +160,7 @@ pub(crate) fn build_rows(
                 })
                 .collect();
             let source = source_of(&name, agg, state, locks, available);
+            let source_checksum = source_checksum_of(&name, agg, state, locks);
             rows.push(DoctorRow {
                 kind: agg.kind,
                 name,
@@ -151,6 +171,7 @@ pub(crate) fn build_rows(
                 state,
                 version,
                 source,
+                source_checksum,
                 content_checksum,
             });
         }

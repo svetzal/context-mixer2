@@ -70,6 +70,9 @@ pub struct DoctorRow {
     /// The source this came from: the lock entry's repo when tracked/drifted, or
     /// the providing source when untracked. `None` for orphaned/external.
     pub source: Option<String>,
+    /// The lock entry's recorded `source_checksum`, when tracked/drifted.
+    /// `None` for untracked/orphaned/external (no lock entry to read one from).
+    pub source_checksum: Option<String>,
     /// The artifact's current on-disk content checksum (SHA-256). Drives
     /// content-based divergence: copies whose bytes differ are flagged diverged,
     /// independent of their version or tracking state — so a genuine content
@@ -104,6 +107,12 @@ pub struct DoctorArtifact {
     pub tools: Vec<Platform>,
     /// The source it came from (lock provenance), when all copies agree.
     pub source: Option<String>,
+    /// The lock entry's recorded `source_checksum`, when all copies agree;
+    /// `None` if they differ or no copy is tracked. Feeds `cmx list`'s
+    /// checksum-aware outdated decision (`artifact_status::source_outdated`),
+    /// the same content-based comparison `cmx install`/`cmx outdated` use,
+    /// rather than a bare installed-vs-available version-string comparison.
+    pub source_checksum: Option<String>,
     /// The distinct install locations it occupies.
     pub locations: Vec<PathBuf>,
     /// True when the copies' **content differs** across locations (distinct

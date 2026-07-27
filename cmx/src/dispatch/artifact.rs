@@ -4,10 +4,9 @@
 use anyhow::Result;
 use std::process::ExitCode;
 
-use crate::cli::ArtifactAction;
+use crate::cli::{self, ArtifactAction};
 use crate::context::AppContext;
 use crate::dispatch::scope_from;
-use crate::dispatch::set::DRY_RUN_DEPRECATED_WARNING;
 use crate::flags::{Force, RunMode, Selection};
 use crate::platform::{Platform, platforms_label};
 use crate::types::{ArtifactKind, InstallScope};
@@ -188,12 +187,7 @@ pub fn handle_artifact(
             local,
         } => {
             let scope = scope_from(local);
-            let mode = if dry_run {
-                eprintln!("{DRY_RUN_DEPRECATED_WARNING}");
-                RunMode::Plan
-            } else {
-                RunMode::from_flag(apply)
-            };
+            let mode = cli::run_mode(dry_run, apply);
             let result = crate::sync::sync(&name, kind, scope, from, mode, ctx)?;
             print!("{result}");
             Ok(ExitCode::SUCCESS)

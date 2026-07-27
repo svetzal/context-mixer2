@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use clap_complete::Shell;
 
+use crate::flags::RunMode;
 use crate::platform::{PLATFORM_HELP_VALUES, Platform};
 
 mod artifact;
@@ -21,6 +22,27 @@ pub use config::{ConfigAction, ExternalAction, PlatformsAction};
 pub use home::HomeAction;
 pub use set::SetAction;
 pub use source::SourceAction;
+
+/// Warning printed when a deprecated `--dry-run` flag is passed — the plan is
+/// now shown by default, and `--apply` is what executes it.
+pub(crate) const DRY_RUN_DEPRECATED_WARNING: &str =
+    "--dry-run is deprecated; the plan is now shown by default — pass --apply to execute";
+
+/// Resolve `--dry-run`/`--apply` into a [`RunMode`], the one conversion point
+/// every dispatch site with a deprecated `--dry-run` flag alongside `--apply`
+/// shares — `cmx set activate`/`deactivate` and `cmx {agent,skill} sync` used
+/// to each hand-roll this same `if dry_run { warn; Plan } else {
+/// from_flag(apply) }` branch. `--dry-run` wins when both are passed (it's the
+/// deprecated spelling of "don't apply," so it can only ever request `Plan`,
+/// never override an explicit `--apply` into applying).
+pub(crate) fn run_mode(dry_run: bool, apply: bool) -> RunMode {
+    if dry_run {
+        eprintln!("{DRY_RUN_DEPRECATED_WARNING}");
+        RunMode::Plan
+    } else {
+        RunMode::from_flag(apply)
+    }
+}
 
 const COMPLETIONS_LONG_HELP: &str = "\
 Generate a shell completion script to stdout.

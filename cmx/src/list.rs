@@ -4,12 +4,13 @@ use crate::error::Result;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+use crate::artifact_status;
 use crate::context::AppContext;
 use crate::doctor::{self, ArtifactState};
 use crate::flags::SurveyScope;
 use crate::source_iter::{self, SourceArtifactInfo};
 use crate::table::Table;
-use crate::types::{ArtifactKind, InstallScope};
+use crate::types::{ArtifactKind, InstallScope, LockEntry, LockSource};
 
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -150,22 +151,64 @@ fn display_source(source: Option<&str>) -> String {
     source.unwrap_or("no source").to_string()
 }
 
+/// Decide `Ok` vs `Outdated` (and the other status arms) for one artifact.
+///
+/// `Ok` is a **content** claim, not just a version-string match: it is
+/// decided via [`artifact_status::source_outdated`], the same checksum-aware
+/// comparison `cmx install`/`cmx outdated` use, so a source artifact edited
+/// without a version bump is correctly reported `Outdated` here too, instead
+/// of a bare `installed == available` string comparison that would miss it.
+/// `lock_source_checksum` is the checksum recorded at install time (from the
+/// lock entry, via [`crate::doctor::DoctorArtifact::source_checksum`]);
+/// `current_source_checksum` is the source's checksum right now.
 fn list_status(
     installed: Option<&str>,
     available: &AvailableVersion,
     deprecated: bool,
+    kind: ArtifactKind,
+    lock_source_checksum: Option<&str>,
+    current_source_checksum: Option<&str>,
 ) -> ListStatus {
     if deprecated {
         return ListStatus::Deprecated;
     }
 
-    match (installed, available) {
-        (_, AvailableVersion::SourceMissing) => ListStatus::SourceMissing,
-        (_, AvailableVersion::Unversioned) => ListStatus::Unversioned,
-        (Some(installed), AvailableVersion::Version(available)) if installed == available => {
-            ListStatus::Ok
-        }
-        _ => ListStatus::Outdated,
+    let available_version = match available {
+        AvailableVersion::SourceMissing => return ListStatus::SourceMissing,
+        AvailableVersion::Unversioned => return ListStatus::Unversioned,
+        AvailableVersion::Version(v) => v,
+    };
+
+    let Some(current_checksum) = current_source_checksum else {
+        // No checksum available for the current source offering — fall back
+        // to outdated, matching the prior behavior for any mismatch.
+        return ListStatus::Outdated;
+    };
+
+    // A synthetic lock entry carrying just the two fields `source_outdated`
+    // reads (`version`, `source_checksum`) — `DoctorArtifact` aggregates
+    // across install locations rather than preserving the underlying
+    // `LockEntry`, so this reconstructs an equivalent view instead of
+    // re-deriving the outdated rule inline.
+    let lock_entry = lock_source_checksum.map(|checksum| {
+        LockEntry::new(
+            kind,
+            installed.map(str::to_string),
+            LockSource::new(String::new(), String::new()),
+            checksum.to_string(),
+            String::new(),
+            String::new(),
+        )
+    });
+
+    if artifact_status::source_outdated(
+        lock_entry.as_ref(),
+        current_checksum,
+        Some(available_version),
+    ) {
+        ListStatus::Outdated
+    } else {
+        ListStatus::Ok
     }
 }
 
@@ -212,8 +255,9 @@ fn rows_by_scope(
     {
         let infos = source_versions.get(&a.name);
         let available = available_version(infos, a.source.as_deref());
-        let deprecated =
-            preferred_source_info(infos, a.source.as_deref()).is_some_and(|i| i.deprecated);
+        let preferred = preferred_source_info(infos, a.source.as_deref());
+        let deprecated = preferred.is_some_and(|i| i.deprecated);
+        let current_source_checksum = preferred.map(|i| i.checksum.as_str());
 
         by_scope.entry(a.scope).or_default().push(Row {
             name: a.name.clone(),
@@ -224,7 +268,14 @@ fn rows_by_scope(
             },
             source: a.source.clone(),
             platforms: a.tools.iter().map(ToString::to_string).collect(),
-            status: list_status(a.version.as_deref(), &available, deprecated),
+            status: list_status(
+                a.version.as_deref(),
+                &available,
+                deprecated,
+                a.kind,
+                a.source_checksum.as_deref(),
+                current_source_checksum,
+            ),
         });
     }
     Ok(by_scope)
@@ -325,24 +376,77 @@ mod tests {
     #[test]
     fn list_status_distinguishes_ok_outdated_unversioned_missing_and_deprecated() {
         assert_eq!(
-            list_status(Some("1.0"), &AvailableVersion::Version("1.0".to_string()), false),
+            list_status(
+                Some("1.0"),
+                &AvailableVersion::Version("1.0".to_string()),
+                false,
+                ArtifactKind::Agent,
+                Some("sha256:same"),
+                Some("sha256:same"),
+            ),
             ListStatus::Ok
         );
         assert_eq!(
-            list_status(Some("1.0"), &AvailableVersion::Version("2.0".to_string()), false),
+            list_status(
+                Some("1.0"),
+                &AvailableVersion::Version("2.0".to_string()),
+                false,
+                ArtifactKind::Agent,
+                Some("sha256:old"),
+                Some("sha256:new"),
+            ),
             ListStatus::Outdated
         );
         assert_eq!(
-            list_status(Some("1.0"), &AvailableVersion::Unversioned, false),
+            list_status(
+                Some("1.0"),
+                &AvailableVersion::Unversioned,
+                false,
+                ArtifactKind::Agent,
+                None,
+                None,
+            ),
             ListStatus::Unversioned
         );
         assert_eq!(
-            list_status(Some("1.0"), &AvailableVersion::SourceMissing, false),
+            list_status(
+                Some("1.0"),
+                &AvailableVersion::SourceMissing,
+                false,
+                ArtifactKind::Agent,
+                None,
+                None,
+            ),
             ListStatus::SourceMissing
         );
         assert_eq!(
-            list_status(Some("1.0"), &AvailableVersion::Version("1.0".to_string()), true),
+            list_status(
+                Some("1.0"),
+                &AvailableVersion::Version("1.0".to_string()),
+                true,
+                ArtifactKind::Agent,
+                Some("sha256:same"),
+                Some("sha256:same"),
+            ),
             ListStatus::Deprecated
+        );
+    }
+
+    #[test]
+    fn list_status_outdated_when_checksum_differs_despite_matching_version_string() {
+        // Regression: `list_status` used to compare version strings only, so a
+        // source edited without a version bump incorrectly reported `Ok`.
+        assert_eq!(
+            list_status(
+                Some("1.0"),
+                &AvailableVersion::Version("1.0".to_string()),
+                false,
+                ArtifactKind::Agent,
+                Some("sha256:old"),
+                Some("sha256:new"),
+            ),
+            ListStatus::Outdated,
+            "matching version strings with a changed checksum must be Outdated, not Ok"
         );
     }
 
@@ -433,6 +537,43 @@ mod tests {
         assert_eq!(row.installed_version.as_deref(), Some("1.0.0"));
         assert_eq!(row.available_version.as_deref(), Some("1.0.0"));
         assert_eq!(row.status, ListStatus::Ok);
+    }
+
+    #[test]
+    fn list_reports_outdated_when_source_content_changes_without_version_bump() {
+        use crate::platform::Platform;
+
+        let t = TestContext::new();
+        setup_source(&t.fs, &t.paths, "guidelines", "/src");
+        t.fs.add_file("/src/shared/SKILL.md", versioned_skill_content("s", "1.0.0"));
+
+        let pv = t.paths.with_platform(Platform::Codex);
+        let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
+        t.fs.add_file(dir.join("shared").join("SKILL.md"), versioned_skill_content("s", "1.0.0"));
+        let cs = crate::checksum::checksum_dir(&dir.join("shared"), &t.fs).unwrap();
+        let entry = crate::test_support::make_lock_entry_with_checksum(
+            ArtifactKind::Skill,
+            Some("1.0.0"),
+            "guidelines",
+            "shared",
+            &cs,
+        );
+        crate::lockfile::mutate(InstallScope::Global, &t.fs, &pv, |l| {
+            l.packages.insert("shared".to_string(), entry);
+        })
+        .unwrap();
+
+        // The source content changes but the version stays the same.
+        t.fs.add_file("/src/shared/SKILL.md", versioned_skill_content("s updated", "1.0.0"));
+
+        let out = list_kind(ArtifactKind::Skill, false, &t.ctx()).unwrap();
+        let rows = &out.rows[&InstallScope::Global];
+        let row = rows.iter().find(|r| r.name == "shared").expect("listed");
+        assert_eq!(
+            row.status,
+            ListStatus::Outdated,
+            "content changed without a version bump must be Outdated, matching `cmx outdated`"
+        );
     }
 
     #[test]

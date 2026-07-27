@@ -61,8 +61,8 @@ fn scan_marketplace_entry(
                 });
             }
         }
-        Some(PluginSource::Remote(v)) => {
-            let source_type = v.get("source").and_then(|s| s.as_str()).unwrap_or("unknown");
+        Some(source @ PluginSource::Remote(_)) => {
+            let source_type = source.source_type_name();
             warnings.push(ScanWarning {
                 message: format!(
                     "plugin '{}' uses remote source type '{}' which is not yet supported",
@@ -111,8 +111,8 @@ pub(crate) fn scan_marketplace_plugin(
     };
 
     if plugin.agents.is_empty() && plugin.skills.is_empty() {
-        if let Some(PluginSource::Remote(v)) = &plugin.source {
-            let source_type = v.get("source").and_then(|s| s.as_str()).unwrap_or("unknown");
+        if let Some(source @ PluginSource::Remote(_)) = &plugin.source {
+            let source_type = source.source_type_name();
             return Ok(PluginScan::RemoteUnsupported(source_type.to_string()));
         }
     }

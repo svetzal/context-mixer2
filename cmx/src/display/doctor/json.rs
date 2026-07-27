@@ -140,6 +140,7 @@ mod tests {
             versions: vec!["1.0.0".to_string()],
             tools: vec![Platform::Claude],
             source: None,
+            source_checksum: None,
             locations: vec![PathBuf::from("/home/u/.claude/skills")],
             diverged: false,
         }
@@ -162,6 +163,7 @@ mod tests {
             state,
             version: version.map(str::to_string),
             source: None,
+            source_checksum: None,
             content_checksum: format!("sha256:{name}:{location}:{}", version.unwrap_or("none")),
         }
     }
@@ -267,6 +269,7 @@ mod tests {
             versions: vec!["1.0.0".to_string()],
             tools: vec![Platform::Claude],
             source: Some("home".to_string()),
+            source_checksum: None,
             locations: vec![PathBuf::from("/a")],
             diverged: false,
         });

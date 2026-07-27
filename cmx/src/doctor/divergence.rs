@@ -112,6 +112,7 @@ mod tests {
             versions: vec![],
             tools: vec![],
             source: None,
+            source_checksum: None,
             locations: vec![],
             diverged,
         }

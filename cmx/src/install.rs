@@ -9,6 +9,7 @@ use crate::checksum;
 use crate::context::AppContext;
 use crate::copy;
 use crate::diff::file_changes_between;
+use crate::local_modification;
 use crate::lockfile;
 use crate::paths::ConfigPaths;
 use crate::platform::Platform;
@@ -392,13 +393,14 @@ pub(crate) fn gather_install_facts(
     ctx: &AppContext<'_>,
 ) -> Result<InstallFacts> {
     let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
-    let locally_modified = check_local_modifications(
+    let locally_modified = local_modification::for_artifact(
         artifact_name,
         kind,
         scope,
         lock.packages.get(artifact_name),
         ctx,
-    )?;
+    )?
+    .modified;
     let already_installed = ctx.paths.is_installed(kind, artifact_name, scope, ctx.fs);
     Ok(InstallFacts {
         locally_modified: locally_modified && (!force.is_yes() || already_installed),
@@ -508,25 +510,6 @@ pub(crate) fn decide_install(
     }
 }
 
-/// Check whether the named artifact has been locally modified since it was
-/// installed. Returns `Ok(true)` when modifications are detected, `Ok(false)`
-/// when clean. Gateway I/O only — the caller decides what to do with the result.
-fn check_local_modifications(
-    artifact_name: &str,
-    kind: ArtifactKind,
-    scope: InstallScope,
-    lock_entry: Option<&LockEntry>,
-    ctx: &AppContext<'_>,
-) -> Result<bool> {
-    let dest_check = ctx.paths.require_installed_artifact_path(kind, artifact_name, scope)?;
-    if ctx.fs.exists(&dest_check) {
-        if let Some(entry) = lock_entry {
-            return Ok(checksum::is_locally_modified(&dest_check, kind, entry, ctx.fs)?);
-        }
-    }
-    Ok(false)
-}
-
 fn drifted_sibling_platforms(
     artifact_name: &str,
     kind: ArtifactKind,
@@ -614,7 +597,7 @@ fn parse_name_with_sources<'a>(name: &'a str, sources: &SourcesFile) -> (Option<
     resolved.unwrap_or((None, name))
 }
 
-fn collect_discarded_paths(
+pub(crate) fn collect_discarded_paths(
     kind: ArtifactKind,
     installed_path: &Path,
     source_path: &Path,

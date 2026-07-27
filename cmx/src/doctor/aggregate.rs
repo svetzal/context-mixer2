@@ -63,6 +63,8 @@ fn fold_group(members: &[&DoctorRow]) -> DoctorArtifact {
     locations.dedup();
 
     let versions: BTreeSet<Option<&str>> = members.iter().map(|r| r.version.as_deref()).collect();
+    let source_checksums: BTreeSet<Option<&str>> =
+        members.iter().map(|r| r.source_checksum.as_deref()).collect();
     // Divergence is a content question: copies are diverged only when
     // their bytes actually differ. This catches genuinely different
     // copies that happen to share a version (or carry none), and stops
@@ -88,6 +90,12 @@ fn fold_group(members: &[&DoctorRow]) -> DoctorArtifact {
     let mut distinct_versions: Vec<String> =
         versions.iter().filter_map(|v| v.map(str::to_string)).collect();
     distinct_versions.sort();
+    // Source checksum only when all copies agree, same rule as `version` above.
+    let source_checksum = if source_checksums.len() == 1 {
+        first.source_checksum.clone()
+    } else {
+        None
+    };
 
     // Source: the distinct provenance(s) across copies, joined when they
     // differ (rare — copies normally share a source).
@@ -109,6 +117,7 @@ fn fold_group(members: &[&DoctorRow]) -> DoctorArtifact {
         versions: distinct_versions,
         tools,
         source,
+        source_checksum,
         locations,
         diverged,
     }
@@ -309,6 +318,32 @@ mod tests {
         let mut versions = artifacts[0].versions.clone();
         versions.sort();
         assert_eq!(versions, vec!["3.2.0", "3.3.0"]);
+    }
+
+    #[test]
+    fn group_rows_source_checksum_carried_for_single_location() {
+        let mut row = make_row(ArtifactKind::Skill, "alpha", ArtifactState::Tracked, "sha256:x");
+        row.source_checksum = Some("sha256:source-x".to_string());
+
+        let artifacts = group_rows(&[row]);
+        assert_eq!(artifacts[0].source_checksum.as_deref(), Some("sha256:source-x"));
+    }
+
+    #[test]
+    fn group_rows_source_checksum_none_when_copies_disagree() {
+        let mut row_a = make_row(ArtifactKind::Skill, "alpha", ArtifactState::Tracked, "sha256:v1");
+        row_a.location = PathBuf::from("/path/a");
+        row_a.source_checksum = Some("sha256:source-a".to_string());
+
+        let mut row_b = make_row(ArtifactKind::Skill, "alpha", ArtifactState::Tracked, "sha256:v2");
+        row_b.location = PathBuf::from("/path/b");
+        row_b.source_checksum = Some("sha256:source-b".to_string());
+
+        let artifacts = group_rows(&[row_a, row_b]);
+        assert!(
+            artifacts[0].source_checksum.is_none(),
+            "source_checksum must be None when copies disagree"
+        );
     }
 
     #[test]

@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config;
 use crate::context::AppContext;
-use crate::diff::file_changes_between;
 use crate::install;
 use crate::platform::Platform;
 use crate::platform_copies::gather_platform_copies;
@@ -329,17 +328,12 @@ fn member_deactivate_targets(
             }
             let discarded_paths = if facts.locally_modified {
                 if let Some(source_artifact) = &source_artifact {
-                    file_changes_between(
+                    install::collect_discarded_paths(
                         member.kind,
                         &artifact_path,
                         &source_artifact.artifact.path,
                         &pctx,
                     )?
-                    .into_iter()
-                    .map(|change| {
-                        crate::diff::changed_target_path(&artifact_path, &change, pctx.fs)
-                    })
-                    .collect()
                 } else {
                     vec![artifact_path.clone()]
                 }
