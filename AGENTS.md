@@ -374,25 +374,23 @@ Test support and conformance:
 
 ## cmf — Context Mixer Forge
 
-Publisher and authoring tool for managing agentic context artifacts.
+Compiler and publisher for intent-based agentic guidance.
 
 ### cmf Architecture
 
 - `cmf/src/main.rs` — binary entry point; dispatches CLI commands (including status)
 - `cmf/src/lib.rs` — crate root; re-exports all public modules
-- `cmf/src/cli.rs` — clap CLI definition (7 commands: facet, recipe, plugin, manifest, marketplace, validate, status)
-- `cmf/src/repo.rs` — Repo root detection (marketplace, plugin, facets-only, unknown)
+- `cmf/src/cli.rs` — clap CLI definition (6 commands: intent, plugin, manifest, marketplace, validate, status)
+- `cmf/src/repo.rs` — Repo root detection (marketplace, plugin, intents-only, unknown)
+- `cmf/src/intent.rs` — recursive intent discovery, TOML parsing, and semantic-graph validation
 - `cmf/src/plugin/mod.rs` — Plugin scanning, initialization, validation
 - `cmf/src/plugin/validate.rs` — Plugin validation logic
 - `cmf/src/plugin_types.rs` — thin re-export shim (`pub use cmx::plugin_types::{...}`); the serde types for plugin.json and marketplace.json now live in `cmx/src/plugin_types.rs` (single source of truth)
 - `cmf/src/marketplace.rs` — Marketplace validation and generation
-- `cmf/src/facet.rs` — Facet scanning and validation
-- `cmf/src/facet_types.rs` — Facet and Recipe structs, frontmatter parser
-- `cmf/src/recipe.rs` — Recipe assembly and diffing
 - `cmf/src/manifest.rs` — Multi-platform manifest generation
 - `cmf/src/validate.rs` — Aggregate validation
-- `cmf/src/display/mod.rs` — formatting for plugin lists, recipes, facets, manifests, and validation results; submodules:
-  `cmf/src/display/facet.rs`, `cmf/src/display/manifest.rs`, `cmf/src/display/plugin.rs`,
+- `cmf/src/display/mod.rs` — formatting for intent and plugin lists, manifests, status, and validation results; submodules:
+  `cmf/src/display/intent.rs`, `cmf/src/display/manifest.rs`, `cmf/src/display/plugin.rs`,
   `cmf/src/display/status.rs`, `cmf/src/display/validation.rs`
 - `cmf/src/validation.rs` — Shared validation types
 - `cmf/src/test_support.rs` — test helpers for generating fake marketplace/plugin JSON

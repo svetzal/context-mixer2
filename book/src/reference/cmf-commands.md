@@ -1,80 +1,57 @@
 # cmf Command Reference
 
-cmf is the publisher and authoring tool for context mixer artifacts. Run all commands from the root of a marketplace, plugin, or facets repository.
+cmf is the compiler and publisher for intent-based agentic guidance. Run its
+commands from the root of an intent library, marketplace, or plugin repository.
 
-## Status
-
-| Command | Description |
-|---------|-------------|
-| `cmf status` | Show repository overview: kind, plugins, facets, validation summary |
-
-Example output:
-
-```
-Repository: svetzal-guidelines (marketplace)
-Root: /home/user/guidelines
-Plugins: 13 (11 ecosystem, 1 functional, 1 personal)
-Agents: 16 | Skills: 7
-Facets: 7 (5 principles, 1 language, 1 testing)
-Recipes: 1
-Validation: all clean
-```
-
-## Validation
+## Intents
 
 | Command | Description |
-|---------|-------------|
-| `cmf validate` | Run all validation checks (marketplace, plugins, facets, recipes) |
+| --- | --- |
+| `cmf intent list` | Recursively list TOML intent records by repository-relative key |
+| `cmf intent validate` | Validate intent schemas and semantic graph relationships |
 
-Prints errors first, then warnings. Exits non-zero (`2`) when any **error-level**
-issue is found — so it's usable as a CI gate — while warnings-only and clean runs
-exit `0`. The per-domain validators (`cmf facet validate`, `cmf plugin validate`,
-`cmf marketplace validate`) follow the same rule.
+Intent keys are paths below `intents/` without the `.toml` extension, such as
+`craftsperson/verify-before-declaring-completion`. Relationship targets use the
+same key format.
+
+Validation checks that records parse, required authoring fields are present,
+confidence is between zero and one, relationship types are recognized, and
+every relationship target exists. Errors produce exit code `2`; clean results
+and warnings-only results produce exit code `0`.
+
+## Status and aggregate validation
+
+| Command | Description |
+| --- | --- |
+| `cmf status` | Show repository kind, intent/category counts, plugins, artifacts, and validation summary |
+| `cmf validate` | Validate intents, marketplace metadata, and plugins together |
 
 ## Plugin management
 
 | Command | Description |
-|---------|-------------|
-| `cmf plugin list` | List all plugins with version, category, and artifact counts |
-| `cmf plugin init <name>` | Scaffold a new plugin directory under `plugins/` |
-| `cmf plugin validate` | Validate all plugin structures and frontmatter |
+| --- | --- |
+| `cmf plugin list` | List plugins with version, category, and artifact counts |
+| `cmf plugin init <name>` | Scaffold a plugin directory under `plugins/` |
+| `cmf plugin validate` | Validate plugin structures and artifact frontmatter |
 
-`plugin init` requires a marketplace repository. It creates `plugins/<name>/` with `.claude-plugin/plugin.json`, `agents/`, and `skills/` directories.
+`plugin init` requires a marketplace repository. It creates
+`plugins/<name>/` with `.claude-plugin/plugin.json`, `agents/`, and `skills/`.
 
-## Marketplace
-
-| Command | Description |
-|---------|-------------|
-| `cmf marketplace validate` | Check marketplace.json against actual plugin directories |
-| `cmf marketplace generate` | Generate or update marketplace.json from the plugins directory |
-
-`marketplace generate` discovers plugins under `plugins/`, reads each `plugin.json`, and writes `marketplace.json`. Existing entries are preserved (including categories and metadata); new plugins are appended.
-
-## Facet management
+## Marketplace management
 
 | Command | Description |
-|---------|-------------|
-| `cmf facet list` | List all facets grouped by category, plus recipes |
-| `cmf facet validate` | Validate facet frontmatter, naming, and recipe references |
+| --- | --- |
+| `cmf marketplace validate` | Check `marketplace.json` against plugin directories |
+| `cmf marketplace generate` | Generate or update `marketplace.json` from `plugins/` |
 
-## Recipe management
-
-| Command | Description |
-|---------|-------------|
-| `cmf recipe list` | List all recipes with output paths and facet counts |
-| `cmf recipe assemble <name>` | Assemble an agent from a recipe's facets |
-| `cmf recipe assemble --all` | Assemble all recipes |
-| `cmf recipe diff <name>` | Show diff between assembled output and current file |
+Generation preserves existing entry metadata and adds newly discovered
+plugins.
 
 ## Manifest generation
 
 | Command | Description |
-|---------|-------------|
-| `cmf manifest generate` | Generate multi-platform manifests from `.claude-plugin/` sources |
+| --- | --- |
+| `cmf manifest generate` | Project canonical `.claude-plugin/` manifests to supported manifest directories |
 
-Reads plugin metadata from `.claude-plugin/plugin.json` or `marketplace.json` and writes equivalent manifests for other platforms:
-
-- `.copilot-plugin/plugin.json`
-- `.cursor-plugin/plugin.json`
-- `.windsurf-plugin/plugin.json`
-- `.gemini-plugin/plugin.json`
+The generated targets are GitHub Copilot, Cursor, Windsurf, and Gemini CLI.
+Platforms without a Claude-style plugin manifest do not receive invented files.

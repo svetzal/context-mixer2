@@ -239,7 +239,7 @@ mod tests {
         let root = RepoRoot {
             path: PathBuf::from("/repo"),
             kind: RepoKind::Unknown,
-            has_facets: false,
+            has_intents: false,
             has_plugins_dir: false,
         };
 

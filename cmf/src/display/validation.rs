@@ -11,7 +11,7 @@ impl fmt::Display for ValidationReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let issues = &self.0;
         if issues.is_empty() {
-            return writeln!(f, "All plugins valid.");
+            return writeln!(f, "All guidance valid.");
         }
 
         let errors: Vec<_> = issues.iter().filter(|i| i.level == IssueLevel::Error).collect();
@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn validation_report_display_clean() {
         let report = ValidationReport(vec![]);
-        assert_eq!(report.to_string(), "All plugins valid.\n");
+        assert_eq!(report.to_string(), "All guidance valid.\n");
     }
 
     #[test]

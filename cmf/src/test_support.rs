@@ -1,4 +1,4 @@
-//! Test helpers for generating fake marketplace/plugin JSON.
+//! Test helpers for generating fake marketplace, plugin, and intent sources.
 
 use std::path::PathBuf;
 
@@ -16,7 +16,7 @@ pub fn fake_marketplace_root(fs: &FakeFilesystem, marketplace_json: &str) -> Rep
     RepoRoot {
         path: PathBuf::from("/repo"),
         kind: RepoKind::Marketplace,
-        has_facets: false,
+        has_intents: false,
         has_plugins_dir: true,
     }
 }
@@ -26,7 +26,7 @@ pub fn fake_marketplace_root_simple(path: &str) -> RepoRoot {
     RepoRoot {
         path: PathBuf::from(path),
         kind: RepoKind::Marketplace,
-        has_facets: false,
+        has_intents: false,
         has_plugins_dir: false,
     }
 }
@@ -116,43 +116,32 @@ pub fn fake_plugin_json(name: &str) -> String {
     )
 }
 
-/// Generate a valid facet markdown file with frontmatter.
-pub fn fake_facet_content(name: &str, category: &str, scope: &str) -> String {
+/// Generate a minimal valid intent record.
+pub fn fake_intent_record(id: &str) -> String {
     format!(
-        "\
----
-name: {name}
-facet: {category}
-scope: {scope}
----
-# {name}
-
-Facet content for {name}.
-"
-    )
-}
-
-/// Generate a valid recipe JSON string.
-pub fn fake_recipe_json(name: &str, produces: &str, facets: &[&str]) -> String {
-    let facet_list: Vec<String> = facets.iter().map(|f| format!(r#""{f}""#)).collect();
-    format!(
-        r#"{{
-  "name": "{name}",
-  "description": "Recipe for {name}",
-  "produces": "{produces}",
-  "facets": [{}],
-  "runtime_skills": []
-}}"#,
-        facet_list.join(", ")
+        r#"id = "{id}"
+title = "Verify the result"
+category = "quality"
+tags = ["verification"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Reliable completion"
+threat = "Unchecked changes"
+expectation = "Verification exposes defects"
+strategy = "Run proportionate checks"
+tradeoff = "Verification takes time"
+evidence = [{{ type = "gate", description = "Checks pass", required = true }}]
+scope = {{ project = "guidelines", paths = ["agents/test.md"] }}
+sources = [{{ type = "document", ref = "agents/test.md", summary = "Requires checks", confidence = 1.0 }}]
+"#
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::facet_types::{Recipe, parse_facet};
+    use crate::intent::IntentRecord;
     use crate::plugin_types::{Marketplace, PluginManifest};
-    use std::path::Path;
 
     #[test]
     fn fake_marketplace_json_is_valid() {
@@ -172,19 +161,10 @@ mod tests {
     }
 
     #[test]
-    fn fake_facet_content_is_parseable() {
-        let content = fake_facet_content("error-handling", "rust", "Error patterns");
-        let facet = parse_facet(Path::new("/facets/error-handling.md"), &content).unwrap();
-        assert_eq!(facet.name, "error-handling");
-        assert_eq!(facet.category, "rust");
-    }
-
-    #[test]
-    fn fake_recipe_json_is_valid() {
-        let json = fake_recipe_json("rust-agent", "AGENTS.md", &["errors", "testing"]);
-        let recipe: Recipe = serde_json::from_str(&json).unwrap();
-        assert_eq!(recipe.name, "rust-agent");
-        assert_eq!(recipe.produces, "AGENTS.md");
-        assert_eq!(recipe.facets, vec!["errors", "testing"]);
+    fn fake_intent_record_is_valid() {
+        let source = fake_intent_record("guidelines.intent.verify");
+        let intent: IntentRecord = toml::from_str(&source).unwrap();
+        assert_eq!(intent.id, "guidelines.intent.verify");
+        assert_eq!(intent.category, "quality");
     }
 }

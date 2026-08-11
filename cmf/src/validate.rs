@@ -3,19 +3,19 @@
 use anyhow::Result;
 use cmx::gateway::Filesystem;
 
-use crate::facet::validate_facets;
+use crate::intent::validate_intents;
 use crate::marketplace::validate_marketplace;
 use crate::plugin::validate_all_plugins;
 use crate::repo::RepoRoot;
 use crate::validation::ValidationIssue;
 
-/// Run all validation checks: marketplace, plugin, and facet validation.
+/// Run all validation checks: intents, marketplace, and plugins.
 pub fn validate_all(root: &RepoRoot, fs: &dyn Filesystem) -> Result<Vec<ValidationIssue>> {
     let mut issues = validate_marketplace(root, fs)?;
     let mut plugin_issues = validate_all_plugins(root, fs)?;
     issues.append(&mut plugin_issues);
-    let mut facet_issues = validate_facets(root, fs)?;
-    issues.append(&mut facet_issues);
+    let mut intent_issues = validate_intents(root, fs)?;
+    issues.append(&mut intent_issues);
     Ok(issues)
 }
 
@@ -52,7 +52,7 @@ mod tests {
         let root = RepoRoot {
             path: PathBuf::from("/repo"),
             kind: RepoKind::Marketplace,
-            has_facets: false,
+            has_intents: false,
             has_plugins_dir: true,
         };
 

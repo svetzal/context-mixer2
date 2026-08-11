@@ -1,7 +1,5 @@
-//! Crate root for `cmf` (Context Mixer Forge), the publisher tool for
-//! authoring the material `cmx` consumes: facets assembled into agents by
-//! recipes, plugin scaffolding and validation, and marketplace/manifest
-//! generation.
+//! Crate root for `cmf` (Context Mixer Forge), the compiler and publisher for
+//! intent-based agentic guidance consumed by `cmx`.
 //!
 //! Note: `cmf` depends on `cmx` for `plugin_types` — `cmf/src/plugin_types.rs`
 //! is a thin re-export shim (`pub use cmx::plugin_types::{...}`), not a
@@ -10,13 +8,11 @@
 
 pub mod cli;
 pub mod display;
-pub mod facet;
-pub mod facet_types;
+pub mod intent;
 pub mod manifest;
 pub mod marketplace;
 pub mod plugin;
 pub mod plugin_types;
-pub mod recipe;
 pub mod repo;
 #[cfg(test)]
 pub mod test_support;

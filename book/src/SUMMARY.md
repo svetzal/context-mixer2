@@ -27,8 +27,7 @@
 - [Writing Skills](./creating/skills.md)
 - [Marketplace Structure](./creating/marketplace.md)
 - [Creating Plugins](./creating/plugins.md)
-- [Working with Facets](./creating/facets.md)
-- [Recipe Assembly](./creating/recipes.md)
+- [Writing Intents](./creating/intents.md)
 - [Versioning](./creating/versioning.md)
 - [Deprecation](./creating/deprecation.md)
 

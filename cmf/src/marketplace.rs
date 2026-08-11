@@ -386,7 +386,7 @@ mod tests {
         let root = RepoRoot {
             path: PathBuf::from("/repo"),
             kind: RepoKind::Marketplace,
-            has_facets: false,
+            has_intents: false,
             has_plugins_dir: true,
         };
 
@@ -440,7 +440,7 @@ mod tests {
         let root = RepoRoot {
             path: PathBuf::from("/repo"),
             kind: RepoKind::Marketplace,
-            has_facets: false,
+            has_intents: false,
             has_plugins_dir: true,
         };
 
@@ -484,7 +484,7 @@ mod tests {
         let root = RepoRoot {
             path: PathBuf::from("/repo"),
             kind: RepoKind::Marketplace,
-            has_facets: false,
+            has_intents: false,
             has_plugins_dir: true,
         };
 
@@ -536,7 +536,7 @@ mod tests {
         let root = RepoRoot {
             path: PathBuf::from("/repo"),
             kind: RepoKind::Marketplace,
-            has_facets: false,
+            has_intents: false,
             has_plugins_dir: true,
         };
 

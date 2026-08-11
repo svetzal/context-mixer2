@@ -1,12 +1,11 @@
-//! clap CLI definition (7 commands: facet, recipe, plugin, manifest,
-//! marketplace, validate, status).
+//! clap CLI definition for intent authoring and artifact publishing.
 
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
     name = "cmf",
-    about = "Publisher and authoring tool for context mixer facets, recipes, and plugins",
+    about = "Compiler and publisher for intent-based agentic guidance",
     version
 )]
 /// Top-level `cmf` command-line parser.
@@ -19,17 +18,11 @@ pub struct Cli {
 /// The top-level `cmf` subcommands.
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Manage facets in the current repository
-    Facet {
-        /// The facet subcommand to run.
+    /// Inspect and validate elemental intent records
+    Intent {
+        /// The intent subcommand to run.
         #[command(subcommand)]
-        action: FacetAction,
-    },
-    /// Manage recipes for assembling agents from facets
-    Recipe {
-        /// The recipe subcommand to run.
-        #[command(subcommand)]
-        action: RecipeAction,
+        action: IntentAction,
     },
     /// Manage plugins for the marketplace
     Plugin {
@@ -51,37 +44,17 @@ pub enum Commands {
     },
     /// Run all validation checks
     Validate,
-    /// Show repository overview: plugins, facets, validation summary
+    /// Show repository overview: intents, plugins, and validation summary
     Status,
 }
 
-/// Subcommands for `cmf facet`.
+/// Subcommands for `cmf intent`.
 #[derive(Subcommand)]
-pub enum FacetAction {
-    /// List facets in the current repository
+pub enum IntentAction {
+    /// List intents in the current repository
     List,
-    /// Check frontmatter, scope boundaries, and dependency constraints
+    /// Check intent schemas, identities, and graph relationships
     Validate,
-}
-
-/// Subcommands for `cmf recipe`.
-#[derive(Subcommand)]
-pub enum RecipeAction {
-    /// List available recipes
-    List,
-    /// Assemble an agent from facets per recipe
-    Assemble {
-        /// Recipe name (omit when using --all)
-        name: Option<String>,
-        /// Assemble all recipes
-        #[arg(long, conflicts_with = "name")]
-        all: bool,
-    },
-    /// Show diff between assembled output and current agent
-    Diff {
-        /// Recipe name
-        name: String,
-    },
 }
 
 /// Subcommands for `cmf plugin`.

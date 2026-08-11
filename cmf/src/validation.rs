@@ -1,6 +1,6 @@
 //! Shared validation types.
 
-/// Shared validation types used across plugin, marketplace, and facet validation.
+/// Shared validation types used across intent, plugin, and marketplace validation.
 use std::path::Path;
 
 use anyhow::Result;
@@ -72,13 +72,13 @@ pub enum IssueLevel {
     Warning,
 }
 
-/// A single validation finding, tied to the context (e.g. plugin or facet
-/// name) it was found in.
+/// A single validation finding, tied to the context (e.g. plugin or intent
+/// name or intent key) it was found in.
 #[derive(Debug, Clone)]
 pub struct ValidationIssue {
     /// Whether this issue is fatal to validation.
     pub level: IssueLevel,
-    /// The plugin, facet, or file the issue was found in.
+    /// The plugin, intent, or file the issue was found in.
     pub context: String,
     /// Human-readable description of the problem.
     pub message: String,
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn validation_report_display_empty() {
         let out = ValidationReport(vec![]).to_string();
-        assert_eq!(out, "All plugins valid.\n");
+        assert_eq!(out, "All guidance valid.\n");
     }
 
     #[test]

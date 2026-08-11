@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Removed cmf's facet and recipe system outright.** `cmf facet`, `cmf recipe`,
+  the Markdown facet parser, JSON recipe model, and naive concatenation engine
+  are gone with no compatibility aliases or migration layer. cmf is not yet a
+  deployed compatibility surface, so retaining a second authoring model would
+  only create forked truth.
+
+### Added
+
+- **cmf is now intent-native.** `cmf intent list` recursively indexes TOML
+  intent records by repository-relative key; `cmf intent validate` checks the
+  record schema, confidence bounds, relationship types, and dangling graph
+  targets. Aggregate `cmf validate` and `cmf status` now include the intent
+  catalogue, establishing intents as the canonical source from which agents,
+  skills, and future materialized guidance are produced.
+
 ### Fixed
 
 - **`cmx doctor`, `cmx info`, and the "did you mean" hints now respect `cmx config platforms`.** `doctor/survey.rs` inlined its own re-implementation of the managed-or-all-platforms fallback instead of calling `config::managed_or_all_platforms`, while `suggestions.rs` and `info/mod.rs` iterated `Platform::ALL` directly with no allowlist check at all — the third recurrence of the same class of bug as the `promote`/`unadopt` fixes below. This meant `cmx info <name>` could describe a skill living only on a platform excluded via `cmx config platforms`, and the did-you-mean hints could suggest names from unmanaged platforms. All three now resolve platforms via `config::managed_or_all_platforms` like every other cross-platform command; `info`'s active-platform-first search moved onto a generalized `platform_iter::active_first_of` that takes its candidate set from the caller instead of hardcoding `Platform::ALL`. The `cross_platform_commands_never_bypass_the_managed_platform_allowlist` guard test is now scope-wide (scans every production file under `cmx/src`, matches both `platform_iter::all()` and `Platform::ALL`) rather than a fixed path list, so a new module bypassing the allowlist a different way can't slip through unnoticed again.

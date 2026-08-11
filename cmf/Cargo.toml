@@ -6,7 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 publish = false
-description = "Publisher and authoring tool for context mixer facets, recipes, and plugins"
+description = "Compiler and publisher for intent-based agentic guidance"
 
 [dependencies]
 cmx = { path = "../cmx" }
@@ -14,6 +14,7 @@ clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+toml = "0.8"
 
 [lints]
 workspace = true

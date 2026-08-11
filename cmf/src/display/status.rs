@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use cmx::gateway::Filesystem;
 use cmx::json_file::load_json;
 
-use crate::facet::{scan_facets, scan_recipes};
+use crate::intent::scan_intents;
 use crate::plugin::scan_plugins;
 use crate::plugin_types::Marketplace;
 use crate::repo::{RepoKind, RepoRoot};
@@ -14,12 +14,12 @@ use crate::validate::validate_all;
 use crate::validation::IssueLevel;
 
 /// Render the full `cmf status` report: repo identity, plugin summary,
-/// facet summary, and validation summary, in that order.
+/// intent summary, and validation summary, in that order.
 pub fn status_report(root: &RepoRoot, fs: &dyn Filesystem) -> String {
     let mut out = String::new();
     out.push_str(&repo_identity_str(root, fs));
     out.push_str(&plugin_summary_str(root, fs));
-    out.push_str(&facet_summary_str(root, fs));
+    out.push_str(&intent_summary_str(root, fs));
     out.push_str(&validation_summary_str(root, fs));
     out
 }
@@ -34,7 +34,7 @@ fn repo_identity_str(root: &RepoRoot, fs: &dyn Filesystem) -> String {
     let kind_label = match root.kind {
         RepoKind::Marketplace => "marketplace",
         RepoKind::Plugin => "plugin",
-        RepoKind::FacetsOnly => "facets-only",
+        RepoKind::IntentsOnly => "intents-only",
         RepoKind::Unknown => "unknown",
     };
 
@@ -76,41 +76,28 @@ fn plugin_summary_str(root: &RepoRoot, fs: &dyn Filesystem) -> String {
     )
 }
 
-fn facet_summary_str(root: &RepoRoot, fs: &dyn Filesystem) -> String {
-    if !root.has_facets {
+fn intent_summary_str(root: &RepoRoot, fs: &dyn Filesystem) -> String {
+    if !root.has_intents {
         return String::new();
     }
 
-    let Ok(facets) = scan_facets(root, fs) else {
+    let Ok(intents) = scan_intents(root, fs) else {
         return String::new();
     };
-
-    let mut out = String::new();
-
-    if !facets.is_empty() {
-        let mut by_category: BTreeMap<String, usize> = BTreeMap::new();
-        for facet in &facets {
-            *by_category.entry(facet.category.clone()).or_default() += 1;
-        }
-
-        let breakdown: Vec<String> =
-            by_category.iter().map(|(cat, count)| format!("{count} {cat}")).collect();
-
-        let facet_count = facets.len();
-        let breakdown = breakdown.join(", ");
-        let _ = std::fmt::write(&mut out, format_args!("Facets: {facet_count} ({breakdown})\n"));
+    if intents.is_empty() {
+        return String::new();
     }
 
-    let Ok(recipes) = scan_recipes(root, fs) else {
-        return out;
-    };
-
-    if !recipes.is_empty() {
-        let recipe_count = recipes.len();
-        let _ = std::fmt::write(&mut out, format_args!("Recipes: {recipe_count}\n"));
+    let mut by_category: BTreeMap<String, usize> = BTreeMap::new();
+    for intent in &intents {
+        *by_category.entry(intent.record.category.clone()).or_default() += 1;
     }
-
-    out
+    let breakdown = by_category
+        .iter()
+        .map(|(category, count)| format!("{count} {category}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("Intents: {} ({breakdown})\n", intents.len())
 }
 
 fn validation_summary_str(root: &RepoRoot, fs: &dyn Filesystem) -> String {
@@ -151,7 +138,7 @@ mod tests {
     };
 
     use super::{
-        facet_summary_str, plugin_summary_str, repo_identity_str, status_report,
+        intent_summary_str, plugin_summary_str, repo_identity_str, status_report,
         validation_summary_str,
     };
 
@@ -159,7 +146,7 @@ mod tests {
         RepoRoot {
             path: PathBuf::from(path),
             kind: RepoKind::Unknown,
-            has_facets: false,
+            has_intents: false,
             has_plugins_dir: false,
         }
     }
@@ -183,7 +170,7 @@ mod tests {
         let root = RepoRoot {
             path: PathBuf::from("/plugin"),
             kind: RepoKind::Plugin,
-            has_facets: false,
+            has_intents: false,
             has_plugins_dir: false,
         };
         let out = repo_identity_str(&root, &fs);
@@ -223,28 +210,27 @@ mod tests {
     }
 
     #[test]
-    fn facet_summary_str_no_facets_flag_returns_empty() {
+    fn intent_summary_str_no_intents_flag_returns_empty() {
         let fs = FakeFilesystem::new();
         let root = unknown_root("/repo");
-        assert_eq!(facet_summary_str(&root, &fs), "");
+        assert_eq!(intent_summary_str(&root, &fs), "");
     }
 
     #[test]
-    fn facet_summary_str_with_facets_shows_count() {
-        use crate::test_support::fake_facet_content;
+    fn intent_summary_str_with_intents_shows_count() {
         let fs = FakeFilesystem::new();
         fs.add_file(
-            "/repo/facets/rust/errors.md",
-            fake_facet_content("errors", "rust", "Error handling"),
+            "/repo/intents/craftsperson/verify.toml",
+            crate::test_support::fake_intent_record("guidelines.intent.verify"),
         );
         let root = RepoRoot {
             path: PathBuf::from("/repo"),
-            kind: RepoKind::FacetsOnly,
-            has_facets: true,
+            kind: RepoKind::IntentsOnly,
+            has_intents: true,
             has_plugins_dir: false,
         };
-        let out = facet_summary_str(&root, &fs);
-        assert!(out.contains("Facets:"));
+        let out = intent_summary_str(&root, &fs);
+        assert!(out.contains("Intents:"));
         assert!(out.contains('1'));
     }
 
@@ -278,7 +264,7 @@ mod tests {
         let root = RepoRoot {
             path: PathBuf::from("/repo"),
             kind: RepoKind::Marketplace,
-            has_facets: false,
+            has_intents: false,
             has_plugins_dir: true,
         };
         let out = validation_summary_str(&root, &fs);

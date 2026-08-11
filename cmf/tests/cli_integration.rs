@@ -1,78 +1,34 @@
 //! Integration tests for cmf's CLI argument parsing.
 
 use clap::Parser;
-use cmf::cli::{
-    Cli, Commands, FacetAction, ManifestAction, MarketplaceAction, PluginAction, RecipeAction,
-};
+use cmf::cli::{Cli, Commands, IntentAction, ManifestAction, MarketplaceAction, PluginAction};
 
 #[test]
-fn parse_facet_list() {
-    let cli = Cli::try_parse_from(["cmf", "facet", "list"]).unwrap();
+fn parse_intent_list() {
+    let cli = Cli::try_parse_from(["cmf", "intent", "list"]).unwrap();
     assert!(matches!(
         cli.command,
-        Commands::Facet {
-            action: FacetAction::List
+        Commands::Intent {
+            action: IntentAction::List
         }
     ));
 }
 
 #[test]
-fn parse_facet_validate() {
-    let cli = Cli::try_parse_from(["cmf", "facet", "validate"]).unwrap();
+fn parse_intent_validate() {
+    let cli = Cli::try_parse_from(["cmf", "intent", "validate"]).unwrap();
     assert!(matches!(
         cli.command,
-        Commands::Facet {
-            action: FacetAction::Validate
+        Commands::Intent {
+            action: IntentAction::Validate
         }
     ));
 }
 
 #[test]
-fn parse_recipe_list() {
-    let cli = Cli::try_parse_from(["cmf", "recipe", "list"]).unwrap();
-    assert!(matches!(
-        cli.command,
-        Commands::Recipe {
-            action: RecipeAction::List
-        }
-    ));
-}
-
-#[test]
-fn parse_recipe_assemble_all() {
-    let cli = Cli::try_parse_from(["cmf", "recipe", "assemble", "--all"]).unwrap();
-    assert!(matches!(
-        cli.command,
-        Commands::Recipe {
-            action: RecipeAction::Assemble { all: true, .. }
-        }
-    ));
-}
-
-#[test]
-fn parse_recipe_assemble_named() {
-    let cli = Cli::try_parse_from(["cmf", "recipe", "assemble", "myrecipe"]).unwrap();
-    match cli.command {
-        Commands::Recipe {
-            action: RecipeAction::Assemble { name, .. },
-        } => {
-            assert_eq!(name, Some("myrecipe".to_string()));
-        }
-        _ => panic!("unexpected command"),
-    }
-}
-
-#[test]
-fn parse_recipe_diff() {
-    let cli = Cli::try_parse_from(["cmf", "recipe", "diff", "myrecipe"]).unwrap();
-    match cli.command {
-        Commands::Recipe {
-            action: RecipeAction::Diff { name },
-        } => {
-            assert_eq!(name, "myrecipe");
-        }
-        _ => panic!("unexpected command"),
-    }
+fn facet_and_recipe_commands_are_gone() {
+    assert!(Cli::try_parse_from(["cmf", "facet", "list"]).is_err());
+    assert!(Cli::try_parse_from(["cmf", "recipe", "list"]).is_err());
 }
 
 #[test]

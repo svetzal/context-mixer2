@@ -1,4 +1,4 @@
-//! Repo root detection (marketplace, plugin, facets-only, unknown).
+//! Repo root detection (marketplace, plugin, intents-only, unknown).
 
 use std::path::{Path, PathBuf};
 
@@ -13,8 +13,8 @@ pub enum RepoKind {
     Marketplace,
     /// Has `.claude-plugin/plugin.json` but no `marketplace.json`
     Plugin,
-    /// Has `facets/` but no `.claude-plugin/`
-    FacetsOnly,
+    /// Has `intents/` but no `.claude-plugin/`
+    IntentsOnly,
     /// No recognized markers
     Unknown,
 }
@@ -26,8 +26,8 @@ pub struct RepoRoot {
     pub path: PathBuf,
     /// The detected repository kind.
     pub kind: RepoKind,
-    /// Whether a `facets/` directory exists at the root.
-    pub has_facets: bool,
+    /// Whether an `intents/` directory exists at the root.
+    pub has_intents: bool,
     /// Whether a `plugins/` directory exists at the root.
     pub has_plugins_dir: bool,
 }
@@ -38,20 +38,20 @@ pub struct RepoRoot {
 pub fn detect_repo(start: &Path, fs: &dyn Filesystem) -> Result<RepoRoot> {
     let marketplace_json = start.join(".claude-plugin").join("marketplace.json");
     let plugin_json = start.join(".claude-plugin").join("plugin.json");
-    let facets_dir = start.join("facets");
+    let intents_dir = start.join("intents");
     let plugins_dir = start.join("plugins");
 
     let has_marketplace = fs.exists(&marketplace_json);
     let has_plugin = fs.exists(&plugin_json);
-    let has_facets = fs.is_dir(&facets_dir);
+    let has_intents = fs.is_dir(&intents_dir);
     let has_plugins_dir = fs.is_dir(&plugins_dir);
 
     let kind = if has_marketplace {
         RepoKind::Marketplace
     } else if has_plugin {
         RepoKind::Plugin
-    } else if has_facets {
-        RepoKind::FacetsOnly
+    } else if has_intents {
+        RepoKind::IntentsOnly
     } else {
         RepoKind::Unknown
     };
@@ -59,7 +59,7 @@ pub fn detect_repo(start: &Path, fs: &dyn Filesystem) -> Result<RepoRoot> {
     Ok(RepoRoot {
         path: start.to_path_buf(),
         kind,
-        has_facets,
+        has_intents,
         has_plugins_dir,
     })
 }
@@ -94,12 +94,12 @@ mod tests {
     }
 
     #[test]
-    fn detect_facets_only() {
+    fn detect_intents_only() {
         let fs = FakeFilesystem::new();
-        fs.add_dir("/repo/facets");
+        fs.add_dir("/repo/intents");
         let root = detect_repo(Path::new("/repo"), &fs).unwrap();
-        assert_eq!(root.kind, RepoKind::FacetsOnly);
-        assert!(root.has_facets);
+        assert_eq!(root.kind, RepoKind::IntentsOnly);
+        assert!(root.has_intents);
     }
 
     #[test]
@@ -108,17 +108,17 @@ mod tests {
         fs.add_dir("/repo");
         let root = detect_repo(Path::new("/repo"), &fs).unwrap();
         assert_eq!(root.kind, RepoKind::Unknown);
-        assert!(!root.has_facets);
+        assert!(!root.has_intents);
         assert!(!root.has_plugins_dir);
     }
 
     #[test]
-    fn marketplace_with_facets() {
+    fn marketplace_with_intents() {
         let fs = FakeFilesystem::new();
         fs.add_file("/repo/.claude-plugin/marketplace.json", "{}");
-        fs.add_dir("/repo/facets");
+        fs.add_dir("/repo/intents");
         let root = detect_repo(Path::new("/repo"), &fs).unwrap();
         assert_eq!(root.kind, RepoKind::Marketplace);
-        assert!(root.has_facets);
+        assert!(root.has_intents);
     }
 }
