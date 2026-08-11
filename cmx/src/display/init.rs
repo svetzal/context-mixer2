@@ -205,7 +205,7 @@ fn status_label(action: &TargetAction) -> &'static str {
 // ---------------------------------------------------------------------------
 
 /// Per-platform target object in `"targets"`. The `action` and `status` labels
-/// are computed once here via [`action_label`] / [`status_label`], removing
+/// are computed once here via `action_label` / `status_label`, removing
 /// the parallel string-mapping from `init_json` itself.
 #[derive(Serialize)]
 struct InitTargetJson {
@@ -269,7 +269,7 @@ struct InitBlockedJson<'a> {
 /// Build the machine-readable `--json` shape for `cmx init` / `cmx init --remove`.
 ///
 /// Every field-name and label decision is encoded in the projection types
-/// above and in [`action_label`] / [`status_label`] — there is exactly one
+/// above and in `action_label` / `status_label` — there is exactly one
 /// home for the `--json` contract for each variant.
 pub fn init_json(outcome: &InitOutcome) -> Value {
     match outcome {

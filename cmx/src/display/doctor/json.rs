@@ -86,7 +86,7 @@ struct DoctorJson<'a> {
 
 /// Project the survey to the machine-readable schema documented for
 /// `cmx doctor --json`. Mirrors the human `Display` impl's content and
-/// selection (via [`super::shown_artifacts`]), but structures divergence as a
+/// selection (via `super::shown_artifacts`), but structures divergence as a
 /// `locations` array instead of free-text prose.
 ///
 /// Every field-name and value-encoding decision is expressed as serde

@@ -3,6 +3,10 @@
 //! (`cmx/src/cli/source.rs`, `cmx/src/cli/set.rs`, `cmx/src/cli/artifact.rs`,
 //! `cmx/src/cli/home.rs`, `cmx/src/cli/config.rs`).
 
+// Clap renders `[Mutates]` as a literal safety label in command help. Rustdoc
+// otherwise interprets the same intentional text as an unresolved link.
+#![allow(rustdoc::broken_intra_doc_links)]
+
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
