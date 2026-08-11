@@ -1,0 +1,11 @@
+id = "dependency-risk"
+version = "0.1.0"
+description = "Use when selecting, adding, removing, or upgrading a dependency."
+surface = "skill"
+budget_tokens = 1200
+
+[select]
+keys = ["craftsperson/audit-dependency-risk"]
+
+[content]
+include = ["guidance", "rationale", "evidence"]

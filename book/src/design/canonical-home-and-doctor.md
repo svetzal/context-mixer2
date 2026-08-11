@@ -62,8 +62,8 @@ yourself (as opposed to artifacts you pulled from a remote marketplace).
 - **Structure:** a plain artifact tree — `agents/*.md` and `skills/<name>/SKILL.md`
   — with **no `marketplace.json` required**. cmx's existing fallback
   tree-walking scanner already reads un-manifested repositories, so the home
-  works with `list`, `install`, `search`, and `browse` unchanged. `cmf validate`
-  / `cmf status` can lint and author it without new code.
+  works with `list`, `install`, `search`, and `browse` unchanged. cmf does not
+  author or lint canonical-home artifacts.
 - **First-class status:** the home is **auto-registered as a visible local
   source** named `home` (created, and written into `sources.json`, on first use
   — e.g. the first `adopt`). It then behaves like any registered source:

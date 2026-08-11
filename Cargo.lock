@@ -324,9 +324,8 @@ version = "3.1.3"
 dependencies = [
  "anyhow",
  "clap",
- "cmx",
+ "cmx-core",
  "serde",
- "serde_json",
  "toml",
 ]
 

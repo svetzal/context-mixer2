@@ -50,16 +50,16 @@ classification. Relationships form the semantic graph: `specializes` makes
 general guidance concrete for a narrower context, while `related-to` records a
 meaningful non-hierarchical association.
 
-## Validation
+## Maintenance and materialization
 
-Run:
+Intent authoring and validation belong to the dedicated guidelines-maintenance
+tool. cmf intentionally does not write, scaffold, or validate these records.
+Once the collection is valid, use a materialization profile to consume it:
 
 ```bash
-cmf intent validate
+cmf assemble universal-craftsperson --explain
 ```
 
-Validation is a CI gate. It exits `2` for malformed records, invalid fields,
-unknown relationship types, or dangling relationship targets.
-
-Use `cmf intent list` to inspect the indexed catalogue and the keys available
-to relationships and materialization profiles.
+cmf scans the relevant TOML fields, expands only the graph relationships the
+profile permits, and emits an agent or skill without changing the knowledge
+base.

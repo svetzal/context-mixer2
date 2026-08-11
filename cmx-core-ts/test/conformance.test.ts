@@ -5,9 +5,12 @@ import {
   BundledSkill,
   canonicalFiles,
   checksumBundled,
+  checksumBytes,
   decideVersionGuardAction,
   lockFileName,
+  markdownToCodexToml,
   platformInstallSubpath,
+  reconcileDocumentVersion,
   reconcileSkillVersion,
   resolveTargets,
   SkillInstaller,
@@ -53,6 +56,18 @@ const frontmatterManifest = await loadFixtureJson<{
     expected: { skill_md_path: string; idempotent_second_pass: boolean };
   }>;
 }>(path.join(fixtureRoot, "frontmatter/manifest.json"));
+const agentTransformManifest = await loadFixtureJson<{
+  cases: Array<{
+    name: string;
+    input: { artifact_name: string; version: string; markdown: string };
+    expected: {
+      reconciled_markdown: string;
+      codex_toml: string;
+      source_checksum: string;
+      codex_checksum: string;
+    };
+  }>;
+}>(path.join(fixtureRoot, "agent-transform/manifest.json"));
 const versionGuardManifest = await loadFixtureJson<{
   cases: Array<{
     name: string;
@@ -162,6 +177,21 @@ describe("frontmatter fixtures", () => {
         );
         expect(new TextDecoder().decode(twice.bytes)).toBe(expected);
       }
+    });
+  }
+});
+
+describe("agent transform fixtures", () => {
+  for (const fixture of agentTransformManifest.cases) {
+    test(fixture.name, () => {
+      const reconciled = reconcileDocumentVersion(fixture.input.markdown, fixture.input.version);
+      const codex = markdownToCodexToml(reconciled, fixture.input.artifact_name);
+      expect(reconciled).toBe(fixture.expected.reconciled_markdown);
+      expect(codex).toBe(fixture.expected.codex_toml);
+      expect(checksumBytes(new TextEncoder().encode(reconciled))).toBe(
+        fixture.expected.source_checksum,
+      );
+      expect(checksumBytes(new TextEncoder().encode(codex))).toBe(fixture.expected.codex_checksum);
     });
   }
 });

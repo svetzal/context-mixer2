@@ -1,6 +1,6 @@
 # cmx-core
 
-Embeddable core for installing agent skills across platforms. Extracted from [cmx](https://github.com/svetzal/context-mixer2), the context-mixer CLI.
+Embeddable core for installing agents and skills across platforms. Extracted from [cmx](https://github.com/svetzal/context-mixer2), the context-mixer CLI.
 
 CLI tools that ship a companion agent skill use this crate to install it, instead of hand-rolling file copies into hard-wired paths:
 
@@ -18,6 +18,25 @@ let plan = installer.plan(&skill, Scope::Global, false, &ctx)?;
 println!("{plan}");                              // dry-run: names every file and destination
 let report = installer.apply(&skill, &plan, &ctx)?;
 println!("{report}");                            // summary: platform, action, destination, version
+```
+
+Generated guidance can use the artifact-generic API. Markdown agents are
+adapted automatically for Codex targets; skills use the same proven
+`SkillInstaller` lifecycle internally.
+
+```rust
+use cmx_core::artifact_install::{ArtifactIdentity, ArtifactInstaller, BundledArtifact};
+use cmx_core::production::ProductionContext;
+use cmx_core::skill_install::Scope;
+
+let artifact = BundledArtifact::agent("---\nname: reviewer\ndescription: Reviews code\n---\nReview carefully.\n");
+let installer = ArtifactInstaller::new(ArtifactIdentity::new("reviewer", "1.0.0"));
+let production = ProductionContext::claude()?;
+let context = production.ctx();
+let plan = installer.plan(&artifact, Scope::Global, false, &context)?;
+println!("{plan}");
+let report = installer.apply(&artifact, &plan, &context)?;
+println!("{report}");
 ```
 
 ## Context
@@ -93,7 +112,7 @@ the two most common branching points without requiring exhaustive matching.
 
 ## What you get
 
-- **Platform-aware destinations** — knows the skill directories for Claude, Codex, Cursor, Copilot, and ten other agent platforms, at global or project scope (global by default).
+- **Platform-aware destinations** — knows the agent and skill locations for Claude, Codex, Cursor, Copilot, and ten other platforms, at global or project scope.
 - **cmx integration** — on a cmx-managed machine, the skill is registered as a tracked artifact that `cmx doctor`, `cmx list`, and `cmx update` all understand. Without cmx, the install still works and still records a lock entry: the lockfile format is the integration contract, so a later cmx arrival finds everything tracked instead of orphaned.
 - **Standardized version guard** — older installed → update; same version with identical content → skip; newer installed → refuse unless forced.
 - **Plan/apply** — every mutation previews precisely before it happens; `apply` performs exactly what `plan` reported. Both return `Display`-able types for consistent CLI output across all embedding tools.

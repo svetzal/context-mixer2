@@ -1,10 +1,10 @@
-//! Embeddable core for installing and tracking agent skills across AI-coding-assistant
+//! Embeddable core for installing and tracking agents and skills across AI-coding-assistant
 //! platforms (Claude, Codex, Cursor, Copilot, and more — see [`platform`]).
 //!
-//! CLI tools that ship a companion skill use this crate instead of hand-rolling file
-//! copies into hard-wired, per-platform paths. The primary entry point is
-//! [`skill_install::SkillInstaller`], which implements a **plan → apply** lifecycle
-//! mirrored across every operation:
+//! CLI tools that ship a companion skill or generate guidance use this crate instead
+//! of hand-rolling file copies into hard-wired, per-platform paths. The primary entry
+//! points are [`skill_install::SkillInstaller`] for companion skills and
+//! [`artifact_install::ArtifactInstaller`] for generated agents or skills.
 //!
 //! - `plan` computes a dry-run install plan (what would be written, updated, skipped,
 //!   or refused) without touching disk.
@@ -62,6 +62,8 @@
 //! }
 //! ```
 
+pub mod agent;
+pub mod artifact_install;
 pub mod artifact_remove;
 pub mod artifact_status;
 pub mod checksum;

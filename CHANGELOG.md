@@ -9,20 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- **Removed cmf's facet and recipe system outright.** `cmf facet`, `cmf recipe`,
-  the Markdown facet parser, JSON recipe model, and naive concatenation engine
-  are gone with no compatibility aliases or migration layer. cmf is not yet a
-  deployed compatibility surface, so retaining a second authoring model would
-  only create forked truth.
+- **Removed cmf's entire authoring and publishing surface.** `intent`, `plugin`,
+  `manifest`, `marketplace`, and `validate` are gone alongside the already
+  removed facet/recipe system. There are no compatibility aliases: cmf was not
+  deployed, and retaining the old product model would create forked truth.
 
 ### Added
 
-- **cmf is now intent-native.** `cmf intent list` recursively indexes TOML
-  intent records by repository-relative key; `cmf intent validate` checks the
-  record schema, confidence bounds, relationship types, and dangling graph
-  targets. Aggregate `cmf validate` and `cmf status` now include the intent
-  catalogue, establishing intents as the canonical source from which agents,
-  skills, and future materialized guidance are produced.
+- **cmf is now a focused intent materializer.** `cmf assemble <profile>` scans
+  TOML intent records, applies deterministic selection and graph traversal,
+  shapes an agent or skill, and enforces a context budget. `--explain` writes
+  selection provenance separately from agent-facing output. `cmf install`
+  previews by default and applies through cmx-core with `--apply`; `cmf status`
+  reports the knowledge-base inventory.
+- **cmx-core installs generated agents and skills.** The new
+  `artifact_install` API generalizes the embeddable plan/apply lifecycle and
+  owns Markdown-to-Codex-TOML conversion, lock tracking, version guards, and
+  managed-source registration for generated artifacts.
 
 ### Fixed
 
@@ -191,7 +194,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `cmx doctor`'s header now reports the number of platforms it **actually** surveyed (the managed set when one is configured, e.g. "2 managed platform(s) surveyed") instead of always claiming all 13. The count was hardcoded and became misleading once `doctor` could be scoped to a managed-platform set.
-- `marketplace.json` `metadata` fields (`version`, `description`) are now optional. Both are optional in the Claude Code marketplace spec, but cmx required them, so any source whose `metadata` block omitted either field failed to parse with `missing field \`version\``. Because the parse happens during the survey that backs `cmx list`, `cmx doctor`, and related commands, a single such source aborted the whole command. Partial or absent `metadata` blocks are now tolerated.
+- `marketplace.json` `metadata` fields (`version`, `description`) are now optional. Both are optional in the Claude Code marketplace spec, but cmx required them, so any source whose `metadata` block omitted either field failed to parse with `missing field \`version\``. Because the parse happens during the survey that backs`cmx list`,`cmx doctor`, and related commands, a single such source aborted the whole command. Partial or absent`metadata` blocks are now tolerated.
 - `scan::extract_field` now reads YAML **block scalars** (`description: >` folded and `description: |` literal). Previously a multi-line `description` collapsed to just the `>`/`|` indicator, so e.g. `cmx info` showed an activation trigger of `>`. Folded scalars join with spaces, literal scalars keep newlines; an inline value that merely starts with `>` (like `>= 2.0`) is still taken verbatim.
 - The source scanner no longer **silently drops** a skill or agent whose frontmatter is accepted by Claude Code but is not strictly valid YAML — most commonly an unquoted, multi-paragraph `description:` broken by a blank line (a plain scalar can't resume after a blank line at column 0). Such artifacts vanished from `cmx search`, `cmx {skill,agent} diff`, `cmx outdated`, and the `Available` column of `cmx list`, while `cmx doctor` — which reads files against lock entries rather than scanning — still listed them and pointed at `cmx skill diff <name>`, which then dead-ended with "No skill named … found in any registered source." Frontmatter that fails a strict YAML parse now falls back to a lenient line scan that recovers the top-level fields (whitespace-joining multi-line/multi-paragraph values); well-formed frontmatter is untouched and keeps its exact YAML semantics.
 

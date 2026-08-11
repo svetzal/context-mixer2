@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "codex-agent",
+      "description": "Pins version reconciliation, Codex TOML conversion, and source-versus-installed checksums for a generated agent.",
+      "input": {
+        "artifact_name": "fixture-agent",
+        "version": "2.4.6",
+        "markdown": "---\nname: fixture-agent\ndescription: Reviews code\nmodel: gpt-5\n---\nReview carefully.\nReport \"why\".\n"
+      },
+      "expected": {
+        "reconciled_markdown": "---\nname: fixture-agent\ndescription: Reviews code\nmodel: gpt-5\nmetadata:\n  version: \"2.4.6\"\n---\nReview carefully.\nReport \"why\".\n",
+        "codex_toml": "name = \"fixture-agent\"\ndescription = \"Reviews code\"\nmodel = \"gpt-5\"\ndeveloper_instructions = \"Review carefully.\\nReport \\\"why\\\".\"\n",
+        "source_checksum": "sha256:b95b42ff12b328f41de978b0736f1682f5b81bba4942f5267c77c387390cae8e",
+        "codex_checksum": "sha256:5f989a4f1a0ca68239a2777b43867ad51ed94f0eaa9a697f21725279b8b5ae6c"
+      }
+    }
+  ]
+}

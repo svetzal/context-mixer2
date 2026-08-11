@@ -39,6 +39,8 @@ export const setMetadataVersion = (content: string, version: string): string => 
   return `${open}${reconcileInner(inner, value)}${closingAndRest}`;
 };
 
+export const reconcileDocumentVersion = setMetadataVersion;
+
 const findClosingFence = (afterOpen: string): number | undefined => {
   let lineStart = 0;
 

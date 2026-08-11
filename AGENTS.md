@@ -302,7 +302,7 @@ Types:
 - `cmx/src/error.rs` — `CliError` typed enum and `Result<T>` alias for all cmx command-core modules; transparent pass-through to `CmxError`; `Message(String)` escape hatch for runtime-built messages
 - `cmx/src/flags.rs` — intent-revealing flag enums (`Force`, `RunMode`, `Purge`, `Selection`, `SurveyScope`) that replace positional `bool` parameters at internal call sites; each carries a `from_flag(bool)` constructor used exactly once at the clap dispatch boundary, and the enum itself (not a bool unwrapped from it) is threaded through core function signatures. `cmx/tests/flag_boundary.rs` is the architectural guard that enforces this — it fails the build if `force`/`purge`/`apply`/`local`/`include_local` reappears as a bare `bool` function parameter outside `cmx/src/cli/` or a report struct field
 - `cmx/src/plugin_types.rs` — serde types for plugin.json and marketplace.json (single source of truth lifted from cmf)
-- `cmx/src/codex_agent.rs` — transforms a cmx markdown agent into a Codex CLI subagent TOML document
+- `cmx/src/codex_agent.rs` — compatibility re-export of cmx-core's Markdown-to-Codex-TOML transform
 
 Re-exports from cmx-core:
 
@@ -334,8 +334,10 @@ Paths and persistence:
 - `cmx-core/src/json_file.rs` — generic JSON file load/save helpers
 - `cmx-core/src/fs_util.rs` — filesystem utility functions
 
-Skill lifecycle:
+Artifact lifecycle:
 
+- `cmx-core/src/agent.rs` — tool-neutral Markdown-agent to Codex-TOML transformation
+- `cmx-core/src/artifact_install.rs` — generated agent/skill plan-and-apply API used by materializers such as cmf
 - `cmx-core/src/frontmatter.rs` — YAML frontmatter parsing and version stamping (the shared behavior the conformance suite gates)
 - `cmx-core/src/skill_fs.rs` — skill filesystem helpers
 - `cmx-core/src/skill_install/mod.rs` — `SkillInstaller` struct and `new()`; declares submodules; re-exports all public types
@@ -372,28 +374,23 @@ Test support and conformance:
 - `cmx-core/src/conformance.rs` — conformance test runner (reads golden fixtures from `cmx-core/conformance/` and drives the Rust port)
 - `cmx-core/src/bin/generate_conformance_fixtures.rs` — binary for regenerating conformance golden fixtures
 
+TypeScript port additions mirror the Rust artifact API:
+
+- `cmx-core-ts/src/agent.ts` — Markdown-agent to Codex-TOML transformation
+- `cmx-core-ts/src/artifact-installer.ts` — generated agent/skill plan-and-apply API
+
 ## cmf — Context Mixer Forge
 
-Compiler and publisher for intent-based agentic guidance.
+Read-only materializer for an externally maintained TOML intent knowledge base.
 
 ### cmf Architecture
 
-- `cmf/src/main.rs` — binary entry point; dispatches CLI commands (including status)
+- `cmf/src/main.rs` — binary entry point; assembles, previews, and applies installs through cmx-core
 - `cmf/src/lib.rs` — crate root; re-exports all public modules
-- `cmf/src/cli.rs` — clap CLI definition (6 commands: intent, plugin, manifest, marketplace, validate, status)
-- `cmf/src/repo.rs` — Repo root detection (marketplace, plugin, intents-only, unknown)
-- `cmf/src/intent.rs` — recursive intent discovery, TOML parsing, and semantic-graph validation
-- `cmf/src/plugin/mod.rs` — Plugin scanning, initialization, validation
-- `cmf/src/plugin/validate.rs` — Plugin validation logic
-- `cmf/src/plugin_types.rs` — thin re-export shim (`pub use cmx::plugin_types::{...}`); the serde types for plugin.json and marketplace.json now live in `cmx/src/plugin_types.rs` (single source of truth)
-- `cmf/src/marketplace.rs` — Marketplace validation and generation
-- `cmf/src/manifest.rs` — Multi-platform manifest generation
-- `cmf/src/validate.rs` — Aggregate validation
-- `cmf/src/display/mod.rs` — formatting for intent and plugin lists, manifests, status, and validation results; submodules:
-  `cmf/src/display/intent.rs`, `cmf/src/display/manifest.rs`, `cmf/src/display/plugin.rs`,
-  `cmf/src/display/status.rs`, `cmf/src/display/validation.rs`
-- `cmf/src/validation.rs` — Shared validation types
-- `cmf/src/test_support.rs` — test helpers for generating fake marketplace/plugin JSON
+- `cmf/src/cli.rs` — clap grammar for `assemble`, `install`, and `status`
+- `cmf/src/catalog.rs` — read-only recursive discovery and parsing of TOML intent records
+- `cmf/src/profile.rs` — materialization-profile schema, loading, and scope guards
+- `cmf/src/assembly.rs` — deterministic selection, graph expansion, surface shaping, and budget enforcement
 
 ## Spec
 

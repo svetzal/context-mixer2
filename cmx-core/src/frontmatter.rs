@@ -117,7 +117,7 @@ pub fn reconcile_skill_version(files: &[SkillFile], version: &str) -> Vec<SkillF
 /// Set `metadata.version` in `content`'s leading YAML frontmatter to `version`,
 /// preserving all other bytes. Returns `content` unchanged when it has no
 /// frontmatter fence.
-fn set_metadata_version(content: &str, version: &str) -> String {
+pub fn reconcile_document_version(content: &str, version: &str) -> String {
     let value = format!("\"{version}\"");
 
     let Some(spans) = split_frontmatter_spans(content) else {
@@ -131,6 +131,10 @@ fn set_metadata_version(content: &str, version: &str) -> String {
     out.push_str(&new_inner);
     out.push_str(spans.closing_and_body);
     out
+}
+
+fn set_metadata_version(content: &str, version: &str) -> String {
+    reconcile_document_version(content, version)
 }
 
 /// Reconcile the frontmatter inner text (between the fences). Each line in `inner`

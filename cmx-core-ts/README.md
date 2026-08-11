@@ -1,6 +1,6 @@
 # cmx-core (TypeScript)
 
-Native Bun/TypeScript port of the `cmx-core` skill-install surface. Published to
+Native Bun/TypeScript port of the `cmx-core` artifact-install surface. Published to
 npm as `cmx-core`; the source lives in the `cmx-core-ts/` directory of the
 [context-mixer2](https://github.com/svetzal/context-mixer2) repo, alongside the
 Rust reference and the shared conformance fixtures.
@@ -10,16 +10,23 @@ It exposes the same embeddable shape as the Rust library:
 - `ToolIdentity`
 - `BundledSkill`
 - `SkillInstaller`
+- `ArtifactIdentity`
+- `BundledArtifact`
+- `ArtifactInstaller`
 - `ConfigPaths`
 - `NodeFilesystem`
 - `SystemClock`
 
-The library scope is bundled skill installation only. It implements:
+The library installs generated agents and bundled skills. It implements:
 
 - `plan`
 - `apply`
 - `status`
 - `remove`
+
+Generated agents use Markdown as their canonical form. The installer adapts
+that source to each target, including Codex's TOML subagent format, while
+tracking both the canonical source checksum and installed checksum.
 
 Example:
 
@@ -64,3 +71,4 @@ The test harness consumes the committed fixtures in `../cmx-core/conformance/` a
 - platform paths and lock names
 - target resolution
 - end-to-end install behavior, tree snapshots, lock JSON values, and normalized reports
+- generated-agent transformation and checksum parity

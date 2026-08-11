@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Generated artifact installation.** `artifact_install` adds a shared
+  plan/apply API for in-memory agents and skills. Agent installs preserve the
+  same target resolution, version guards, lock tracking, and managed-source
+  registration as bundled skills, and transform Markdown to Codex TOML inside
+  cmx-core rather than forcing embedders to duplicate platform logic.
+- **Tool-neutral agent conversion.** `agent::markdown_to_codex_toml` is now the
+  canonical Markdown-to-Codex adapter used by both cmx and cmf.
+- **Agent transformation conformance.** A shared fixture pins Rust and
+  TypeScript output and checksum parity for generated agents.
 - **`error_summary::truncate_summary(text: &str) -> String`.** Collapses three
   independent copies of "truncate this error message to a short CLI-note
   length" (`error_summary`'s own 120-char `MAX_LEN`, `gateway::real`'s

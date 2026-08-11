@@ -1,57 +1,55 @@
 # cmf Command Reference
 
-cmf is the compiler and publisher for intent-based agentic guidance. Run its
-commands from the root of an intent library, marketplace, or plugin repository.
+cmf is a read-only consumer of a structured intent knowledge base. Another
+tool owns authoring and validation of the TOML records; cmf scans them to
+assemble and install agent-facing guidance.
 
-## Intents
+Run commands from the knowledge-base root, or pass `--root <path>`. Intent
+records live below `intents/`. Named profiles resolve below `profiles/`, while
+an explicit profile path can live elsewhere.
 
-| Command | Description |
-| --- | --- |
-| `cmf intent list` | Recursively list TOML intent records by repository-relative key |
-| `cmf intent validate` | Validate intent schemas and semantic graph relationships |
-
-Intent keys are paths below `intents/` without the `.toml` extension, such as
-`craftsperson/verify-before-declaring-completion`. Relationship targets use the
-same key format.
-
-Validation checks that records parse, required authoring fields are present,
-confidence is between zero and one, relationship types are recognized, and
-every relationship target exists. Errors produce exit code `2`; clean results
-and warnings-only results produce exit code `0`.
-
-## Status and aggregate validation
+## Commands
 
 | Command | Description |
 | --- | --- |
-| `cmf status` | Show repository kind, intent/category counts, plugins, artifacts, and validation summary |
-| `cmf validate` | Validate intents, marketplace metadata, and plugins together |
+| `cmf assemble <profile>` | Write an assembled agent or `SKILL.md` document to stdout |
+| `cmf install <profile>` | Preview platform-aware installation through cmx-core |
+| `cmf install <profile> --apply` | Apply the displayed installation plan |
+| `cmf status` | Count structured intents and materialization profiles |
 
-## Plugin management
+`assemble --explain` writes selected intent keys, graph traversals, and the
+estimated token count to stderr, leaving stdout safe for redirection.
+`--surface agent|skill` can override a profile's delivery surface.
 
-| Command | Description |
-| --- | --- |
-| `cmf plugin list` | List plugins with version, category, and artifact counts |
-| `cmf plugin init <name>` | Scaffold a plugin directory under `plugins/` |
-| `cmf plugin validate` | Validate plugin structures and artifact frontmatter |
+`install` is global by default. Use `--local` for project scope and `--force`
+to replace drifted or newer installed guidance. Target platforms come from
+cmx configuration and existing lock state; cmf does not duplicate their path
+or format rules.
 
-`plugin init` requires a marketplace repository. It creates
-`plugins/<name>/` with `.claude-plugin/plugin.json`, `agents/`, and `skills/`.
+## Profile schema
 
-## Marketplace management
+```toml
+id = "rust-dependency-change"
+version = "0.1.0"
+description = "Use when adding, removing, or upgrading Rust dependencies."
+surface = "skill"
+budget_tokens = 2800
 
-| Command | Description |
-| --- | --- |
-| `cmf marketplace validate` | Check `marketplace.json` against plugin directories |
-| `cmf marketplace generate` | Generate or update `marketplace.json` from `plugins/` |
+[select]
+keys = ["craftsperson/audit-dependency-risk"]
+categories = ["dependencies", "quality"]
+tags = ["security", "cargo"]
 
-Generation preserves existing entry metadata and adds newly discovered
-plugins.
+[graph]
+follow = ["specializes", "related-to"]
+max_related_depth = 1
+prefer_specializations = true
 
-## Manifest generation
+[content]
+include = ["guidance", "rationale", "evidence"]
+```
 
-| Command | Description |
-| --- | --- |
-| `cmf manifest generate` | Project canonical `.claude-plugin/` manifests to supported manifest directories |
-
-The generated targets are GitHub Copilot, Cursor, Windsurf, and Gemini CLI.
-Platforms without a Claude-style plugin manifest do not receive invented files.
+A profile must name exact keys or combine category and tag filters. This guard
+prevents accidental whole-catalogue exports. Graph expansion is bounded, and
+generation fails instead of truncating when the shaped artifact exceeds its
+declared context budget.

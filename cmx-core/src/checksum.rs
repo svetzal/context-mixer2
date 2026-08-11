@@ -22,8 +22,13 @@ use crate::types::{ArtifactKind, LockEntry};
 /// Compute SHA-256 checksum for an agent (single .md file) via the given filesystem.
 pub fn checksum_file(path: &Path, fs: &dyn Filesystem) -> Result<String> {
     let content = fs.read(path)?;
-    let hash = Sha256::digest(&content);
-    Ok(format!("sha256:{}", hex_encode(&hash)))
+    Ok(checksum_bytes(&content))
+}
+
+/// Compute the canonical checksum for one in-memory file.
+pub fn checksum_bytes(content: &[u8]) -> String {
+    let hash = Sha256::digest(content);
+    format!("sha256:{}", hex_encode(&hash))
 }
 
 /// Compute SHA-256 checksum for a skill (directory) via the given filesystem.

@@ -27,6 +27,7 @@ cmx-core/conformance/
   README.md
   checksum/
   frontmatter/
+  agent-transform/
   version-guard/
   paths/
   target-resolve/
@@ -94,6 +95,12 @@ Schema:
 ```
 
 The `input/` and `expected/` files are real `SKILL.md` byte fixtures. Ports must compare the expected output byte-for-byte.
+
+### `agent-transform/manifest.json`
+
+Pins the generated-agent path: version reconciliation in the source markdown,
+Codex TOML transformation, and separate checksums for the portable source and
+platform-specific installed bytes.
 
 ### `version-guard/manifest.json`
 

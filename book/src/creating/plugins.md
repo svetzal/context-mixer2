@@ -4,7 +4,7 @@ A plugin is a directory that bundles agents and skills into a distributable unit
 
 ## Plugin structure
 
-```
+```text
 my-plugin/
 ├── .claude-plugin/
 │   └── plugin.json
@@ -32,39 +32,10 @@ The `.claude-plugin/plugin.json` file identifies the directory as a plugin:
 }
 ```
 
-## Scaffolding a new plugin
-
-From a marketplace repository root:
-
-```bash
-cmf plugin init my-new-plugin
-```
-
-This creates the full directory structure under `plugins/my-new-plugin/` with a starter `plugin.json` and empty `agents/` and `skills/` directories. You can then add agent `.md` files and skill directories.
-
-Plugin init requires a marketplace repository (one with `.claude-plugin/marketplace.json`).
-
-## Listing plugins
-
-```bash
-cmf plugin list
-```
-
-Reads the marketplace manifest and scans each plugin for agents and skills. Output includes name, version, category, and artifact counts.
-
-## Validating plugins
-
-```bash
-cmf plugin validate
-```
-
-Checks each plugin listed in the marketplace:
-
-- `plugin.json` exists and is valid JSON
-- Plugin name is not empty
-- Plugin name matches its directory name
-- Agent `.md` files have valid frontmatter with a `name` field
-- Skill directories contain a `SKILL.md` with a `description` field
+Plugin scaffolding, validation, marketplace generation, and manifest
+projection are outside cmf. cmf materializes structured intents and installs
+the resulting artifact directly through cmx-core; use the repository's chosen
+publishing workflow when a distributable plugin is actually required.
 
 ## Plugin categories
 

@@ -84,10 +84,10 @@ Legend: ✓✓ native/first-class · ✓ supported · ✗ none/unsupported.
 | Tool | Skill = `SKILL.md` dir? | Reads `.agents/skills`? | Agent-as-file? | Commands | MCP config | Plugin/registry | cmx status |
 |---|---|---|---|---|---|---|---|
 | Claude Code | ✓✓ | (uses `.claude/skills`) | ✓ md | ✓ `.claude/commands` | ✓ | `.claude-plugin/` marketplace | **implemented** |
-| GitHub Copilot | ✓ | ✗ | ✓ md | — | — | (cmf target) | implemented |
-| Cursor | ✓ | ✗ (`.cursor/skills`) | ✓ md | — | ✓ | (cmf target) | implemented |
-| Windsurf | ✓ | ✗ | ✓ md | — | ✓ | (cmf target) | implemented |
-| Gemini CLI | ✓ | ✗ | ✓ md | — | ✓ | (cmf target) | implemented |
+| GitHub Copilot | ✓ | ✗ | ✓ md | — | — | external | implemented |
+| Cursor | ✓ | ✗ (`.cursor/skills`) | ✓ md | — | ✓ | external | implemented |
+| Windsurf | ✓ | ✗ | ✓ md | — | ✓ | external | implemented |
+| Gemini CLI | ✓ | ✗ | ✓ md | — | ✓ | external | implemented |
 | opencode | ✓✓ | ✓ | ✓ md (`.opencode/agent`) | ✓ | ✓ | ✗ (npm/JS) | **implemented** |
 | Codex CLI | ✓✓ | ✓ | ✓ **TOML** (transform) | ✓ prompts (deprecated) | ✓ | ✗ | **implemented** |
 | Pi | ✓✓ | ✓ | ✗ | ✗ | ✓ | tap (GitHub repos) | **implemented** |
@@ -127,7 +127,7 @@ Notes:
 - **Codex agents are transformed**, not copied: cmx parses the source markdown
   frontmatter + body and emits a Codex subagent TOML
   (`name`, `description`, `developer_instructions`, optional `model`). See
-  `cmx/src/codex_agent.rs`.
+  `cmx-core/src/agent.rs`.
 - **Amp** resolves *user-scoped* skills under XDG (`~/.config/agents/skills/`),
   not `~/.agents/skills/`. Project skills use the shared path.
 - **Hermes** is global-centric: its auto-read source of truth is
@@ -174,7 +174,7 @@ when* config-merge is in scope.
 | Decision | Choice | Rationale |
 |---|---|---|
 | Unsupported artifact kinds | **Skip with a clear error** | Each platform declares supported kinds; e.g. `cmx agent install --platform pi` fails loudly rather than writing where the tool never reads. |
-| cmf manifest generation for new tools | **Don't generate** | None of opencode/codex/pi/crush/amp/zed/openhands/hermes has a Claude-style plugin/marketplace manifest; generating `.X-plugin/` dirs would be dead files. |
+| Manifest generation for new tools | **Out of scope** | None of opencode/codex/pi/crush/amp/zed/openhands/hermes has a Claude-style plugin/marketplace manifest; generating `.X-plugin/` dirs would be dead files. |
 | Codex agents | **Transform md → TOML now** | Codex subagents are TOML; a verbatim copy wouldn't work. Hand-rolled emitter, no new dependency. |
 | Codex / cohort skill location | **Shared `.agents/skills/`** | Matches official docs and the cross-tool standard; serves multiple tools at once. |
 | **Config-merge / MCP servers** | **Out of scope (file-drop only)** | MCP/Zed-profile/Goose/Crush config is a *merge into a shared file*, not a file install. It's a different engine and brushes the charter non-goal "managing LLM API keys" (MCP entries can carry secrets). Revisit deliberately if pursued. |
@@ -319,8 +319,8 @@ distinctive strengths, abstraction friction).
 - `cmx/src/platform.rs` — the `Platform` enum and all per-tool knowledge
   (`install_subpath`, `supports`, `agent_extension`, `transforms_agent_to_toml`,
   `slug`, `manifest_dir`, `targets`).
-- `cmx/src/codex_agent.rs` — markdown → Codex TOML transform (pure functional
-  core).
+- `cmx-core/src/agent.rs` — markdown → Codex TOML transform (pure functional
+  core, shared by cmx and cmf).
 - `cmx/src/paths.rs` — `ConfigPaths::install_dir`, `installed_artifact_path`
   (platform-aware filename), `ensure_supports`.
 - `book/src/reference/platforms.md` — user-facing platform path & lockfile tables.

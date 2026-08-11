@@ -1,88 +1,65 @@
-//! clap CLI definition for intent authoring and artifact publishing.
+//! Command-line grammar for guidance materialization.
 
-use clap::{Parser, Subcommand};
+use std::path::PathBuf;
+
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(
     name = "cmf",
-    about = "Compiler and publisher for intent-based agentic guidance",
+    about = "Assemble intent records into installable agent guidance",
     version
 )]
-/// Top-level `cmf` command-line parser.
+/// Top-level `cmf` parser.
 pub struct Cli {
-    /// The subcommand to run.
+    /// Intent knowledge-base root. Defaults to the current directory.
+    #[arg(long, global = true)]
+    pub root: Option<PathBuf>,
+    /// Operation to perform.
     #[command(subcommand)]
     pub command: Commands,
 }
 
-/// The top-level `cmf` subcommands.
+/// Delivery surface for assembled guidance.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum SurfaceArg {
+    /// Always-loaded or explicitly selected custom agent guidance.
+    Agent,
+    /// Triggered, situational skill guidance.
+    Skill,
+}
+
+/// Supported `cmf` operations.
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Inspect and validate elemental intent records
-    Intent {
-        /// The intent subcommand to run.
-        #[command(subcommand)]
-        action: IntentAction,
+    /// Assemble a profile and write the artifact to stdout.
+    Assemble {
+        /// Profile path, or a name resolved below `<root>/profiles/`.
+        profile: PathBuf,
+        /// Override the profile's delivery surface.
+        #[arg(long, value_enum)]
+        surface: Option<SurfaceArg>,
+        /// Write selection and traversal provenance to stderr.
+        #[arg(long)]
+        explain: bool,
     },
-    /// Manage plugins for the marketplace
-    Plugin {
-        /// The plugin subcommand to run.
-        #[command(subcommand)]
-        action: PluginAction,
+    /// Preview or apply installation of an assembled profile.
+    Install {
+        /// Profile path, or a name resolved below `<root>/profiles/`.
+        profile: PathBuf,
+        /// Override the profile's delivery surface.
+        #[arg(long, value_enum)]
+        surface: Option<SurfaceArg>,
+        /// Install project-locally instead of user-wide.
+        #[arg(long)]
+        local: bool,
+        /// Apply the displayed plan.
+        #[arg(long)]
+        apply: bool,
+        /// Overwrite drifted or newer installed guidance.
+        #[arg(long)]
+        force: bool,
     },
-    /// Generate multi-platform manifests
-    Manifest {
-        /// The manifest subcommand to run.
-        #[command(subcommand)]
-        action: ManifestAction,
-    },
-    /// Validate and generate marketplace metadata
-    Marketplace {
-        /// The marketplace subcommand to run.
-        #[command(subcommand)]
-        action: MarketplaceAction,
-    },
-    /// Run all validation checks
-    Validate,
-    /// Show repository overview: intents, plugins, and validation summary
+    /// Report intent and profile inventory for the knowledge base.
     Status,
-}
-
-/// Subcommands for `cmf intent`.
-#[derive(Subcommand)]
-pub enum IntentAction {
-    /// List intents in the current repository
-    List,
-    /// Check intent schemas, identities, and graph relationships
-    Validate,
-}
-
-/// Subcommands for `cmf plugin`.
-#[derive(Subcommand)]
-pub enum PluginAction {
-    /// Scaffold a new plugin directory (plugin.json + agents/ + skills/)
-    Init {
-        /// Plugin name
-        name: String,
-    },
-    /// Validate plugin structure
-    Validate,
-    /// List plugins in the current marketplace repository
-    List,
-}
-
-/// Subcommands for `cmf manifest`.
-#[derive(Subcommand)]
-pub enum ManifestAction {
-    /// Generate multi-platform manifests (.claude-plugin, .copilot-plugin, .cursor-plugin, .windsurf-plugin, .gemini-plugin)
-    Generate,
-}
-
-/// Subcommands for `cmf marketplace`.
-#[derive(Subcommand)]
-pub enum MarketplaceAction {
-    /// Validate marketplace.json against actual plugins
-    Validate,
-    /// Generate marketplace.json from plugin directory structure
-    Generate,
 }

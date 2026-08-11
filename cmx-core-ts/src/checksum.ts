@@ -10,6 +10,12 @@ export interface ChecksumEntry {
   bytes: Uint8Array;
 }
 
+export const checksumBytes = (bytes: Uint8Array): string => {
+  const hasher = createHash("sha256");
+  hasher.update(bytes);
+  return `sha256:${hasher.digest("hex")}`;
+};
+
 const comparePathKeys = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 

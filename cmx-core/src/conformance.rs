@@ -1,6 +1,7 @@
 //! Generator and test runner for the language-neutral conformance fixtures under
 //! `cmx-core/conformance/` that pin the behavior described in `cmx-core/SPEC.md`
-//! (checksum, frontmatter, version-guard, paths, target-resolve, install-e2e).
+//! (checksum, frontmatter, agent-transform, version-guard, paths,
+//! target-resolve, install-e2e).
 //!
 //! This crate is the fixtures' oracle: [`generate_conformance_fixtures`] derives them
 //! from the in-memory `test-support` implementation, and `cargo test` re-runs them to
@@ -26,6 +27,7 @@ use crate::skill_install::{
 use crate::targets;
 use crate::test_support::TestContext;
 use crate::types::{ArtifactKind, CmxConfig, InstallScope, LockEntry, LockFile, LockSource};
+use crate::{agent, checksum};
 
 const FIXTURE_TOOL_NAME: &str = "fixture-tool";
 const FIXTURE_VERSION: &str = "2.4.6";
@@ -39,11 +41,67 @@ pub fn generate_conformance_fixtures(out: &Path) -> Result<()> {
     write_readme(&out.join("README.md"))?;
     generate_checksum_fixtures(&out.join("checksum"))?;
     generate_frontmatter_fixtures(&out.join("frontmatter"))?;
+    generate_agent_transform_fixtures(&out.join("agent-transform"))?;
     generate_version_guard_fixtures(&out.join("version-guard"))?;
     generate_paths_fixtures(&out.join("paths"))?;
     generate_target_resolve_fixtures(&out.join("target-resolve"))?;
     generate_install_e2e_fixtures(&out.join("install-e2e"))?;
     Ok(())
+}
+
+#[derive(Serialize)]
+struct AgentTransformManifest {
+    schema_version: u32,
+    cases: Vec<AgentTransformCase>,
+}
+
+#[derive(Serialize)]
+struct AgentTransformCase {
+    name: String,
+    description: String,
+    input: AgentTransformInput,
+    expected: AgentTransformExpected,
+}
+
+#[derive(Serialize)]
+struct AgentTransformInput {
+    artifact_name: String,
+    version: String,
+    markdown: String,
+}
+
+#[derive(Serialize)]
+struct AgentTransformExpected {
+    reconciled_markdown: String,
+    codex_toml: String,
+    source_checksum: String,
+    codex_checksum: String,
+}
+
+fn generate_agent_transform_fixtures(out: &Path) -> Result<()> {
+    fs::create_dir_all(out).with_context(|| format!("create {}", out.display()))?;
+    let markdown = "---\nname: fixture-agent\ndescription: Reviews code\nmodel: gpt-5\n---\nReview carefully.\nReport \"why\".\n";
+    let reconciled = frontmatter::reconcile_document_version(markdown, FIXTURE_VERSION);
+    let codex = agent::markdown_to_codex_toml(&reconciled, "fixture-agent");
+    let manifest = AgentTransformManifest {
+        schema_version: 1,
+        cases: vec![AgentTransformCase {
+            name: "codex-agent".to_string(),
+            description: "Pins version reconciliation, Codex TOML conversion, and source-versus-installed checksums for a generated agent.".to_string(),
+            input: AgentTransformInput {
+                artifact_name: "fixture-agent".to_string(),
+                version: FIXTURE_VERSION.to_string(),
+                markdown: markdown.to_string(),
+            },
+            expected: AgentTransformExpected {
+                source_checksum: checksum::checksum_bytes(reconciled.as_bytes()),
+                codex_checksum: checksum::checksum_bytes(codex.as_bytes()),
+                reconciled_markdown: reconciled,
+                codex_toml: codex,
+            },
+        }],
+    };
+    write_json(&out.join("manifest.json"), &manifest)
 }
 
 fn fixed_time() -> DateTime<Utc> {
@@ -1306,6 +1364,7 @@ cmx-core/conformance/
   README.md
   checksum/
   frontmatter/
+  agent-transform/
   version-guard/
   paths/
   target-resolve/
@@ -1373,6 +1432,12 @@ Schema:
 ```
 
 The `input/` and `expected/` files are real `SKILL.md` byte fixtures. Ports must compare the expected output byte-for-byte.
+
+### `agent-transform/manifest.json`
+
+Pins the generated-agent path: version reconciliation in the source markdown,
+Codex TOML transformation, and separate checksums for the portable source and
+platform-specific installed bytes.
 
 ### `version-guard/manifest.json`
 

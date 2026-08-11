@@ -20,8 +20,9 @@ language-neutral: it describes observable behavior, not Rust types.
 
 ## 1. Scope
 
-cmx-core answers one request: *"Here is my skill (name, version, files). Install
-it at this scope. Tell me what you did."* A port must implement four operations:
+cmx-core answers one request: *"Here is my agent or skill (name, version,
+content). Install it at this scope. Tell me what you did."* The original
+`SkillInstaller` implements four operations:
 
 | Operation | Purpose |
 | --------- | ------- |
@@ -35,10 +36,27 @@ writes lock entries even on machines that have never seen cmx, so a later cmx
 arrival finds everything tracked. No port may depend on the `cmx` binary being
 present.
 
+The artifact-generic API accepts generated Markdown agents and skills for
+`plan` and `apply`. Skill operations delegate to `SkillInstaller`. Agent
+operations use the same target resolution, version guard, lock format, and
+plan/apply parity guard; `status` and `remove` remain on the skill-specific API.
+
 **Out of scope for cmx-core** (stays in the `cmx` CLI): marketplace/manifest
-machinery (`plugin_types`), git-source cloning, agent installation from sources.
-cmx-core installs **bundled skills** only — an agent-kind lock entry may be read
-(§3) but cmx-core never installs agents.
+machinery (`plugin_types`), git-source cloning, and resolving named artifacts
+from configured sources.
+
+### 1.1 Generated agent adaptation
+
+The portable generated-agent source is Markdown with optional YAML
+frontmatter. Before checksumming, cmx-core reconciles `metadata.version` exactly
+as it does for `SKILL.md`. Markdown-agent platforms receive those reconciled
+bytes. Codex receives TOML with `name`, `description`, optional `model`, and
+`developer_instructions`; strings use escaped single-line TOML basic strings.
+
+Agent lock entries use `type = "agent"` and
+`source.path = "agents/<name>.md"`. `source_checksum` hashes the reconciled
+portable Markdown. `installed_checksum` hashes the actual platform bytes, so
+it differs for Codex TOML and remains suitable for drift detection.
 
 ---
 
@@ -95,8 +113,8 @@ Field rules (contract):
 - **`version`** (top level): integer, currently `1`.
 - **`packages`**: object keyed by artifact name. **Serialized in sorted key
   order** (Rust uses `BTreeMap`; ports must sort keys on write — see §3.3).
-- **`type`**: `"skill"` or `"agent"`, lowercase. cmx-core writes only `"skill"`;
-  it must *read* `"agent"` entries other tools wrote without error.
+- **`type`**: `"skill"` or `"agent"`, lowercase. cmx-core writes `"skill"` for
+  `SkillInstaller` and `"agent"` for generated-agent installs.
 - **`version`** (per entry): optional string. **Omitted entirely when absent**
   (not `null`). For a bundled-skill install it is always present (the tool's
   version).

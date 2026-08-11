@@ -1,3 +1,5 @@
+export * from "./agent.ts";
+export * from "./artifact-installer.ts";
 export * from "./checksum.ts";
 export * from "./config.ts";
 export * from "./frontmatter.ts";
