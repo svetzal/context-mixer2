@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-speculative-features"
+title = "Avoid speculative features"
+category = "design"
+tags = ["python", "uv", "testing", "error-handling", "build-and-delivery", "yagni"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The codebase carries only behavior justified by current requirements."
+threat = "Guessed future needs add maintenance surface, constraints, and failure modes before they create value."
+expectation = "Actual future requirements will differ from current predictions."
+strategy = "Apply YAGNI: build the simplest thing that satisfies current needs and remove speculative additions when noticed."
+evidence = [{ type = "scope_review", description = "Every added behavior maps to a current requirement or failing test rather than a hypothetical future use.", required = true }]
+tradeoff = "A later requirement may require rework that advance generalization could have avoided."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#small-safe-increments", summary = "Explicitly rejects speculative work and repeats removal of speculative features in self-correction.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.delete-qobjects-on-owning-event-loop"
+title = "Delete QObjects on their owning event loop"
+category = "reliability"
+tags = ["cpp", "qt", "concurrency", "testing", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "QObject destruction respects thread affinity."
+threat = "Cross-thread direct deletion races pending events."
+expectation = "Worker objects finish from other threads."
+strategy = "Use deleteLater for cross-thread destruction."
+evidence = [{ type = "gate", description = "A trace shows deletion on the owning thread.", required = true }]
+tradeoff = "Deferred deletion can leak if the loop stops."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#memory-management", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

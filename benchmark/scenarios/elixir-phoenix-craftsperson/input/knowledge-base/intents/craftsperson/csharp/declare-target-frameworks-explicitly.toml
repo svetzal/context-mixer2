@@ -1,0 +1,17 @@
+id = "guidelines.intent.declare-target-frameworks-explicitly"
+title = "Declare target frameworks explicitly"
+category = "design"
+tags = ["csharp", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A project has an auditable runtime compatibility and support target."
+threat = "Implicit framework selection changes behavior or compatibility when SDK defaults and development environments change."
+expectation = "New .NET SDKs and target frameworks will be installed while older deployments or consumers may remain in service."
+strategy = "Declare an explicit TargetFramework or TargetFrameworks value in each project file."
+evidence = [{ type = "manifest", description = "Every SDK-style project declares its intended target framework or frameworks explicitly.", required = true }]
+tradeoff = "Explicit targets require deliberate upgrades and can leave a project on an aging framework until maintainers act."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#build--project-management", summary = "Directs projects to use explicit target frameworks such as net8.0 or net9.0.", confidence = 1.0 }]

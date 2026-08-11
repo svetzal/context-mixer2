@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-observable-behavior"
+title = "Test observable behavior instead of implementation"
+category = "testing"
+tags = ["typescript", "bun", "cli", "concurrency", "testing", "error-handling"]
+relations = [
+  { type = "specializes", target = "craftsperson/test-observable-behavior" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Internal design can be refactored while tests continue to protect user-visible behavior."
+threat = "Tests coupled to private calls and structure fail during harmless refactors and discourage design improvement."
+expectation = "The CLI's internals will be reorganized as clearer boundaries and abstractions emerge."
+strategy = "Express tests in terms of inputs, outputs, errors, and externally observable effects rather than internal implementation steps."
+evidence = [{ type = "review", description = "Representative internal refactors that preserve public behavior do not require test rewrites, and assertions target outcomes rather than private collaborators.", required = true }]
+tradeoff = "Behavioral tests can make precise fault localization harder and may require broader fixtures than interaction-based unit tests."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "States that tests verify behavior, not implementation details, and repeats this as a self-correction rule.", confidence = 1.0 }]

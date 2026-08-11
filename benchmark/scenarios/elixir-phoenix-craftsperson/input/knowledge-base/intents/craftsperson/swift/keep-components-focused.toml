@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-components-focused"
+title = "Keep UI and domain components focused"
+category = "design"
+tags = ["swift", "dependencies", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "A component can change for one coherent reason and be understood without loading unrelated behavior."
+threat = "Massive view controllers, view models, or domain types concentrate unrelated responsibilities and dependencies."
+expectation = "Features will accumulate behavior in existing components unless boundaries are deliberately maintained."
+strategy = "Split oversized components into small focused collaborators aligned with distinct responsibilities."
+evidence = [{ type = "architecture_review", description = "Changed controllers, view models, functions, and structs have one stated responsibility and do not directly coordinate unrelated domain and infrastructure concerns.", required = true }]
+tradeoff = "Splitting components increases file count, dependency wiring, and navigation between collaborators."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#common-patterns-and-anti-patterns", summary = "Calls for small focused functions and structs and rejects massive view controllers and view models.", confidence = 0.98 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.reuse-application-ui-components"
+title = "Reuse application UI components and patterns"
+category = "design"
+tags = ["elixir", "phoenix", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "New interface elements remain visually and behaviorally consistent with the rest of the application."
+threat = "One-off buttons, inputs, icons, and form markup drift in spacing, semantics, accessibility, and theme behavior."
+expectation = "Many features and contributors will extend the UI independently."
+strategy = "Inspect and reuse core_components inputs, buttons, forms, and icons and follow existing form structure before adding custom styling."
+evidence = [{ type = "ui_review", description = "New controls use shared application components or document a missing capability, and match existing interaction, accessibility, and visual states.", required = true }]
+tradeoff = "Shared components constrain local visual choices and may need extension before a feature can ship."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#core-ui-principles", summary = "Requires following existing styles and reusing core input, button, form, and icon components.", confidence = 1.0 }]

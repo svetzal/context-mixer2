@@ -1,0 +1,17 @@
+id = "guidelines.intent.constrain-metaprogramming"
+title = "Use metaprogramming only for substantial interface gains"
+category = "design"
+tags = ["ruby", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to benefit from Ruby's dynamic facilities without making behavior opaque"
+threat = "Metaprogramming hides method definitions and control flow from readers, tools, and debuggers"
+expectation = "Ruby's runtime flexibility will continue to make concise metaprogramming tempting"
+strategy = "Use metaprogramming sparingly and only when it significantly improves the public interface"
+evidence = [{ type = "review", description = "Each metaprogrammed construct documents the interface improvement, has behavior coverage, and is simpler for callers than an explicit alternative", required = true }]
+tradeoff = "Avoiding metaprogramming can introduce repetitive explicit code, while justified uses remain harder to trace"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#edge-cases-and-escalation", summary = "Metaprogramming is restricted to sparse use that significantly improves the interface.", confidence = 1.0 }]

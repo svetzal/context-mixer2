@@ -1,0 +1,17 @@
+id = "guidelines.intent.generate-safe-upload-filenames"
+title = "Generate safe upload filenames"
+category = "design"
+tags = ["elixir", "phoenix", "persistence", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Uploaded files can be stored without collisions or user-controlled filesystem paths."
+threat = "Client filenames collide, overwrite content, or encode path traversal."
+expectation = "Many untrusted users will upload files with arbitrary and repeated names."
+strategy = "Generate storage filenames with Ecto.UUID rather than using client-provided names."
+evidence = [{ type = "security_test", description = "Repeated and traversal-shaped client filenames produce distinct UUID-based storage paths confined to the upload directory.", required = true }]
+tradeoff = "Original names require separate metadata and stored files are not human-identifiable by filename."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#file-uploads", summary = "Requires UUID filenames to prevent collision and path traversal.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.conventional-src-project-layout"
+title = "Make package and architectural boundaries visible in a src layout"
+category = "documentation"
+tags = ["python", "documentation", "dependencies", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Developers and tooling can locate importable code, core logic, adapters, and delivery entry points predictably."
+threat = "Ad hoc layout blurs architectural responsibilities and can accidentally make repository-root modules importable."
+expectation = "The project will grow into multiple domain, integration, and command-line modules."
+strategy = "Use a src-based package with explicit core, adapter, and delivery modules plus standard pyproject, docs, and README locations."
+evidence = [{ type = "review", description = "The package installs from `src/`, core modules do not live under adapters, and CLI and documentation entry points occupy the documented standard locations.", required = true }]
+tradeoff = "A prescribed layout adds directories and may be excessive for a small single-module package."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#project-structure", summary = "The source provides a standard src layout separating core, adapters, CLI, docs, and project metadata.", confidence = 0.96 }]

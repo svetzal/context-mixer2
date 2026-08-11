@@ -1,0 +1,17 @@
+id = "guidelines.intent.synchronize-yard-documentation"
+title = "Keep YARD documentation synchronized with implementation"
+category = "documentation"
+tags = ["ruby", "documentation", "public-api", "contracts", "consumer-guidance"]
+relations = [
+  { type = "specializes", target = "craftsperson/document-public-contracts" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability for users and maintainers to rely on documented Ruby APIs and behavior"
+threat = "Implementation changes leave generated documentation describing obsolete signatures or semantics"
+expectation = "Public APIs and behavior will evolve while consumers continue to consult `docs/`"
+strategy = "Update YARD comments and verify the documentation in `docs/` against every relevant implementation change"
+evidence = [{ type = "gate", description = "Generated or reviewed YARD documentation matches changed public signatures, return values, errors, and behavior", required = true }]
+tradeoff = "Documentation maintenance adds work to every public behavior change and can duplicate information already visible in code"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#quality-gates-non-negotiable", summary = "Current YARD documentation in docs is required before work is complete.", confidence = 1.0 }]

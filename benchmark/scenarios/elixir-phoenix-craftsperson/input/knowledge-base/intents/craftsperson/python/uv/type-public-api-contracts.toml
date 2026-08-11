@@ -1,0 +1,17 @@
+id = "guidelines.intent.type-public-api-contracts"
+title = "Type public API contracts"
+category = "quality"
+tags = ["python", "uv", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Callers and static tools can discover and verify the inputs and outputs of supported interfaces."
+threat = "Untyped public boundaries allow contract drift and force consumers to infer accepted values from implementations."
+expectation = "Public functions and APIs will be reused and refactored by callers outside their defining module."
+strategy = "Provide type hints on every public API and function signature."
+evidence = [{ type = "static_gate", description = "Static type analysis reports no missing annotations on public functions and APIs.", required = true }]
+tradeoff = "Maintaining complete annotations adds effort and can expose limitations in third-party type information."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#type-hints", summary = "Requires type hints for all public APIs and function signatures.", confidence = 1.0 }]

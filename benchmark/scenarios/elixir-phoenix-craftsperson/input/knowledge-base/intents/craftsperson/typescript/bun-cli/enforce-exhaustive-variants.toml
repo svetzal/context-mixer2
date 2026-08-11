@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-exhaustive-variants"
+title = "Make variant handling exhaustive"
+category = "design"
+tags = ["typescript", "bun", "cli", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Every supported finite variant is handled explicitly and additions surface all affected decision points."
+threat = "Open-ended strings and non-exhaustive branches let new variants fall through to incorrect default behavior."
+expectation = "Command states, log levels, and other finite option sets will gain variants over time."
+strategy = "Preserve literal unions with const assertions and use compiler-enforced exhaustive handling."
+evidence = [{ type = "static_check", description = "Adding a fixture variant to each closed union causes compilation failures at every switch or mapping that must decide its behavior.", required = true }]
+tradeoff = "Adding a legitimate variant requires coordinated edits across all exhaustive consumers, even where a generic default might have sufficed."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#type-system-patterns", summary = "Recommends `as const` for literal types and exhaustiveness checking and illustrates a closed log-level union.", confidence = 1.0 }]

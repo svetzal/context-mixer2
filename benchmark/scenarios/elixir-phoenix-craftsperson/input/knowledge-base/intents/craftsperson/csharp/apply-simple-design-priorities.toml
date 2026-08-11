@@ -1,0 +1,17 @@
+id = "guidelines.intent.apply-simple-design-priorities"
+title = "Resolve design tensions by explicit priority"
+category = "design"
+tags = ["csharp", "testing", "error-handling", "simplicity", "design-priorities", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/apply-simple-design-priorities" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Conflicting design heuristics are resolved consistently without sacrificing correctness for aesthetics."
+threat = "Treating every heuristic as absolute or equal produces arbitrary choices when readability, duplication, and structural minimalism conflict."
+expectation = "Real changes will repeatedly force tradeoffs among correctness, revealed intent, knowledge duplication, and entity count."
+strategy = "Treat the simple-design rules as heuristics in order: passing tests, revealing intent, avoiding knowledge duplication, then minimizing entities; consult the user when a justified exception remains unclear."
+evidence = [{ type = "decision_review", description = "A design tradeoff among simple-design heuristics states the conflict and preserves the higher-priority outcome unless an explicit user-approved exception exists.", required = true }]
+tradeoff = "A fixed ordering can undervalue context where a lower-ranked concern has unusually large consequences."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#engineering-principles-simple-design-heuristics", summary = "Orders passing tests, revealed intent, no knowledge duplication, and minimal entities while treating them as overridable heuristics.", confidence = 1.0 }]

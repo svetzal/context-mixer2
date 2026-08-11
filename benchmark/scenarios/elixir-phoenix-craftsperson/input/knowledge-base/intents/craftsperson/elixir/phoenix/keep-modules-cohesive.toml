@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-modules-cohesive"
+title = "Keep modules cohesive"
+category = "documentation"
+tags = ["elixir", "phoenix", "documentation", "dependencies", "synchronization", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "A module has a recognizable responsibility and a predictable public contract."
+threat = "Unrelated functions accumulate into catch-all modules whose changes have broad, unclear impact."
+expectation = "Feature growth will repeatedly tempt contributors to place behavior in the nearest existing module."
+strategy = "Organize focused modules with the public API first, related functions together, private helpers last, and extensive module and function documentation."
+evidence = [{ type = "structure_review", description = "Each changed module has one stated responsibility, a readily located documented public API, and no unrelated function clusters.", required = true }]
+tradeoff = "Stricter cohesion creates more modules and requires judgment about boundaries."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#code-structure--patterns", summary = "Prescribes focused modules, public-first ordering, documentation, and grouping related functions.", confidence = 1.0 }]

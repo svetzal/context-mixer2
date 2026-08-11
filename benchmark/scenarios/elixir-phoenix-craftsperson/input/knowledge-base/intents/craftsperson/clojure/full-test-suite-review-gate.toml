@@ -1,0 +1,17 @@
+id = "guidelines.intent.full-test-suite-review-gate"
+title = "Require the automated test suite before review completion"
+category = "quality"
+tags = ["clojure", "testing", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to know that reviewed changes preserve established behavior across the project"
+threat = "Locally plausible changes can regress behavior outside the edited functions"
+expectation = "The suite will encode an expanding set of cross-cutting behavioral contracts"
+strategy = "Run the project's complete Clojure test alias before declaring a review or implementation complete"
+evidence = [{ type = "gate", description = "clojure -M:test completes with all tests passing", required = true }]
+tradeoff = "A mandatory full-suite run lengthens feedback cycles and can make unrelated flaky tests block completion"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-gates-mandatory", summary = "The complete test alias is mandatory before any code review is complete.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#self-verification", summary = "Self-verification requires confirming all tests pass.", confidence = 1.0 }]

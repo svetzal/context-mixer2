@@ -1,0 +1,17 @@
+id = "guidelines.intent.handle-absence-explicitly"
+title = "Handle absent values explicitly"
+category = "design"
+tags = ["typescript", "bun", "cli", "error-handling", "domain-modeling", "type-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Missing data follows a deliberate success, fallback, or error path rather than crashing unexpectedly."
+threat = "Unjustified non-null assertions erase the possibility of absence from the type system without changing runtime reality."
+expectation = "Lookups, optional configuration, and environment-dependent values will legitimately be absent in user environments."
+strategy = "Keep nullable return types intact and branch explicitly on absence instead of applying non-null assertions."
+evidence = [{ type = "test", description = "The static check finds no unjustified non-null assertions, and each lookup or optional input has a test covering its absent case and resulting error or fallback.", required = true }]
+tradeoff = "Explicit absence handling adds branches and error paths to otherwise linear code."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#type-system-patterns", summary = "Marks unjustified non-null assertions as wrong and demonstrates an explicit not-found error path.", confidence = 1.0 }]

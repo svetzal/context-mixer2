@@ -1,0 +1,17 @@
+id = "guidelines.intent.parse-cli-input-into-validated-types"
+title = "Parse CLI input into validated domain values"
+category = "architecture"
+tags = ["typescript", "bun", "cli", "validation", "trust-boundaries", "security"]
+relations = [
+  { type = "specializes", target = "craftsperson/validate-untrusted-input-at-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Command handlers receive a structured, typed representation of valid user intent."
+threat = "Ad hoc access to raw argument strings spreads parsing ambiguity and validation omissions through command logic."
+expectation = "The CLI will add options, subcommands, defaults, and invalid combinations over time."
+strategy = "Parse arguments explicitly at the entry boundary, validate them, and return structured objects with typed fields."
+evidence = [{ type = "test", description = "Argument-parser tests cover valid commands, defaults, unknown flags, missing values, and invalid combinations; downstream handlers accept only the validated result type.", required = true }]
+tradeoff = "A dedicated parser and typed command model add upfront code and may duplicate conventions offered by parser libraries."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#cli-argument-parsing", summary = "Directs explicit argument parsing with validation and structured typed results.", confidence = 1.0 }]

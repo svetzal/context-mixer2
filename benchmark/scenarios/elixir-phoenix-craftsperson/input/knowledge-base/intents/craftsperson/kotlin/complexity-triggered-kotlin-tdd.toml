@@ -1,0 +1,17 @@
+id = "guidelines.intent.complexity-triggered-kotlin-tdd"
+title = "Use tests to drive complex Kotlin behavior"
+category = "testing"
+tags = ["kotlin", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to discover and stabilize complex behavior in small, verifiable increments."
+threat = "Implementing complex logic before examples are executable encourages tangled design and late feedback."
+expectation = "Some features will contain enough branching or domain uncertainty to make post-hoc tests costly."
+strategy = "Write tests first when complexity warrants test-driven development."
+evidence = [{ type = "trace", description = "For changes classified as complex, change history shows a failing behavioral test preceding the implementation and the final suite covers the discovered cases.", required = true }]
+tradeoff = "TDD adds short-term iteration overhead and can anchor design prematurely when requirements are still fluid."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#workflow-pattern", summary = "The source prescribes writing tests first when complexity warrants it.", confidence = 1.0 }]

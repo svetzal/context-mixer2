@@ -1,0 +1,17 @@
+id = "guidelines.intent.choose-containers-at-integration-boundaries"
+title = "Choose containers at integration boundaries"
+category = "design"
+tags = ["cpp", "qt", "performance", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Core structures stay efficient while Qt APIs stay natural."
+threat = "One family everywhere causes inefficiency or conversion friction."
+expectation = "Core algorithms and Qt interfaces will evolve separately."
+strategy = "Prefer STL in core and performance paths, Qt containers at Qt APIs."
+evidence = [{ type = "gate", description = "Container choices align with boundaries and measured needs.", required = true }]
+tradeoff = "Mixing families adds conversions and judgment calls."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#qt-containers-vs-stl", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

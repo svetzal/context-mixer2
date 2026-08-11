@@ -1,0 +1,17 @@
+id = "guidelines.intent.validate-memory-and-undefined-behavior"
+title = "Validate memory and undefined behavior dynamically"
+category = "design"
+tags = ["cpp", "qt", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Latent lifetime and UB defects are detected."
+threat = "Ordinary tests can pass despite corruption or leaks."
+expectation = "New paths and optimizations expose nondeterministic defects."
+strategy = "Run tests under ASan and UBSan, or Valgrind when unavailable."
+evidence = [{ type = "gate", description = "Instrumented tests complete without findings.", required = true }]
+tradeoff = "Instrumentation is slow and platform-sensitive."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#quality-assurance-process", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

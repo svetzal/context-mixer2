@@ -1,0 +1,17 @@
+id = "guidelines.intent.explicit-gradle-dependency-exposure"
+title = "Expose only dependencies that form part of a module contract"
+category = "design"
+tags = ["kotlin", "gradle", "testing", "dependencies", "domain-modeling", "type-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to keep module consumers isolated from internal implementation choices."
+threat = "Using api indiscriminately leaks transitive dependencies and couples downstream compilation to internals."
+expectation = "Module APIs and implementations will evolve independently as the project grows."
+strategy = "Use api only for types exposed by the public contract, implementation for internals, and testImplementation for test-only libraries."
+evidence = [{ type = "static_check", description = "Dependency declarations are classified by actual ABI exposure, and test libraries are absent from production compile and runtime classpaths.", required = true }]
+tradeoff = "Correct classification requires ABI awareness and can surface missing declarations during refactoring."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#build-and-dependency-management", summary = "The source explicitly distinguishes api, implementation, and testImplementation configurations.", confidence = 1.0 }]

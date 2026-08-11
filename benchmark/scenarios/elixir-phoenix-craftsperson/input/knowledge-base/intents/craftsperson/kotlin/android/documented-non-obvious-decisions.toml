@@ -1,0 +1,17 @@
+id = "guidelines.intent.documented-non-obvious-decisions"
+title = "Preserve rationale at surprising implementation choices"
+category = "documentation"
+tags = ["kotlin", "android", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for future maintainers to distinguish deliberate constraints from accidental complexity."
+threat = "Non-obvious choices are removed or repeated because their rationale is invisible."
+expectation = "Original decision-makers will not always be present when code is changed."
+strategy = "Document non-obvious decisions in focused code comments and project documentation."
+evidence = [{ type = "gate", description = "Review finds rationale comments at surprising constraints that explain why, not merely what, and removes comments that no longer match code.", required = true }]
+tradeoff = "Comments can clutter code and become stale if not maintained with the decision."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#documentation-standards", summary = "The source explicitly requires non-obvious decisions to be documented.", confidence = 1.0 }]

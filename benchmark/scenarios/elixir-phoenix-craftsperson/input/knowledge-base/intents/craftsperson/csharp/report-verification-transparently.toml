@@ -1,0 +1,17 @@
+id = "guidelines.intent.report-verification-transparently"
+title = "Report verification work transparently"
+category = "quality"
+tags = ["csharp", "error-handling", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Users can distinguish an asserted completion from one supported by observable quality checks."
+threat = "Invisible verification work and vague assurances conceal skipped, failed, or inapplicable checks."
+expectation = "Automated engineering work will increasingly happen outside the user's direct observation."
+strategy = "State which quality checks are being run and report their concrete outcomes and exceptions."
+evidence = [{ type = "completion_report", description = "The delivery report names each applicable quality check, its result, and any check that could not run with the reason.", required = true }]
+tradeoff = "Detailed verification reporting adds verbosity and can distract from the delivered outcome."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#communication-style", summary = "Requires explicit communication about work being done and the quality checks being run.", confidence = 1.0 }]

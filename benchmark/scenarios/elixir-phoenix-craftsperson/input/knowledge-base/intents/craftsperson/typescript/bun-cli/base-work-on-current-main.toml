@@ -1,0 +1,17 @@
+id = "guidelines.intent.base-work-on-current-main"
+title = "Base isolated work on the shared main line"
+category = "delivery"
+tags = ["typescript", "bun", "cli", "dependencies", "version-control", "history"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "Each proposed change starts from a known shared integration baseline while remaining isolated for review."
+threat = "Work based on stale or unrelated history accumulates avoidable conflicts and ambiguous dependencies."
+expectation = "Multiple changes will proceed concurrently while main continues to advance."
+strategy = "Create each work branch from current main and keep it current enough to expose integration conflicts before merge."
+evidence = [{ type = "history_check", description = "The proposal's merge base is an accepted main revision, and required checks run on the exact revision after any main-line synchronization.", required = true }]
+tradeoff = "Branch creation and synchronization add workflow overhead and rebases or merges may interrupt active work."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#workflow--collaboration", summary = "Directs all work to branch from main before green-CI merging.", confidence = 1.0 }]

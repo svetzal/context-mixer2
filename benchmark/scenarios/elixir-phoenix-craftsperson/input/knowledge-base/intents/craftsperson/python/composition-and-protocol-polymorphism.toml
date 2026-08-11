@@ -1,0 +1,17 @@
+id = "guidelines.intent.composition-and-protocol-polymorphism"
+title = "Prefer replaceable composition over inheritance hierarchies"
+category = "design"
+tags = ["python", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Behavior can be combined and substituted without inheriting unwanted implementation or hierarchy constraints."
+threat = "Inheritance for reuse couples subclasses to base implementation and makes evolution fragile."
+expectation = "Collaborator implementations and combinations will vary as the system grows."
+strategy = "Compose objects and pure functions, use protocols for structural polymorphism, and reserve ABCs for contracts rather than code reuse."
+evidence = [{ type = "review", description = "Polymorphic production paths depend on protocols or explicit contracts and delegation; ABC base classes contain no shared implementation used solely for reuse.", required = true }]
+tradeoff = "Composition requires explicit delegation and protocols can make runtime relationships less discoverable than a class hierarchy."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#compose-over-inherit", summary = "The source favours composition and protocol-based polymorphism and limits ABCs to contracts.", confidence = 1.0 }]

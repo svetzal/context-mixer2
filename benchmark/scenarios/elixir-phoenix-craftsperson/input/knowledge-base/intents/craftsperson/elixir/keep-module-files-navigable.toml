@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-module-files-navigable"
+title = "Keep module files navigable"
+category = "design"
+tags = ["elixir", "dependencies", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "Maintainers can predict where a module lives without fragmenting tightly coupled helpers unnecessarily."
+threat = "Catch-all files hide ownership, while rigid file splitting separates tiny helpers from the code they clarify."
+expectation = "The codebase will grow enough that module discovery matters, but some helpers will remain meaningful only beside one primary module."
+strategy = "Mirror primary module names in file paths and normally keep one primary module per file, allowing only small tightly scoped helper modules when cohesion improves."
+evidence = [{ type = "structure_review", description = "Primary modules resolve predictably from their names and any secondary module has a documented, tightly scoped relationship to the primary module.", required = true }]
+tradeoff = "The exception requires subjective judgment and weakens a mechanically enforceable one-module-per-file rule."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#common-mistakes", summary = "Treats one module per file as a navigability convention and allows tightly scoped helper modules when they improve cohesion.", confidence = 1.0 }]

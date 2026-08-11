@@ -1,0 +1,17 @@
+id = "guidelines.intent.property-tests-for-complex-logic"
+title = "Exercise complex logic with generated properties"
+category = "testing"
+tags = ["clojure", "testing", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to validate invariants across input spaces too large for hand-selected examples"
+threat = "Example-based tests miss combinations and boundary cases in complex transformations"
+expectation = "Core logic will receive increasingly varied and adversarial data"
+strategy = "Use test.check generators and invariant properties for complex core logic"
+evidence = [{ type = "test", description = "Each identified complex invariant has a test.check property that runs a documented number of generated cases", required = true }]
+tradeoff = "Generators and shrinking logic require expertise, add runtime, and can make failures harder to reproduce if seeds are not retained"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-tools-you-wield", summary = "test.check is prescribed for property-based testing of core logic.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#5-testing", summary = "Reviews ask for property-based tests for complex logic.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#property-based-tests", summary = "The example demonstrates generated maps and timestamps checking key preservation.", confidence = 1.0 }]

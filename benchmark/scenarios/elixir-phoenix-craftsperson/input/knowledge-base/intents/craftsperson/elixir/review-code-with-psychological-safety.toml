@@ -1,0 +1,17 @@
+id = "guidelines.intent.review-code-with-psychological-safety"
+title = "Review code with psychological safety"
+category = "collaboration"
+tags = ["elixir", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Reviewers can challenge technical decisions while contributors remain willing to expose uncertainty and mistakes."
+threat = "Personal or adversarial critique suppresses questions, candor, and early defect disclosure."
+expectation = "Collaborators will disagree under delivery pressure and incomplete information."
+strategy = "Critique the code and ideas with curiosity, assume positive intent, and avoid judging colleagues."
+evidence = [{ type = "review_observation", description = "Review comments identify technical effects, ask constructive questions, and contain no personal attribution or hostile framing.", required = true }]
+tradeoff = "Careful review language takes effort and can feel less direct when urgent correction is needed."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#workflow--collaboration", summary = "Makes psychological safety paramount and directs reviewers to critique ideas with curiosity.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.do-not-test-logicless-gateways"
+title = "Do not unit-test logicless gateways"
+category = "testing"
+tags = ["cpp", "qt", "testing", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Tests concentrate on owned behavior."
+threat = "Pass-through adapter tests duplicate implementation."
+expectation = "Boundary syntax will change while policy remains valuable."
+strategy = "Keep gateways thin and test custom logic in the core."
+evidence = [{ type = "gate", description = "Logicless gateways lack unit tests; core policy has them.", required = true }]
+tradeoff = "Wiring confidence relies on integration tests."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

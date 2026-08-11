@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-rubocop-clean"
+title = "Require a clean RuboCop run"
+category = "quality"
+tags = ["ruby", "rubocop", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to preserve consistent, machine-enforced Ruby style and static quality rules"
+threat = "Unchecked style and static-analysis violations accumulate inconsistency and conceal avoidable defects"
+expectation = "Many contributors and Rails-specific code will continue to introduce formatting and lint variation"
+strategy = "Gate completion on `bundle exec rubocop`, including Rails cops when applicable"
+evidence = [{ type = "gate", description = "`bundle exec rubocop` exits successfully with the project's applicable Ruby and Rails cop configuration", required = true }]
+tradeoff = "Strict lint rules can reject readable exceptions and require configuration maintenance across RuboCop upgrades"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#quality-gates-non-negotiable", summary = "A clean RuboCop run, including applicable Rails cops, is a non-negotiable gate.", confidence = 1.0 }]

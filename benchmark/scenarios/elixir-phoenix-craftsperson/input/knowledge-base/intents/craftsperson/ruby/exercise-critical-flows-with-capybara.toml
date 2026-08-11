@@ -1,0 +1,17 @@
+id = "guidelines.intent.exercise-critical-flows-with-capybara"
+title = "Exercise critical Rails user flows end to end"
+category = "testing"
+tags = ["ruby", "capybara", "testing", "error-handling", "edge-cases", "failure-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to verify that critical user outcomes work across the integrated Rails stack"
+threat = "Passing unit tests can miss failures in routing, rendering, JavaScript, sessions, or component integration"
+expectation = "Critical flows will span multiple layers whose contracts can drift independently"
+strategy = "Use Capybara integration tests for critical user journeys"
+evidence = [{ type = "test", description = "Capybara scenarios execute each identified critical flow through the user-visible interface and assert its final outcome", required = true }]
+tradeoff = "End-to-end tests run slowly and can be more brittle than isolated examples"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#rails-specific-guidance", summary = "Critical user flows are required to have Capybara integration coverage.", confidence = 1.0 }]

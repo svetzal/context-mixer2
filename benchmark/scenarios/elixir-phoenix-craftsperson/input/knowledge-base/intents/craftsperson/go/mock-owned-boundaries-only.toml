@@ -1,0 +1,17 @@
+id = "guidelines.intent.mock-owned-boundaries-only"
+title = "Mock only application-owned gateway contracts"
+category = "testing"
+tags = ["go", "testing", "dependencies", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Tests isolate external effects without coupling themselves to third-party implementation details."
+threat = "Mocking library internals makes tests brittle across dependency upgrades and validates assumptions the application does not own."
+expectation = "Third-party APIs and their internal call patterns will change over time."
+strategy = "Mock only gateway or boundary interfaces owned by the application, wrapping a third-party library in a gateway when substitution is needed."
+evidence = [{ type = "test_review", description = "Test doubles implement application-owned gateway interfaces and no test mocks unwrapped third-party internals.", required = true }]
+tradeoff = "An owned wrapper must be designed and maintained even when the third-party API initially appears easy to mock directly."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#maintain-comprehensive-tests", summary = "Forbids mocking library internals and requires third-party libraries to be wrapped behind gateways first.", confidence = 1.0 }]

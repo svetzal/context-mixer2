@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-composable-design"
+title = "Prefer composable behavior over inheritance-like structure"
+category = "design"
+tags = ["rust", "testing", "dependencies", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Behavior can be recombined and tested without depending on rigid structural hierarchies."
+threat = "Inheritance-like patterns entangle reuse with representation and make small behavioral changes affect unrelated consumers."
+expectation = "New variants and integrations will require reusing some behavior without inheriting an entire implementation."
+strategy = "Compose behavior from focused traits, concrete collaborators, and pure functions instead of unnecessary inheritance-like patterns."
+evidence = [{ type = "design_review", description = "Behavioral reuse is expressed through focused composition seams, and each trait or collaborator has a concrete variation or substitution need.", required = true }]
+tradeoff = "Composition can create more small types, explicit wiring, and delegation than a monolithic implementation."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#engineering-practices", summary = "Explicitly favors composition, traits, and pure functions over unnecessary inheritance-like patterns.", confidence = 1.0 }]

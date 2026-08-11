@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-functional-core-from-effects"
+title = "Isolate the functional core from effects"
+category = "architecture"
+tags = ["elixir", "phoenix", "concurrency", "testing", "dependencies", "persistence"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business rules can be understood and tested without databases, networks, filesystems, or process state."
+threat = "I/O and mutation spread through domain logic and make results nondeterministic or infrastructure-dependent."
+expectation = "Infrastructure integrations and delivery mechanisms will change independently from business policy."
+strategy = "Keep core functions deterministic and push state changes and side effects into an imperative shell."
+evidence = [{ type = "test", description = "Core business tests run deterministically without external services, persistent stores, or process orchestration.", required = true }]
+tradeoff = "Separating core and shell adds mapping and orchestration that can be excessive for simple CRUD."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#engineering-principles-your-north-star", summary = "Requires a pure functional core and an imperative shell at side-effect boundaries.", confidence = 1.0 }]

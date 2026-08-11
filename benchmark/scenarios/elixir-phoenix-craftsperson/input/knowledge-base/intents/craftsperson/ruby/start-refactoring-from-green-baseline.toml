@@ -1,0 +1,17 @@
+id = "guidelines.intent.start-refactoring-from-green-baseline"
+title = "Begin refactoring only from a green baseline"
+category = "testing"
+tags = ["ruby", "concurrency", "testing", "error-handling", "tdd", "red-green-refactor"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to attribute any new test failure to the refactoring step that caused it"
+threat = "Pre-existing failures make it impossible to distinguish a refactoring regression from an earlier defect"
+expectation = "Structural improvements will be made without intentionally changing behavior"
+strategy = "Restore the complete test suite to green before beginning a refactor"
+evidence = [{ type = "gate", description = "A successful full test run is recorded immediately before the first behavior-preserving transformation", required = true }]
+tradeoff = "Unrelated failures must be repaired or isolated before valuable refactoring can start"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#when-refactoring", summary = "The workflow says never to refactor with failing tests.", confidence = 1.0 }]

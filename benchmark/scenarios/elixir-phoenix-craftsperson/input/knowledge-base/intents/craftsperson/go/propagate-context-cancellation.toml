@@ -1,0 +1,17 @@
+id = "guidelines.intent.propagate-context-cancellation"
+title = "Carry cancellation and deadlines through call chains"
+category = "reliability"
+tags = ["go", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A caller can cancel an in-flight operation across every downstream layer."
+threat = "Dropping context at an intermediate boundary leaves subordinate work running after its result is no longer needed."
+expectation = "Requests will span nested I/O and concurrent operations with caller-controlled lifetimes."
+strategy = "Accept and propagate context.Context through all relevant call chains."
+evidence = [{ type = "test", description = "Cancellation tests prove downstream operations observe a canceled context and return promptly.", required = true }]
+tradeoff = "Context parameters spread through APIs and can be misused as an untyped dependency container."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#write-idiomatic-go-code", summary = "Requires context propagation through call chains for cancellation and deadlines.", confidence = 1.0 }]

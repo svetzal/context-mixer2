@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-psychological-safety-in-review"
+title = "Review code without attacking its author"
+category = "collaboration"
+tags = ["ruby", "security", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability for collaborators to expose mistakes and discuss alternatives candidly"
+threat = "Personal criticism makes contributors defensive and discourages questions or early feedback"
+expectation = "Code review will repeatedly surface disagreement and imperfect work"
+strategy = "Critique code and ideas rather than colleagues or authors"
+evidence = [{ type = "review", description = "Review comments describe observable code behavior and alternatives without attributing defects or motives to the author", required = true }]
+tradeoff = "Careful depersonalized wording can take more time and may feel less direct"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "Psychological safety is defined as reviewing code and ideas rather than colleagues and authors.", confidence = 1.0 }]

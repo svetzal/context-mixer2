@@ -1,0 +1,17 @@
+id = "guidelines.intent.workload-appropriate-kotlin-execution"
+title = "Match coroutine use to the workload"
+category = "reliability"
+tags = ["kotlin", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to keep I/O and parallel work responsive without imposing asynchronous machinery on trivial synchronous work."
+threat = "Blocking I/O monopolizes execution threads, while gratuitous coroutines obscure simple initialization and CPU logic."
+expectation = "Applications will combine I/O, parallel tasks, long-running work, initialization, and simple CPU-bound operations."
+strategy = "Use coroutines for I/O, parallel, or long-running operations and ordinary blocking code for simple CPU-bound or initialization work."
+evidence = [{ type = "review", description = "Potentially blocking I/O is absent from constrained coroutine threads, and simple synchronous paths do not introduce unnecessary suspend boundaries.", required = true }]
+tradeoff = "Classifying workloads requires judgment and CPU-heavy work may still need explicit dispatcher or parallelism decisions."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#when-to-use-coroutines-vs-blocking-code", summary = "The source assigns coroutines to I/O, parallel, and long-running work and blocking code to simple CPU or initialization work.", confidence = 1.0 }]

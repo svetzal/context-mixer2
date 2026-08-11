@@ -1,0 +1,17 @@
+id = "guidelines.intent.explicit-module-boundaries"
+title = "Preserve independently evolvable Android modules"
+category = "design"
+tags = ["kotlin", "android", "testing", "dependencies", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to change, test, and reuse features or infrastructure without pulling unrelated implementation details across the application."
+threat = "Modules with mixed responsibilities and accidental public surfaces become tightly coupled."
+expectation = "The application will grow across feature, domain, data, app, and core concerns."
+strategy = "Give each module one responsibility and expose an explicit, minimal public API."
+evidence = [{ type = "gate", description = "A module dependency graph and API inspection show responsibility-aligned modules with no undeclared cross-boundary implementation access.", required = true }]
+tradeoff = "More modules and explicit APIs increase Gradle configuration and navigation overhead."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#architectural-principles", summary = "The source requires single-responsibility modules with explicit public APIs and presents a layered module structure.", confidence = 1.0 }]

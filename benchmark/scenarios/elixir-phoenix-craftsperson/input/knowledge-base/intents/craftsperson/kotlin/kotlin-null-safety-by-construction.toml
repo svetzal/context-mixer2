@@ -1,0 +1,17 @@
+id = "guidelines.intent.kotlin-null-safety-by-construction"
+title = "Keep absence explicit in Kotlin control flow"
+category = "design"
+tags = ["kotlin", "error-handling", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to handle missing values without unexpected null-pointer failures."
+threat = "Non-null assertions and unexamined nullable types defer invalid assumptions to runtime."
+expectation = "Data will continue to arrive from external, Java, persistence, and partially populated sources."
+strategy = "Avoid non-null assertions and handle nullable values with safe calls, Elvis expressions, and explicit null-flow constructs."
+evidence = [{ type = "static_check", description = "Production code contains no unexplained !! operators, and tests cover both present and absent cases for nullable inputs.", required = true }]
+tradeoff = "Explicit absence handling adds branches and can propagate nullable or result types through APIs."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#kotlin-idioms", summary = "The source says to avoid !! and use safe calls, Elvis, and scope functions for null-handling flow.", confidence = 1.0 }]

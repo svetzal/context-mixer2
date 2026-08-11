@@ -1,0 +1,17 @@
+id = "guidelines.intent.put-gateways-at-external-boundaries"
+title = "Put gateways at external boundaries"
+category = "architecture"
+tags = ["elixir", "testing", "persistence", "gateways", "external-systems", "dependency-inversion"]
+relations = [
+  { type = "specializes", target = "craftsperson/put-gateways-at-external-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "External systems can be substituted in tests and changed without contaminating domain code."
+threat = "Direct library calls couple core behavior to databases, APIs, filesystems, and HTTP clients."
+expectation = "External providers and libraries will fail, evolve, or need controlled test substitutes."
+strategy = "Wrap every external interaction in a thin behaviour-backed gateway and mock that behaviour with Mox."
+evidence = [{ type = "architecture_test", description = "Core modules depend on gateway behaviours, and tests replace only those behaviours rather than third-party internals.", required = true }]
+tradeoff = "Each integration gains an adapter and contract even when the underlying library is already easy to call."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Defines gateway behaviours for all external interactions and limits Mox to those boundaries.", confidence = 1.0 }]

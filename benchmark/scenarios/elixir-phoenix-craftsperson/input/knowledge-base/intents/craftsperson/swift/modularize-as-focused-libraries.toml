@@ -1,0 +1,17 @@
+id = "guidelines.intent.modularize-as-focused-libraries"
+title = "Decompose monoliths into focused libraries"
+category = "design"
+tags = ["swift", "testing", "dependencies", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Subsystems can be understood, tested, reused, and evolved behind explicit module boundaries."
+threat = "A monolithic target lets unrelated concerns entangle and expands the impact of every change."
+expectation = "The codebase will grow in features and contributors, increasing coordination and build costs."
+strategy = "Organize coherent capabilities as focused reusable SwiftPM library targets."
+evidence = [{ type = "manifest_review", description = "Package.swift defines focused library targets whose public APIs and source ownership align with coherent capabilities rather than arbitrary layers.", required = true }]
+tradeoff = "Additional modules increase manifest maintenance, API-surface decisions, and cross-target build overhead."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#build-and-dependency-management", summary = "Prescribes library-style modularization that breaks monoliths into focused reusable libraries.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.root-cause-quality-remediation"
+title = "Preserve the signal of quality gates"
+category = "documentation"
+tags = ["kotlin", "android", "documentation", "error-handling", "synchronization", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to trust that a green gate means the underlying defect was resolved."
+threat = "Suppressions and partial reruns can hide failures or leave other checks invalidated by a fix."
+expectation = "Schedule pressure will create incentives to bypass slow or inconvenient findings."
+strategy = "Stop on a failed gate, fix its root cause, rerun the complete gate set, and document any truly necessary suppression."
+evidence = [{ type = "gate", description = "Failure remediation records identify the cause and fix, all mandatory gates pass afterward, and every suppression has a specific rationale.", required = true }]
+tradeoff = "Root-cause work and full reruns can delay delivery for low-risk or unrelated findings."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#quality-gates-mandatory", summary = "The source forbids warning suppression as a shortcut and requires fixing root causes and rerunning all checks.", confidence = 1.0 }]

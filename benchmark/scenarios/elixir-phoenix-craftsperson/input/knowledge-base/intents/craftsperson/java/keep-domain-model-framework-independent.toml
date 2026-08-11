@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-domain-model-framework-independent"
+title = "Keep the domain model framework-independent"
+category = "reliability"
+tags = ["java", "testing", "dependencies", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Core business models and rules can run, test, and migrate without loading a specific framework or persistence library."
+threat = "Spring, JPA, or library annotations make domain semantics depend on infrastructure lifecycle and tooling."
+expectation = "Framework versions and persistence choices will change on a different cadence from business rules."
+strategy = "Keep Spring, JPA, and external-library dependencies out of core domain models and logic."
+evidence = [{ type = "dependency_gate", description = "Core packages compile and test without Spring, JPA, or adapter libraries on their dependency path.", required = true }]
+tradeoff = "Framework-independent models require separate entities or DTOs and explicit mappings."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Forbids Spring, JPA annotations, and external libraries in core domain models and logic.", confidence = 1.0 }]

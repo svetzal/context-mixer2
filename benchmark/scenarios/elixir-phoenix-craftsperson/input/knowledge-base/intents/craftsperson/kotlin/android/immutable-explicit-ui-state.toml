@@ -1,0 +1,17 @@
+id = "guidelines.intent.immutable-explicit-ui-state"
+title = "Preserve stable and exhaustive UI state models"
+category = "design"
+tags = ["kotlin", "android", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to reason about UI snapshots and enumerate valid states without hidden mutation."
+threat = "Mutable or loosely structured state permits inconsistent combinations and changes that observers cannot trace."
+expectation = "Concurrent asynchronous updates and richer UI workflows will increase state-transition complexity."
+strategy = "Represent state with immutable data classes, sealed classes, and read-only StateFlow exposure."
+evidence = [{ type = "gate", description = "State model review shows immutable properties, closed state variants where appropriate, and no externally mutable state holders.", required = true }]
+tradeoff = "Copying immutable models and defining sealed variants adds allocations and boilerplate."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#architectural-principles", summary = "The source requires immutable data classes, StateFlow, and sealed classes for state.", confidence = 1.0 }]

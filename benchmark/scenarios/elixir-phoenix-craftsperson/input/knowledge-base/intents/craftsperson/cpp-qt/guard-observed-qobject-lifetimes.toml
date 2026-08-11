@@ -1,0 +1,17 @@
+id = "guidelines.intent.guard-observed-qobject-lifetimes"
+title = "Guard observed QObject lifetimes"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Observers detect QObject deletion before dereference."
+threat = "Raw observers remain dangling after deletion."
+expectation = "Event loops and parents will control lifetimes."
+strategy = "Use QPointer and check it before use."
+evidence = [{ type = "gate", description = "Deleting the object nulls the observed QPointer in tests.", required = true }]
+tradeoff = "QPointer adds Qt coupling and not thread safety."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#memory-management", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

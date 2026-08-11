@@ -1,0 +1,17 @@
+id = "guidelines.intent.single-source-each-domain-decision"
+title = "Keep each domain decision in one place"
+category = "design"
+tags = ["elixir", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "A domain rule can change without coordinating edits across unrelated locations."
+threat = "Duplicated knowledge drifts when one representation changes and another does not."
+expectation = "Business rules will evolve while superficially identical code may represent either shared or independent decisions."
+strategy = "Extract knowledge that changes for the same reason while allowing coincidental duplication for decisions that may diverge."
+evidence = [{ type = "change_review", description = "A representative domain-rule change has one authoritative implementation and does not require synchronized edits elsewhere.", required = true }]
+tradeoff = "Centralizing a decision can introduce indirection, and misidentifying coincidental similarity can couple independent behavior."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Rejects knowledge duplication while distinguishing independent decisions that only happen to look alike.", confidence = 1.0 }]

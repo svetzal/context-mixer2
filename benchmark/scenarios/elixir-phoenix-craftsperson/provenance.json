@@ -1,0 +1,9 @@
+{
+  "copied_at": "2026-08-11",
+  "repository": "https://github.com/svetzal/guidelines",
+  "revision": "3f7118c7c725b3b3bc2c4cffa6fd05bfffb477c7",
+  "sources": [
+    "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md",
+    "intents/**/*.toml"
+  ]
+}

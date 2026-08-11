@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-warning-free-builds"
+title = "Keep builds free of errors and warnings"
+category = "quality"
+tags = ["csharp", "static-analysis", "error-handling", "build-and-delivery", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Compiler diagnostics remain a trustworthy signal of defects and compatibility problems."
+threat = "Accumulated warnings normalize ignored diagnostics and conceal newly introduced risks in background noise."
+expectation = "Compiler and analyzer diagnostics will expand as the codebase, SDK, and language evolve."
+strategy = "Run dotnet build as a completion gate and resolve every error and warning."
+evidence = [{ type = "build_gate", description = "dotnet build completes successfully with zero warnings and zero errors for all projects.", required = true }]
+tradeoff = "A zero-warning policy can block delivery on low-risk diagnostics or warnings introduced by toolchain upgrades."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#quality-gates-mandatory", summary = "Makes a warning-free dotnet build the first mandatory completion gate.", confidence = 1.0 }]

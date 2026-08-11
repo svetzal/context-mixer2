@@ -1,0 +1,17 @@
+id = "guidelines.intent.prevent-formatting-edition-churn"
+title = "Prevent formatting-edition churn"
+category = "quality"
+tags = ["rust", "formatting", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Formatting checks produce stable, reviewable diffs across toolchain and edition changes."
+threat = "Rust 2024 formatting defaults trigger an unrelated mass reformat during feature work."
+expectation = "Projects and contributors will adopt newer rustfmt versions at different times."
+strategy = "Run cargo fmt --check and align rustfmt style_edition with the project's declared edition."
+evidence = [{ type = "ci_gate", description = "cargo fmt --check succeeds and feature diffs contain no unexplained repository-wide reformatting.", required = true }]
+tradeoff = "Pinning formatting behavior delays adoption of newer formatting improvements."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#formatting", summary = "Requires cargo fmt --check and warns about Rust 2024 style-edition churn.", confidence = 1.0 }]

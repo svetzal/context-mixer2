@@ -1,0 +1,17 @@
+id = "guidelines.intent.pin-nuget-dependency-versions"
+title = "Pin NuGet dependency versions"
+category = "design"
+tags = ["csharp", "dependencies", "build-and-delivery", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The same source revision resolves a reproducible dependency graph across environments and dates."
+threat = "Floating package ranges silently select different transitive behavior as new releases appear."
+expectation = "NuGet packages will continue releasing independently of the application and builds will be repeated later."
+strategy = "Declare exact NuGet package versions and change them through deliberate reviewed updates."
+evidence = [{ type = "manifest", description = "Package references resolve exact reviewed versions without floating ranges.", required = true }]
+tradeoff = "Pinned dependencies require ongoing upgrade work and delay automatic receipt of fixes."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#build--project-management", summary = "Requires NuGet package versions to be pinned for reproducible builds.", confidence = 1.0 }]

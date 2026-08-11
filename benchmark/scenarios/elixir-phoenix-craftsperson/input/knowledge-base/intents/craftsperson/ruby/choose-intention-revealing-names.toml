@@ -1,0 +1,17 @@
+id = "guidelines.intent.choose-intention-revealing-names"
+title = "Choose names that reveal intent immediately"
+category = "design"
+tags = ["ruby", "testing", "readability", "clarity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to infer a Ruby collaborator's role and behavior from its name"
+threat = "Abbreviations and generic names force readers to inspect implementations and guess domain meaning"
+expectation = "The codebase will accumulate collaborators and domain concepts whose distinctions must remain visible"
+strategy = "Use intention-revealing names and avoid abbreviations except those universally understood"
+evidence = [{ type = "review", description = "Changed classes, methods, variables, and predicates communicate their domain role without requiring implementation lookup", required = true }]
+tradeoff = "Descriptive names can be longer and may require renaming established interfaces"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#code-is-communication", summary = "The agent requires names that reveal intent and discourages non-universal abbreviations.", confidence = 1.0 }]

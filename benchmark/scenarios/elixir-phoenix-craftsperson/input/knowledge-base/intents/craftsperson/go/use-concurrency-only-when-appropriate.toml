@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-concurrency-only-when-appropriate"
+title = "Introduce goroutines only for real concurrency benefit"
+category = "reliability"
+tags = ["go", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The system gains useful throughput or latency improvements without gratuitous concurrent complexity."
+threat = "Goroutines added to inherently sequential or trivial work introduce scheduling, lifecycle, and race hazards without benefit."
+expectation = "Performance pressure will tempt maintainers to parallelize loops and workflows speculatively."
+strategy = "Use goroutines for I/O-bound work or true parallelism and keep other flows sequential."
+evidence = [{ type = "review", description = "Each new goroutine has a documented I/O-latency or measured parallelism rationale and an explicit lifetime.", required = true }]
+tradeoff = "Requiring a concrete concurrency rationale can defer speculative performance gains and retain slower sequential code longer."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#concurrency-patterns", summary = "Limits goroutine use to I/O-bound operations and true parallelism.", confidence = 1.0 }]

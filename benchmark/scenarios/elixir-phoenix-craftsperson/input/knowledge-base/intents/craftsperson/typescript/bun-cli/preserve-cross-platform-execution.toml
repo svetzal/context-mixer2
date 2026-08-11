@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-cross-platform-execution"
+title = "Preserve execution across target platforms"
+category = "design"
+tags = ["typescript", "bun", "cli", "testing", "dependencies", "build-and-delivery"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The compiled CLI behaves correctly on every declared target operating system."
+threat = "Hard-coded separators, paths, commands, and build assumptions make an artifact platform-dependent."
+expectation = "Users and release pipelines will execute the CLI on multiple target platforms with different filesystem and command conventions."
+strategy = "Use platform-aware path APIs, avoid platform-specific commands and paths, and build and exercise artifacts for each supported target."
+evidence = [{ type = "matrix_gate", description = "CI builds the compiled executable and runs path-sensitive smoke tests on every declared target platform.", required = true }]
+tradeoff = "A cross-platform matrix increases release time and can preclude convenient native commands or require platform adapters."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#compiled-executables", summary = "Requires compiled binaries to work across target platforms, platform-aware path APIs, and no assumed platform-specific commands or paths.", confidence = 1.0 }]

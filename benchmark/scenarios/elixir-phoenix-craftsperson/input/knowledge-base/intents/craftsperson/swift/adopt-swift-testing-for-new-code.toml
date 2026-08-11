@@ -1,0 +1,17 @@
+id = "guidelines.intent.adopt-swift-testing-for-new-code"
+title = "Use Swift Testing for new behavior tests"
+category = "testing"
+tags = ["swift", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "New tests can use the modern behavior-focused testing capabilities of the Swift toolchain."
+threat = "Continuing to default new coverage to legacy conventions prevents adoption of clearer and more capable test APIs."
+expectation = "Swift Testing will be the evolving first-party framework for new Swift test suites."
+strategy = "Write new non-UI behavior tests with Swift Testing unless compatibility constraints require XCTest."
+evidence = [{ type = "test_source_review", description = "New non-UI test targets import Testing and express scenarios with Swift Testing traits and expectations, or document a compatibility exception.", required = true }]
+tradeoff = "Mixed frameworks increase cognitive load, and Swift Testing may require newer toolchains or lack XCTest-specific facilities."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#testing-philosophy", summary = "Explicitly prefers Swift Testing for new code while retaining XCTest where needed.", confidence = 1.0 }]

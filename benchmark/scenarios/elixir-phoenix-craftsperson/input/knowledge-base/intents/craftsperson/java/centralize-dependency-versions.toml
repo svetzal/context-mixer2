@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralize-dependency-versions"
+title = "Centralize dependency version decisions"
+category = "dependencies"
+tags = ["java", "security", "dependencies", "build-and-delivery", "reproducibility", "lockfiles"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-dependency-resolution-reproducible" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A multi-module build can upgrade a shared dependency consistently from one authoritative version decision."
+threat = "Repeated version declarations drift and produce incompatible module dependency graphs."
+expectation = "Dependency updates and additional modules will otherwise multiply the number of coordinated edits."
+strategy = "Use Maven dependencyManagement or Gradle version catalogs as the single source for shared dependency versions."
+evidence = [{ type = "manifest", description = "Shared dependency versions are declared once and all modules resolve the intended version.", required = true }]
+tradeoff = "Centralization can hide the version at the point of use and couples modules to a shared release policy."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#build-and-dependency-management", summary = "Directs Maven projects to dependencyManagement and Gradle projects to version catalogs for centralized versions.", confidence = 1.0 }]

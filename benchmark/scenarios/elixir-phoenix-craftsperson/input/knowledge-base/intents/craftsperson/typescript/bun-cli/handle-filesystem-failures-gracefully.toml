@@ -1,0 +1,17 @@
+id = "guidelines.intent.handle-filesystem-failures-gracefully"
+title = "Handle expected filesystem failures gracefully"
+category = "design"
+tags = ["typescript", "bun", "cli", "error-handling", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "The CLI produces deliberate behavior when files are absent or inaccessible."
+threat = "Raw filesystem exceptions turn ordinary environmental conditions into unexplained crashes or unsafe fallback behavior."
+expectation = "Users will run the CLI with missing configuration, restricted permissions, and varying filesystem state."
+strategy = "Classify missing-file and permission failures at the filesystem boundary and map them to explicit fallbacks or contextual errors."
+evidence = [{ type = "test", description = "Boundary behavior tests cover absent files, denied reads, and denied writes and assert the documented fallback, message, and exit behavior for each.", required = true }]
+tradeoff = "Platform-specific error classification adds branching and can mask unexpected faults if categories are too broad."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#file-system-operations", summary = "Requires file I/O gateways and graceful handling of missing files and permissions.", confidence = 1.0 }]

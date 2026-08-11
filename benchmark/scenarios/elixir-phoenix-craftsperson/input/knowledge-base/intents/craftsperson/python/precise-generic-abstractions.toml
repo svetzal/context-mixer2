@@ -1,0 +1,17 @@
+id = "guidelines.intent.precise-generic-abstractions"
+title = "Preserve type relationships in reusable abstractions"
+category = "design"
+tags = ["python", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Reusable components retain the relationships among their input, stored, and returned types."
+threat = "Broad object or Any-shaped APIs erase type relationships and let incompatible reuse pass unnoticed."
+expectation = "Common containers and behaviors will be reused with multiple concrete types."
+strategy = "Represent reusable type relationships with TypeVar and Generic and structural requirements with Protocol."
+evidence = [{ type = "static-analysis", description = "Type-checker fixtures accept valid instantiations and reject at least one incompatible instantiation of each reusable generic or protocol contract.", required = true }]
+tradeoff = "Generic and protocol definitions add conceptual overhead and can produce complex type-checker diagnostics."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#type-hints", summary = "The source directs use of TypeVar, Generic, and Protocol for reusable typed code.", confidence = 0.98 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.remediate-security-findings"
+title = "Resolve security findings before completion"
+category = "reliability"
+tags = ["go", "security", "dependencies", "data-integrity", "transactions", "database-constraints"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A completed change has no known unaddressed security defect in its code or dependency path."
+threat = "Security scans become advisory noise when findings are allowed to persist without resolution."
+expectation = "Automated analysis will uncover both true defects and findings requiring contextual disposition."
+strategy = "Stop completion on security findings and remediate the underlying code or dependency before proceeding."
+evidence = [{ type = "security_review", description = "Every gosec and govulncheck finding is absent after remediation, with no unresolved result carried into completion.", required = true }]
+tradeoff = "Treating every finding as blocking can delay delivery when a finding is false, unreachable, or lacks an immediate upstream fix."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#enforce-security-standards", summary = "States that all security findings must be addressed before work is complete.", confidence = 1.0 }]

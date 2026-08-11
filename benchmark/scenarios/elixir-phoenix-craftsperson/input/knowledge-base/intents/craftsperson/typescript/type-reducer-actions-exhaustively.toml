@@ -1,0 +1,17 @@
+id = "guidelines.intent.type-reducer-actions-exhaustively"
+title = "Model reducer actions as an exhaustive union"
+category = "design"
+tags = ["typescript", "testing", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to keep state transitions explicit and type-safe as actions evolve"
+threat = "Loose action objects admit missing payloads, invalid combinations, and unhandled transition kinds"
+expectation = "State reducers will gain new actions and payload variants"
+strategy = "Define reducer actions as a discriminated union with variant-specific fields"
+evidence = [{ type = "static-check", description = "Type-checking rejects invalid action payloads and adding an action variant exposes reducers that do not handle it", required = true }]
+tradeoff = "Every new action requires union and reducer updates, increasing boilerplate for simple state"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#react-patterns", summary = "The React state example models reducer actions with a discriminated union.", confidence = 1.0 }]

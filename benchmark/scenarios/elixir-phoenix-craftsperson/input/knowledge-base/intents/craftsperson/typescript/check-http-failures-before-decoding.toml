@@ -1,0 +1,17 @@
+id = "guidelines.intent.check-http-failures-before-decoding"
+title = "Classify HTTP failures before decoding success data"
+category = "design"
+tags = ["typescript", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "Ability to distinguish transport-level failure responses from valid application payloads"
+threat = "Decoding every HTTP response as success data obscures status failures and produces misleading validation errors"
+expectation = "Remote services will return non-success statuses with bodies that do not match success schemas"
+strategy = "Check response status before parsing the success payload and raise a status-aware API error"
+evidence = [{ type = "test", description = "An HTTP adapter test proves a non-success response becomes an API error carrying its status and is not passed to the success schema", required = true }]
+tradeoff = "Status checks add adapter branches and may need special handling for APIs that encode useful data in non-success responses"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#nodejs-patterns", summary = "The async fetch example checks response.ok and raises a status-specific ApiError before validating JSON.", confidence = 1.0 }]

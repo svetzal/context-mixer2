@@ -1,0 +1,17 @@
+id = "guidelines.intent.design-boundary-contracts-first"
+title = "Design boundary contracts before concrete integration code"
+category = "reliability"
+tags = ["go", "dependencies", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Dependencies are shaped by consumer needs and lifecycle requirements rather than by a concrete vendor API."
+threat = "Implementation-first integration lets library structure leak into business code and omits cancellation or substitution needs."
+expectation = "New features will introduce dependencies whose implementations and operational lifetimes change over time."
+strategy = "Before implementation, define small consumer-facing contracts, dependency boundaries, and context propagation needs."
+evidence = [{ type = "design_review", description = "A new integration begins with a minimal consumer contract and explicit context behavior before its concrete gateway is introduced.", required = true }]
+tradeoff = "Interface-first design can create premature abstractions when requirements are still exploratory or the dependency is trivial."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#design-interfaces-first", summary = "Requires clean small contracts, planned dependency boundaries, and context needs before implementation.", confidence = 1.0 }]

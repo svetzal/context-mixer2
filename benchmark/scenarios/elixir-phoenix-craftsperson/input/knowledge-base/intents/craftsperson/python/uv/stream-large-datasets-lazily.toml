@@ -1,0 +1,17 @@
+id = "guidelines.intent.stream-large-datasets-lazily"
+title = "Stream large transformations lazily"
+category = "reliability"
+tags = ["python", "uv", "concurrency", "backpressure", "resource-bounds"]
+relations = [
+  { type = "specializes", target = "craftsperson/bound-concurrent-work" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The system can process large input sequences without allocating every transformed value at once."
+threat = "Eager collection construction makes memory use scale with the entire dataset and delays first results."
+expectation = "Some transformations will operate on datasets substantially larger than development examples."
+strategy = "Use generator expressions for large datasets while reserving list comprehensions for bounded simple transformations that need materialization."
+evidence = [{ type = "performance_test", description = "Representative large-input processing maintains bounded incremental memory use and yields results without full materialization.", required = true }]
+tradeoff = "Generators are single-pass, defer failures until iteration, and can complicate debugging or repeated access."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#comprehensions-and-generators", summary = "Assigns generator expressions to large datasets and list comprehensions to simple transformations.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.follow-established-conventions-under-ambiguity"
+title = "Follow established conventions when choices are equivalent"
+category = "design"
+tags = ["java", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "The codebase remains coherent when evidence does not favor one technically valid option."
+threat = "Arbitrary personal preference introduces needless local variation and recurring debates."
+expectation = "Many design and style decisions will have multiple reasonable solutions with no clear winner."
+strategy = "Defer to repository conventions first and established Java community standards when the repository has no answer."
+evidence = [{ type = "review", description = "A choice without differentiating evidence follows an existing project pattern or cites the applicable team or Java standard.", required = true }]
+tradeoff = "Established conventions can preserve inferior patterns and slow adoption of better approaches."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#when-stuck-or-uncertain", summary = "Directs uncertain choices to team conventions or Java community standards.", confidence = 1.0 }]

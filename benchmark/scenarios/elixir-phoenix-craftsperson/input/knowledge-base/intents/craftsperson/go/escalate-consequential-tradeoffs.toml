@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-consequential-tradeoffs"
+title = "Escalate consequential choices with competing tradeoffs"
+category = "collaboration"
+tags = ["go", "security", "decision-making", "escalation", "tradeoffs"]
+relations = [
+  { type = "specializes", target = "craftsperson/escalate-consequential-tradeoffs" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Stakeholders retain authority over choices whose security or product consequences cannot be settled technically."
+threat = "An implementer can silently choose among valid designs with materially different risk, cost, or behavior."
+expectation = "Some changes will present multiple valid approaches or security implications not resolved by existing requirements."
+strategy = "Seek user clarification before choosing among materially different approaches or accepting a security-sensitive design."
+evidence = [{ type = "decision_record", description = "A consequential choice records viable options, security and operational tradeoffs, and the stakeholder's selected direction.", required = true }]
+tradeoff = "Stakeholder escalation slows delivery and may expose decision-makers to technical detail they would prefer to delegate."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#when-to-seek-clarification", summary = "Requires clarification for security implications and when valid approaches carry different tradeoffs.", confidence = 1.0 }]

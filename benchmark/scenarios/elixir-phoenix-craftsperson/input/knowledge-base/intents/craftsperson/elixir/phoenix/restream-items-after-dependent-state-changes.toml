@@ -1,0 +1,17 @@
+id = "guidelines.intent.restream-items-after-dependent-state-changes"
+title = "Restream items after dependent state changes"
+category = "design"
+tags = ["elixir", "phoenix", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Streamed item rendering stays synchronized with non-stream assigns that affect its appearance."
+threat = "Changing an editing or selection assign alone does not rerender existing streamed nodes, leaving stale UI."
+expectation = "Streamed rows will gain modes controlled by shared LiveView state."
+strategy = "Reinsert every affected stream item whenever another assign changes how that item renders."
+evidence = [{ type = "liveview_test", description = "Changing dependent state updates the existing streamed item's markup without a full page refresh.", required = true }]
+tradeoff = "The event handler must identify and reinsert affected records, coupling shared state transitions to stream updates."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#updating-stream-items", summary = "Mandates reinserting stream items when another assign affects their rendering.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-zero-ruff-warnings"
+title = "Enforce zero Ruff warnings"
+category = "quality"
+tags = ["python", "uv", "ruff", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Static quality findings remain actionable instead of accumulating as accepted background noise."
+threat = "A warning backlog hides new defects and makes the lint signal easy to ignore."
+expectation = "The codebase and Ruff rules will evolve, continually producing new opportunities for drift."
+strategy = "Run Ruff checks on source code and require zero warnings before completion."
+evidence = [{ type = "lint_gate", description = "uv run ruff check src exits successfully with no diagnostics.", required = true }]
+tradeoff = "Strict lint cleanliness can block delivery on low-risk style findings and creates work when rule sets change."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Mandates Ruff with zero warnings and calls that standard non-negotiable.", confidence = 1.0 }]

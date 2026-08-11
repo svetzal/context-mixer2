@@ -1,0 +1,17 @@
+id = "guidelines.intent.review-code-with-psychological-safety"
+title = "Review code with psychological safety"
+category = "collaboration"
+tags = ["rust", "security", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Review participants can examine design risks candidly without personal attack or defensiveness."
+threat = "Judgmental feedback targets the author, withholds rationale, or presents one solution as unquestionably correct."
+expectation = "Code review will surface disagreement and tradeoffs among people with different context."
+strategy = "Critique code and ideas with curiosity, explain why a suggestion helps, acknowledge sound choices, and name alternatives and tradeoffs."
+evidence = [{ type = "review_audit", description = "Review comments address observable code and rationale, avoid personal judgments, and include alternatives where tradeoffs exist.", required = true }]
+tradeoff = "Careful framing takes more time and can soften urgency if severe risks are not still stated plainly."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#code-review-philosophy", summary = "Makes psychological safety, rationale, alternatives, and explicit tradeoffs part of code review.", confidence = 1.0 }]

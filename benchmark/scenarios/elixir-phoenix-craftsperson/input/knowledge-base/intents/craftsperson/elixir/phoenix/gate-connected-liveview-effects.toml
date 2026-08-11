@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-connected-liveview-effects"
+title = "Gate connected-only LiveView effects"
+category = "design"
+tags = ["elixir", "phoenix", "concurrency", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Subscriptions, timers, messages, and expensive loads run once in the phase that can sustain them."
+threat = "Disconnected rendering duplicates effects, performs wasted work, or starts processes that cannot communicate with a live socket."
+expectation = "LiveViews will mount first over HTTP and again over WebSocket under variable client connectivity."
+strategy = "Check connected?/1 before PubSub subscription, timers, self-messages, and expensive connected-phase loads."
+evidence = [{ type = "trace_test", description = "Mount traces show no connected-only effect during static render and exactly one effect after WebSocket connection.", required = true }]
+tradeoff = "The first render may show placeholder data and mount logic gains a phase branch."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#two-phase-rendering", summary = "Requires connected? guards around subscriptions, timers, self-messages, and expensive loads.", confidence = 1.0 }]

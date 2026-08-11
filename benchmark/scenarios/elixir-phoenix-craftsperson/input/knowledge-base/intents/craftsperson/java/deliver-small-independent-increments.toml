@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliver-small-independent-increments"
+title = "Deliver small independent increments"
+category = "delivery"
+tags = ["java", "testing", "error-handling", "incremental-delivery", "change-scope", "reversibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/deliver-small-independent-increments" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Each change can be understood, tested, reverted, and integrated independently."
+threat = "Large multi-purpose commits hide causality and make failure recovery risky."
+expectation = "Several concerns will compete within feature work and defects may require selective rollback."
+strategy = "Commit one logical reason at a time and keep implementation increments small and safe."
+evidence = [{ type = "history_review", description = "Each commit has one coherent purpose, passes its applicable checks, and can be reverted without removing unrelated behavior.", required = true }]
+tradeoff = "Splitting work requires sequencing discipline and can create temporary intermediate states."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#version-control-and-collaboration", summary = "Calls for small safe increments and single-reason atomic commits.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-consistent-formatting"
+title = "Enforce repository-wide formatting"
+category = "quality"
+tags = ["csharp", "testing", "formatting", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Code changes remain mechanically consistent and reviews focus on behavior rather than formatting noise."
+threat = "Editor-specific formatting creates churn, merge conflicts, and subjective review debates."
+expectation = "Contributors will use different editors and local formatting configurations."
+strategy = "Define formatting in .editorconfig and require dotnet format --verify-no-changes to pass."
+evidence = [{ type = "format_gate", description = "dotnet format --verify-no-changes exits successfully with no files requiring changes.", required = true }]
+tradeoff = "Automated formatting can produce broad diffs and constrains individual style preferences."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#quality-gates-mandatory", summary = "Makes the dotnet format verification command a mandatory quality gate.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.kotlin-extension-domain-operations"
+title = "Keep domain operations close to the types they enrich"
+category = "reliability"
+tags = ["kotlin", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to expose cohesive domain operations without expanding or wrapping the owned type."
+threat = "Utility objects and scattered helpers make domain behavior difficult to discover and compose."
+expectation = "Domain behavior will accumulate around both owned types and types that cannot be modified."
+strategy = "Use focused extension functions for domain operations and clean API design."
+evidence = [{ type = "review", description = "Operations that conceptually enrich a type are discoverable as narrowly scoped extensions rather than unrelated utility methods.", required = true }]
+tradeoff = "Extensions can be hard to discover across packages and may create ambiguous imports or the illusion of true member dispatch."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#core-identity", summary = "The source identifies extension functions as the preferred mechanism for clean API and domain-operation design.", confidence = 0.95 }]

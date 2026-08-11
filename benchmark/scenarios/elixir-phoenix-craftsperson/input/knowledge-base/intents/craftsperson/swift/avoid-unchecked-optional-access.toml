@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-unchecked-optional-access"
+title = "Avoid unjustified force unwrapping"
+category = "design"
+tags = ["swift", "error-handling", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Absence is handled deliberately instead of terminating execution unexpectedly."
+threat = "Force unwrapping converts an unchecked absence assumption into a runtime crash."
+expectation = "Inputs, lifecycle timing, and external data will expose absence cases not seen during initial development."
+strategy = "Use optional binding, defaults, typed errors, or validated construction; permit force unwrap only with a clear invariant justification."
+evidence = [{ type = "static_gate", description = "Each force-unwrap expression is rejected by lint or accompanied by a local invariant explanation and a test exercising that invariant.", required = true }]
+tradeoff = "Explicit absence handling adds branches and can obscure code where a framework invariant truly guarantees presence."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#common-patterns-and-anti-patterns", summary = "Explicitly avoids force unwrapping without clear justification.", confidence = 1.0 }]

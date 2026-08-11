@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolated-development-dependencies"
+title = "Keep development tooling out of runtime requirements"
+category = "quality"
+tags = ["python", "security", "testing", "documentation", "dependencies", "static-analysis"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Runtime consumers install only packages required to execute the product."
+threat = "Bundling test, lint, and documentation tools with production dependencies expands installs and vulnerability surface."
+expectation = "Development tooling will grow independently of runtime functionality."
+strategy = "Declare development dependencies separately under project optional dependencies."
+evidence = [{ type = "review", description = "The project metadata places test, lint, audit, and docs-only packages in a development optional-dependency group and a runtime-only install succeeds without them.", required = true }]
+tradeoff = "Contributors must select the correct dependency extra and multiple environment profiles require maintenance."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#dependency-management", summary = "The source requires dev dependencies to be separated in project optional dependencies.", confidence = 0.98 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.mock-only-owned-boundaries"
+title = "Mock owned gateways instead of library internals"
+category = "testing"
+tags = ["ruby", "testing", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability for isolated tests to remain stable across third-party library implementation changes"
+threat = "Mocks of library internals encode assumptions about APIs the application does not own"
+expectation = "Third-party gems will refactor internals or change call sequences while preserving supported behavior"
+strategy = "Mock only gateway or boundary classes and wrap third-party libraries before substituting them in tests"
+evidence = [{ type = "review", description = "Test doubles target application-owned gateway interfaces and no spec stubs internal methods of a third-party gem", required = true }]
+tradeoff = "Creating owned wrappers adds production code and can conceal useful library capabilities"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "The agent forbids mocking library internals and requires a gateway wrapper when a third party must be mocked.", confidence = 1.0 }]

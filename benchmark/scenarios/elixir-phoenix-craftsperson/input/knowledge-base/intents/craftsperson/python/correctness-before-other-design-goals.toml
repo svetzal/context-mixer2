@@ -1,0 +1,17 @@
+id = "guidelines.intent.correctness-before-other-design-goals"
+title = "Preserve correctness before optimizing other design qualities"
+category = "design"
+tags = ["python", "testing", "simplicity", "design-priorities", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/apply-simple-design-priorities" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The system continues to satisfy its verified behavior while design improvements are made."
+threat = "Readability, deduplication, or simplification work can be accepted despite breaking established behavior."
+expectation = "Design heuristics will conflict during future implementation and refactoring decisions."
+strategy = "Give passing tests first priority in the ordered simple-design heuristics and surface conflicts with user requirements."
+evidence = [{ type = "gate", description = "The complete test suite passes before a change is considered complete or integrated.", required = true }]
+tradeoff = "Preserving current tested behavior can delay desirable redesign and can entrench tests that encode obsolete expectations."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#simple-design-heuristics", summary = "The source ranks all tests passing as the non-negotiable first design heuristic.", confidence = 1.0 }]

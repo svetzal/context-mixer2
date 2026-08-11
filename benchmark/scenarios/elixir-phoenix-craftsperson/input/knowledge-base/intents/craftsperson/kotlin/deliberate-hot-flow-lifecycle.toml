@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliberate-hot-flow-lifecycle"
+title = "Make hot Flow lifetime and replay semantics explicit"
+category = "reliability"
+tags = ["kotlin", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Ability to share stream work without retaining producers or stale values beyond their intended lifetime."
+threat = "Careless stateIn or shareIn use leaks collection, performs work without subscribers, or replays inappropriate state."
+expectation = "Multiple consumers will need shared state and shared upstream work."
+strategy = "Use stateIn or shareIn only with deliberate scope, start policy, and replay choices."
+evidence = [{ type = "test", description = "Hot-flow tests verify startup, shutdown, replay, and no-subscriber behavior against the documented sharing policy.", required = true }]
+tradeoff = "Explicit sharing configuration adds lifecycle complexity and can still retain memory or work longer than expected."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#flow-patterns", summary = "The source cautions that stateIn and shareIn must be used carefully for hot flows.", confidence = 0.98 }]

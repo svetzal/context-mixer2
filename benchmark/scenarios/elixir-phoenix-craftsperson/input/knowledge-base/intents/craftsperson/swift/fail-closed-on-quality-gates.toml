@@ -1,0 +1,17 @@
+id = "guidelines.intent.fail-closed-on-quality-gates"
+title = "Fail closed on quality-gate failures"
+category = "quality"
+tags = ["swift", "documentation", "error-handling", "quality-gates", "project-conventions", "completion"]
+relations = [
+  { type = "specializes", target = "craftsperson/honor-the-project-quality-gate" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "A completed change has trustworthy evidence rather than unexplained or suppressed failures."
+threat = "Continuing after a failed check, suppressing symptoms, or rerunning only part of the suite hides unresolved defects."
+expectation = "Delivery pressure will create incentives to bypass noisy gates or declare success after a narrow fix."
+strategy = "Stop on a failed gate, fix its root cause, rerun all checks, and document any justified suppression locally."
+evidence = [{ type = "workflow_gate", description = "After any check failure, the change records a root-cause correction or explained exception and a subsequent complete successful gate run.", required = true }]
+tradeoff = "Fail-closed workflow can halt unrelated progress when tooling is flaky or the root cause lies outside the team's control."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#quality-gates-mandatory", summary = "Commands work to stop on failure, correct root causes, rerun every check, and explain suppressions.", confidence = 1.0 }]

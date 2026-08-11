@@ -1,0 +1,17 @@
+id = "guidelines.intent.synchronize-docs-with-api"
+title = "Change implementation and narrative documentation together"
+category = "documentation"
+tags = ["go", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Users can rely on docs as an accurate description of the current API and implementation."
+threat = "API changes leave generated or hand-written documentation describing behavior that no longer exists."
+expectation = "The exported surface will change repeatedly while readers continue to consult docs independently of source."
+strategy = "Update Go doc comments and regenerate or edit docs/ whenever the API surface changes."
+evidence = [{ type = "gate", description = "An API change produces corresponding documentation changes, and documentation generation leaves the working tree clean.", required = true }]
+tradeoff = "Synchronized documentation broadens each API change and can slow small iterations."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#synchronize-documentation", summary = "Requires docs/ to reflect implementation and documentation to change whenever the API changes.", confidence = 1.0 }]

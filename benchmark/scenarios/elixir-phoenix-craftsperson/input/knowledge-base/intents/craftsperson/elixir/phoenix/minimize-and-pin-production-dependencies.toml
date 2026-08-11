@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimize-and-pin-production-dependencies"
+title = "Minimize and pin production dependencies"
+category = "dependencies"
+tags = ["elixir", "phoenix", "dependencies", "build-and-delivery", "supply-chain", "complexity"]
+relations = [
+  { type = "specializes", target = "craftsperson/minimize-dependency-surface" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Production builds remain reproducible with a small, understood third-party risk surface."
+threat = "Unnecessary or loosely constrained packages introduce supply-chain, compatibility, and maintenance risk."
+expectation = "Dependencies will publish breaking, vulnerable, or abandoned releases over the application's lifetime."
+strategy = "Add dependencies only when the standard library is insufficient and pin production application requirements in mix.exs."
+evidence = [{ type = "manifest_review", description = "Every production dependency has a current use and an intentional version constraint; removable packages are absent.", required = true }]
+tradeoff = "The team may implement small capabilities locally and must perform deliberate version updates."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#dependency-management", summary = "Requires minimal, audited, pinned dependencies for production applications.", confidence = 1.0 }]

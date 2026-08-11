@@ -1,0 +1,17 @@
+id = "guidelines.intent.semantic-modifier-ordering"
+title = "Preserve intentional Compose modifier behavior"
+category = "design"
+tags = ["kotlin", "android", "build-and-delivery", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "Ability to compose layout, input, drawing, and accessibility behavior in a predictable order."
+threat = "Carelessly ordered or opaque Modifier chains change hit targets, padding, clipping, and semantics even when they contain the same operations."
+expectation = "Reusable composables will accumulate more modifiers and caller-supplied customization."
+strategy = "Build Modifier chains fluently, semantically, and in an order that makes behavioral effects explicit."
+evidence = [{ type = "gate", description = "Focused Compose tests verify hit areas, layout, clipping, and semantics for order-sensitive chains, and review can explain each modifier's position.", required = true }]
+tradeoff = "Explicitly structured chains may be longer and require extra tests for behavior that appears visually simple."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#compose-ui", summary = "The source requires Modifier chains to be used fluently and semantically.", confidence = 1.0 }]

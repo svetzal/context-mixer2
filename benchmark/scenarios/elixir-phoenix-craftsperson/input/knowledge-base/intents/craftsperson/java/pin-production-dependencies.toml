@@ -1,0 +1,17 @@
+id = "guidelines.intent.pin-production-dependencies"
+title = "Pin production dependency versions"
+category = "dependencies"
+tags = ["java", "dependencies", "build-and-delivery", "supply-chain", "complexity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/minimize-dependency-surface" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Production builds resolve a reproducible, reviewable dependency graph."
+threat = "Version ranges and SNAPSHOT artifacts change without a source change and can introduce untested behavior."
+expectation = "Remote repositories will publish new or mutable artifacts after a release is built."
+strategy = "Declare explicit stable dependency versions and exclude ranges and SNAPSHOT dependencies from production builds."
+evidence = [{ type = "manifest_gate", description = "The production dependency graph contains no version ranges or SNAPSHOT versions and resolves consistently in CI.", required = true }]
+tradeoff = "Pinned versions require deliberate maintenance and can delay compatible security or bug-fix updates."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#build-and-dependency-management", summary = "Requires explicitly pinned versions and rejects ranges and SNAPSHOT dependencies in production.", confidence = 1.0 }]

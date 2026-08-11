@@ -1,0 +1,17 @@
+id = "guidelines.intent.inspect-project-invariants-before-change"
+title = "Inspect project invariants before substantive change"
+category = "delivery"
+tags = ["rust", "testing", "build-and-delivery", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Changes begin from an accurate understanding of the Rust project's declared compatibility and build constraints."
+threat = "Work starts without inspecting manifests, lockfiles, toolchain pins, or CI and silently violates project assumptions."
+expectation = "Agents and contributors will make substantive changes across Rust repositories with differing configurations."
+strategy = "Inspect Cargo.toml, Cargo.lock, toolchain configuration, and CI workflows before substantive changes."
+evidence = [{ type = "review", description = "Change summaries identify the inspected manifest, lockfile, toolchain, and CI constraints relevant to the work.", required = true }]
+tradeoff = "Up-front inspection adds latency even for changes that ultimately do not touch a declared invariant."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#detect--preserve-invariants-mandatory", summary = "Requires inspection of manifests, lockfile, toolchain pinning, and CI before substantive changes.", confidence = 1.0 }]

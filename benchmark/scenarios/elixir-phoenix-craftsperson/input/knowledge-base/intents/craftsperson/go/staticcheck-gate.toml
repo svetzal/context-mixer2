@@ -1,0 +1,17 @@
+id = "guidelines.intent.staticcheck-gate"
+title = "Gate changes on advanced Go static analysis"
+category = "design"
+tags = ["go", "testing", "dependencies", "static-analysis", "performance", "idioms"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Subtle correctness, performance, and maintainability problems are detected without executing the program."
+threat = "Defects outside the compiler and vet rule sets can survive ordinary tests."
+expectation = "The codebase and Go ecosystem will accumulate patterns whose risks are captured by evolving specialist analysis."
+strategy = "Run staticcheck across every package before completion."
+evidence = [{ type = "gate", description = "staticcheck ./... exits successfully with no findings.", required = true }]
+tradeoff = "A broader evolving rule set adds tool maintenance and can introduce new failures after tool upgrades."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#apply-quality-gates-mandatory-before-completion", summary = "Mandates staticcheck ./... as the advanced static-analysis gate.", confidence = 1.0 }]

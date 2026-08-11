@@ -1,0 +1,17 @@
+id = "guidelines.intent.behavior-focused-tests"
+title = "Specify observable behavior rather than implementation structure"
+category = "design"
+tags = ["python", "concurrency", "testing", "error-handling", "cohesion", "single-responsibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Internal design can be refactored without rewriting tests when externally meaningful behavior is unchanged."
+threat = "Tests coupled to implementation details make harmless refactoring expensive and produce false failures."
+expectation = "Implementations will evolve while their behavioral contracts remain stable."
+strategy = "Assert externally meaningful results and interactions at owned boundaries, and refocus tests that inspect private implementation details."
+evidence = [{ type = "review", description = "A semantics-preserving internal refactor does not require test changes, and assertions describe outputs, state transitions, errors, or owned boundary interactions.", required = true }]
+tradeoff = "Behavior-only tests can make some internal fault localization less direct and may require broader fixture setup."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#tests-are-the-executable-spec", summary = "The source says tests verify behavior rather than implementation details and repeats this in self-correction guidance.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.plain-data-over-custom-types"
+title = "Model domain information as ordinary Clojure data"
+category = "design"
+tags = ["clojure", "testing", "persistence", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to inspect, transform, serialize, and compose domain information with standard Clojure functions"
+threat = "Unnecessary records and custom types hide information behind bespoke behavior and constrain generic transformations"
+expectation = "Domain data will pass through new workflows, tools, and integrations"
+strategy = "Prefer maps, vectors, and sets, introducing records or types only when their semantics are necessary"
+evidence = [{ type = "review", description = "Each new record or custom type has a documented requirement that plain data cannot satisfy", required = true }]
+tradeoff = "Plain collections provide fewer compile-time cues and may permit malformed shapes without complementary validation"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#core-philosophy", summary = "Data-oriented design prefers plain maps, vectors, and sets over custom types.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#2-data-design", summary = "Reviews are instructed to challenge unnecessary records and types.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.optimize-code-for-human-readers"
+title = "Optimize Ruby code for its next human reader"
+category = "design"
+tags = ["ruby", "security", "readability", "clarity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for future maintainers to understand code without reconstructing the author's mental model"
+threat = "Code written primarily for execution can hide purpose behind technically correct but opaque structure"
+expectation = "Ruby code will be read and changed by people who lack the original implementation context"
+strategy = "Treat code as communication and optimize each line for the next human reader"
+evidence = [{ type = "review", description = "A reviewer unfamiliar with the change can explain each changed unit's purpose and control flow from the code itself", required = true }]
+tradeoff = "Reader-oriented structure can be more verbose than the shortest executable formulation"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#code-is-communication", summary = "The agent says to optimize every line for the next human reader.", confidence = 1.0 }]

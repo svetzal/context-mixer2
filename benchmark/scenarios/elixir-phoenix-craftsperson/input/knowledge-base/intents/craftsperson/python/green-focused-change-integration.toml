@@ -1,0 +1,17 @@
+id = "guidelines.intent.green-focused-change-integration"
+title = "Integrate only focused changes that pass automation"
+category = "delivery"
+tags = ["python", "build-and-delivery", "incremental-delivery", "change-scope", "reversibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/deliver-small-independent-increments" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Changes reach the main line with bounded review scope and verified repository-wide compatibility."
+threat = "Broad or failing changes overwhelm reviewers and destabilize the shared branch."
+expectation = "Multiple streams of work will converge on main through asynchronous review and automation."
+strategy = "Branch from main, keep pull requests focused and clearly described, and require green CI before merge."
+evidence = [{ type = "gate", description = "The pull request contains one focused change, identifies its purpose, and all required CI checks succeed before merge.", required = true }]
+tradeoff = "Branch and review gates increase lead time and can create integration queues or stale branches."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#version-control", summary = "The source requires branching from main, green CI, descriptive commits, and focused reviewable PRs.", confidence = 1.0 }]

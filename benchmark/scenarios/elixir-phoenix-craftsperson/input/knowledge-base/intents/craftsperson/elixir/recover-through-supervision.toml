@@ -1,0 +1,17 @@
+id = "guidelines.intent.recover-through-supervision"
+title = "Recover exceptional process failures through supervision"
+category = "design"
+tags = ["elixir", "concurrency", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The system restores service after isolated exceptional failures without defensive error handling everywhere."
+threat = "Unsupervised crashes terminate capabilities, while over-catching leaves processes in corrupt or unknown state."
+expectation = "Long-running BEAM systems will encounter rare defects and transient infrastructure failures."
+strategy = "Let truly exceptional failures crash isolated processes and design supervision trees to restart them safely."
+evidence = [{ type = "fault_test", description = "A supervised process can be forced to crash and is restarted into a valid state without taking unrelated capabilities down.", required = true }]
+tradeoff = "Crash recovery can discard in-process state and requires careful supervisor topology and idempotent initialization."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#error-handling", summary = "Applies let-it-crash only to truly exceptional scenarios and requires appropriate supervision.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.colocate-module-tests"
+title = "Co-locate each module with its specification"
+category = "delivery"
+tags = ["typescript", "bun", "cli", "testing", "dependencies", "tooling"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Maintainers can discover a module's tests immediately and notice when a module has no specification."
+threat = "Separate test trees obscure correspondence, drift from source layout, and let untested modules go unnoticed."
+expectation = "The source tree will gain modules and be reorganized during refactoring."
+strategy = "Place one `*_spec.ts` beside each tested module and configure the Bun test scripts around that convention."
+evidence = [{ type = "layout_check", description = "A repository check maps each testable source module to a neighboring `*_spec.ts`, rejects tests in separate `tests/` or `__tests__/` trees, and confirms the configured test glob discovers them.", required = true }]
+tradeoff = "Co-location mixes production and test files in the same directories and may complicate packaging exclusions."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#project-structure", summary = "Mandates one co-located `_spec.ts` per module and rejects separate test directories for discoverability.", confidence = 1.0 }]

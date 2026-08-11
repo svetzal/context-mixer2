@@ -1,0 +1,17 @@
+id = "guidelines.intent.bind-expression-results"
+title = "Bind expression results explicitly"
+category = "delivery"
+tags = ["elixir", "phoenix", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "State transformations performed by branch expressions are retained by later code."
+threat = "Rebinding inside if, case, or cond is mistaken for mutation and the outer value remains unchanged."
+expectation = "LiveView and pipeline code will conditionally transform immutable values."
+strategy = "Bind the result of each block expression to the value used afterward."
+evidence = [{ type = "test", description = "Conditional transformation tests assert the returned outer value and static review finds no relied-upon rebinding confined to a branch.", required = true }]
+tradeoff = "Explicit outer bindings add lines and sometimes require an else branch returning the original value."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#core-language-patterns", summary = "Explains that rebinding inside block expressions does not propagate and requires binding the expression result.", confidence = 1.0 }]

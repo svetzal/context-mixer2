@@ -1,0 +1,17 @@
+id = "guidelines.intent.mock-owned-gateway-boundaries-only"
+title = "Mock only owned gateway boundaries"
+category = "testing"
+tags = ["csharp", "testing", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Tests isolate external effects through stable contracts controlled by the application."
+threat = "Mocking third-party library internals couples tests to implementation details that change across library versions."
+expectation = "External libraries and their internal APIs will evolve independently of the application's domain behavior."
+strategy = "Wrap third-party I/O in application-owned gateway interfaces and mock those interfaces, never the library internals."
+evidence = [{ type = "test_dependency_review", description = "Test doubles implement application-owned gateway interfaces and no test mocks internal types or call shapes from an external library.", required = true }]
+tradeoff = "Owned gateways add adapter code and may expose only a subset of a library's capabilities."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#testing-philosophy", summary = "Forbids mocking library internals and requires third-party libraries to be wrapped behind gateway interfaces first.", confidence = 1.0 }]

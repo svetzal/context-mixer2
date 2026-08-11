@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-gateways-logic-free"
+title = "Keep gateway classes as logic-free adapters"
+category = "architecture"
+tags = ["ruby", "testing", "gateways", "business-logic", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-gateways-logic-free" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to test domain decisions without performing external I/O"
+threat = "Business logic inside gateways becomes difficult to exercise independently and blurs integration boundaries"
+expectation = "External adapters will evolve and may acquire tempting convenience logic over time"
+strategy = "Keep gateways as thin wrappers; move custom decision logic into the core rather than testing I/O-only adapters"
+evidence = [{ type = "review", description = "Gateway methods contain only translation and delegation; any branching domain rule is exercised in a core object instead", required = true }]
+tradeoff = "Moving even small logic out of adapters can increase collaborator count and data translation"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "Gateway classes should be thin, logic-free, and generally need no direct tests.", confidence = 1.0 }]

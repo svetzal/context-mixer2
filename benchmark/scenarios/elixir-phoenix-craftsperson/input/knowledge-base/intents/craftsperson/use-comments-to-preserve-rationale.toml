@@ -1,0 +1,292 @@
+id = "guidelines.intent.use-comments-to-preserve-rationale"
+title = "Use comments to preserve rationale"
+category = "documentation"
+tags = ["comments", "rationale", "maintainability"]
+status = "hypothesized"
+confidence = 0.97
+capability = "A future maintainer can recover why a surprising constraint or choice exists."
+threat = "Comments narrate visible mechanics while non-obvious intent, rejected alternatives, and safety constraints disappear."
+expectation = "Code structure can explain what executes but cannot always encode the external history or tradeoff that selected it."
+strategy = "Make code explain what it does and reserve comments for why a surprising choice, constraint, workaround, or tradeoff must remain."
+evidence = [{ type = "review", description = "Comments add durable rationale not evident from the code and do not merely translate syntax into prose.", required = true }]
+tradeoff = "Rationale comments can become stale or discourage revisiting a decision whose original constraints no longer apply."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#documentation", summary = "Uses comments to explain why rather than narrate what.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#engineering-principles-you-follow", summary = "Preserves rationale in comments at surprising decisions.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#documentation-standards", summary = "Records rationale at surprising implementation choices.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defn settle-batch [txns]
+  ;; Partition size 499, not 500: the processor's batch API
+  ;; rejects exactly 500 items (off-by-one on their side,
+  ;; confirmed with vendor 2026-03, ticket VND-88). Tried
+  ;; 500-with-retry — it caused duplicate settlements.
+  (doseq [batch (partition-all 499 txns)]
+    (submit! batch)))
+'''
+bad = '''
+(defn settle-batch [txns]
+  ;; partition the transactions into batches of 499
+  (doseq [batch (partition-all 499 txns)]
+    ;; loop over each batch
+    (submit! batch)))   ;; submit the batch
+
+; narrates what the code already says; the load-bearing fact
+; (WHY 499, and that 500 double-settles) lives nowhere
+'''
+
+[examples.cpp]
+good = '''
+// Retry once, not three times: the vendor gateway treats a
+// third attempt within 60s as fraud and locks the merchant
+// account (support ticket #4211, Nov 2025). Revisit if fixed.
+constexpr int kMaxPaymentAttempts = 2;
+
+// QSaveFile, not QFile: a crash mid-write must never leave a
+// half-written settings file (data-loss report INC-88).
+QSaveFile out(settingsPath());
+'''
+bad = '''
+// increment i by one
+++i;
+// loop over all the orders
+for (const auto& order : orders) {
+  // call process on the order
+  process(order);
+}
+// Meanwhile, WHY payment attempts are capped at 2 is written
+// nowhere — and next quarter someone "fixes" it back to 3,
+// locking the merchant account. The mechanics needed no prose.
+'''
+
+[examples.csharp]
+good = '''
+// Serial with a 1s gap on purpose: the vendor rate-
+// limits per ACCOUNT, not per key, and bursts get us
+// blackholed for 10 minutes (incident 2026-03-04).
+// Do not "optimize" this back to Task.WhenAll.
+foreach (var batch in batches)
+{
+    await _client.Push(batch, ct);
+    await Task.Delay(TimeSpan.FromSeconds(1), ct);
+}
+'''
+bad = '''
+// loop over the batches
+foreach (var batch in batches)
+{
+    // push the batch
+    await _client.Push(batch, ct);
+    // wait one second
+    await Task.Delay(TimeSpan.FromSeconds(1), ct);
+}
+// narrates the visible mechanics; the constraint that
+// makes this shape mandatory is gone
+'''
+
+[examples.elixir]
+good = '''
+Enum.each(users, fn user ->
+  Mailer.send(user)
+
+  # Mailgun throttles bursts over 10/s (docs, 2025-11);
+  # without this pause whole batches drop SILENTLY.
+  # Remove when we move to the queued-delivery API.
+  Process.sleep(120)
+end)
+'''
+bad = '''
+# increment the counter by one
+count = count + 1
+
+# loop over the users
+Enum.each(users, fn user ->
+  # send the email
+  Mailer.send(user)
+  Process.sleep(120)
+end)
+# the sleep — the one line with a non-obvious reason —
+# is the only line left unexplained
+'''
+
+[examples.go]
+good = '''
+// Cap is 3, not 5: the acquirer counts our retries toward its
+// 4-attempt fraud rule (vendor ticket #8841); exceeding it
+// locks the customer's card for 24h. Revisit if we ever
+// switch acquirers.
+const maxChargeAttempts = 3
+
+func shouldRetry(attempt int, err error) bool {
+	return attempt < maxChargeAttempts &&
+		errors.Is(err, ErrTransient)
+}
+'''
+bad = '''
+// increment the counter
+attempts++
+// loop over the users
+for _, u := range users {
+	// check if the user is active
+	if u.Active {
+		// append the user to the result
+		result = append(result, u)
+	}
+}
+// (why attempts is capped at 3 is recorded nowhere)
+'''
+
+[examples.java]
+good = '''
+// Batch size 500 is a hard limit of the vendor's bulk
+// API; larger batches return 413 in production
+// (INC-2231, 2026-03-04). Do not "fix" by retrying
+// smaller: their dedupe window is only 5 seconds.
+private static final int VENDOR_BATCH_LIMIT = 500;
+
+List<List<Order>> batches(List<Order> orders) {
+    return partition(orders, VENDOR_BATCH_LIMIT);
+}
+'''
+bad = '''
+// increment i by one
+i++;
+// loop over the orders
+for (var order : orders) {
+    // add the order total to the total
+    total = total.add(order.total());
+}
+// return the total
+return total;
+// meanwhile, WHY the loop skips drafts two lines up —
+// the one surprising choice — is documented nowhere
+'''
+
+[examples.kotlin]
+good = '''
+// The vendor returns HTTP 200 with an EMPTY body when
+// throttling, not 429 (confirmed with their support,
+// 2026-03). Treating it as success cached zero rates and
+// corrupted quotes — this branch must stay.
+if (response.isSuccess && response.body.isEmpty()) {
+    return Fetch.Throttled
+}
+'''
+bad = '''
+// check if the response is success and the body is empty
+if (response.isSuccess && response.body.isEmpty()) {
+    // return throttled
+    return Fetch.Throttled
+}
+// increment the retry counter by one
+retries++
+// (the WHY — a vendor quirk worth keeping — appears nowhere)
+'''
+
+[examples.python]
+good = '''
+def flush(self) -> None:
+    batch = self._pending[:500]
+    # Vendor API silently truncates batches over 500 items
+    # (ticket VND-2214, confirmed 2026-03) even though its
+    # docs claim a 1000 limit. Keep chunking at 500 until
+    # the vendor confirms a fix.
+    self._client.send(batch)
+    del self._pending[:len(batch)]
+'''
+bad = '''
+def flush(self) -> None:
+    # take the first 500 items
+    batch = self._pending[:500]
+    # send the batch
+    self._client.send(batch)
+    # remove the sent items from pending
+    del self._pending[:len(batch)]
+    # every comment narrates syntax; the reason the limit
+    # is 500 — the only surprising fact — is recorded nowhere
+'''
+
+[examples.ruby]
+good = '''
+# Stripe redelivers webhooks for up to 3 days; without dedupe
+# on event id, a replay after an outage double-credits wallets
+# (incident #212). Rejected: timestamp-window dedupe — clock
+# skew between hosts caused false negatives in staging.
+def handle(event:)
+  return if Processed.exists?(event_id: event.id)
+
+  credit_wallet(event: event)
+end
+'''
+bad = '''
+# loop over the events
+events.each do |event|
+  # check if processed
+  next if Processed.exists?(event_id: event.id)
+
+  # credit the wallet
+  credit_wallet(event: event) # why dedupe? nobody remembers —
+end                           # someone "simplifies" it away
+'''
+
+[examples.rust]
+good = '''
+// Retry only 3 times: the vendor rate-limits at 5/min and
+// bans the key for 24h past that (support ticket #4411).
+// Raising this cap requires their paid tier.
+const MAX_RETRIES: u32 = 3;
+
+fn subtotal(items: &[Item]) -> Cents {
+    items.iter().map(Item::price).sum()
+}
+'''
+bad = '''
+// set max retries to 3
+const MAX_RETRIES: u32 = 3;
+
+// loop over the items and sum the prices
+fn subtotal(items: &[Item]) -> Cents {
+    // return the sum
+    items.iter().map(Item::price).sum()
+}
+// the *why* behind 3 (vendor ban threshold) is gone
+'''
+
+[examples.swift]
+good = '''
+// Full jitter, not plain exponential: the gateway throttles
+// bursts, and synchronized client retries caused the
+// INC-412 stampede. Keep the random factor.
+let delay = base * pow(2, attempt) * .random(in: 0...1)
+'''
+bad = '''
+// multiply base by two to the power of attempt, then by
+// a random number between zero and one
+let delay = base * pow(2, attempt) * .random(in: 0...1)
+// increment the attempt counter
+attempt += 1
+// the why (throttling, INC-412) lives in nobody's head now
+'''
+
+[examples.typescript]
+good = '''
+// Stripe retries webhooks for 72h; dedupe on event id or a
+// network blip double-fulfills orders (incident 2024-11-03).
+// At-most-once delivery was tried and rejected: it drops
+// legitimate events during deploys.
+const fresh = await store.putIfAbsent(event.id);
+if (!fresh) return; // duplicate delivery, already handled
+'''
+bad = '''
+// increment i by one
+i++;
+// loop over the users
+for (const user of users) {
+  // call sendEmail with the user
+  sendEmail(user); // sends the email
+}
+// return true — while the dedupe-or-double-fulfill
+// constraint that shaped this code goes unrecorded
+return true;
+'''

@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-changesets-for-persistence"
+title = "Use changesets for persistence"
+category = "reliability"
+tags = ["elixir", "phoenix", "security", "persistence", "build-and-delivery", "data-integrity"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Every database insert and update passes through explicit casting, validation, and constraint translation."
+threat = "Raw maps bypass field policy and validation, allowing malformed or unauthorized data into persistence."
+expectation = "Persisted schemas will gain validations and system-owned fields as features evolve."
+strategy = "Build Ecto changesets for all Repo inserts and updates rather than passing raw maps."
+evidence = [{ type = "static_check", description = "All Repo.insert and Repo.update call sites receive changesets, with tests for rejected invalid attributes.", required = true }]
+tradeoff = "Internal trusted writes still incur changeset construction and validation boilerplate."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#ecto-database-guidelines", summary = "Requires changesets for every insert and update and rejects raw maps passed to Repo.", confidence = 1.0 }]

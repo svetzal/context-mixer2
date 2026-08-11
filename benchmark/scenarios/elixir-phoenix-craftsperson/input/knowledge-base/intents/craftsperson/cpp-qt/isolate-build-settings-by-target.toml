@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-build-settings-by-target"
+title = "Isolate build settings by target"
+category = "design"
+tags = ["cpp", "qt", "build-and-delivery", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Components export only their real contracts."
+threat = "Global include and link state leaks across targets."
+expectation = "The project will add libraries and tests."
+strategy = "Use target include, feature, and link commands with visibility."
+evidence = [{ type = "gate", description = "No target-specific need uses global include_directories or link_libraries.", required = true }]
+tradeoff = "Target-based CMake is more verbose."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#build-system-cmake", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

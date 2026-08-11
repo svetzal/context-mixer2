@@ -1,0 +1,17 @@
+id = "guidelines.intent.distinguish-identifiers-with-brands"
+title = "Distinguish semantically different identifiers at compile time"
+category = "design"
+tags = ["typescript", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to prevent identifiers with the same runtime representation from being interchanged"
+threat = "Plain strings for different entity IDs permit validly typed but semantically wrong calls"
+expectation = "More entity identifiers will cross shared APIs as the domain grows"
+strategy = "Represent identifiers with distinct branded types and controlled constructors"
+evidence = [{ type = "static-check", description = "Type-checking rejects passing one entity's branded identifier where another entity's identifier is required", required = true }]
+tradeoff = "Brands require conversion points and can complicate serialization and interoperability with untyped libraries"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#type-system-patterns", summary = "Branded types are prescribed to prevent ID mixups.", confidence = 1.0 }]

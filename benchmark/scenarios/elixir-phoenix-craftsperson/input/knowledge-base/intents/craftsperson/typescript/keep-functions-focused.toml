@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-functions-focused"
+title = "Keep functions short enough to reveal one coherent behavior"
+category = "design"
+tags = ["typescript", "testing", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.91
+capability = "Ability to understand and test a function as one focused unit"
+threat = "Long functions accumulate multiple levels of abstraction and hidden responsibilities"
+expectation = "Incremental feature additions will otherwise grow existing functions indefinitely"
+strategy = "Treat functions beyond roughly fifteen to twenty lines as a prompt to extract coherent responsibilities"
+evidence = [{ type = "review", description = "Functions exceeding the guideline have an explicit cohesion rationale; otherwise each extracted function has one describable purpose", required = true }]
+tradeoff = "Aggressive extraction can fragment a readable flow and create indirection through many tiny functions"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#red-flags-to-catch", summary = "Functions longer than fifteen to twenty lines are named as a red flag.", confidence = 1.0 }]

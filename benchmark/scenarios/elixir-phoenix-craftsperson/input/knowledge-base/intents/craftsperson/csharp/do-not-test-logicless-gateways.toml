@@ -1,0 +1,17 @@
+id = "guidelines.intent.do-not-test-logicless-gateways"
+title = "Do not unit-test logicless gateways"
+category = "testing"
+tags = ["csharp", "testing", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Test effort remains concentrated on application-owned behavior rather than duplicating verification of external libraries."
+threat = "Tests for pass-through adapters become brittle interaction scripts with little defect-detection value."
+expectation = "External client libraries will change their APIs while thin adapters continue to delegate equivalent operations."
+strategy = "Leave pure I/O gateway wrappers without unit tests; when a gateway contains custom logic, move that logic into the core when feasible and test it there."
+evidence = [{ type = "test_and_adapter_review", description = "Logicless gateway wrappers have no interaction-only unit tests, and custom branching or transformation is either core-tested or explicitly justified at the adapter.", required = true }]
+tradeoff = "Incorrect wiring or misuse of a library can escape unit tests and require integration tests or production-like verification to detect."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#testing-philosophy", summary = "Says not to test I/O-isolating gateways without custom logic and prefers moving such logic into the core.", confidence = 1.0 }]

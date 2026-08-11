@@ -1,0 +1,17 @@
+id = "guidelines.intent.track-dependency-lifecycle-risk"
+title = "Track dependency lifecycle risk"
+category = "dependencies"
+tags = ["elixir", "phoenix", "security", "dependencies", "supply-chain", "complexity"]
+relations = [
+  { type = "specializes", target = "craftsperson/minimize-dependency-surface" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Maintainers can plan replacement or upgrades before dependencies become unsupported."
+threat = "Retired and increasingly outdated packages silently become operational and security liabilities."
+expectation = "Package maintainers will retire releases and publish newer compatible or incompatible versions."
+strategy = "Use mix hex.audit to detect retired packages and mix hex.outdated --all to maintain upgrade visibility without blocking by default."
+evidence = [{ type = "audit", description = "Routine dependency reports identify retired packages and enumerate outdated packages with an explicit disposition.", required = true }]
+tradeoff = "Lifecycle reports create recurring triage work even when no immediate upgrade is warranted."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#quality-assurance-process", summary = "Separates retired-package and outdated-package visibility from vulnerability blocking.", confidence = 1.0 }]

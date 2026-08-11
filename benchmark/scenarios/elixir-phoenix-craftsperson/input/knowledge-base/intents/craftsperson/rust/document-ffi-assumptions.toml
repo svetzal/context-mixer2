@@ -1,0 +1,17 @@
+id = "guidelines.intent.document-ffi-assumptions"
+title = "Document FFI memory and concurrency assumptions"
+category = "documentation"
+tags = ["rust", "concurrency", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Foreign-function boundaries remain sound across language and runtime assumptions."
+threat = "Callers treat foreign functions as safe while pointer, threading, or memory-model preconditions remain unstated."
+expectation = "FFI integrations will cross trust and type-system boundaries where Rust cannot enforce external behavior."
+strategy = "Assume foreign functions are unsafe and document pointer validity, thread-safety, and memory-model requirements."
+evidence = [{ type = "review", description = "Each FFI surface documents its pointer, lifetime, ownership, thread, and memory-model contract.", required = true }]
+tradeoff = "Thorough FFI contracts take substantial effort and may still depend on incomplete upstream documentation."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#unsafe-and-ffi-non-negotiable-rules", summary = "Applies Rustonomicon guidance and requires documenting pointer, thread, and memory-model assumptions.", confidence = 1.0 }]

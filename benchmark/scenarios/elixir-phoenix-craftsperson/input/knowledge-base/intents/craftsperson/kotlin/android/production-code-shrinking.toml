@@ -1,0 +1,17 @@
+id = "guidelines.intent.production-code-shrinking"
+title = "Preserve production package efficiency"
+category = "design"
+tags = ["kotlin", "android", "dependencies", "build-and-delivery", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to ship smaller and more optimized Android artifacts."
+threat = "Unused code and unoptimized bytecode increase download size, startup cost, and attack surface."
+expectation = "Dependencies and feature code will accumulate as the application matures."
+strategy = "Enable R8 full mode for production builds."
+evidence = [{ type = "gate", description = "Release build configuration enables full-mode shrinking and artifact analysis demonstrates shrinking and optimization occurred.", required = true }]
+tradeoff = "Full-mode optimization increases build time and can expose reflection or serialization assumptions."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#build-configuration", summary = "The source explicitly requires R8 full mode for production builds.", confidence = 1.0 }]

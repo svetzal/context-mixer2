@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-lazy-sequence-head-retention"
+title = "Consume lazy sequences without retaining their heads"
+category = "design"
+tags = ["clojure", "concurrency", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to process large lazy inputs with bounded live memory"
+threat = "Holding a reference to the head keeps already-consumed sequence elements reachable and exhausts memory"
+expectation = "Input sequences may grow beyond sizes that fit comfortably in memory"
+strategy = "Structure lazy-sequence consumers so processed prefixes are not retained"
+evidence = [{ type = "test", description = "A representative large-input memory test or heap observation shows live memory remains bounded while the sequence is consumed", required = true }]
+tradeoff = "Memory-sensitive sequence structure can make code less direct and may require specialized profiling to verify"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#6-performance-considerations", summary = "Correct lazy-sequence handling explicitly includes avoiding head retention.", confidence = 1.0 }]

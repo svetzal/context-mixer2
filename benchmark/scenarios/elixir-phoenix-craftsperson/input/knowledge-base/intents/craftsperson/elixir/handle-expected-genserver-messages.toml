@@ -1,0 +1,17 @@
+id = "guidelines.intent.handle-expected-genserver-messages"
+title = "Handle expected GenServer messages explicitly"
+category = "reliability"
+tags = ["elixir", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "A GenServer exposes a complete, understandable runtime protocol."
+threat = "Expected calls, casts, or info messages fall through or crash because the server protocol is only partially implemented."
+expectation = "Clients and runtime integrations will add message variants as the service evolves."
+strategy = "Implement explicit callbacks for every expected message and make each reply or state transition intentional."
+evidence = [{ type = "protocol_test", description = "Tests send every documented call, cast, and expected info message and assert the reply and resulting state.", required = true }]
+tradeoff = "Explicit callback coverage adds clauses and maintenance when the protocol changes."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#otp-best-practices", summary = "Requires GenServers to handle all expected messages explicitly.", confidence = 1.0 }]

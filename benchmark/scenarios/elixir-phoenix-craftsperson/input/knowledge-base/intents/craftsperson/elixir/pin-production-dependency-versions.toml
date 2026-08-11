@@ -1,0 +1,17 @@
+id = "guidelines.intent.pin-production-dependency-versions"
+title = "Pin production dependency versions deliberately"
+category = "design"
+tags = ["elixir", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Production dependency resolution remains reproducible and upgrades occur as reviewed changes."
+threat = "Loose constraints admit unplanned dependency changes that alter behavior or compatibility."
+expectation = "Packages will publish new releases independently of application deployments."
+strategy = "Use intentional production version constraints in mix.exs and update them through explicit dependency changes."
+evidence = [{ type = "manifest_review", description = "Every production dependency has an intentional bounded constraint and clean resolution reproduces the reviewed lockfile.", required = true }]
+tradeoff = "Pinned requirements require ongoing upgrade work and can delay compatible fixes until constraints are changed."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#dependency-management", summary = "Directs production applications to pin dependency versions in mix.exs.", confidence = 1.0 }]

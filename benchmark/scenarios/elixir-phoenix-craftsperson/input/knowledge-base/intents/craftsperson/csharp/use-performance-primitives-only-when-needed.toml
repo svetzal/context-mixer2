@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-performance-primitives-only-when-needed"
+title = "Reserve specialized primitives for demonstrated performance needs"
+category = "performance"
+tags = ["csharp", "testing", "performance", "profiling", "evidence", "optimization"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-from-measurement" },
+]
+status = "hypothesized"
+confidence = 0.86
+capability = "Performance-sensitive paths can reduce allocation or copying without making ordinary code needlessly difficult to understand."
+threat = "Either ignoring hot-path costs or applying low-level optimizations everywhere erodes performance or maintainability."
+expectation = "Some workloads will develop measurable performance constraints while most code remains better served by conventional abstractions."
+strategy = "Use specialized constructs such as Span<T> where performance matters, and otherwise prefer the simplest readable representation."
+evidence = [{ type = "benchmark", description = "A use of a specialized performance primitive is tied to a measured hot path and demonstrates a meaningful improvement against a readable baseline.", required = true }]
+tradeoff = "Specialized memory-oriented APIs add lifetime constraints, unfamiliar syntax, and maintenance complexity."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#core-identity", summary = "Includes Span<T> specifically where performance matters, while later preferring the simplest workable design.", confidence = 0.9 }]

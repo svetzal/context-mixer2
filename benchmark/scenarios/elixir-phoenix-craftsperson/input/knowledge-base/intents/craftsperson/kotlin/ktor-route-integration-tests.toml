@@ -1,0 +1,17 @@
+id = "guidelines.intent.ktor-route-integration-tests"
+title = "Exercise Ktor routes through the application boundary"
+category = "quality"
+tags = ["kotlin", "testing", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to verify routing, serialization, status codes, and server wiring together."
+threat = "Unit-tested handlers can still be unreachable or misconfigured at the HTTP boundary."
+expectation = "Server applications will add endpoints, plugins, and response variants."
+strategy = "Use Ktor testApplication and its client to exercise routes as integration tests."
+evidence = [{ type = "test", description = "Route tests issue HTTP requests through testApplication and assert status, headers, and representative response bodies for success and failure paths.", required = true }]
+tradeoff = "Application-boundary tests are slower and require more realistic configuration than isolated unit tests."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#ktor-test-for-server-side", summary = "The source prescribes testApplication, client route calls, and response-status verification.", confidence = 1.0 }]

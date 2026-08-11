@@ -1,0 +1,17 @@
+id = "guidelines.intent.module-purpose-readmes"
+title = "Preserve module-level orientation"
+category = "documentation"
+tags = ["kotlin", "android", "documentation", "dependencies", "synchronization", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for contributors to quickly understand why a module exists and how it should be used."
+threat = "Module intent and boundaries become tribal knowledge as structure grows."
+expectation = "Feature, domain, data, and core modules will be added and maintained by different contributors."
+strategy = "Maintain a README in every module explaining its purpose."
+evidence = [{ type = "gate", description = "A repository check finds a current README in every module and boundary review confirms its description matches code.", required = true }]
+tradeoff = "Per-module documents create repetitive maintenance and can become stale."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#documentation-standards", summary = "The source explicitly requires a README in each module explaining its purpose.", confidence = 1.0 }]

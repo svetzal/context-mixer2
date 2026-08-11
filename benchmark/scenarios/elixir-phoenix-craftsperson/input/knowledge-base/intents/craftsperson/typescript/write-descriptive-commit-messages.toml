@@ -1,0 +1,17 @@
+id = "guidelines.intent.write-descriptive-commit-messages"
+title = "Describe the behavior of each commit"
+category = "delivery"
+tags = ["typescript", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to understand why a change entered history without reconstructing the diff"
+threat = "Generic commit messages erase decision context and slow debugging or reversal"
+expectation = "Future maintainers will investigate regressions and evolution through version history"
+strategy = "Write concise commit messages that name the concrete behavior or decision changed"
+evidence = [{ type = "review", description = "The commit subject identifies the behavior introduced or corrected and distinguishes it from adjacent changes", required = true }]
+tradeoff = "Crafting precise history takes time and messages can still omit context found only during implementation"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#workflow-collaboration", summary = "Version-control guidance explicitly requires descriptive commit messages.", confidence = 1.0 }]

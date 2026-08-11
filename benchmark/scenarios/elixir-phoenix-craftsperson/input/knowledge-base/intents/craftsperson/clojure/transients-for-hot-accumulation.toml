@@ -1,0 +1,17 @@
+id = "guidelines.intent.transients-for-hot-accumulation"
+title = "Use transients only for performance-critical accumulation"
+category = "design"
+tags = ["clojure", "performance", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.91
+capability = "Ability to perform high-volume collection accumulation within required resource limits"
+threat = "Repeated persistent collection updates can create excessive allocation in measured hotspots"
+expectation = "Some workloads will grow enough that persistent accumulation becomes a demonstrated bottleneck"
+strategy = "Introduce transients for performance-critical accumulation after the hot path is identified"
+evidence = [{ type = "benchmark", description = "A repeatable benchmark shows the transient implementation materially improves the specified hot-path time or allocation target", required = true }, { type = "test", description = "Equivalence tests show the transient implementation returns the same persistent value as the simple implementation", required = true }]
+tradeoff = "Transient code has stricter usage rules, is less idiomatic, and is easier to misuse across threads or after persistent conversion"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#6-performance-considerations", summary = "Reviews ask whether transients are used for performance-critical accumulation.", confidence = 1.0 }]

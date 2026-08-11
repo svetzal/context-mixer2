@@ -1,0 +1,17 @@
+id = "guidelines.intent.audit-dependency-vulnerabilities"
+title = "Audit dependencies for known vulnerabilities"
+category = "design"
+tags = ["java", "security", "testing", "dependencies", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Known vulnerable third-party components are identified before a Java artifact is delivered."
+threat = "A transitive or direct dependency can expose the application even when first-party tests pass."
+expectation = "New CVEs will continue to be published against versions already present in dependency graphs."
+strategy = "Run OWASP Dependency-Check as part of the delivery gate and remediate actionable findings."
+evidence = [{ type = "security_gate", description = "The dependency vulnerability scan completes within configured policy and has no unaccepted actionable findings.", required = true }]
+tradeoff = "Vulnerability feeds can be slow, unavailable, or noisy, and remediation can force incompatible upgrades."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#quality-gates-mandatory", summary = "Mandates OWASP Dependency-Check to detect known vulnerabilities.", confidence = 1.0 }]

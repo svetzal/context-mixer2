@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-interfaces-for-contracts-only"
+title = "Use interfaces for contracts, not code sharing"
+category = "reliability"
+tags = ["csharp", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "An interface communicates a meaningful substitution boundary rather than serving as ceremony or an inheritance workaround."
+threat = "Interfaces introduced for implementation sharing obscure ownership and multiply types without enabling useful substitution."
+expectation = "Pressure for reuse and testability will otherwise produce an interface for every class."
+strategy = "Introduce interfaces only to express contracts across real boundaries; share implementation through focused composition."
+evidence = [{ type = "interface_review", description = "Every interface has at least one meaningful boundary or substitution role, and implementation reuse occurs through collaborators rather than interface defaults or marker abstractions.", required = true }]
+tradeoff = "Avoiding anticipatory interfaces can make a later substitution require extracting a contract after callers already exist."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#composition-over-inheritance", summary = "Directs interfaces to represent contracts rather than implementation sharing.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.kotlin-business-logic-coverage-floor"
+title = "Keep business logic under a meaningful coverage floor"
+category = "testing"
+tags = ["kotlin", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to change business behavior with automated regression feedback."
+threat = "Untested branches allow regressions to reach users as core logic expands."
+expectation = "Business rules will accumulate more variants and maintenance changes."
+strategy = "Run the full test suite with JaCoCo and maintain at least 80 percent line coverage on business logic."
+evidence = [{ type = "gate", description = "./gradlew test jacocoTestReport passes and the report shows at least 80 percent line coverage for business-logic packages.", required = true }]
+tradeoff = "A numeric floor can reward shallow assertions and adds test maintenance even for low-risk lines."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#quality-gate-enforcement", summary = "The source mandates passing tests with JaCoCo and targets 80 percent or greater line coverage on business logic.", confidence = 1.0 }]

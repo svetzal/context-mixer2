@@ -1,0 +1,17 @@
+id = "guidelines.intent.exhaustive-kotlin-domain-hierarchies"
+title = "Represent data-bearing domain alternatives exhaustively"
+category = "design"
+tags = ["kotlin", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to model and exhaustively handle domain states whose variants carry different data."
+threat = "Loose class families, flags, or enums hide invalid combinations and permit unhandled variants."
+expectation = "State machines and domain result variants will evolve with additional states and payloads."
+strategy = "Use sealed classes or interfaces for algebraic data types and reserve enums for structurally uniform variants."
+evidence = [{ type = "static_check", description = "Domain variants with distinct payloads form sealed hierarchies and consumers use exhaustive when expressions without fallback branches.", required = true }]
+tradeoff = "Sealed hierarchies introduce more types and can complicate serialization and cross-module extension."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#domain-modeling", summary = "The source prescribes sealed hierarchies for state machines and ADTs and distinguishes them from enums by variant data.", confidence = 1.0 }]

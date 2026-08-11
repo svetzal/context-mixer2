@@ -1,0 +1,17 @@
+id = "guidelines.intent.branch-ruby-work-from-main"
+title = "Start Ruby change branches from main"
+category = "delivery"
+tags = ["ruby", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to develop changes against the current integration baseline"
+threat = "Branches based on stale or secondary lines accumulate hidden divergence and integration surprises"
+expectation = "Parallel changes will continue to land on the main development line"
+strategy = "Create work branches from `main`"
+evidence = [{ type = "gate", description = "The change branch's merge base is a current `main` revision according to repository policy", required = true }]
+tradeoff = "Refreshing the branch from main can introduce conflicts before the feature itself is complete"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "The source's version-control etiquette says to branch from main.", confidence = 1.0 }]

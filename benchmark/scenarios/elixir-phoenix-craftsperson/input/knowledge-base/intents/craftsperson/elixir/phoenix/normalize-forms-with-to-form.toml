@@ -1,0 +1,17 @@
+id = "guidelines.intent.normalize-forms-with-to-form"
+title = "Normalize LiveView forms with to_form"
+category = "design"
+tags = ["elixir", "phoenix", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Templates consume one stable form contract whether input originates from params or a changeset."
+threat = "Templates coupled directly to changesets mishandle field access, namespaces, errors, and LiveView change tracking."
+expectation = "Forms will alternate between validation changesets and parameter-backed intermediate state."
+strategy = "Convert params or changesets with to_form/2, assign the result, and access fields through @form in Phoenix.Component forms."
+evidence = [{ type = "template_test", description = "Forms render, validate, and submit from both changeset and parameter sources without templates accessing @changeset directly.", required = true }]
+tradeoff = "The extra form abstraction requires assignment plumbing and can hide some underlying changeset details."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#form-handling", summary = "Mandates to_form/2 and @form field access and forbids passing changesets directly to templates.", confidence = 1.0 }]

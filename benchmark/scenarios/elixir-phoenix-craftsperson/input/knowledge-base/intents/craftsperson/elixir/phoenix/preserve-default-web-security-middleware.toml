@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-default-web-security-middleware"
+title = "Preserve default web security middleware"
+category = "architecture"
+tags = ["elixir", "phoenix", "security", "trust-boundaries", "authorization"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Browser requests retain baseline CSRF and security-header protection as routes evolve."
+threat = "Pipeline edits remove CSRF validation or weaken browser headers without accounting for the exposed attack surface."
+expectation = "New pipelines, APIs, embeddings, and CSP requirements will pressure defaults to be customized."
+strategy = "Keep Plug.CSRFProtection and put_secure_browser_headers in browser pipelines and require explicit rationale for deviations, including intentional CSP changes."
+evidence = [{ type = "security_test", description = "State-changing browser requests reject missing or invalid CSRF tokens and response headers match the documented secure policy.", required = true }]
+tradeoff = "Security middleware constrains cross-origin integrations and strict headers require deliberate exceptions for embedded or third-party content."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#phoenix-security-non-negotiable", summary = "Requires built-in CSRF and secure browser headers and explicit rationale for deviations.", confidence = 1.0 }]

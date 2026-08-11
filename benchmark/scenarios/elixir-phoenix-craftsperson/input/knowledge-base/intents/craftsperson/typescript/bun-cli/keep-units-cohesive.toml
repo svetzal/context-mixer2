@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-units-cohesive"
+title = "Keep code units cohesive"
+category = "design"
+tags = ["typescript", "bun", "cli", "testing", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "Each function and object has a small, comprehensible responsibility that can change for one reason."
+threat = "Long functions, boolean mode switches, and god objects combine distinct behaviors into units that are difficult to reason about or test."
+expectation = "Feature additions will tend to accrete branches and responsibilities onto existing command paths and service classes."
+strategy = "Treat long functions, boolean parameters, and oversized classes as prompts to separate named behaviors and responsibilities."
+evidence = [{ type = "review", description = "Changed functions substantially beyond 20 lines, boolean behavior switches, and multi-domain classes each have an explicit cohesion justification or are decomposed into intention-revealing units.", required = true }]
+tradeoff = "Decomposition increases the number of functions and modules and can fragment logic that is most readable in one place."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#red-flags-to-catch", summary = "Flags functions longer than 15-20 lines, boolean parameters hiding two behaviors, and god objects as maintainability risks.", confidence = 0.95 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.respect-project-specific-conventions"
+title = "Respect project-specific conventions"
+category = "documentation"
+tags = ["csharp", "testing", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A change fits the architecture, terminology, and quality expectations of the project it joins."
+threat = "Applying generic C# advice without context introduces conflicting patterns and fragments the codebase."
+expectation = "Different projects will make valid local tradeoffs and preserve decisions not captured by general language guidance."
+strategy = "Read project instructions and documentation first, then prefer established architecture, domain language, and quality standards over generic conventions."
+evidence = [{ type = "context_alignment_review", description = "The change cites or follows applicable project guidance, uses established domain terms, and introduces no conflicting architecture or weaker quality standard.", required = true }]
+tradeoff = "Local consistency can preserve dated practices and forgo improvements that would be preferred in a new project."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#working-with-project-context", summary = "Prioritizes project-specific patterns, architecture, quality standards, documentation, and terminology over general conventions.", confidence = 1.0 }]

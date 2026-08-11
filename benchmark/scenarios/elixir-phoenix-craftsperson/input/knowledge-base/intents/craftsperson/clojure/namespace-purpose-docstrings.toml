@@ -1,0 +1,17 @@
+id = "guidelines.intent.namespace-purpose-docstrings"
+title = "State each namespace purpose at its declaration"
+category = "design"
+tags = ["clojure", "documentation", "dependencies", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Ability to identify a namespace's responsibility before reading its implementation"
+threat = "Names alone become ambiguous as the system accumulates similarly named modules and historical responsibilities"
+expectation = "Future maintainers will navigate unfamiliar namespaces while diagnosing or extending behavior"
+strategy = "Maintain a namespace docstring that explains the namespace's single purpose"
+evidence = [{ type = "static-check", description = "Every production ns form has a non-empty docstring whose stated purpose matches the namespace contents", required = true }]
+tradeoff = "Namespace docstrings must be updated during responsibility changes or they become misleading"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#4-namespace-organization", summary = "A namespace docstring explaining purpose is an explicit review criterion.", confidence = 1.0 }]

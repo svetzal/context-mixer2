@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-leiningen-migration-impact"
+title = "Escalate build migration when existing tooling is affected"
+category = "collaboration"
+tags = ["clojure", "leiningen", "persistence", "build-and-delivery", "requirements", "decision-making"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to modernize the build with informed consent about workflow disruption"
+threat = "A technically attractive deps.edn migration can disable required Leiningen plugins, scripts, or release conventions"
+expectation = "Existing projects will carry local tooling not visible from the build manifest alone"
+strategy = "Seek user clarification before migrating from Leiningen when existing tooling could be affected"
+evidence = [{ type = "decision-record", description = "The migration decision identifies affected commands and plugins and records the user's accepted compatibility plan", required = true }]
+tradeoff = "Human approval slows modernization and can preserve legacy structure longer than technically necessary"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#when-to-escalate", summary = "A Leiningen-to-deps.edn migration affecting existing tooling is explicitly reserved for user clarification.", confidence = 1.0 }]

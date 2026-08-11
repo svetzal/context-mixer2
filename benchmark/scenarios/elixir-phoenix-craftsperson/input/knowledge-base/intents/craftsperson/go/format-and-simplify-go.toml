@@ -1,0 +1,17 @@
+id = "guidelines.intent.format-and-simplify-go"
+title = "Keep all Go source canonical and simplified"
+category = "quality"
+tags = ["go", "testing", "formatting", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Every production, test, and example source file remains mechanically consistent and easy to scan."
+threat = "Hand-formatted code and avoidable syntax variations create noisy diffs and obscure substantive changes."
+expectation = "Many contributors and generators will edit Go source with different local formatting habits."
+strategy = "Run gofmt with simplification across the complete Go source tree before work is considered complete."
+evidence = [{ type = "gate", description = "gofmt -s produces no diff for production, test, or example Go files.", required = true }]
+tradeoff = "Mandatory canonical formatting removes individual style choices and can enlarge otherwise focused diffs."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#ensure-code-quality", summary = "Requires gofmt -s and applies linting expectations to production code, examples, and tests.", confidence = 1.0 }]

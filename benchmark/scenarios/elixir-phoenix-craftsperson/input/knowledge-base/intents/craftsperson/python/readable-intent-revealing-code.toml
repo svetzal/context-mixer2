@@ -1,0 +1,17 @@
+id = "guidelines.intent.readable-intent-revealing-code"
+title = "Keep Python code legible as an explanation of the domain"
+category = "design"
+tags = ["python", "dependencies", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Maintainers can understand behavior, contracts, and domain boundaries directly from the code."
+threat = "Cryptic names, opaque signatures, and arbitrary module boundaries hide intent and make changes error-prone."
+expectation = "Future maintainers will need to change unfamiliar code without relying on its original author."
+strategy = "Optimize names, signatures, and module boundaries for communication of domain intent."
+evidence = [{ type = "review", description = "A reviewer unfamiliar with the change can state each public function's contract and each module's domain responsibility from the code.", required = true }]
+tradeoff = "More explicit naming and organization can make code longer and require refactoring beyond the immediate behavior change."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#code-is-communication", summary = "The source says code should optimize for the next reader and reveal intent through names, signatures, and module boundaries.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.inject-boundary-dependencies"
+title = "Inject effectful dependencies through contracts"
+category = "design"
+tags = ["go", "testing", "dependencies", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Core behavior can run with different boundary implementations in tests and production."
+threat = "Constructing concrete dependencies inside business logic hard-codes environment choices and prevents isolated tests."
+expectation = "Tests, deployments, and future integrations will require different implementations of the same boundary behavior."
+strategy = "Pass boundary dependencies into consumers through focused interfaces rather than constructing them internally."
+evidence = [{ type = "architecture_review", description = "Core constructors accept boundary interfaces and tests substitute deterministic fakes without global state or external resources.", required = true }]
+tradeoff = "Dependency injection increases constructor parameters and moves object assembly into a composition root."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#functional-core-imperative-shell", summary = "Prescribes dependency injection through interfaces for testability.", confidence = 1.0 }]

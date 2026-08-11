@@ -1,0 +1,17 @@
+id = "guidelines.intent.review-with-psychological-safety"
+title = "Direct code review criticism at the work"
+category = "collaboration"
+tags = ["go", "security", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Contributors can discuss defects and design disagreements candidly without personal attack."
+threat = "Critiquing the author rather than the code makes feedback defensive and suppresses future collaboration."
+expectation = "Reviews will surface mistakes and competing technical judgments among colleagues."
+strategy = "Critique code and ideas, never the colleague who produced them."
+evidence = [{ type = "review", description = "Review comments describe observable code behavior, risks, or alternatives and contain no judgments about the author's competence or motives.", required = true }]
+tradeoff = "Careful depersonalized phrasing takes additional effort and may feel less direct in urgent situations."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#code-review-approach", summary = "Says to review code rather than the colleague and critique ideas rather than authors.", confidence = 1.0 }]

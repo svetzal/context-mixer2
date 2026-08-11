@@ -1,0 +1,17 @@
+id = "guidelines.intent.delay-abstraction-until-evidence"
+title = "Delay abstraction until repetition proves it"
+category = "design"
+tags = ["cpp", "qt", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Abstractions match observed variation."
+threat = "Premature abstractions freeze guessed commonality."
+expectation = "Future requirements may diverge from today's pattern."
+strategy = "Keep code concrete until repeated use reveals a stable boundary."
+evidence = [{ type = "gate", description = "Each abstraction serves multiple real variations.", required = true }]
+tradeoff = "Temporary duplication and later extraction cost are accepted."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

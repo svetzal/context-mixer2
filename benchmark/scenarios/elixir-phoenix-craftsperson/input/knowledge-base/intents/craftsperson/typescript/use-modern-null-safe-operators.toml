@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-modern-null-safe-operators"
+title = "Express optional access and defaults with null-safe operators"
+category = "design"
+tags = ["typescript", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.86
+capability = "Ability to handle nullish values without conflating them with valid falsy data"
+threat = "Legacy truthiness checks and verbose property guards accidentally replace zero, false, or empty strings"
+expectation = "Optional data will remain common in evolving TypeScript interfaces"
+strategy = "Use optional chaining and nullish coalescing where their semantics match the contract"
+evidence = [{ type = "test", description = "Tests distinguish null or undefined from valid falsy values along changed optional-access and defaulting paths", required = true }]
+tradeoff = "Compact operators can hide a long optional path and may silently propagate undefined farther than intended"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#core-identity-expertise", summary = "Modern TypeScript usage explicitly includes nullish coalescing and optional chaining.", confidence = 0.9 }]

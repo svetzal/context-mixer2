@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-eafp-over-prechecks"
+title = "Prefer operation-first error handling"
+category = "reliability"
+tags = ["python", "uv", "error-handling", "error-modeling", "recoverability", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Code handles the actual outcome of an operation without relying on stale preconditions."
+threat = "Look-before-you-leap checks race with changing state and duplicate the operation's own validation."
+expectation = "Filesystem, mapping, and concurrent state can change between a precheck and the attempted operation."
+strategy = "Prefer EAFP by performing the operation and catching only its expected failure over separate precondition checks."
+evidence = [{ type = "review", description = "State-sensitive code relies on the operation's result or narrow exception rather than a check-then-act sequence unless the precheck has independent value.", required = true }]
+tradeoff = "Exceptions may become part of ordinary control flow and can obscure intent or add cost when failure is common."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#error-handling", summary = "Explicitly prefers EAFP over look-before-you-leap error handling.", confidence = 1.0 }]

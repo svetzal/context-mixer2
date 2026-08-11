@@ -1,0 +1,17 @@
+id = "guidelines.intent.colocate-tests-with-modules"
+title = "Co-locate each module with its specification"
+category = "design"
+tags = ["typescript", "testing", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to find a module's tests immediately and notice when none exist"
+threat = "Separate test trees drift from source organization and hide untested modules"
+expectation = "Modules will be added, renamed, and moved as the project evolves"
+strategy = "Place one module_spec.ts beside each tested module and configure the runner to discover that convention"
+evidence = [{ type = "static-check", description = "Every testable changed module has a sibling *_spec.ts file included by the Vitest or Jest configuration", required = true }]
+tradeoff = "Co-location adds test files to production source directories and may not suit all build or packaging conventions"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#project-structure", summary = "The standard layout mandates co-located *_spec.ts files and explicitly rejects separate tests directories.", confidence = 1.0 }]

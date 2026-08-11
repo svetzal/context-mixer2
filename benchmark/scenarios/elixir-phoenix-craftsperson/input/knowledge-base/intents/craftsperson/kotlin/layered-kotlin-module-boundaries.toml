@@ -1,0 +1,17 @@
+id = "guidelines.intent.layered-kotlin-module-boundaries"
+title = "Enforce dependency direction with Kotlin modules"
+category = "delivery"
+tags = ["kotlin", "dependencies", "builds", "configuration", "reproducibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to evolve domain, application, and infrastructure concerns independently."
+threat = "Undirected dependencies let framework and I/O concerns leak into the domain and create change amplification."
+expectation = "Applications will expand across business logic, use cases, and multiple delivery or persistence technologies."
+strategy = "Use a modular Gradle multi-project layout with separate domain, application, and infrastructure modules and a dependency-free domain."
+evidence = [{ type = "static_check", description = "settings.gradle.kts includes the intended subprojects and the domain module has no project or external infrastructure dependencies.", required = true }]
+tradeoff = "Multiple modules add Gradle configuration, boundary mapping, and build-graph overhead for small applications."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#build-and-dependency-management", summary = "The source prescribes domain, application, and infrastructure modules with a dependency-free domain.", confidence = 1.0 }]

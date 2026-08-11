@@ -1,0 +1,17 @@
+id = "guidelines.intent.standardize-domain-errors"
+title = "Expose stable domain error metadata"
+category = "reliability"
+tags = ["typescript", "error-handling", "error-modeling", "recoverability", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Ability for callers to classify failures without parsing human-readable messages"
+threat = "Generic errors and message matching make recovery and transport mapping brittle"
+expectation = "Failures will cross layers that need stable codes and status semantics"
+strategy = "Define custom error classes with explicit codes, status metadata, and inherited error identity"
+evidence = [{ type = "test", description = "Tests classify representative failures by error type and stable code or status without matching message text", required = true }]
+tradeoff = "A custom error taxonomy adds classes and requires governance to avoid overlapping codes"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#nodejs-patterns", summary = "The error-handling example defines AppError subclasses with stable code and statusCode properties.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.index-query-critical-fields"
+title = "Index query-critical fields"
+category = "reliability"
+tags = ["elixir", "phoenix", "persistence", "data-integrity", "transactions", "database-constraints"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Common lookups and association joins remain responsive as tables grow."
+threat = "Unindexed foreign keys and frequently filtered columns degrade into full-table scans."
+expectation = "Production row counts and relationship traversals will increase over time."
+strategy = "Add database indexes for foreign keys and fields used frequently in query predicates."
+evidence = [{ type = "query_plan", description = "Representative high-volume queries use intended indexes and avoid full-table scans at production-like cardinality.", required = true }]
+tradeoff = "Indexes consume storage and slow writes, and unnecessary indexes add migration and maintenance cost."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#migrations", summary = "Requires indexes on foreign keys and frequently queried fields.", confidence = 1.0 }]

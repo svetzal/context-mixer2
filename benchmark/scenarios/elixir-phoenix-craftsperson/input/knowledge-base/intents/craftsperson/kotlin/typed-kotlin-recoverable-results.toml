@@ -1,0 +1,17 @@
+id = "guidelines.intent.typed-kotlin-recoverable-results"
+title = "Model recoverable outcomes as exhaustive result values"
+category = "design"
+tags = ["kotlin", "error-handling", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for callers to see and exhaustively handle expected success and failure outcomes."
+threat = "Exceptions or sentinel values hide recoverable cases from function signatures and allow callers to omit handling."
+expectation = "Business operations will gain additional validation and domain failure variants."
+strategy = "Represent recoverable outcomes with sealed result types carrying the relevant success or error data."
+evidence = [{ type = "static_check", description = "APIs with expected failure modes return sealed result values, and tests or exhaustive when consumers cover every variant.", required = true }]
+tradeoff = "Result types add branching and propagation boilerplate and can proliferate overlapping error hierarchies."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#error-handling", summary = "The source prescribes sealed result types and limits exceptions to exceptional conditions.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-speculative-capability"
+title = "Avoid speculative capability"
+category = "design"
+tags = ["java", "testing", "yagni", "scope-control", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The codebase contains only abstractions and flexibility justified by current behavior."
+threat = "Future-proofing adds unused extension points, layers, and configuration that obscure present requirements."
+expectation = "Future needs are uncertain and will often differ from today's predictions."
+strategy = "Implement only current requirements and introduce abstractions when concrete new requirements provide evidence."
+evidence = [{ type = "review", description = "Each new abstraction or extension point serves a current test, requirement, or repeated change pressure.", required = true }]
+tradeoff = "Deferring flexibility can require later refactoring when a genuinely new variation arrives."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Applies YAGNI and rejects speculative generalization, premature abstraction, and future-proofing.", confidence = 1.0 }]

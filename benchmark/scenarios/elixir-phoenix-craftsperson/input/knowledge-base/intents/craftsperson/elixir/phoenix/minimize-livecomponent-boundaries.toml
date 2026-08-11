@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimize-livecomponent-boundaries"
+title = "Minimize LiveComponent boundaries"
+category = "reliability"
+tags = ["elixir", "phoenix", "testing", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "LiveView state and event flow remain understandable from a small number of ownership boundaries."
+threat = "Unnecessary stateful components fragment assigns, event routing, and update semantics."
+expectation = "UI decomposition pressure will encourage component extraction before independent state or lifecycle is needed."
+strategy = "Prefer function components or the parent LiveView and introduce a LiveComponent only for a strong, specific stateful need."
+evidence = [{ type = "architecture_review", description = "Each LiveComponent documents the independent state, lifecycle, or event-ownership need that a function component cannot satisfy.", required = true }]
+tradeoff = "Parent LiveViews or function-component interfaces may become larger before a stateful boundary is justified."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#liveview-naming-and-routes", summary = "Advises avoiding LiveComponents unless there is a strong, specific need.", confidence = 1.0 }]

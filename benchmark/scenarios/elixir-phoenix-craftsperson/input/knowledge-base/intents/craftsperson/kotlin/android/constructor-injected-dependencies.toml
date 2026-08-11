@@ -1,0 +1,17 @@
+id = "guidelines.intent.constructor-injected-dependencies"
+title = "Make component dependencies explicit at construction"
+category = "design"
+tags = ["kotlin", "android", "testing", "dependencies", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to see, supply, and substitute every required collaborator."
+threat = "Field injection, service lookup, or internal construction hides dependencies and complicates testing."
+expectation = "Components will gain collaborators and be instantiated in multiple scopes and tests."
+strategy = "Use Hilt constructor injection for dependencies wherever construction permits it."
+evidence = [{ type = "gate", description = "Hilt-managed classes declare injected constructors and contain no avoidable injected mutable fields or service locators.", required = true }]
+tradeoff = "Constructors can become large and expose design pressure that requires refactoring."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#dependency-injection-hilt", summary = "The source mandates constructor injection for all dependencies.", confidence = 1.0 }]

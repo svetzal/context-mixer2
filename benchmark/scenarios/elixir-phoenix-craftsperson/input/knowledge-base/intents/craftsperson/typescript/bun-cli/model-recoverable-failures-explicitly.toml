@@ -1,0 +1,17 @@
+id = "guidelines.intent.model-recoverable-failures-explicitly"
+title = "Model recoverable failures as explicit results"
+category = "reliability"
+tags = ["typescript", "bun", "cli", "error-handling", "error-modeling", "recoverability"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "Callers must account for expected failure as part of a function's normal contract."
+threat = "Thrown exceptions hide recoverable outcomes from signatures and allow callers to omit handling."
+expectation = "Parsing and validation operations will encounter routine user-correctable failures."
+strategy = "Return a discriminated `Result` value for recoverable failures and reserve thrown errors for non-recoverable control flow."
+evidence = [{ type = "static_check", description = "Recoverable APIs expose a success/error union, and tests compile only after callers handle both variants and assert each outcome.", required = true }]
+tradeoff = "Result values add branching and propagation boilerplate and may conflict with exception-oriented library APIs."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#error-handling-patterns", summary = "Labels a discriminated Result type as the pattern for recoverable errors and applies it to configuration parsing.", confidence = 0.95 }]

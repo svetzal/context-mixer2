@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-intent-first-change-workflow"
+title = "Use an intent-first validated change workflow"
+category = "design"
+tags = ["rust", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Engineering work stays tied to required behavior and ends with visible evidence and residual-risk awareness."
+threat = "Implementation begins from a guessed mechanism, grows beyond the need, and is reported without validation or invariant review."
+expectation = "Agents will be asked to implement ambiguous changes under pressure to produce code quickly."
+strategy = "Restate required behavior, make the smallest useful change, run relevant gates, summarize evidence and risks, then recheck touched invariants."
+evidence = [{ type = "work_summary", description = "The delivered change states its intended behavior, scoped implementation, gate results, remaining risks, and invariant impact.", required = true }]
+tradeoff = "Explicit restatement and reporting adds ceremony to very small changes."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#your-workflow", summary = "Defines a five-step workflow from intent restatement through invariant checks.", confidence = 1.0 }]

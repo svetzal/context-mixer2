@@ -1,0 +1,17 @@
+id = "guidelines.intent.document-accepted-moderate-vulnerabilities"
+title = "Record accepted moderate dependency risk"
+category = "documentation"
+tags = ["typescript", "documentation", "dependencies", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to make residual dependency risk visible and revisit it deliberately"
+threat = "Moderate findings are silently normalized and later lose their rationale or owner"
+expectation = "Some vulnerabilities will not justify immediate disruption but their severity or exploitability may change"
+strategy = "Document every acknowledged moderate audit finding and its acceptance rationale"
+evidence = [{ type = "decision-record", description = "Each unresolved moderate finding has a recorded impact assessment, rationale, and condition or date for reassessment", required = true }]
+tradeoff = "Risk documentation takes time and can create maintenance obligations for low-likelihood findings"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "The source requires documenting acknowledged moderate audit findings.", confidence = 1.0 }]

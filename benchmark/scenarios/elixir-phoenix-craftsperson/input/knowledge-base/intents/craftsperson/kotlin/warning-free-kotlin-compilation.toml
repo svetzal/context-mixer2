@@ -1,0 +1,17 @@
+id = "guidelines.intent.warning-free-kotlin-compilation"
+title = "Deliver Kotlin code that compiles without warnings"
+category = "quality"
+tags = ["kotlin", "documentation", "static-analysis", "error-handling", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to notice new compiler diagnostics rather than losing them in an accepted warning baseline."
+threat = "Accumulated warnings hide deprecations, unsafe constructs, and newly introduced compiler concerns."
+expectation = "Kotlin, JDK, and framework upgrades will introduce new diagnostics over time."
+strategy = "Treat compiler warnings as completion blockers and resolve their root causes or document a narrowly scoped exception."
+evidence = [{ type = "gate", description = "The production and test compilation tasks complete with no warnings other than explicitly documented, narrowly scoped exceptions.", required = true }]
+tradeoff = "Warning-free enforcement can require churn during toolchain upgrades and may block work on low-risk diagnostics."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#output-quality", summary = "The source requires delivered code to compile without warnings.", confidence = 1.0 }]

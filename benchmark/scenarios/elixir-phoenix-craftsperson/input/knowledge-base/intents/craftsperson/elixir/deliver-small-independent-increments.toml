@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliver-small-independent-increments"
+title = "Deliver small independently shippable increments"
+category = "delivery"
+tags = ["elixir", "concurrency", "error-handling", "incremental-delivery", "change-scope", "reversibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/deliver-small-independent-increments" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Changes can be reviewed, shipped, and reversed without carrying unrelated risk."
+threat = "Multi-purpose changes entangle failures and make review or rollback ambiguous."
+expectation = "Delivery pressure will require useful progress before every adjacent improvement is complete."
+strategy = "Use single-reason commits whose smallest working implementation could ship independently, then refactor."
+evidence = [{ type = "history_review", description = "Each change set has one coherent reason and passes its gates without depending on unrelated follow-up work.", required = true }]
+tradeoff = "Incremental delivery creates more commits and may temporarily retain code intended for later refactoring."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Requires small, safe, single-reason increments that can ship independently.", confidence = 1.0 }]

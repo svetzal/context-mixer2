@@ -1,0 +1,17 @@
+id = "guidelines.intent.restrain-model-callbacks"
+title = "Use Rails model callbacks judiciously"
+category = "reliability"
+tags = ["ruby", "dependencies", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to trace when Rails model side effects occur"
+threat = "Accumulated callbacks trigger implicit behavior across save lifecycles and create ordering dependencies"
+expectation = "Models will gain more persistence-related behavior as the application grows"
+strategy = "Limit callbacks to cases where lifecycle coupling is explicit and justified"
+evidence = [{ type = "review", description = "Each added callback documents why lifecycle invocation is required and has tests covering ordering, conditions, and side effects", required = true }]
+tradeoff = "Avoiding callbacks moves orchestration into explicit services and can add boilerplate at call sites"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#rails-specific-guidance", summary = "Rails conventions include using model callbacks judiciously.", confidence = 1.0 }]

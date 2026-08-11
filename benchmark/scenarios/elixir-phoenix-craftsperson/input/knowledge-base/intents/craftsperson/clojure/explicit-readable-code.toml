@@ -1,0 +1,17 @@
+id = "guidelines.intent.explicit-readable-code"
+title = "Prefer explicit readable code over clever abstraction"
+category = "design"
+tags = ["clojure", "readability", "clarity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability for a Clojure developer to understand and safely modify code months after it was written"
+threat = "Dense cleverness and implicit behavior obscure control flow and domain meaning"
+expectation = "Maintainers will revisit code without the original author's immediate context"
+strategy = "Choose clear names, visible data flow, appropriate destructuring, and shallow local structure over compressed abstractions"
+evidence = [{ type = "review", description = "A reviewer can explain the changed data flow from names and structure without macro expansion or reconstructing deeply nested bindings", required = true }]
+tradeoff = "Explicit implementations can be longer and may repeat small amounts of structure"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#core-philosophy", summary = "Clear readable code is preferred over clever abstractions.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#3-idiomatic-patterns", summary = "Reviews check threading, binding depth, and appropriate destructuring for readable structure.", confidence = 0.95 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#self-verification", summary = "The final review asks whether code will be clear to a Clojure developer in six months.", confidence = 1.0 }]

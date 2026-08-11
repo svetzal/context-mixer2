@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-speculative-features"
+title = "Avoid speculative features"
+category = "design"
+tags = ["elixir", "testing", "yagni", "scope-control", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The product and codebase stay focused on behavior with demonstrated value."
+threat = "Hypothetical future needs add paths, configuration, and maintenance obligations that may never be used."
+expectation = "Ideas about future requirements will outnumber validated needs."
+strategy = "Apply YAGNI and remove functionality that is not required by current behavior."
+evidence = [{ type = "scope_review", description = "Every added feature or extension point maps to an accepted current requirement or failing behavioral test.", required = true }]
+tradeoff = "A later requirement may require revisiting code rather than activating a prebuilt extension."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Invokes YAGNI and directs removal of speculative features.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.gateway-isolated-external-io"
+title = "Isolate all external interactions behind owned boundaries"
+category = "testing"
+tags = ["kotlin", "android", "testing", "persistence", "test-doubles", "boundaries"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 1
+capability = "Ability to test core behavior deterministically and replace external systems without rewriting callers."
+threat = "Direct use of network, database, filesystem, sensor, or third-party APIs spreads volatile I/O details through business code."
+expectation = "External services and libraries will fail, evolve, and require substitutes in tests or future implementations."
+strategy = "Route every external interaction through an application-owned gateway interface and mock only that boundary."
+evidence = [{ type = "gate", description = "Import and test review show core code depends on gateway interfaces and tests do not mock third-party library internals.", required = true }]
+tradeoff = "Gateway interfaces and adapters add indirection and maintenance for each integration."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#architectural-principles", summary = "The source explicitly routes all external interactions through mockable gateway interfaces and forbids mocking library internals.", confidence = 1.0 }]

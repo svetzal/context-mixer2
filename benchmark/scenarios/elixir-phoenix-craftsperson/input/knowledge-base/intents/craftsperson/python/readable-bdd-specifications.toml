@@ -1,0 +1,17 @@
+id = "guidelines.intent.readable-bdd-specifications"
+title = "Make test structure read as a behavioral specification"
+category = "testing"
+tags = ["python", "testing", "documentation", "error-handling", "readability", "executable-specification"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-tests-readable-specifications" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Readers can understand component behavior from test names and layout without decoding implementation-oriented labels."
+threat = "Generic test names and noisy phase comments obscure the behavior a failure is meant to specify."
+expectation = "The test corpus will become a primary source for understanding established requirements."
+strategy = "Use Describe classes, `should_*` methods, nested behavior groupings, and blank-line Arrange-Act-Assert separation without phase comments."
+evidence = [{ type = "gate", description = "Pytest discovers the configured Describe and should naming patterns, and review finds each test name states one expected behavior with phase separation visible from blank lines.", required = true }]
+tradeoff = "Custom naming differs from pytest defaults and nested classes can add visual and collection complexity."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#bdd-style-specification-tests", summary = "The source establishes Describe/should naming, nested groups, and uncommented Arrange-Act-Assert spacing.", confidence = 1.0 }]

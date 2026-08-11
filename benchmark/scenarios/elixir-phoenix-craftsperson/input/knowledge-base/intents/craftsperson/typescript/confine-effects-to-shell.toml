@@ -1,0 +1,17 @@
+id = "guidelines.intent.confine-effects-to-shell"
+title = "Confine effects to an imperative shell"
+category = "architecture"
+tags = ["typescript", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to identify, coordinate, and replace external effects without contaminating business logic"
+threat = "Scattered I/O and state changes create hidden coupling across otherwise independent decisions"
+expectation = "Databases, APIs, filesystems, and delivery mechanisms will change over the system's lifetime"
+strategy = "Push I/O, state mutation, and external interactions to explicit shell boundaries around the functional core"
+evidence = [{ type = "architecture", description = "Dependency inspection shows core modules do not import I/O adapters and shell modules own effect execution", required = true }]
+tradeoff = "The core-shell split introduces orchestration layers and additional data transformations"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Functional core, imperative shell pushes I/O, state changes, and side effects to boundaries.", confidence = 1.0 }]

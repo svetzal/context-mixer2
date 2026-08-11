@@ -1,0 +1,17 @@
+id = "guidelines.intent.extract-only-meaningful-abstractions"
+title = "Extract abstractions that expose domain meaning"
+category = "design"
+tags = ["ruby", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to navigate complex behavior through coherent named concepts"
+threat = "Mechanical extraction creates service objects, value objects, or modules that add indirection without explaining the domain"
+expectation = "Refactoring pressure will repeatedly present opportunities to extract code"
+strategy = "Extract modules, service objects, and value objects only when they reveal a meaningful responsibility"
+evidence = [{ type = "review", description = "Each extracted abstraction has a domain-relevant name, cohesive responsibility, and simpler call sites than the inline code it replaces", required = true }]
+tradeoff = "Waiting for clear meaning can leave some large methods in place longer, while extraction adds navigation even when justified"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#when-refactoring", summary = "The refactoring workflow calls for meaningful modules, service objects, and value objects that reveal intent.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.functional-kotlin-flow-transformations"
+title = "Express stream transformations as Flow operators"
+category = "reliability"
+tags = ["kotlin", "concurrency", "backpressure", "resource-bounds"]
+relations = [
+  { type = "specializes", target = "craftsperson/bound-concurrent-work" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Ability to compose asynchronous transformations while retaining Flow cancellation and backpressure semantics."
+threat = "Manual collection and mutable accumulation obscure pipeline behavior and can break cancellation or demand propagation."
+expectation = "Stream-processing pipelines will add filtering, mapping, and concurrent flattening stages."
+strategy = "Compose Flow pipelines with functional operators such as map, filter, and flatMapMerge."
+evidence = [{ type = "review", description = "Transformation-only stages use Flow operators, and tests verify ordering, concurrency limits, and cancellation where flattening is involved.", required = true }]
+tradeoff = "Operator chains can hide execution context and become difficult to debug when overly long."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#flow-patterns", summary = "The source directs functional use of map, filter, and flatMapMerge.", confidence = 1.0 }]

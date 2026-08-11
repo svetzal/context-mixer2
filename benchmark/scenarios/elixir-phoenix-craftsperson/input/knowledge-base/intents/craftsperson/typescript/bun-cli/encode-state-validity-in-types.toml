@@ -1,0 +1,17 @@
+id = "guidelines.intent.encode-state-validity-in-types"
+title = "Encode state validity in types"
+category = "design"
+tags = ["typescript", "bun", "cli", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Invalid combinations of state cannot be constructed as ordinary program values."
+threat = "Loose object shapes permit contradictory fields that require scattered runtime checks and can reach production paths."
+expectation = "CLI workflows will gain additional states and transitions whose valid combinations become harder to remember."
+strategy = "Represent state machines and variant results with discriminated unions that encode only valid cases."
+evidence = [{ type = "static_check", description = "Type-level negative tests or compiler fixtures reject representative invalid state combinations, while each valid variant is constructible.", required = true }]
+tradeoff = "Precise unions increase type-definition and narrowing work and can make cross-cutting changes touch every variant."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#type-system-patterns", summary = "Directs illegal states to be made unrepresentable and demonstrates discriminated unions for command results.", confidence = 1.0 }]

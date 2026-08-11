@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-csrf-protection"
+title = "Preserve Rails CSRF protection"
+category = "architecture"
+tags = ["ruby", "security", "trust-boundaries", "authorization"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to ensure state-changing browser requests originate from the intended application session"
+threat = "Cross-site request forgery can trick an authenticated browser into submitting attacker-controlled actions"
+expectation = "Rails applications will expose cookie-authenticated state-changing endpoints to browsers"
+strategy = "Keep Rails CSRF protections enabled and correctly applied"
+evidence = [{ type = "test", description = "A request without a valid authenticity token is rejected for protected state-changing browser endpoints", required = true }]
+tradeoff = "CSRF enforcement complicates non-browser clients, embedded integrations, and some test setup"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#rails-specific-guidance", summary = "The Rails security-first guidance explicitly calls for CSRF protection.", confidence = 1.0 }]

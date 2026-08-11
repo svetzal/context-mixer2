@@ -1,0 +1,17 @@
+id = "guidelines.intent.fully-cover-functional-core"
+title = "Fully cover business logic in the functional core"
+category = "architecture"
+tags = ["java", "testing", "error-handling", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Every business rule and decision path has executable regression evidence."
+threat = "Untested domain branches cause silent business errors even when overall project coverage appears healthy."
+expectation = "Adapter and framework code will dilute aggregate coverage metrics as the application grows."
+strategy = "Target complete behavioral coverage of functional-core business logic independently from the repository-wide threshold."
+evidence = [{ type = "coverage_gate", description = "JaCoCo reports and focused tests demonstrate one hundred percent line and branch coverage for designated functional-core packages.", required = true }]
+tradeoff = "Absolute coverage can make harmless refactoring expensive and still cannot prove assertion quality."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#testing-philosophy", summary = "Sets a specific goal of 100 percent coverage for business logic in the functional core.", confidence = 1.0 }]

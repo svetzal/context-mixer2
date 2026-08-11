@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-feature-semantics"
+title = "Preserve feature-flag and default-feature semantics"
+category = "architecture"
+tags = ["rust", "security", "trust-boundaries", "authorization"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Consumers can opt into and out of crate capabilities without unexpected compatibility changes."
+threat = "Ordinary changes alter feature membership or defaults and silently expand or remove consumer behavior."
+expectation = "Published crates will be used under multiple feature combinations and downstream dependency graphs."
+strategy = "Treat feature flags and default-features behavior as compatibility invariants and require authorization for default changes."
+evidence = [{ type = "ci_gate", description = "Representative feature combinations compile and tests verify default-feature behavior remains stable.", required = true }]
+tradeoff = "Stable feature semantics can constrain cleanup and make the feature matrix more expensive to maintain."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#detect--preserve-invariants-mandatory", summary = "Requires preserving feature flags and default-features semantics and avoiding SemVer-incompatible enablement.", confidence = 1.0 }]

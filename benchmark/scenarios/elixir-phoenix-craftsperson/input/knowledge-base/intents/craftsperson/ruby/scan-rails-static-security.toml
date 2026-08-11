@@ -1,0 +1,17 @@
+id = "guidelines.intent.scan-rails-static-security"
+title = "Statically scan Rails changes for security defects"
+category = "architecture"
+tags = ["ruby", "security", "testing", "static-analysis", "build-and-delivery", "trust-boundaries"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to catch Rails-specific security weaknesses before deployment"
+threat = "Framework-specific injection, authorization, and unsafe rendering patterns can evade ordinary tests and linting"
+expectation = "Rails features will continue to expose controllers, models, and views to untrusted input"
+strategy = "Run `bundle exec brakeman` as a required gate for Rails applications"
+evidence = [{ type = "gate", description = "`bundle exec brakeman` exits successfully with no unresolved warnings for the candidate Rails revision", required = true }]
+tradeoff = "Static analysis can produce false positives that require investigation or carefully documented exceptions"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#quality-gates-non-negotiable", summary = "Brakeman is a non-negotiable Rails-specific security gate.", confidence = 1.0 }]

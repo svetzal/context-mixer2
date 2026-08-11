@@ -1,0 +1,17 @@
+id = "guidelines.intent.document-public-apis-with-docc"
+title = "Document every public API with decision-rich DocC"
+category = "documentation"
+tags = ["swift", "documentation", "error-handling", "public-api", "contracts", "consumer-guidance"]
+relations = [
+  { type = "specializes", target = "craftsperson/document-public-contracts" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "API consumers can use public Swift contracts correctly without reading their implementation."
+threat = "Undocumented rationale, failure modes, and complex usage force consumers to guess and misuse APIs."
+expectation = "Public APIs will gain consumers who lack the authors' context and cannot rely on informal explanations."
+strategy = "Give every public API DocC that explains why it exists, documents returned or thrown errors, and includes examples for complex usage."
+evidence = [{ type = "documentation_gate", description = "Public-declaration inspection finds DocC on every symbol, with rationale and error semantics present and a compiling example for each complex API.", required = true }]
+tradeoff = "Comprehensive API documentation takes ongoing effort and can become redundant for trivial declarations."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#documentation-standards", summary = "Requires DocC for every public API, rationale rather than restatement, complex examples, and documented errors.", confidence = 1.0 }]

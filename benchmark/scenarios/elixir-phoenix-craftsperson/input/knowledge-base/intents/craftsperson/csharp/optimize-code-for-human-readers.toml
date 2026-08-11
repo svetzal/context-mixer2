@@ -1,0 +1,17 @@
+id = "guidelines.intent.optimize-code-for-human-readers"
+title = "Optimize code for the next human reader"
+category = "design"
+tags = ["csharp", "security", "readability", "clarity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A maintainer can infer the business behavior and change it safely without relying on the original author."
+threat = "Clever, poorly named, or mechanically organized code makes intent expensive to discover."
+expectation = "Code will be read and modified many more times than it is initially written."
+strategy = "Use meaningful names, clear structure, and appropriately sized abstractions so the code reads like an explanation of the business problem."
+evidence = [{ type = "reader_review", description = "A reviewer unfamiliar with the change can state its business behavior from names, types, and control flow without decoding incidental mechanics.", required = true }]
+tradeoff = "Reader-oriented code can be more verbose and may sacrifice compactness or micro-optimization."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#core-identity", summary = "Defines code as communication for the next human reader; the simple-design priorities require code to reveal intent.", confidence = 1.0 }]

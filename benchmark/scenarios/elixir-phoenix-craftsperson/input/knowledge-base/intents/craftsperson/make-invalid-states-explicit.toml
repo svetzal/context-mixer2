@@ -1,0 +1,364 @@
+id = "guidelines.intent.make-invalid-states-explicit"
+title = "Make invalid states explicit"
+category = "design"
+tags = ["domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "related-to", target = "craftsperson/validate-untrusted-input-at-boundaries" },
+  { type = "related-to", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Invalid combinations are rejected at construction or handled as visible alternatives rather than circulating as ordinary domain state."
+threat = "Loose flags, nullable fields, unchecked strings, or partially initialized objects admit combinations the domain cannot interpret safely."
+expectation = "New states and variants will be added while callers continue assuming old invariants."
+strategy = "Model domain alternatives and absence explicitly, validate construction, and require exhaustive handling where the implementation medium permits it."
+evidence = [{ type = "model_review", description = "Invalid combinations cannot enter core operations silently and every valid alternative has an intentional handling path.", required = true }]
+tradeoff = "More precise models add types, constructors, validation, or branches and can complicate serialization and framework integration."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "Models absence and alternatives explicitly.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#modern-java-mastery", summary = "Uses closed domains for compiler-checked exhaustive handling.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#type-system-patterns", summary = "Makes invalid state combinations unrepresentable and variants exhaustive.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(def shipment-schema
+  [:multi {:dispatch :status}
+   [:pending   [:map [:status [:= :pending]]]]
+   [:shipped   [:map [:status [:= :shipped]]
+                [:tracking-id :string]]]
+   [:delivered [:map [:status [:= :delivered]]
+                [:tracking-id :string]
+                [:signed-by :string]]]])
+
+(defn shipment [m]   ; invalid combinations cannot construct
+  (if (mc/validate shipment-schema m)
+    m
+    (throw (ex-info "invalid shipment"
+                    (mc/explain shipment-schema m)))))
+'''
+bad = '''
+(defn shipment [m] m)   ; anything goes
+
+;; all circulating in production today:
+;;   {:status "delivered" :tracking-id nil :signed-by nil}
+;;   {:status :shipped :shipped? false}
+;;   {:delivered true :status :pending}
+; every consumer re-guesses which flag combination is real,
+; and each guesses differently
+'''
+
+[examples.cpp]
+good = '''
+class Email {
+public:
+  static std::optional<Email> parse(std::string_view raw);
+private:
+  explicit Email(std::string value);   // only via parse()
+  std::string value_;
+};
+
+// Alternatives are a closed set; std::visit forces handling.
+using Shipment = std::variant<Pending, InTransit, Delivered>;
+// InTransit carries its tracking id — no "maybe set" fields.
+'''
+bad = '''
+struct Shipment {
+  bool pending = false;
+  bool delivered = false;    // pending && delivered: meaning?
+  std::string trackingNumber;  // "" or "N/A" or unset?
+  std::optional<QDateTime> deliveredAt;
+  std::string customerEmail;   // unvalidated at construction
+};
+// delivered==false with deliveredAt set circulates freely;
+// every consumer re-guesses which combinations are real
+'''
+
+[examples.csharp]
+good = '''
+public abstract record Shipment
+{
+    public sealed record Pending(Address To) : Shipment;
+    public sealed record Shipped(string Tracking)
+        : Shipment;
+    public sealed record Delivered(DateOnly On)
+        : Shipment;
+}
+// every alternative handled; no half-states exist
+public static string Label(Shipment s) => s switch
+{
+    Shipment.Pending p => $"to {p.To.City}",
+    Shipment.Shipped x => $"tracking {x.Tracking}",
+    Shipment.Delivered d => $"delivered {d.On}",
+    _ => throw new UnreachableException()
+};
+'''
+bad = '''
+public class Shipment
+{
+    public bool IsShipped { get; set; }
+    public bool IsDelivered { get; set; }
+    public string? Tracking { get; set; }
+    public DateOnly? DeliveredOn { get; set; }
+}
+// delivered-but-never-shipped and shipped-with-null-
+// tracking are all representable, all circulating
+// through the core as ordinary state
+'''
+
+[examples.elixir]
+good = '''
+defmodule Shipment do
+  @enforce_keys [:status]
+  defstruct [:status]
+
+  # each state carries exactly the data that makes it
+  # valid: :pending | {:shipped, trk} | {:delivered, on}
+  def eta(%{status: {:shipped, trk}}), do: Carrier.eta(trk)
+  def eta(%{status: :pending}), do: :not_shipped
+  def eta(%{status: {:delivered, on}}), do: {:on, on}
+end
+'''
+bad = '''
+defmodule Shipment do
+  # loose flags admit nonsense: shipped with no tracking,
+  # delivered-but-not-shipped — all representable, all
+  # circulating through the core as ordinary state
+  defstruct shipped?: false, tracking: nil,
+            delivered?: false
+
+  def eta(%{shipped?: true, tracking: nil}), do: "???"
+  def eta(%{tracking: trk}), do: Carrier.eta(trk)
+end
+'''
+
+[examples.go]
+good = '''
+// alternatives are explicit; an impossible combination has no
+// representation and construction is validated
+type Pending struct{}
+type Paid struct{ At time.Time }
+type Refunded struct{ PaidAt, RefundedAt time.Time }
+
+func NewRefunded(paid, ref time.Time) (Refunded, error) {
+	if ref.Before(paid) {
+		return Refunded{}, ErrRefundBeforePayment
+	}
+	return Refunded{PaidAt: paid, RefundedAt: ref}, nil
+}
+'''
+bad = '''
+type Payment struct {
+	Paid       bool
+	Refunded   bool // Refunded=true, Paid=false: representable
+	PaidAt     *time.Time
+	RefundedAt *time.Time // may be set while Refunded is false
+}
+
+// every reader re-derives which flag combos are meaningful
+func (p Payment) Settled() bool {
+	return p.Paid && !p.Refunded && p.PaidAt != nil
+}
+'''
+
+[examples.java]
+good = '''
+sealed interface Payment permits Pending, Settled, Failed {}
+record Pending(OrderId order) implements Payment {}
+record Settled(OrderId order, TxnId txn) implements Payment {}
+record Failed(OrderId order, Reason reason)
+        implements Payment {}
+
+String describe(Payment p) {
+    return switch (p) {      // compiler forces every case
+        case Pending s -> "awaiting settlement";
+        case Settled s -> "settled as " + s.txn();
+        case Failed s  -> "failed: " + s.reason();
+    };
+}
+'''
+bad = '''
+// flags and nullables admit states the domain can't read
+class Payment {
+    boolean settled;
+    boolean failed;       // settled && failed: both true?
+    String txnId;         // null unless settled... usually
+    String failureReason; // sometimes "", sometimes "n/a"
+}
+
+// every caller re-guesses the rules:
+if (p.settled && !p.failed && p.txnId != null) {
+    ship(p);
+}
+'''
+
+[examples.kotlin]
+good = '''
+sealed interface Payment {
+    data class Pending(val id: PaymentId) : Payment
+    data class Settled(
+        val id: PaymentId, val settledAt: Instant) : Payment
+    data class Failed(
+        val id: PaymentId, val reason: DeclineReason) : Payment
+}
+// settledAt exists only on Settled; "settled and failed at
+// once" is unrepresentable, and `when` must cover all three
+'''
+bad = '''
+data class Payment(
+    val id: String,
+    val settled: Boolean,
+    val failed: Boolean,        // settled && failed compiles
+    val settledAt: Instant?,    // null even when settled
+    val failureReason: String?, // "", "n/a", or anything
+)
+'''
+
+[examples.python]
+good = '''
+@dataclass(frozen=True)
+class Anonymous: ...
+
+@dataclass(frozen=True)
+class Authenticated:
+    user_id: UserId
+    expires: datetime
+
+type Visitor = Anonymous | Authenticated
+
+def greeting(v: Visitor) -> str:
+    match v:   # a half-logged-in state cannot be built
+        case Authenticated(user_id=uid): return f"Hi {uid}"
+        case Anonymous(): return "Hi guest"
+'''
+bad = '''
+@dataclass
+class Visitor:
+    logged_in: bool = False
+    user_id: str | None = None
+    expires: datetime | None = None
+    # logged_in=True with user_id=None is representable;
+    # every caller must remember to re-check the combo
+
+def greeting(v: Visitor) -> str:
+    if v.logged_in:
+        return f"Hi {v.user_id}"   # may greet None
+    return "Hi guest"
+'''
+
+[examples.ruby]
+good = '''
+class Shipment
+  Pending   = Data.define(:items)
+  Shippable = Data.define(:items, :address)
+
+  # an address is required to construct a Shippable at all
+  def self.ready(items:, address:)
+    raise ArgumentError, "address required" if address.nil?
+    Shippable.new(items: items, address: address)
+  end
+end
+
+case shipment
+in Shipment::Shippable then dispatch(shipment)
+in Shipment::Pending   then request_address(shipment)
+end
+'''
+bad = '''
+class Shipment
+  # nothing prevents shipped && cancelled, or shipped with
+  # no address — every combination circulates as valid state
+  attr_accessor :items, :address, :shipped, :cancelled
+end
+
+s = Shipment.new
+s.shipped = true    # no address — carrier call explodes later
+s.cancelled = true  # both flags true: meaning undefined
+'''
+
+[examples.rust]
+good = '''
+// a contact is either verified or pending — never both,
+// never neither
+pub enum Contact {
+    Verified { email: Email, verified_at: DateTime },
+    Pending { email: Email, token: VerifyToken },
+}
+impl Email {
+    pub fn parse(raw: &str) -> Result<Email, EmailError> {
+        raw.contains('@')
+            .then(|| Email(raw.to_owned()))
+            .ok_or(EmailError::Malformed)
+    }
+}
+'''
+bad = '''
+// flags and options admit combinations the domain cannot
+// interpret
+pub struct Contact {
+    email: String,                 // unchecked at construction
+    verified: bool,
+    verified_at: Option<DateTime>, // may disagree w/ verified
+    verify_token: Option<String>,  // set while verified?
+}
+// verified=true + verified_at=None circulates as ordinary
+// state until something downstream panics on it
+'''
+
+[examples.swift]
+good = '''
+enum Download {
+    case inProgress(fraction: Double)
+    case finished(fileURL: URL)
+    case failed(DownloadError)
+}
+
+func statusLabel(for download: Download) -> String {
+    switch download {
+    case .inProgress(let f): "\(Int(f * 100))%"
+    case .finished: "Done"
+    case .failed(let e): e.shortDescription
+    }  // exhaustive: no impossible combination can arrive
+}
+'''
+bad = '''
+struct Download {
+    var isFinished = false
+    var isFailed = false
+    var fileURL: URL?   // set when finished... usually
+    var error: Error?
+}
+// finished && failed can both be true; finished with a nil
+// fileURL compiles fine — every reader re-derives the rules
+let path = download.fileURL!  // force-unwrap hides the hole
+'''
+
+[examples.typescript]
+good = '''
+type Payment =
+  | { state: "pending" }
+  | { state: "captured"; capturedAt: Date; receiptId: string }
+  | { state: "failed"; reason: string };
+
+const describePayment = (p: Payment): string => {
+  switch (p.state) {
+    case "pending": return "awaiting capture";
+    case "captured": return `receipt ${p.receiptId}`;
+    case "failed": return `failed: ${p.reason}`;
+    // exhaustive: adding a state fails compilation here
+  }
+};
+'''
+bad = '''
+// captured && failed can both be true; receiptId can
+// appear on a pending payment. The type permits states
+// the domain cannot interpret.
+interface Payment {
+  captured: boolean;
+  failed: boolean;
+  capturedAt?: Date;
+  receiptId?: string;
+  reason?: string;
+}
+const describePayment = (p: Payment): string =>
+  p.captured ? `receipt ${p.receiptId!}` : "pending?";
+'''

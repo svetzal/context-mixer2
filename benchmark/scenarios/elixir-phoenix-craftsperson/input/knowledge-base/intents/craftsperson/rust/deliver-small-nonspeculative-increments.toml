@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliver-small-nonspeculative-increments"
+title = "Deliver small non-speculative increments"
+category = "design"
+tags = ["rust", "testing", "yagni", "scope-control", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Each change can be understood, validated, and reversed independently."
+threat = "Large or speculative changes combine unrelated risk and create code for futures that may never arrive."
+expectation = "Projects will evolve through repeated uncertain requests rather than a perfectly known final design."
+strategy = "Make single-responsibility changes and apply YAGNI to avoid speculative implementation."
+evidence = [{ type = "diff_review", description = "Each change has one clear reason and contains no unused extension points or unrequested features.", required = true }]
+tradeoff = "Small increments can require repeated integration work and defer efficiencies available from a broader redesign."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#engineering-practices", summary = "Requires small, safe, single-responsibility changes and avoidance of speculative work.", confidence = 1.0 }]

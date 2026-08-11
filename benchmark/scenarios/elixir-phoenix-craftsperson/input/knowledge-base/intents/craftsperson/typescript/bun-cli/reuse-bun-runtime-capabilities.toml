@@ -1,0 +1,17 @@
+id = "guidelines.intent.reuse-bun-runtime-capabilities"
+title = "Prefer Bun capabilities before adding dependencies"
+category = "delivery"
+tags = ["typescript", "bun", "cli", "testing", "dependencies", "tooling"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The CLI retains a small, coherent dependency surface while using runtime-supported facilities."
+threat = "Replaceable third-party packages add supply-chain exposure, version conflicts, and maintenance work."
+expectation = "The package ecosystem and Bun runtime will evolve at different rates over the CLI's lifetime."
+strategy = "Use Bun's built-in runtime and test APIs when they meet the need; add a package only for clear, irreplaceable value."
+evidence = [{ type = "manifest_check", description = "Each non-development dependency in package.json has a recorded capability not adequately provided by Bun, and tests use Bun's built-in runner and assertions unless an exception is documented.", required = true }]
+tradeoff = "Bun-specific APIs reduce portability to other JavaScript runtimes and may offer fewer features than specialized packages."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#core-identity--expertise", summary = "Prefers Bun built-ins over external packages and later specifically prefers Bun's test runner assertions.", confidence = 1.0 }]

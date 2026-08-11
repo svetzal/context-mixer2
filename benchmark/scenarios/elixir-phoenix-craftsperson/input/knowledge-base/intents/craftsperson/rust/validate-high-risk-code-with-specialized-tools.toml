@@ -1,0 +1,17 @@
+id = "guidelines.intent.validate-high-risk-code-with-specialized-tools"
+title = "Match specialized validation to high-risk code"
+category = "quality"
+tags = ["rust", "concurrency", "security", "testing", "error-handling", "static-analysis"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "High-risk code receives validation proportional to failure modes that ordinary tests cannot expose."
+threat = "A standard stable-toolchain gate is assumed sufficient for rare but severe low-level, concurrent, or adversarial-input failures."
+expectation = "Some projects will contain low-level or adversarial surfaces whose failures are rare but severe."
+strategy = "Assess unsafe, FFI, concurrent, parser, decoder, protocol, and security-critical changes and select Miri, sanitizers, or fuzzing according to the identified risk."
+evidence = [{ type = "risk_review", description = "Each high-risk change records the relevant failure mode, the specialized gate selected for it, and any documented platform or nightly constraint.", required = true }]
+tradeoff = "Risk classification and specialized gate selection add review effort and may still omit an unrecognized failure mode."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#optional-but-recommended-for-unsafeffi-or-security-critical-code", summary = "Recommends choosing Miri, sanitizers, and fuzzing for the high-risk surfaces each tool can probe.", confidence = 1.0 }]

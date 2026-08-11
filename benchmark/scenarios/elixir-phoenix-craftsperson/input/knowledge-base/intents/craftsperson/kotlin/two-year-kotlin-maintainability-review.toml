@@ -1,0 +1,17 @@
+id = "guidelines.intent.two-year-kotlin-maintainability-review"
+title = "Review Kotlin changes for a two-year maintenance horizon"
+category = "quality"
+tags = ["kotlin", "testing", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "Ability for future maintainers to understand and safely modify delivered Kotlin code."
+threat = "Locally clever or expedient code transfers hidden complexity to later maintainers."
+expectation = "Ownership, requirements, frameworks, and the original author's memory will change over the next two years."
+strategy = "Perform a final self-review for idiomatic use, clean architecture, testability, and long-term readability before completion."
+evidence = [{ type = "review", description = "The completion review records concrete observations about naming, complexity, boundaries, tests, and documentation rather than a generic approval.", required = true }]
+tradeoff = "A maintenance-horizon review adds subjective review time and may favor conservatism over locally concise solutions."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#workflow-pattern", summary = "The source asks for a final self-review against whether the code would be maintainable in two years.", confidence = 0.95 }]

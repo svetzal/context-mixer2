@@ -1,0 +1,17 @@
+id = "guidelines.intent.document-public-apis-with-doxygen"
+title = "Document and render public APIs"
+category = "documentation"
+tags = ["cpp", "qt", "documentation", "public-api", "contracts", "consumer-guidance"]
+relations = [
+  { type = "specializes", target = "craftsperson/document-public-contracts" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Consumers can discover public contracts."
+threat = "Undocumented APIs force inference from implementation."
+expectation = "The public surface will grow."
+strategy = "Require Doxygen comments and verify generation."
+evidence = [{ type = "gate", description = "doxygen Doxyfile succeeds and public APIs are documented.", required = true }]
+tradeoff = "Comments can repeat signatures and add upkeep."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#quality-assurance-process", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

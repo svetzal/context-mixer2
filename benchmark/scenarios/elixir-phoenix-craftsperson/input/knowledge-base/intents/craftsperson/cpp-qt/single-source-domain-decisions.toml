@@ -1,0 +1,17 @@
+id = "guidelines.intent.single-source-domain-decisions"
+title = "Single-source each domain decision"
+category = "design"
+tags = ["cpp", "qt", "security", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A domain rule changes in one authoritative place."
+threat = "Repeated knowledge drifts across coordinated edit sites."
+expectation = "Business rules will evolve."
+strategy = "Centralize the same decision while allowing identical code for independent decisions."
+evidence = [{ type = "gate", description = "Changing one rule requires one production edit plus focused tests.", required = true }]
+tradeoff = "Centralization can couple decisions that merely look similar."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

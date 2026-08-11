@@ -1,0 +1,17 @@
+id = "guidelines.intent.validate-concurrent-code-with-tsan"
+title = "Validate concurrency with ThreadSanitizer"
+category = "quality"
+tags = ["cpp", "qt", "concurrency", "testing", "static-analysis", "warnings"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Shared-state code remains race-free."
+threat = "Timing races escape normal tests."
+expectation = "Production schedules differ from development."
+strategy = "Run representative concurrent tests under TSan."
+evidence = [{ type = "gate", description = "TSan reports no races.", required = true }]
+tradeoff = "TSan is slow and can report false positives."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#quality-assurance-process", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

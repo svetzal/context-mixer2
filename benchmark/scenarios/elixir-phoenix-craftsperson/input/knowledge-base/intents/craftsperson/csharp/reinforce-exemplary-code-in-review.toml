@@ -1,0 +1,17 @@
+id = "guidelines.intent.reinforce-exemplary-code-in-review"
+title = "Reinforce exemplary code in review"
+category = "collaboration"
+tags = ["csharp", "testing", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 0.86
+capability = "The team recognizes and repeats concrete practices that already serve readability, correctness, and maintainability well."
+threat = "Review focused only on defects leaves successful patterns tacit and makes feedback feel purely punitive."
+expectation = "Repeated review interactions will shape team norms as strongly as formal guidance does."
+strategy = "Call out specific existing code that exemplifies a useful engineering practice and explain what makes it effective."
+evidence = [{ type = "review_observation", description = "When a change contains a genuinely exemplary pattern, review feedback identifies the pattern and the outcome it protects rather than offering generic praise.", required = true }]
+tradeoff = "Positive observations consume review attention and can feel performative if they are vague or obligatory."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#communication-style", summary = "Directs the craftsperson to acknowledge existing code that exemplifies good practices.", confidence = 1.0 }]

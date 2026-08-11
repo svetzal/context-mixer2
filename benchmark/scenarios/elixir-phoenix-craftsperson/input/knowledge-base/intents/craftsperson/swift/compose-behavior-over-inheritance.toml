@@ -1,0 +1,17 @@
+id = "guidelines.intent.compose-behavior-over-inheritance"
+title = "Compose behavior instead of growing inheritance trees"
+category = "design"
+tags = ["swift", "dependencies", "error-handling", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Behavior can be combined and replaced without depending on fragile superclass hierarchies."
+threat = "Deep inheritance couples unrelated behavior through implicit overrides and shared base state."
+expectation = "New variants will require recombining capabilities in ways an original class hierarchy did not anticipate."
+strategy = "Use protocol-oriented composition and extensions, keeping inheritance exceptional and no deeper than two levels."
+evidence = [{ type = "architecture_review", description = "New behavior is supplied through composed protocol conformances or collaborators, and no introduced inheritance chain exceeds two levels.", required = true }]
+tradeoff = "Protocol composition can create more small types, generic constraints, and indirection than a simple base class."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#common-patterns-and-anti-patterns", summary = "Prefers composition and protocol-oriented design while rejecting inheritance hierarchies deeper than two levels.", confidence = 0.99 }]

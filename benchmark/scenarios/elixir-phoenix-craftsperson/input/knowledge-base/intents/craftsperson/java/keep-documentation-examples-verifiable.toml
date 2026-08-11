@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-documentation-examples-verifiable"
+title = "Keep documentation examples verifiable"
+category = "documentation"
+tags = ["java", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Readers can distinguish runnable guidance from illustrative shorthand and trust examples to match supported APIs."
+threat = "Stale or ambiguous snippets teach behavior that no longer compiles or works."
+expectation = "APIs and build conventions will change while examples continue to be copied into new code."
+strategy = "Make documentation examples executable where possible and clearly label unavoidable pseudocode."
+evidence = [{ type = "documentation_test", description = "Executable examples compile or run in CI, and non-executable snippets are explicitly marked as pseudocode.", required = true }]
+tradeoff = "Executable examples require harnesses and maintenance; labels reduce the apparent simplicity of conceptual docs."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#documentation", summary = "Requires examples to be executable or clearly identified as pseudocode.", confidence = 1.0 }]

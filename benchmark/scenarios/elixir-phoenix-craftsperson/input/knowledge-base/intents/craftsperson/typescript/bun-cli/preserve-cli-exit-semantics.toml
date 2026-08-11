@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-cli-exit-semantics"
+title = "Preserve deliberate CLI exit semantics"
+category = "design"
+tags = ["typescript", "bun", "cli", "concurrency", "error-handling", "idioms"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Shell scripts and callers can determine the CLI outcome from its process status."
+threat = "Generic or accidental exit codes make distinct failures indistinguishable and can mislead automation."
+expectation = "The CLI will be composed into scripts and automated workflows that cannot interpret human-readable messages reliably."
+strategy = "Associate failure categories with deliberate exit codes and propagate them through the top-level CLI boundary."
+evidence = [{ type = "integration_test", description = "Black-box executable tests trigger each documented failure category and assert its process exit code, including propagation of relevant subprocess status.", required = true }]
+tradeoff = "Published exit codes become compatibility commitments and direct propagation can expose platform-specific or unusually large statuses."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#error-handling-patterns", summary = "Models exitCode as part of CLI errors and shows subprocess failures carrying the child status.", confidence = 0.95 }]

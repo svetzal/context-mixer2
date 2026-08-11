@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-simple-ownership-flows"
+title = "Prefer simple ownership flows"
+category = "reliability"
+tags = ["rust", "performance", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Developers can reason locally about who owns data and how long borrows remain valid."
+threat = "Clever lifetime relationships make data flow fragile and hard to modify."
+expectation = "The code will evolve, changing call graphs and data lifetimes after the original optimization context is forgotten."
+strategy = "Choose straightforward ownership and borrowing even when more elaborate lifetime techniques could avoid a move or allocation."
+evidence = [{ type = "review", description = "Ownership relationships are evident from function signatures and do not require non-obvious lifetime gymnastics.", required = true }]
+tradeoff = "Simpler ownership may introduce cloning, allocation, or less general APIs."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#ownership-and-borrowing", summary = "Prefers simple ownership flows over clever lifetime gymnastics.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-lockfiles-and-semver-ranges-by-artifact"
+title = "Use dependency resolution appropriate to the artifact"
+category = "delivery"
+tags = ["rust", "dependencies", "build-and-delivery", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Applications build reproducibly while libraries remain compatible with downstream dependency resolution."
+threat = "A single dependency-pinning policy either makes applications drift or overconstrains library consumers."
+expectation = "The same ecosystem produces deployable binaries and reusable libraries with different resolution needs."
+strategy = "Commit Cargo.lock for binaries and applications while expressing library dependencies as compatible SemVer ranges."
+evidence = [{ type = "manifest_review", description = "Lockfile policy and dependency requirements match whether the package is deployed or consumed as a library.", required = true }]
+tradeoff = "Mixed workspaces require nuanced policy and may surprise contributors expecting one universal lockfile rule."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#workspace-and-dependency-management", summary = "Distinguishes lockfile use for applications from SemVer ranges for libraries.", confidence = 1.0 }]

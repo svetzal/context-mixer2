@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-swiftpm-as-build-source-of-truth"
+title = "Use SwiftPM as the package build source of truth"
+category = "delivery"
+tags = ["swift", "dependencies", "build-and-delivery", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Modules, targets, and dependency resolution can be reproduced from one versioned package definition."
+threat = "Parallel build configuration and ad hoc dependency setup drift across machines and automation."
+expectation = "The project will be built, tested, and updated in multiple developer and CI environments."
+strategy = "Define modules, targets, and dependencies in Package.swift and use SwiftPM for build and resolution operations."
+evidence = [{ type = "build_gate", description = "A clean checkout resolves, builds, and tests through SwiftPM using only the committed package manifest and lockfile inputs.", required = true }]
+tradeoff = "SwiftPM may not express every platform-specific build feature and can require integration with Xcode project settings."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#build-and-dependency-management", summary = "Names SwiftPM as the primary tool and Package.swift as the definition of modules, targets, and dependencies.", confidence = 1.0 }]

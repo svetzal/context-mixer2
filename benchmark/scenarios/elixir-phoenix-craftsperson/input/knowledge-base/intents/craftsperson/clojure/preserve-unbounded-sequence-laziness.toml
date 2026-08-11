@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-unbounded-sequence-laziness"
+title = "Do not realize unbounded sequences unnecessarily"
+category = "design"
+tags = ["clojure", "concurrency", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to safely process finite prefixes and streams whose total size is unknown or infinite"
+threat = "Eager realization of an infinite or unbounded sequence never completes or exhausts memory"
+expectation = "Callers may supply lazy streams rather than finite in-memory collections"
+strategy = "Preserve laziness through transformations and realize only explicitly bounded portions"
+evidence = [{ type = "test", description = "A test using an infinite input obtains the required finite result within a time bound without realizing the remainder", required = true }]
+tradeoff = "Lazy behavior can defer failures and resource use, making timing and lifecycle reasoning harder"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#6-performance-considerations", summary = "Reviews explicitly guard against unnecessary realization of infinite sequences.", confidence = 1.0 }]

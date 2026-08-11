@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-literals-for-exhaustiveness"
+title = "Preserve literal sets for exhaustive handling"
+category = "design"
+tags = ["typescript", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to derive closed value sets and detect missing cases at compile time"
+threat = "Widening literal values to primitive types hides omissions when variants are added"
+expectation = "Enumerated roles, actions, and states will acquire new members"
+strategy = "Use const assertions and literal-derived unions so consumers can be checked exhaustively"
+evidence = [{ type = "static-check", description = "Adding a value to the const-defined set causes non-exhaustive consumers to fail type-checking until handled", required = true }]
+tradeoff = "Closed literal sets reduce flexibility for dynamic extension and can require explicit exhaustiveness helpers"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#type-system-patterns", summary = "The type guidelines prescribe as const for literal types and exhaustiveness checking.", confidence = 1.0 }]

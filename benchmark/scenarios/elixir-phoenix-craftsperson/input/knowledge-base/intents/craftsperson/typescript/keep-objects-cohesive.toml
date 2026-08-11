@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-objects-cohesive"
+title = "Keep objects responsible for one cohesive concern"
+category = "design"
+tags = ["typescript", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to change one responsibility without risking unrelated behavior in the same object"
+threat = "God objects centralize unrelated policy, dependencies, and state behind one mutable surface"
+expectation = "New features will tend to attach themselves to already prominent services or classes"
+strategy = "Split objects when their responsibilities change for different reasons"
+evidence = [{ type = "review", description = "Each changed class has a single coherent responsibility and its dependencies serve that responsibility rather than unrelated workflows", required = true }]
+tradeoff = "Decomposition increases the number of collaborators and can scatter workflows across files"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#red-flags-to-catch", summary = "God objects or classes that do too much are explicitly identified as red flags.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.critical-path-coverage"
+title = "Use coverage to expose untested critical behavior"
+category = "testing"
+tags = ["go", "testing", "error-handling", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Important business paths have observable test protection without optimizing for a vanity percentage."
+threat = "A high aggregate percentage can coexist with untested failure handling or critical decisions."
+expectation = "The codebase will expand unevenly and pressure for simple coverage targets will increase."
+strategy = "Measure coverage while prioritizing critical paths and meaningful scenarios over arbitrary numeric thresholds."
+evidence = [{ type = "gate", description = "go test -cover ./... reports coverage and review confirms each identified critical path has a behavioral test regardless of the aggregate percentage.", required = true }]
+tradeoff = "Criticality judgments are partly subjective and provide a less automatic gate than a fixed percentage."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#maintain-comprehensive-tests", summary = "Calls for meaningful coverage focused on critical paths rather than arbitrary percentages.", confidence = 1.0 }]

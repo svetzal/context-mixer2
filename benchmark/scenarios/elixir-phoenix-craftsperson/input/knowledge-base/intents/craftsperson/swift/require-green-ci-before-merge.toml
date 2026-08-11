@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-green-ci-before-merge"
+title = "Require green CI before merge"
+category = "quality"
+tags = ["swift", "build-and-delivery", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "The shared mainline receives only changes that pass the project's automated quality evidence."
+threat = "Merging with failed or missing checks transfers known risk to every downstream contributor and release."
+expectation = "Concurrent pull requests will make local validation insufficient to prove integration safety."
+strategy = "Block pull-request merge until CI and every required quality gate pass."
+evidence = [{ type = "merge_gate", description = "Branch protection reports every required CI check successful for the exact revision merged.", required = true }]
+tradeoff = "Strict merge gating delays urgent work during flaky tests, CI outages, or checks unrelated to the change."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#pull-requests", summary = "Requires green CI and all quality gates before pull-request merge.", confidence = 1.0 }]

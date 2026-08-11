@@ -1,0 +1,17 @@
+id = "guidelines.intent.review-code-with-psychological-safety"
+title = "Review code without judging colleagues"
+category = "collaboration"
+tags = ["csharp", "security", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Contributors can exchange candid technical feedback while remaining willing to share work and ask for help."
+threat = "Personalized or contemptuous criticism turns defect discovery into interpersonal risk and suppresses collaboration."
+expectation = "Repeated review under delivery pressure will surface mistakes and disagreements among colleagues."
+strategy = "Address observable properties of the code and their consequences, never the competence or motives of its author."
+evidence = [{ type = "review_observation", description = "Review comments identify code behavior and impact without personal attribution, ridicule, or assumptions about the author.", required = true }]
+tradeoff = "Careful phrasing takes effort and can make urgent criticism feel less forceful."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#code-review-protocol", summary = "Requires reviewing code rather than colleagues to maintain psychological safety.", confidence = 1.0 }]

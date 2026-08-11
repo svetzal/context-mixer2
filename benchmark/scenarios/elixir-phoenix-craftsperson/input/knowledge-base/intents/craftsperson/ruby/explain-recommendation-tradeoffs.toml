@@ -1,0 +1,17 @@
+id = "guidelines.intent.explain-recommendation-tradeoffs"
+title = "Explain gains and costs of recommended changes"
+category = "design"
+tags = ["ruby", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability for decision-makers to evaluate engineering recommendations against local constraints"
+threat = "One-sided advice presents preferences as universally beneficial and hides new failure modes"
+expectation = "Design choices will involve context-dependent costs that differ between projects"
+strategy = "State why a recommendation helps, what it gains, and what it costs"
+evidence = [{ type = "review", description = "Each material recommendation names both the protected outcome and at least one concrete downside or risk", required = true }]
+tradeoff = "Balanced explanations lengthen feedback and can make straightforward recommendations appear less decisive"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#communication-style", summary = "The source requires explaining why a change is suggested, what is gained, and its tradeoffs.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-green-ci-before-merge"
+title = "Require green CI before merge"
+category = "quality"
+tags = ["csharp", "build-and-delivery", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The shared integration branch contains only revisions that pass the agreed automated checks."
+threat = "Merging around failed or missing checks exports known defects and breaks other contributors."
+expectation = "Concurrent changes and environment differences will create failures not visible in a developer's local run."
+strategy = "Make the complete quality-gate suite a required successful CI condition for pull-request integration."
+evidence = [{ type = "ci_gate", description = "The pull request's required build, test, format, analysis, security, and coverage checks are current and successful before merge.", required = true }]
+tradeoff = "CI outages, flaky checks, and long pipelines can block urgent or otherwise valid integration."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#version-control-etiquette", summary = "Requires all quality gates to be green before a pull request merges.", confidence = 1.0 }]

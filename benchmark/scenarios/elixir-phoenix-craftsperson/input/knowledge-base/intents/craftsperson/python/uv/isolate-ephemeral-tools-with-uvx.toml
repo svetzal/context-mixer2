@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-ephemeral-tools-with-uvx"
+title = "Isolate standalone tools with uvx"
+category = "delivery"
+tags = ["python", "uv", "testing", "dependencies", "tooling", "project-management"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "One-off utilities can run reproducibly without becoming project dependencies or polluting global environments."
+threat = "Installing transient tools into the project or globally creates dependency churn and version ambiguity."
+expectation = "Maintenance will occasionally require utilities that do not import or execute the project itself."
+strategy = "Run standalone or version-specific ephemeral utilities with uvx, reserving uv run for tools that require project context."
+evidence = [{ type = "dependency_review", description = "One-off standalone tools are invoked with uvx and are absent from project dependency groups unless the project actually relies on them.", required = true }]
+tradeoff = "Ephemeral environments may incur download latency and are less visible than committed development dependencies."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#running-project-tools", summary = "Assigns uvx to standalone ephemeral tools and uv run to tools needing project code.", confidence = 1.0 }]

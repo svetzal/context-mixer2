@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-process-dictionary-state"
+title = "Avoid hidden process-dictionary state"
+category = "design"
+tags = ["elixir", "concurrency", "testing", "dependencies", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "A function's behavior can be understood from explicit inputs and owned process state."
+threat = "Implicit process-local values create invisible dependencies that leak across calls and tests."
+expectation = "Concurrent code will move between processes and be exercised under varying execution contexts."
+strategy = "Pass data explicitly or keep it in declared process state rather than the process dictionary."
+evidence = [{ type = "static_check", description = "Application code contains no Process.get/put-style state except documented framework integration points.", required = true }]
+tradeoff = "Explicit state threading can lengthen signatures or require a dedicated process abstraction."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#common-mistakes", summary = "Calls process-dictionary use a sign of unidiomatic code.", confidence = 1.0 }]

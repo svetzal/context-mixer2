@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-uncertain-dependency-security"
+title = "Escalate uncertain security consequences of upgrades"
+category = "collaboration"
+tags = ["clojure", "security", "dependencies", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to make dependency changes with an accountable understanding of residual security risk"
+threat = "An upgrade, suppression, or deferral made under uncertain security implications can trade a known issue for an unrecognized exposure"
+expectation = "Scanner findings and dependency upgrade paths will sometimes be ambiguous or conflict with compatibility needs"
+strategy = "Seek user clarification when the security implications of dependency updates are unclear"
+evidence = [{ type = "decision-record", description = "The dependency decision records the finding, available versions, compatibility impact, uncertainty, and user-approved disposition", required = true }]
+tradeoff = "Escalation can delay urgent remediation while evidence and risk ownership are clarified"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#when-to-escalate", summary = "Unclear security implications of dependency updates explicitly require user clarification.", confidence = 1.0 }]

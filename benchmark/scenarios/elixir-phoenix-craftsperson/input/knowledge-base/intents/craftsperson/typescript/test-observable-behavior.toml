@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-observable-behavior"
+title = "Test observable behavior rather than implementation details"
+category = "testing"
+tags = ["typescript", "concurrency", "testing", "behavior", "public-boundaries", "refactor-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/test-observable-behavior" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to refactor internals without invalidating the executable specification"
+threat = "Tests coupled to private calls and structure fail when behavior remains correct"
+expectation = "Internal design will evolve while externally meaningful contracts remain stable"
+strategy = "Assert inputs, outputs, state transitions, and boundary effects instead of internal implementation steps"
+evidence = [{ type = "review", description = "Tests remain valid under an internal refactor that preserves the unit's observable contract", required = true }]
+tradeoff = "Behavior-focused failures can be less localized and may require broader fixtures than white-box assertions"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "The test principles and self-correction mechanisms explicitly require behavior tests instead of implementation-detail tests.", confidence = 1.0 }]

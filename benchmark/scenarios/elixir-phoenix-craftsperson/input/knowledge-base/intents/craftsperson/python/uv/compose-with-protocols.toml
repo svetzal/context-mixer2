@@ -1,0 +1,17 @@
+id = "guidelines.intent.compose-with-protocols"
+title = "Compose behavior through protocols"
+category = "design"
+tags = ["python", "uv", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Behavior can vary without binding components to inherited implementation hierarchies."
+threat = "Inheritance couples reuse to ancestry and lets superclass changes affect unrelated subclasses."
+expectation = "New collaborators and implementations will need to satisfy contracts without sharing construction or state."
+strategy = "Favor composition and protocol-based polymorphism; use ABCs only to state contracts, not to reuse code."
+evidence = [{ type = "architecture_review", description = "Polymorphic components depend on protocols or contracts and obtain reused behavior through composition rather than inherited implementation.", required = true }]
+tradeoff = "Composition can require explicit delegation and more small objects than inheritance."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#compose-over-inherit", summary = "Favors composition and protocol polymorphism and restricts ABCs to contracts.", confidence = 1.0 }]

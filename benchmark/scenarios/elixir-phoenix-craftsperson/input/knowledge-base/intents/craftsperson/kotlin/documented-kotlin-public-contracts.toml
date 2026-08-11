@@ -1,0 +1,17 @@
+id = "guidelines.intent.documented-kotlin-public-contracts"
+title = "Document every Kotlin public API contract"
+category = "documentation"
+tags = ["kotlin", "concurrency", "documentation", "error-handling", "synchronization", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability for API consumers to understand purpose, inputs, results, and exceptional behavior without reading implementations."
+threat = "Undocumented public contracts invite incorrect assumptions and make refactoring unsafe."
+expectation = "Public APIs will gain consumers and evolve beyond the memory of their original authors."
+strategy = "Write KDoc for every public API, including parameter, return, and @throws details where applicable."
+evidence = [{ type = "static_check", description = "Every public declaration has KDoc covering its behavioral contract, and every intentionally thrown exception appears in @throws documentation.", required = true }]
+tradeoff = "Comprehensive KDoc adds review and maintenance cost and can become stale if behavior changes without updates."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#documentation-with-dokka", summary = "The source requires KDoc on all public APIs and documents parameters, returns, and thrown exceptions.", confidence = 1.0 }]

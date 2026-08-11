@@ -1,0 +1,17 @@
+id = "guidelines.intent.run-complete-default-quality-gate"
+title = "Run a complete default Rust quality gate"
+category = "quality"
+tags = ["rust", "security", "testing", "documentation", "dependencies", "formatting", "static-analysis"]
+relations = [
+  { type = "specializes", target = "craftsperson/honor-the-project-quality-gate" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A Rust change is checked for formatting, static correctness, behavior, documentation, coverage, vulnerabilities, and dependency policy before delivery."
+threat = "A narrow test command passes while defects remain in another quality dimension."
+expectation = "Repositories without an explicit gate will otherwise receive inconsistent validation based on contributor habit."
+strategy = "Default to cargo fmt --check, Clippy with denied warnings, cargo test, cargo doc, cargo llvm-cov, cargo audit, and cargo deny check."
+evidence = [{ type = "quality_gate", description = "All applicable default commands complete successfully or each omission has a stated repository-specific reason.", required = true }]
+tradeoff = "The full gate is slow and requires several auxiliary tools that small projects may not already install."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#mandatory-quality-gates-default-set-if-repo-doesnt-specify-its-own", summary = "Defines a seven-part default quality gate when the repository provides none.", confidence = 1.0 }]

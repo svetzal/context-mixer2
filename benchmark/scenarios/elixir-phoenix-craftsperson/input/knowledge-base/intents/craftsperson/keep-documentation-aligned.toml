@@ -1,0 +1,289 @@
+id = "guidelines.intent.keep-documentation-aligned"
+title = "Keep documentation aligned with behavior"
+category = "documentation"
+tags = ["synchronization", "behavior", "maintenance"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Users and maintainers can rely on documentation as a current description of supported behavior and decisions."
+threat = "Implementation changes while examples, public contracts, architecture notes, or operational instructions continue describing obsolete behavior."
+expectation = "Documentation and implementation will otherwise evolve in separate edits and on separate schedules."
+strategy = "Change relevant narrative and API documentation with behavior, keep examples verifiable, and run the documentation build when one exists."
+evidence = [{ type = "documentation_gate", description = "Changed behavior has corresponding documentation updates and documented examples or builds verify successfully.", required = true }]
+tradeoff = "Synchronized documentation increases the scope and verification cost of behavior changes."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/ruby-ecosystem/agents/ruby-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#quality-assurance-process", summary = "Keeps framework and application documentation aligned with behavior.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#engineering-principles-you-follow", summary = "Changes implementation and narrative documentation together.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#documentation", summary = "Keeps public contracts, examples, and implementation synchronized.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "Keeps documentation examples executable and requires the documentation site to build.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; change: default page size 20 -> 50 (perf review 2026-07)
+(defn list-orders
+  "Returns orders newest-first. `:limit` defaults to 50,
+  maximum 200."
+  [{:keys [limit] :or {limit 50}}]
+  (take (min limit 200) (orders-newest-first)))
+
+;; same commit: README quickstart example re-run and updated —
+;; (list-orders {})  ;=> 50 orders
+'''
+bad = '''
+(defn list-orders
+  "Returns orders newest-first. `:limit` defaults to 20."
+  [{:keys [limit] :or {limit 50}}]  ; changed; docstring wasn't
+  (take (min limit 200) (orders-newest-first)))
+
+;; README still calls 20 "the default" and the pagination
+;; guide still documents the old maximum of 100
+'''
+
+[examples.cpp]
+good = '''
+commit 3c9d1f0
+  feat: reserve() now holds stock for 15 min (was 5)
+
+  src/inventory.cpp          | behavior change
+  docs/api/inventory.md      | timeout table updated
+  examples/reserve_flow.cpp  | compiled by the docs CI job
+  CHANGELOG.md               | noted under Unreleased
+
+$ cmake --build build --target docs
+  Documentation build: OK, examples compile
+'''
+bad = '''
+// inventory.cpp — the hold time changed months ago:
+constexpr auto kHold = std::chrono::minutes(15);
+
+// docs/api/inventory.md — still shipping to users:
+//   "Reservations are held for 5 minutes."
+// examples/reserve_flow.cpp — hasn't compiled since v2.0;
+// nothing in CI would notice either drift.
+'''
+
+[examples.csharp]
+good = '''
+$ git show --stat HEAD | grep -E 'Retry|md'
+ src/Http/RetryPolicy.cs   | 14 ++--
+ README.md                 |  6 ++-
+ docs/operations.md        |  4 +-
+
+# README example is executable and verified in CI
+$ dotnet test --filter Category=DocExamples
+  Passed! 9 tests
+'''
+bad = '''
+README.md:
+  ## Retries
+  Failed calls retry 3 times with a fixed 1s delay.
+
+src/Http/RetryPolicy.cs (changed two sprints ago):
+  // exponential backoff, 5 attempts, with jitter
+  Backoff(attempts: 5, baseMs: 200, jitter: true);
+
+# ops paged at 3am tuned timeouts around the README
+'''
+
+[examples.elixir]
+good = '''
+@doc """
+Splits a full name into given and family parts.
+
+Since v2.3 empty input returns `{:error, :blank}`.
+
+    iex> Names.split("Ada Lovelace")
+    {:ok, {"Ada", "Lovelace"}}
+
+    iex> Names.split("")
+    {:error, :blank}
+"""
+# doctest runs in CI — the examples cannot drift silently
+'''
+bad = '''
+@doc """
+Splits a full name. Returns nil when input is empty.
+"""
+# the behavior changed two releases ago; the docs still
+# promise nil, and nothing executable would ever notice
+def split(""), do: {:error, :blank}
+def split(name) do
+  [given, family] = String.split(name, " ", parts: 2)
+  {:ok, {given, family}}
+end
+'''
+
+[examples.go]
+good = '''
+// retry default changed from 3 to 5 — the docs move in the
+// same commit, and the example executes so it cannot drift
+const DefaultAttempts = 5
+
+// client_test.go, verified on every `go test` run:
+func ExampleClient_MaxAttempts() {
+	c := New()
+	fmt.Println(c.MaxAttempts())
+	// Output: 5
+}
+'''
+bad = '''
+README.md (untouched since the behavior shipped):
+    Requests retry 3 times before failing.
+
+// client.go, edited last sprint:
+const DefaultAttempts = 5
+
+# operators sizing rate limits still plan around "3 retries";
+# no docs build ran and no example executes
+'''
+
+[examples.java]
+good = '''
+commit 3f1b2ca
+  Reduce API rate limit to 60 req/min
+
+  - RateLimiter.MAX_PER_MINUTE: 120 -> 60
+  - docs/api.md: limits table updated to 60
+  - README quickstart example re-run; output refreshed
+  - docs build: OK, zero broken references
+'''
+bad = '''
+commit 8c9d1ef
+  Reduce API rate limit to 60 req/min
+
+  - RateLimiter.MAX_PER_MINUTE: 120 -> 60
+
+# docs/api.md still promises "120 requests per minute";
+# integrators tune their retry logic against the stale
+# number and hit 429s in production
+'''
+
+[examples.kotlin]
+good = '''
+// behavior change: default page size 20 -> 50
+fun listUsers(page: Int, size: Int = 50): Page<User> =
+    repo.page(page, size)
+
+// same commit — docs/api.md:
+//   - | size | optional, default 20 |
+//   + | size | optional, default 50 |
+// $ ./gradlew dokkaHtml  -> docs build verified green
+'''
+bad = '''
+// default changed from 20 to 50 in code only
+fun listUsers(page: Int, size: Int = 50): Page<User> =
+    repo.page(page, size)
+// docs/api.md still promises "default 20", and the README
+// curl example now returns different output than the text
+// beside it claims — every reader is being misled
+'''
+
+[examples.python]
+good = '''
+$ git show --stat 8c1f4e2
+    Rename --output to --dest and accept directories
+
+ src/cli.py        | 14 ++++----
+ README.md         |  6 ++--    # examples move in lockstep
+ docs/usage.md     |  4 ++--
+ tests/test_cli.py |  9 +++--
+
+$ make docs        # doc examples execute during the build
+docs build: 0 broken examples
+'''
+bad = '''
+$ git show --stat 8c1f4e2
+    Rename --output to --dest
+
+ src/cli.py | 14 ++++----
+
+$ grep -- "--output" README.md docs/usage.md | wc -l
+9
+# every documented example now fails with "unknown flag"
+'''
+
+[examples.ruby]
+good = '''
+commit: Rename expire_after: to ttl: on CacheClient
+
+  lib/cache_client.rb    (behavior)
+  README.md#usage        (example updated; doctest passes)
+  docs/configuration.md  (option table updated)
+
+CI: bundle exec yard doctest — README examples execute
+against the real API, so drift fails the build.
+'''
+bad = '''
+# lib/cache_client.rb — keyword renamed last quarter
+def initialize(ttl:) = @ttl = ttl
+
+# README.md still teaches the removed keyword:
+#
+#   CacheClient.new(expire_after: 300)
+#
+# every new integrator hits ArgumentError on day one
+'''
+
+[examples.rust]
+good = '''
+Change: retries now default to 3 (was 5)
+
+  src/client.rs   | DEFAULT_RETRIES = 3
+  README.md       | "retries three times by default"
+  docs/config.md  | default + example output re-captured
+  CHANGELOG.md    | noted under Unreleased
+
+$ cargo test --doc        # doc examples still pass
+test result: ok. 6 passed
+'''
+bad = '''
+Change: retries now default to 3 (was 5)
+
+  src/client.rs   | DEFAULT_RETRIES = 3
+
+README.md still promises "retries five times by default",
+and the doctest pinning the old behavior was deleted to
+make the build pass — the docs now describe a client that
+no longer exists.
+'''
+
+[examples.swift]
+good = '''
+Commit: "Make retry limit configurable (default 3 -> 5)"
+  Sources/HTTPClient.swift        |  4 +-
+  README.md                       |  6 +-  example updated
+  Tests/ReadmeExampleTests.swift  |  2 +-  example compiles
+
+$ swift package generate-documentation
+Build succeeded — docs and behavior move in one change.
+'''
+bad = '''
+Commit: "Make retry limit configurable"
+  Sources/HTTPClient.swift | 4 +-
+
+README still shows `HTTPClient()` retrying 3 times and
+documents the removed `maxRetries` global. The first
+consumer copies the stale example, watches it fail to
+compile, and files a support ticket.
+'''
+
+[examples.typescript]
+good = '''
+One change set, behavior and description together:
+
+  src/retry.ts      | default attempts 3 -> 5
+  README.md         | "retries up to 5 times (was 3)"
+  docs/config.md    | retryAttempts default now 5
+  examples/basic.ts | asserts 5 attempts, runs in CI
+
+$ npm run docs:build && npm run docs:test
+docs build clean; 12 example snippets executed, 12 passed
+'''
+bad = '''
+// Behavior changed; the docs still promise the old world.
+export const DEFAULT_ATTEMPTS = 5; // was 3
+
+// README.md (untouched by this change):
+//   "By default the client retries up to 3 times."
+// docs/config.md still documents retryAttempts: 3, and the
+// pinned example asserts three attempts — it now fails
+// only when someone finally runs it.
+'''

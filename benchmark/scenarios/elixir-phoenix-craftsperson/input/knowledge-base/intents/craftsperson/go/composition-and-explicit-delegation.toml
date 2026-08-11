@@ -1,0 +1,17 @@
+id = "guidelines.intent.composition-and-explicit-delegation"
+title = "Assemble behavior through composition and explicit delegation"
+category = "design"
+tags = ["go", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Types can reuse and combine behavior without hidden inheritance-style coupling."
+threat = "Implicit method promotion and hierarchy-like designs obscure which component owns behavior."
+expectation = "Features will combine existing capabilities while component responsibilities continue to evolve."
+strategy = "Prefer interfaces, struct composition, appropriate embedding, and explicit delegation over implicit inheritance."
+evidence = [{ type = "review", description = "Composite types expose deliberate methods and reviewers can trace each delegated behavior to an owned component.", required = true }]
+tradeoff = "Explicit delegation adds forwarding code, while embedding can still expose more methods than intended if used carelessly."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#composition-over-inheritance", summary = "Prefers composition, appropriate struct embedding, and explicit delegation over implicit inheritance.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.readable-kotlin-scope-functions"
+title = "Use scope functions only when their semantics clarify the flow"
+category = "collaboration"
+tags = ["kotlin", "testing", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.91
+capability = "Ability to read object setup and nullable control flow without mentally decoding incidental syntax."
+threat = "Interchangeable or nested scope functions obscure receiver identity, return values, and control flow."
+expectation = "Kotlin code will attract compact idioms as contributors refactor for concision."
+strategy = "Select let, run, apply, also, and with according to their receiver and result semantics, especially in null-handling flows."
+evidence = [{ type = "review", description = "Scope-function uses have an evident receiver and intended return value, with no nesting that obscures control flow.", required = true }]
+tradeoff = "Avoiding clever chains may produce more explicit local variables and longer code."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#core-identity", summary = "The source requires scope functions to be used appropriately and recommends let or run for null-handling flow.", confidence = 0.9 }]

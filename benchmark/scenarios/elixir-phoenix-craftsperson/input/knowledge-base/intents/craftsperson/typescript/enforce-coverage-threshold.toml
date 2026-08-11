@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-coverage-threshold"
+title = "Enforce the configured test coverage threshold"
+category = "testing"
+tags = ["typescript", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to detect when changed behavior falls outside the executable specification"
+threat = "A passing but sparse suite leaves important paths unverified"
+expectation = "The implementation will grow and coverage can erode incrementally without a gate"
+strategy = "Run the test suite with coverage and require the configured threshold before completion"
+evidence = [{ type = "gate", description = "npm test -- --coverage exits successfully and reports coverage at or above the project threshold", required = true }]
+tradeoff = "Coverage thresholds add runtime and can incentivize low-value assertions merely to raise a metric"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "Coverage execution and an above-threshold result are mandatory completion steps.", confidence = 1.0 }]

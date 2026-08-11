@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-batch-task-failures"
+title = "Isolate batch task failures from callers"
+category = "reliability"
+tags = ["elixir", "concurrency", "error-handling", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Concurrent batch processing can report an individual task failure without unexpectedly terminating the consuming process."
+threat = "Linked task exits cascade into callers and abort unrelated work in the batch."
+expectation = "Individual inputs and external operations will fail independently during concurrent enumeration."
+strategy = "Prefer Task.Supervisor.async_stream_nolink/6 when batch tasks need supervised execution without exit-link propagation to the caller."
+evidence = [{ type = "fault_test", description = "A deliberately crashing batch item yields an observable failure result while the caller and supervisor remain alive and other permitted items complete.", required = true }]
+tradeoff = "The caller must inspect and handle per-item exit results, and failure no longer automatically tears down dependent caller work."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#common-mistakes", summary = "Prefers Task.Supervisor.async_stream_nolink/6 for supervised concurrent tasks.", confidence = 1.0 }]

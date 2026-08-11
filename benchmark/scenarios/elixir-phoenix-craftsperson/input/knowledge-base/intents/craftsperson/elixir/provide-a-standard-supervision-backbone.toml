@@ -1,0 +1,17 @@
+id = "guidelines.intent.provide-a-standard-supervision-backbone"
+title = "Provide a standard supervision backbone"
+category = "reliability"
+tags = ["elixir", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.86
+capability = "Ephemeral workers and background tasks have named discovery and supervised lifecycle facilities available."
+threat = "Ad hoc process spawning creates orphan work, inconsistent lookup, and duplicated lifecycle machinery."
+expectation = "OTP applications will add dynamic workers and background concurrency as responsibilities grow."
+strategy = "Use an application root supervisor with one named Registry, a DynamicSupervisor for ephemeral workers, and a Task.Supervisor for background work as the practical baseline."
+evidence = [{ type = "supervision_test", description = "The application tree starts the documented named registry and supervisors, and representative dynamic workers and tasks terminate with their owners.", required = true }]
+tradeoff = "The baseline adds processes, registered names, and topology that may be unnecessary for a very small application."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#supervision-strategies", summary = "Offers a named Registry, DynamicSupervisor, Task.Supervisor, and root supervisor as the practical baseline.", confidence = 1.0 }]

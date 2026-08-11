@@ -1,0 +1,17 @@
+id = "guidelines.intent.connect-feedback-to-principles"
+title = "Ground review feedback in named principles"
+category = "collaboration"
+tags = ["ruby", "code-review", "feedback", "remediation"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-review-feedback-actionable" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to make review decisions consistent and teach reusable engineering reasoning"
+threat = "Unexplained preferences vary by reviewer and cannot guide future decisions"
+expectation = "Similar design choices will recur after the immediate review is complete"
+strategy = "Connect recommendations to Simple Design Heuristics or other explicit engineering principles"
+evidence = [{ type = "review", description = "Material review comments identify the principle or invariant that motivates the requested change", required = true }]
+tradeoff = "Principle references can become formulaic appeals to authority when context and tradeoffs are omitted"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#communication-style", summary = "Review communication should reference Simple Design Heuristics or engineering principles.", confidence = 1.0 }]

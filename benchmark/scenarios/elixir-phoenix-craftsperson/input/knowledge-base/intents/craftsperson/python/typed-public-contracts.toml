@@ -1,0 +1,17 @@
+id = "guidelines.intent.typed-public-contracts"
+title = "Make public Python contracts statically explicit"
+category = "design"
+tags = ["python", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Callers and tooling can understand accepted inputs and returned values at API boundaries."
+threat = "Implicit or imprecise public contracts allow interface mismatches to surface only at runtime."
+expectation = "Public APIs and their callers will evolve independently across modules and contributors."
+strategy = "Annotate all public APIs and function signatures and avoid `Any` in favor of precise types, `object`, or proper generics."
+evidence = [{ type = "static-analysis", description = "A configured type checker accepts the public interface and reports no missing public annotations or explicit `Any` introduced by project code.", required = true }]
+tradeoff = "Maintaining precise annotations adds design effort and can be cumbersome around highly dynamic libraries."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#type-hints", summary = "The source requires hints on public APIs and signatures and directs authors away from Any.", confidence = 1.0 }]

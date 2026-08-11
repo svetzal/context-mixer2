@@ -1,0 +1,17 @@
+id = "guidelines.intent.index-database-access-paths"
+title = "Index database access paths that matter"
+category = "reliability"
+tags = ["ruby", "persistence", "data-integrity", "transactions", "database-constraints"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to keep common Rails database queries responsive as data grows"
+threat = "Unindexed filters, joins, and constraints degrade into full scans and lock-heavy writes"
+expectation = "Production table sizes and request concurrency will increase"
+strategy = "Add appropriate database indexes for query and constraint access paths"
+evidence = [{ type = "performance", description = "Representative query plans use intended indexes and remain within the project's latency budget at production-like cardinality", required = true }]
+tradeoff = "Indexes consume storage and memory and slow writes, migrations, and vacuum maintenance"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#rails-specific-guidance", summary = "Proper indexing is one of the stated Rails database best practices.", confidence = 1.0 }]

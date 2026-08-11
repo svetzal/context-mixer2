@@ -1,0 +1,17 @@
+id = "guidelines.intent.graceful-async-timeouts-and-cancellation"
+title = "Bound async waits and unwind cleanly on cancellation"
+category = "reliability"
+tags = ["python", "concurrency", "build-and-delivery", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Asynchronous operations stop within expected bounds and release resources when callers withdraw work."
+threat = "Unbounded waits and mishandled cancellation leave requests hung, resources retained, or partial work running."
+expectation = "Networks and upstream services will stall, and application shutdowns or request deadlines will cancel tasks."
+strategy = "Apply explicit asyncio timeouts and handle task cancellation so cleanup and propagation occur correctly."
+evidence = [{ type = "test", description = "Timeout and cancellation tests prove the coroutine terminates within its bound, releases acquired resources, and does not swallow cancellation.", required = true }]
+tradeoff = "Timeout values can reject slow but valid work, and cancellation-safe cleanup complicates coroutine implementations."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#asyncawait-best-practices", summary = "The source requires graceful cancellation and illustrates timeout handling with asyncio.timeout.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.handle-absent-values-explicitly"
+title = "Handle absent values explicitly"
+category = "design"
+tags = ["typescript", "error-handling", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to preserve defined behavior when a lookup or optional value is absent"
+threat = "Unjustified non-null assertions erase absence from the contract and defer failure to an arbitrary dereference"
+expectation = "Collections and external state will legitimately omit requested values"
+strategy = "Retain undefined in the type and branch to an explicit result or domain error"
+evidence = [{ type = "static-check", description = "Changed nullable paths contain no unjustified non-null assertion and tests cover the absence branch", required = true }]
+tradeoff = "Explicit absence handling adds branches and error plumbing to otherwise linear code"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#type-system-patterns", summary = "The common-mistakes section rejects unjustified non-null assertions and demonstrates handling undefined with a domain error.", confidence = 1.0 }]

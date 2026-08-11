@@ -1,0 +1,324 @@
+id = "guidelines.intent.avoid-speculative-capability"
+title = "Avoid speculative capability"
+category = "design"
+tags = ["yagni", "scope-control", "maintainability"]
+status = "hypothesized"
+confidence = 0.99
+capability = "The product and codebase stay focused on behavior with demonstrated value."
+threat = "Hypothetical future needs add paths, configuration, extension points, and maintenance obligations that may never be used."
+expectation = "Ideas about possible future requirements will outnumber validated needs."
+strategy = "Build only capability required by current accepted behavior and remove unused speculative machinery."
+evidence = [{ type = "scope_review", description = "Every added feature and extension point maps to a current requirement, observed variation, or failing behavioral test.", required = true }]
+tradeoff = "A later requirement may require revisiting the design instead of activating a prebuilt extension."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/elixir-ecosystem/agents/elixir-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "Applies YAGNI and rejects speculative capability.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#engineering-principles-you-follow", summary = "Builds only capabilities required now.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Rejects capabilities that are not currently needed.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defn export-csv [rows]
+  (->> rows
+       (map #(str/join "," ((juxt :id :name :total) %)))
+       (str/join "\n")))
+
+(deftest exports-billing-rows-as-csv
+  (is (= "1,Ada,90"
+         (export-csv [{:id 1 :name "Ada" :total 90}]))))
+; exactly the accepted requirement: CSV export, nothing more
+'''
+bad = '''
+(defmulti export
+  ; only CSV was ever requested; the rest is "for later"
+  (fn [format _rows] format))
+
+(defmethod export :csv [_ rows] (rows->csv rows))
+(defmethod export :xml [_ rows] (rows->xml rows))  ; no caller
+(defmethod export :edn [_ rows] (pr-str rows))     ; no caller
+(defmethod export :pdf [_ _] (throw (ex-info "TODO" {})))
+
+(def config {:export/formats [:csv :xml :edn :pdf]
+             :export/plugin-dir "plugins/"})       ; unused
+'''
+
+[examples.cpp]
+good = '''
+// One format, one caller, built for today's requirement.
+class CsvExporter {
+public:
+  void exportOrders(const std::vector<Order>& orders,
+                    std::ostream& out);
+};
+// When PDF export is actually accepted into scope, the
+// seam gets designed against that real second case.
+'''
+bad = '''
+class AbstractExporterFactoryBase {   // no second format exists
+public:
+  virtual std::unique_ptr<Exporter>
+  create(Format f, const ExporterConfig& cfg,
+         PluginRegistry* plugins = nullptr) = 0;  // never used
+  virtual void registerCustomFormat(          // no caller
+      const std::string& name, FormatDescriptor desc) = 0;
+  virtual void setEncodingHook(EncodingHook h) = 0;  // "someday"
+};
+'''
+
+[examples.csharp]
+good = '''
+// csv is the only export the product ships today
+public sealed class CsvExporter
+{
+    public string Export(Order order) =>
+        string.Join('\n', order.Lines.Select(l =>
+            $"{l.Sku},{l.Qty},{l.Price:F2}"));
+}
+'''
+bad = '''
+public interface IExportStrategy { string Export(Order o); }
+
+public sealed class ExporterFactory(IConfig config)
+{
+    // only csv exists; the rest is "for later"
+    public IExportStrategy Create() =>
+        config.Get("export:format") switch
+        {
+            "csv" => new CsvExporter(),
+            "xml" or "pdf" or "xlsx" =>
+                throw new NotSupportedException("soon"),
+            _ => throw new NotSupportedException()
+        };
+}
+'''
+
+[examples.elixir]
+good = '''
+defmodule Export do
+  # the one format current accepted behavior requires
+  def to_csv(rows) do
+    rows
+    |> Enum.map(&Enum.join(&1, ","))
+    |> Enum.join("\n")
+  end
+end
+'''
+bad = '''
+defmodule Export do
+  # only CSV was ever requested; the rest is "for later"
+  @callback export(rows :: list(), opts :: keyword()) ::
+              binary()
+
+  def export(rows, fmt \\ :csv, _opts \\ [gzip: false])
+  def export(rows, :csv, _), do: dump_csv(rows)
+  def export(_rows, :xml, _), do: raise("todo")
+  def export(_rows, :parquet, _), do: raise("todo")
+end
+'''
+
+[examples.go]
+good = '''
+// the product exports CSV today; that is all the code does
+func ExportCSV(ctx context.Context, w io.Writer, r Report) error {
+	cw := csv.NewWriter(w)
+	for _, row := range r.Rows() {
+		if err := cw.Write(row); err != nil {
+			return fmt.Errorf("write report row: %w", err)
+		}
+	}
+	cw.Flush()
+	return cw.Error()
+}
+'''
+bad = '''
+// nobody has asked for anything but CSV
+type Exporter interface {
+	Export(ctx context.Context, w io.Writer, r Report) error
+}
+
+type Registry struct{ byFormat map[string]Exporter }
+
+func (r *Registry) Register(f string, e Exporter) { r.byFormat[f] = e }
+
+// stubs waiting for a future that may never arrive
+type XMLExporter struct{}  // TODO
+type PDFExporter struct{}  // TODO
+type XLSXExporter struct{} // TODO
+'''
+
+[examples.java]
+good = '''
+// exactly the one export the product ships today
+final class CsvExporter {
+    String export(List<Invoice> invoices) {
+        return invoices.stream()
+            .map(i -> i.number() + "," + i.total())
+            .collect(joining("\n"));
+    }
+}
+'''
+bad = '''
+// only CSV is required today; the rest is guessed future need
+interface ExportStrategy { String export(List<Invoice> in); }
+
+final class ExporterFactory {
+    private final Map<Format, ExportStrategy> plugins =
+        new HashMap<>();
+    void registerPlugin(Format f, ExportStrategy s) {
+        plugins.put(f, s);           // zero callers
+    }
+    ExportStrategy forFormat(Format f, boolean async,
+                             int retries) {  // knobs nobody set
+        return plugins.getOrDefault(f, new CsvStrategy());
+    }
+}
+'''
+
+[examples.kotlin]
+good = '''
+// requirement today: export reports as CSV. That is all.
+class ReportService(private val repo: ReportRepo) {
+    fun exportCsv(month: Month): String =
+        repo.forMonth(month).joinToString("\n") { it.toCsvRow() }
+}
+// a second format gets designed when a second format is
+// actually required
+'''
+bad = '''
+interface ExportStrategy { fun export(r: Report): ByteArray }
+class CsvExport : ExportStrategy { /* the only one used */ }
+class XmlExport : ExportStrategy {
+    override fun export(r: Report) = TODO("someday") // unused
+}
+class PdfExport : ExportStrategy {
+    override fun export(r: Report) = TODO("someday") // unused
+}
+class ReportService(val strategies: Map<String, ExportStrategy>)
+'''
+
+[examples.python]
+good = '''
+def export_csv(rows: Iterable[Row], out: Path) -> None:
+    # the one format the product needs today
+    with out.open("w", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(FIELDS)
+        writer.writerows(astuple(r) for r in rows)
+'''
+bad = '''
+class Exporter:
+    """Extensible export engine."""
+    def __init__(self, fmt: str = "csv", compression=None,
+                 encryption=None, chunk_size=None, hooks=None):
+        # only CSV was ever requested; the rest is guesswork
+        self._plugins: dict[str, ExportPlugin] = {}
+
+    def register_plugin(self, name: str, p: ExportPlugin): ...
+    def add_pre_hook(self, hook: Callable): ...
+    def export(self, rows: Iterable[Row]) -> None: ...
+'''
+
+[examples.ruby]
+good = '''
+# frozen_string_literal: true
+
+class ReportExporter
+  def initialize(orders:)
+    @orders = orders
+  end
+
+  # the one format the product ships today
+  def to_csv
+    CSV.generate { |csv| @orders.each { |o| csv << o.to_row } }
+  end
+end
+'''
+bad = '''
+class ReportExporter
+  FORMATS = %i[csv xml pdf xlsx json yaml].freeze # only csv used
+
+  def initialize(orders:, format: :csv, plugins: [], hooks: {})
+    @orders, @format = orders, format
+    @plugins, @hooks = plugins, hooks # no caller passes these
+  end
+
+  def export
+    send("to_#{@format}") # five untested speculative paths
+  end
+end
+'''
+
+[examples.rust]
+good = '''
+// the one accepted behavior, implemented directly
+pub fn export_csv(rows: &[Row], out: &mut impl Write)
+    -> io::Result<()> {
+    for row in rows {
+        writeln!(out, "{},{}", row.id, row.name)?;
+    }
+    Ok(())
+}
+'''
+bad = '''
+// registry + trait for formats nobody has requested
+pub trait Exporter {
+    fn export(&self, rows: &[Row]) -> Vec<u8>;
+}
+pub struct ExporterRegistry {
+    by_name: HashMap<String, Box<dyn Exporter>>,
+}
+impl ExporterRegistry {
+    pub fn register(&mut self, n: &str, e: Box<dyn Exporter>) {
+        self.by_name.insert(n.into(), e); // only "csv" exists
+    }
+}
+'''
+
+[examples.swift]
+good = '''
+// The accepted requirement: export a report as PDF. Only that.
+struct ReportExporter {
+    let renderer: PDFRenderer
+
+    func export(_ report: Report) throws -> Data {
+        try renderer.render(report.pages)
+    }
+}
+'''
+bad = '''
+protocol ExportFormat { func encode(_ r: Report) -> Data }
+
+struct Exporter<F: ExportFormat> {
+    var format: F
+    var options: [String: Any] = [:]     // "future flexibility"
+    var plugins: [any ExportPlugin] = [] // no plugin exists
+    func export(_ r: Report) -> Data { format.encode(r) }
+}
+// only PDF was ever requested; the generic format layer and
+// plugin registry are maintenance debt for imagined needs
+'''
+
+[examples.typescript]
+good = '''
+// One exporter is required today; build exactly that.
+export async function exportCsv(
+  rows: Order[],
+): Promise<string> {
+  const header = "id,total";
+  const lines = rows.map((r) => `${r.id},${r.total}`);
+  return [header, ...lines].join("\n");
+}
+'''
+bad = '''
+// Registry, options, and formats nobody asked for.
+interface Exporter { run(rows: Order[]): Promise<string> }
+const registry = new Map<string, Exporter>();
+export function registerExporter(key: string, e: Exporter) {
+  registry.set(key, e); // only "csv" is ever registered
+}
+export interface ExportOpts { format?: string; v2?: boolean }
+export async function exportAny(
+  rows: Order[], opts: ExportOpts,
+): Promise<string> {
+  return registry.get(opts.format ?? "csv")!.run(rows);
+}
+'''

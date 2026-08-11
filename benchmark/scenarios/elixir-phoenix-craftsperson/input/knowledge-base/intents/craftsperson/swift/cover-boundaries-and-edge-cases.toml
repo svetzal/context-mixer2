@@ -1,0 +1,17 @@
+id = "guidelines.intent.cover-boundaries-and-edge-cases"
+title = "Cover boundaries and edge cases with behavior tests"
+category = "testing"
+tags = ["swift", "testing", "error-handling", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "The test suite detects failures at domain boundaries and unusual but valid inputs, not only the happy path."
+threat = "Nominal examples leave untested edge conditions where validation, state transitions, and integration assumptions break."
+expectation = "Production inputs and sequences will include cases not exercised during straightforward feature implementation."
+strategy = "Derive explicit edge and boundary scenarios from requirements and encode them as readable behavior tests."
+evidence = [{ type = "coverage_review", description = "Each changed rule has tests for its nominal case, relevant lower and upper boundaries, invalid inputs, and state-transition edges identified in the requirement.", required = true }]
+tradeoff = "Expanding scenario coverage increases suite size and maintenance and can overfit tests to implausible cases."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#for-code-review", summary = "Requires comprehensive test coverage and specifically asks reviewers to verify edge cases and test readability.", confidence = 0.96 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.triage-vulnerabilities-by-severity"
+title = "Triage vulnerability findings by severity"
+category = "documentation"
+tags = ["python", "uv", "security", "documentation", "synchronization", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Security findings receive a response proportionate to their near-term risk without disappearing from view."
+threat = "Uniform or informal handling either ships serious known risk or blocks indefinitely on low-impact advisories."
+expectation = "Audits will return findings with different exploitability and remediation urgency."
+strategy = "Address high- and medium-severity findings immediately and document any accepted low-severity finding."
+evidence = [{ type = "security_review", description = "No high or medium finding remains open at completion, and every accepted low finding has a recorded rationale.", required = true }]
+tradeoff = "Severity labels can poorly represent project-specific exposure, and immediate remediation may force disruptive upgrades."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Requires immediate handling of high and medium findings and documentation of acknowledged low findings.", confidence = 1.0 }]

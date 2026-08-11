@@ -1,0 +1,17 @@
+id = "guidelines.intent.hoisted-compose-state"
+title = "Keep Compose UI reusable through explicit state ownership"
+category = "reliability"
+tags = ["kotlin", "android", "testing", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to reuse, preview, and test UI rendering independently from stateful orchestration."
+threat = "Large composables with hidden local state couple rendering to one screen workflow."
+expectation = "Components will be reused across screens and exercised under more state variants."
+strategy = "Keep composables small, split stateful and stateless forms, and hoist state to the appropriate owner."
+evidence = [{ type = "gate", description = "Core UI composables accept state and callbacks as parameters and can be previewed or tested without constructing a ViewModel.", required = true }]
+tradeoff = "State hoisting increases parameter lists and creates wrapper composables."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#compose-ui", summary = "The source requires small reusable composables, stateful/stateless separation, and state hoisting.", confidence = 1.0 }]

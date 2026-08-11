@@ -1,0 +1,17 @@
+id = "guidelines.intent.compose-fallible-steps-with-with"
+title = "Compose fallible steps with with"
+category = "design"
+tags = ["elixir", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Sequential operations stop at the first failure while preserving an explicit success path."
+threat = "Nested case expressions obscure error propagation and allow later steps to run after failed prerequisites."
+expectation = "Business operations will combine increasing numbers of validation, lookup, and external calls."
+strategy = "Use with to match each successful step and return unmatched error values to the caller."
+evidence = [{ type = "test", description = "Tests force failure at each step, observe the original error result, and prove subsequent steps are not invoked.", required = true }]
+tradeoff = "with can obscure which clause failed when error shapes overlap and may require an explicit else for normalization."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#error-handling", summary = "Recommends with for sequential operations that may fail.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-documentation-synchronized"
+title = "Keep documentation synchronized with implementation"
+category = "documentation"
+tags = ["csharp", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Readers can rely on documentation to describe the behavior and structure of the current revision."
+threat = "Implementation changes leave examples, contracts, and architecture descriptions stale."
+expectation = "The code will evolve more often than readers can independently verify every documented claim."
+strategy = "Update affected documentation in the same change as the implementation and verify agreement before delivery."
+evidence = [{ type = "change_review", description = "A change to a documented behavior, API, architecture, or domain concept includes the corresponding documentation update, and unchanged documentation remains accurate.", required = true }]
+tradeoff = "Synchronized updates add delivery effort and can duplicate facts that are already visible in code."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#documentation", summary = "Requires documentation to remain synchronized with implementation and repeats that check before presentation.", confidence = 1.0 }]

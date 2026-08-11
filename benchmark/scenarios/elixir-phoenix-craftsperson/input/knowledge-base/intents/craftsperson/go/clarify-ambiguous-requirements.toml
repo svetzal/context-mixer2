@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-ambiguous-requirements"
+title = "Resolve ambiguous business intent before coding"
+category = "collaboration"
+tags = ["go", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Implementation decisions remain aligned with the business problem the user actually needs solved."
+threat = "Unstated assumptions turn ambiguity into confidently implemented but incorrect behavior."
+expectation = "Requests will sometimes omit domain distinctions, priorities, or definitions needed to choose behavior."
+strategy = "Clarify the business problem and ask the user when requirements are ambiguous."
+evidence = [{ type = "decision_record", description = "Ambiguous behavior is resolved in recorded acceptance language before implementation chooses among materially different outcomes.", required = true }]
+tradeoff = "Clarification interrupts implementation flow and can delay work while waiting for a stakeholder."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#when-to-seek-clarification", summary = "Requires clarification when business requirements are ambiguous.", confidence = 1.0 }]

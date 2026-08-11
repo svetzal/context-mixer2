@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-ecto-queries-in-contexts"
+title = "Keep Ecto queries in contexts"
+category = "architecture"
+tags = ["elixir", "phoenix", "ecto", "security", "dependencies", "persistence"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Data-access policy remains reusable and independent of LiveView lifecycle and presentation."
+threat = "Queries embedded in LiveViews duplicate authorization and persistence knowledge across UI modules."
+expectation = "The same business data will serve multiple LiveViews, controllers, jobs, or APIs."
+strategy = "Place all Ecto queries in the appropriate application context and call contexts from LiveViews."
+evidence = [{ type = "architecture_check", description = "LiveView modules contain no Ecto.Query construction or direct Repo access and context tests cover query policy.", required = true }]
+tradeoff = "Simple page-specific queries require a context API and an additional navigation hop."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#context-patterns", summary = "Forbids Ecto queries in LiveViews and requires them in context modules.", confidence = 1.0 }]

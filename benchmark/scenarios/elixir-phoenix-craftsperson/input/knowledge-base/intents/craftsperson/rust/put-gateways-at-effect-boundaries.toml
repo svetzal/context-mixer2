@@ -1,0 +1,17 @@
+id = "guidelines.intent.put-gateways-at-effect-boundaries"
+title = "Put gateway traits at effect boundaries"
+category = "design"
+tags = ["rust", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Core behavior can substitute controlled adapters without coupling to third-party libraries."
+threat = "Vendor APIs and concrete I/O clients leak into business logic and tests."
+expectation = "External services and libraries will change or be unavailable during tests."
+strategy = "Wrap third-party effects in gateway traits and keep concrete gateway structs thin."
+evidence = [{ type = "architecture_review", description = "Core modules depend on project-owned gateway contracts rather than concrete vendor clients.", required = true }]
+tradeoff = "Gateway interfaces and mappings add types and ceremony when an integration is stable and trivial."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#engineering-practices", summary = "Directs effects through mockable gateway traits and thin wrappers around libraries.", confidence = 1.0 }]

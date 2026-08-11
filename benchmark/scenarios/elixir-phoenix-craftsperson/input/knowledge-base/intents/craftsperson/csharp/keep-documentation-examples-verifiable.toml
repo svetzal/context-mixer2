@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-documentation-examples-verifiable"
+title = "Keep code examples verifiable"
+category = "documentation"
+tags = ["csharp", "testing", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Readers can copy or adapt examples with confidence that they represent executable current behavior."
+threat = "Uncompiled snippets drift syntactically or semantically as APIs and language versions change."
+expectation = "Examples will outlive their authors and be reused after implementation changes."
+strategy = "Compile and run examples as part of self-verification, preferably through automated documentation tests."
+evidence = [{ type = "example_gate", description = "Every shipped code example compiles against the documented target and runs to its stated result.", required = true }]
+tradeoff = "Executable examples require harnesses and maintenance and can constrain concise illustrative snippets."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#self-verification-steps", summary = "Requires examples to be confirmed as compiling and running before work is presented.", confidence = 1.0 }]

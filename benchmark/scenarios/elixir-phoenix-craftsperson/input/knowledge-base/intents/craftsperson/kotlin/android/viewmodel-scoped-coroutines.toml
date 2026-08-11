@@ -1,0 +1,17 @@
+id = "guidelines.intent.viewmodel-scoped-coroutines"
+title = "Bind presentation work to ViewModel lifetime"
+category = "reliability"
+tags = ["kotlin", "android", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to cancel presentation coroutines when their owning ViewModel is cleared."
+threat = "Unscoped work survives screens, leaks references, or publishes stale results."
+expectation = "Configuration changes and navigation will repeatedly create and destroy presentation owners."
+strategy = "Launch ViewModel-owned coroutine work in viewModelScope."
+evidence = [{ type = "gate", description = "ViewModel coroutine launches use viewModelScope and lifecycle tests confirm work is cancelled on clearing.", required = true }]
+tradeoff = "Work that must outlive a ViewModel needs explicit transfer to a longer-lived owner."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#coroutines--flow", summary = "The source requires viewModelScope for ViewModel coroutines.", confidence = 1.0 }]

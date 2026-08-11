@@ -1,0 +1,17 @@
+id = "guidelines.intent.queue-cross-thread-signal-delivery"
+title = "Queue cross-thread signals"
+category = "reliability"
+tags = ["cpp", "qt", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Callbacks execute on the receiver thread."
+threat = "Direct delivery violates receiver affinity."
+expectation = "Workers will publish results to UI objects."
+strategy = "Use QueuedConnection across threads."
+evidence = [{ type = "gate", description = "Tests record the slot on the receiver thread.", required = true }]
+tradeoff = "Queueing adds latency and needs an event loop."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#signals-and-slots", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

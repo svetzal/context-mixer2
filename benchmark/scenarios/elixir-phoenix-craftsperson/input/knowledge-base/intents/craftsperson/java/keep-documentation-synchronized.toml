@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-documentation-synchronized"
+title = "Keep documentation synchronized with implementation"
+category = "documentation"
+tags = ["java", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Users and maintainers can rely on guides and Javadoc as accurate descriptions of current behavior."
+threat = "Code changes leave documentation describing obsolete contracts or workflows."
+expectation = "Public contracts and implementation details will continue to evolve after documentation is written."
+strategy = "Update Javadoc and docs content in the same change whenever implementation or public contracts change."
+evidence = [{ type = "review_gate", description = "A contract-changing diff includes corresponding Javadoc and guide updates, and documentation examples match the verified behavior.", required = true }]
+tradeoff = "Synchronous documentation work lengthens small changes and may update several formats."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#documentation", summary = "Requires docs and Javadoc to remain synchronized and to change immediately with public contracts.", confidence = 1.0 }]

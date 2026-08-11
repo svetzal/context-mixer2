@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-regressions-with-coverage"
+title = "Gate changes on passing behavior coverage"
+category = "testing"
+tags = ["typescript", "bun", "cli", "testing", "error-handling", "coverage"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Supported behavior, including edge cases and failures, remains protected against regression."
+threat = "Untested paths and failing suites allow changes to silently break existing CLI behavior."
+expectation = "The command surface and its error cases will grow faster than reviewers can validate manually."
+strategy = "Require the full Bun test suite and coverage run to pass above the project's threshold, with explicit edge-case and error-path tests."
+evidence = [{ type = "gate", description = "`bun test` and `bun test --coverage` exit successfully, reported coverage exceeds the configured threshold, and changed error and edge paths have behavioral assertions.", required = true }]
+tradeoff = "Coverage gates increase suite maintenance and can incentivize low-value tests when the threshold is treated as the goal."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#quality-assurance-process", summary = "Makes passing tests and coverage above threshold mandatory and calls out edge cases and error paths.", confidence = 1.0 }]

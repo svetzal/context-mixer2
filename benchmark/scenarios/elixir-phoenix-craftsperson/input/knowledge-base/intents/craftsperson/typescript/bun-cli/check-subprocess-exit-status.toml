@@ -1,0 +1,17 @@
+id = "guidelines.intent.check-subprocess-exit-status"
+title = "Check every subprocess exit status"
+category = "reliability"
+tags = ["typescript", "bun", "cli", "concurrency", "testing", "error-handling"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The CLI distinguishes successful child-process completion from command failure."
+threat = "Ignoring a nonzero exit status allows failed external work to be reported or consumed as success."
+expectation = "The CLI will depend on external commands whose failure output can still look superficially usable."
+strategy = "Await child termination, inspect its exit code, and map nonzero status through an explicit success or failure policy."
+evidence = [{ type = "test", description = "Subprocess fixtures returning zero and representative nonzero codes cause the caller to take the documented success and failure paths respectively.", required = true }]
+tradeoff = "Strict status handling requires explicit exceptions for tools that use nonzero codes for nonfatal results."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#subprocess-execution", summary = "Requires subprocess exit codes to be checked and demonstrates returning the awaited status.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-new-async-std-usage"
+title = "Avoid introducing async-std"
+category = "reliability"
+tags = ["rust", "concurrency", "dependencies", "persistence", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Async code depends on an actively supported runtime ecosystem."
+threat = "New work introduces a discontinued runtime and inherits declining maintenance and compatibility."
+expectation = "Dependencies and examples may continue suggesting async-std despite its discontinued status."
+strategy = "Do not introduce async-std; flag existing usage to the user for a deliberate migration decision."
+evidence = [{ type = "dependency_review", description = "New dependency graphs and source imports contain no newly introduced async-std usage.", required = true }]
+tradeoff = "Avoiding async-std may require adapting examples, selecting a less familiar runtime, or deferring migration of existing code."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#async", summary = "Explicitly rejects new async-std usage and asks that existing usage be flagged.", confidence = 1.0 }]

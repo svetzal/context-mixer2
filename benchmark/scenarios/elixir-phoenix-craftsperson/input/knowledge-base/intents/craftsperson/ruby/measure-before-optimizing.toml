@@ -1,0 +1,17 @@
+id = "guidelines.intent.measure-before-optimizing"
+title = "Optimize only after measurement justifies complexity"
+category = "performance"
+tags = ["ruby", "testing", "performance", "profiling", "evidence", "optimization"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-from-measurement" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to improve performance without sacrificing clarity for imagined bottlenecks"
+threat = "Speculative optimization obscures code while targeting costs that may not matter"
+expectation = "Performance concerns will arise before their source and business impact are known"
+strategy = "Default to clear code and optimize only when measurements prove a necessary bottleneck"
+evidence = [{ type = "performance", description = "A reproducible baseline identifies the bottleneck and the optimized version materially improves the relevant metric without failing behavior tests", required = true }]
+tradeoff = "Waiting for evidence can leave known but unmeasured inefficiency in place, and measurement itself costs time"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#edge-cases-and-escalation", summary = "The source defaults performance-versus-clarity decisions to clarity unless measurement proves optimization necessary.", confidence = 1.0 }]

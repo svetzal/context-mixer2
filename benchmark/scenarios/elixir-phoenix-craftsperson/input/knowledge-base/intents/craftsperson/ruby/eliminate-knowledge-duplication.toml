@@ -1,0 +1,17 @@
+id = "guidelines.intent.eliminate-knowledge-duplication"
+title = "Keep each design decision in one authoritative place"
+category = "design"
+tags = ["ruby", "security", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to change one design decision without coordinating edits across unrelated locations"
+threat = "Duplicated knowledge creates multiple sites that drift when the underlying decision changes"
+expectation = "Business rules and implementation decisions will evolve independently over the system's lifetime"
+strategy = "Remove knowledge duplication while allowing identical code that represents genuinely different decisions"
+evidence = [{ type = "review", description = "A change to one rule has one authoritative implementation, and any retained identical code is justified by distinct reasons to change", required = true }]
+tradeoff = "Centralizing knowledge can introduce indirection and requires judgment to avoid coupling coincidentally similar code"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#simple-design-heuristics-in-priority-order", summary = "The third heuristic removes multiple spots that change for the same reason while permitting identical code for different decisions.", confidence = 1.0 }]

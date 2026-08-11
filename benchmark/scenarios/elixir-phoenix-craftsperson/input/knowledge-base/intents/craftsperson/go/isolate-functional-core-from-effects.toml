@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-functional-core-from-effects"
+title = "Isolate business decisions from effects"
+category = "architecture"
+tags = ["go", "concurrency", "testing", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Core business behavior can be reasoned about and tested deterministically without external systems."
+threat = "Interleaving decisions with I/O and goroutines makes behavior slow, nondeterministic, and difficult to change."
+expectation = "Business rules and external infrastructure will evolve independently."
+strategy = "Keep business logic in small pure-ish functions and push I/O, concurrency, and side effects to an imperative shell."
+evidence = [{ type = "architecture_test", description = "Core behavior tests run without external resources, goroutines, clocks, or network services, and effectful imports remain at boundaries.", required = true }]
+tradeoff = "Separating core and shell adds mapping and orchestration code that may be excessive for trivial workflows."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#functional-core-imperative-shell", summary = "Keeps business logic pure-ish and pushes I/O, goroutines, and side effects to edges.", confidence = 1.0 }]

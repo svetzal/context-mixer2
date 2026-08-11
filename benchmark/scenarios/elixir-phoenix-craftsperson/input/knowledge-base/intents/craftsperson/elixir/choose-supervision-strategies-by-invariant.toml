@@ -1,0 +1,17 @@
+id = "guidelines.intent.choose-supervision-strategies-by-invariant"
+title = "Choose supervision strategies by invariant"
+category = "design"
+tags = ["elixir", "concurrency", "dependencies", "error-handling", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A child failure restarts exactly the processes needed to restore valid system state."
+threat = "An arbitrary restart strategy either leaves dependent processes inconsistent or disrupts independent workers unnecessarily."
+expectation = "Supervision trees will contain both independent workers and processes with ordered or shared invariants."
+strategy = "Choose the simplest strategy that maintains invariants, defaulting to one_for_one and using one_for_all or rest_for_one only for actual coupling."
+evidence = [{ type = "fault_test", description = "Crashing each child restarts precisely the child set required by documented dependency invariants.", required = true }]
+tradeoff = "Encoding coupling in supervisor order or restart groups can increase disruption and make topology changes behaviorally significant."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#supervision-strategies", summary = "Defines restart strategies by process coupling and defaults to the simplest invariant-preserving one_for_one strategy.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-functional-core-from-effects"
+title = "Isolate the functional core from effects"
+category = "architecture"
+tags = ["python", "uv", "testing", "persistence", "functional-core", "side-effects"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business logic can be understood and tested without filesystems, databases, networks, or mutable runtime state."
+threat = "I/O and mutation spread through domain logic and make outcomes nondeterministic or expensive to exercise."
+expectation = "Delivery mechanisms and infrastructure will change independently from core policy."
+strategy = "Keep core functions pure and deterministic, pushing I/O, state changes, and other effects to an imperative shell."
+evidence = [{ type = "test", description = "Core business tests run deterministically without real I/O, external services, or global mutable state.", required = true }]
+tradeoff = "Separating core and shell introduces mapping and orchestration code that can be excessive for simple CRUD."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#functional-core-imperative-shell", summary = "Requires pure core business logic with side effects pushed to shell boundaries.", confidence = 1.0 }]

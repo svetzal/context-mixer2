@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-msrv"
+title = "Preserve the minimum supported Rust version"
+category = "architecture"
+tags = ["rust", "security", "dependencies", "build-and-delivery", "trust-boundaries", "authorization"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Downstream users can continue building the crate with the project's promised minimum Rust toolchain."
+threat = "New syntax, dependency resolution, or toolchain changes raise the effective MSRV without notice."
+expectation = "Published libraries may be consumed in environments that upgrade Rust more slowly than the project itself."
+strategy = "Detect package.rust-version, preserve it during ordinary work, recommend declaring it when absent, and require authorization before raising it."
+evidence = [{ type = "ci_gate", description = "The project builds and tests on its declared minimum supported Rust version.", required = true }]
+tradeoff = "Supporting an older compiler can restrict language features and dependency upgrades."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#detect--preserve-invariants-mandatory", summary = "Requires preserving a declared MSRV and escalating before raising it.", confidence = 1.0 }]

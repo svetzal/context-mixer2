@@ -1,0 +1,17 @@
+id = "guidelines.intent.separate-test-layers"
+title = "Separate fast unit tests from integration tests"
+category = "reliability"
+tags = ["python", "uv", "testing", "build-and-delivery", "resource-management", "cleanup"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Developers and CI can select fast isolated feedback or broader integration confidence deliberately."
+threat = "An undifferentiated suite becomes slow and makes external-environment requirements unpredictable."
+expectation = "The project will accumulate both pure behavior tests and checks that exercise real integrations."
+strategy = "Mark unit and integration tests with pytest markers while retaining clear ownership in colocated spec files."
+evidence = [{ type = "test_gate", description = "Pytest marker selection runs unit and integration layers independently, and integration tests declare their external prerequisites.", required = true }]
+tradeoff = "Markers require maintenance and misclassification can leave important tests out of routine runs."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#test-organization", summary = "Directs separation of fast isolated unit tests from integration tests through pytest markers.", confidence = 1.0 }]

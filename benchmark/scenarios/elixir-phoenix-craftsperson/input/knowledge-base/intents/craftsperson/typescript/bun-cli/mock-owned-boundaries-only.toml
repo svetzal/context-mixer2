@@ -1,0 +1,17 @@
+id = "guidelines.intent.mock-owned-boundaries-only"
+title = "Mock only application-owned boundaries"
+category = "testing"
+tags = ["typescript", "bun", "cli", "testing", "test-doubles", "boundaries"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Tests can substitute external behavior through stable contracts owned by the application."
+threat = "Mocking third-party internals couples tests to APIs and call sequences the application does not control."
+expectation = "Runtime and dependency implementations will change independently of the CLI's behavioral contracts."
+strategy = "Wrap third-party interactions in gateways and mock those gateway interfaces rather than library internals."
+evidence = [{ type = "test_review", description = "Test doubles implement only application-owned gateway contracts; no test stubs or spies on Bun or third-party library internals.", required = true }]
+tradeoff = "Even a small external call may require an owned wrapper and dependency-injection seam before it can be isolated in tests."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Repeatedly forbids mocking library internals and requires third-party calls to be wrapped in mockable gateways.", confidence = 1.0 }]

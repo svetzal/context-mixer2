@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-behavior-red-green-refactor"
+title = "Clarify behavior through red-green-refactor"
+category = "testing"
+tags = ["java", "concurrency", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Expected behavior is executable before design changes obscure the intended outcome."
+threat = "Implementation-first work produces untestable designs and tests that merely confirm existing code."
+expectation = "Features and refactorings will continue to change behavior under delivery pressure."
+strategy = "Write a failing behavior test first, implement the simplest passing change, and refactor while keeping tests green."
+evidence = [{ type = "test_trace", description = "Change history or development trace shows a relevant failing test, the minimal passing implementation, and a green refactoring state.", required = true }]
+tradeoff = "Strict test-first sequencing adds friction for exploratory work and awkwardly testable infrastructure changes."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#when-implementing-features", summary = "Prescribes a failing test, minimal implementation, and refactoring with tests kept green.", confidence = 1.0 }]

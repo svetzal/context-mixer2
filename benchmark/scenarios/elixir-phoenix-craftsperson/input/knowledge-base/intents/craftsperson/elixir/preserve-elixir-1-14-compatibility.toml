@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-elixir-1-14-compatibility"
+title = "Preserve the declared Elixir compatibility floor"
+category = "design"
+tags = ["elixir", "build-and-delivery", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "The project continues to build and behave correctly on every declared supported Elixir version."
+threat = "Contributors on newer toolchains adopt APIs or syntax unavailable to users on the minimum supported release."
+expectation = "Elixir will add attractive language and library features while some deployments remain on older supported runtimes."
+strategy = "Maintain Elixir 1.14 or the project's explicitly approved higher floor and exercise that floor in CI."
+evidence = [{ type = "compatibility_gate", description = "The full build and test suite pass on the declared minimum Elixir version with its compatible OTP release.", required = true }]
+tradeoff = "Maintaining the floor delays use of newer language features and expands the CI matrix."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#supported-versions-invariant", summary = "Declares Elixir 1.14 or newer as the supported baseline and requires OTP to match the project pin.", confidence = 1.0 }]

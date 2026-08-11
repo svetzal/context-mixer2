@@ -1,0 +1,17 @@
+id = "guidelines.intent.psychologically-safe-code-review"
+title = "Preserve psychological safety during technical review"
+category = "collaboration"
+tags = ["python", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "People can expose uncertainty, receive critique, and improve code without interpersonal defensiveness."
+threat = "Personalized or adversarial feedback suppresses questions and turns technical disagreement into social risk."
+expectation = "Maintainers will repeatedly disagree about designs under delivery pressure."
+strategy = "Review code rather than colleagues, assume positive intent, and frame critiques as curious questions about ideas and alternatives."
+evidence = [{ type = "review", description = "Review comments refer to observable code or consequences, avoid judgments about the author, and use questions or alternatives for non-mandatory design concerns.", required = true }]
+tradeoff = "Careful framing takes time and can soften urgent or unambiguous feedback if applied mechanically."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#code-review-mindset", summary = "The source makes psychological safety paramount and asks reviewers to critique ideas with curiosity and assumed positive intent.", confidence = 1.0 }]

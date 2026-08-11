@@ -1,0 +1,17 @@
+id = "guidelines.intent.distinguish-predicates-from-guards"
+title = "Distinguish predicates from guards by name"
+category = "design"
+tags = ["elixir", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Function names communicate whether a boolean check is an ordinary predicate or valid in guards."
+threat = "is_-prefixed regular functions imply guard compatibility and question-free predicates violate Elixir naming expectations."
+expectation = "Public APIs will accumulate boolean checks used in both ordinary code and function heads."
+strategy = "End regular predicate names in ? and reserve is_ names for guard functions."
+evidence = [{ type = "static_check", description = "Public boolean functions end in ? unless declared as guards, and is_-prefixed functions are guard-safe definitions.", required = true }]
+tradeoff = "Renaming an established predicate can break callers and compatibility even when behavior is unchanged."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#common-mistakes", summary = "Requires ? suffixes for regular predicates and reserves is_ names for guards.", confidence = 1.0 }]

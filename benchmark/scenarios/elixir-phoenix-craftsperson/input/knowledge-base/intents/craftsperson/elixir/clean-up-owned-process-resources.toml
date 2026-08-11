@@ -1,0 +1,17 @@
+id = "guidelines.intent.clean-up-owned-process-resources"
+title = "Clean up process-owned resources when possible"
+category = "reliability"
+tags = ["elixir", "concurrency", "build-and-delivery", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.89
+capability = "Resources owned by a terminating process are released predictably when lifecycle callbacks can run."
+threat = "Open handles or external leases outlive the process that owns them and leak capacity or stale ownership."
+expectation = "Long-running services will acquire resources whose cleanup is not wholly guaranteed by VM process exit."
+strategy = "Implement terminate/2 when owned resources require explicit cleanup, while designing for exits where the callback cannot run."
+evidence = [{ type = "lifecycle_test", description = "A controlled shutdown test observes release of every explicitly owned external resource and documents behavior for abrupt termination.", required = true }]
+tradeoff = "terminate/2 is not guaranteed for every exit, so cleanup logic adds complexity without replacing external expiry or idempotent recovery."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#otp-best-practices", summary = "Calls for proper terminate/2 cleanup when necessary; limits of that callback are an inferred boundary.", confidence = 0.9 }]

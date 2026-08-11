@@ -1,0 +1,17 @@
+id = "guidelines.intent.single-source-of-knowledge"
+title = "Keep each shared decision in one place"
+category = "design"
+tags = ["python", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A business or technical decision can be changed consistently without coordinating edits across multiple locations."
+threat = "Knowledge duplication creates coupled change points that drift apart."
+expectation = "Rules and domain decisions will change while superficially similar code may legitimately diverge."
+strategy = "Extract knowledge that must change for the same reason while allowing identical code that represents independent decisions."
+evidence = [{ type = "review", description = "For every changed rule, review identifies one authoritative representation and no duplicated locations that must be edited in lockstep.", required = true }]
+tradeoff = "Centralizing knowledge can introduce indirection, and mistaking coincidental similarity for shared knowledge can couple independent behavior."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#simple-design-heuristics", summary = "The source distinguishes harmful knowledge duplication from identical code representing decisions that may diverge.", confidence = 1.0 }]

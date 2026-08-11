@@ -1,0 +1,17 @@
+id = "guidelines.intent.limit-rails-concerns"
+title = "Reserve Rails concerns for genuinely shared behavior"
+category = "design"
+tags = ["ruby", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to find model and controller behavior without following diffuse mixin chains"
+threat = "Convenience concerns hide responsibilities and couple unrelated classes through shared modules"
+expectation = "Repeated-looking Rails code will create pressure to extract mixins"
+strategy = "Use concerns sparingly, only for truly shared behavior, and prefer explicit composition"
+evidence = [{ type = "review", description = "Each concern serves multiple consumers with the same reason to change and does not hide required collaborator state", required = true }]
+tradeoff = "Composition can require repetitive delegation and more explicit wiring than `include`"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#rails-specific-guidance", summary = "The source limits concerns to truly shared behavior and prefers composition.", confidence = 1.0 }]

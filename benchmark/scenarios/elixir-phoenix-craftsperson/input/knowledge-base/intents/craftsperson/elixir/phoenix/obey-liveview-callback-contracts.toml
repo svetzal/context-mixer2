@@ -1,0 +1,17 @@
+id = "guidelines.intent.obey-liveview-callback-contracts"
+title = "Obey LiveView callback contracts"
+category = "reliability"
+tags = ["elixir", "phoenix", "documentation", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "LiveView lifecycle and event callbacks return values the runtime can interpret reliably."
+threat = "A structurally plausible but invalid tuple causes cryptic runtime crashes after an event or navigation."
+expectation = "LiveViews will add callbacks with different reply and navigation semantics."
+strategy = "Return only the documented tuple shapes for mount, handle_event, handle_info, and handle_params."
+evidence = [{ type = "callback_test", description = "Tests invoke every callback branch and the LiveView process remains alive with the expected reply or socket update.", required = true }]
+tradeoff = "Callbacks must adapt domain results into framework tuples, adding repetitive return plumbing."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#callback-return-contracts", summary = "Enumerates strict valid return values for core LiveView callbacks.", confidence = 1.0 }]

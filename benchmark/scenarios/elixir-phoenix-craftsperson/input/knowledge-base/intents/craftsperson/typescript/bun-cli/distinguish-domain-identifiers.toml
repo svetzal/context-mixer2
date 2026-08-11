@@ -1,0 +1,17 @@
+id = "guidelines.intent.distinguish-domain-identifiers"
+title = "Distinguish domain identifiers at compile time"
+category = "design"
+tags = ["typescript", "bun", "cli", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Values with the same primitive representation but different domain meanings cannot be interchanged accidentally."
+threat = "Structural typing treats semantically different strings such as absolute and relative paths as interchangeable."
+expectation = "The CLI will pass more identifiers and paths across module boundaries as features expand."
+strategy = "Use branded types for identifiers and other primitive values whose domain distinctions must be preserved."
+evidence = [{ type = "static_check", description = "Compiler-negative tests show one branded identifier cannot be supplied where another is required without explicit validated conversion.", required = true }]
+tradeoff = "Brands require constructors or validators at boundaries and add friction when interoperating with libraries that accept primitives."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#type-system-patterns", summary = "Recommends branded types for type-safe identifiers and illustrates preventing absolute/relative path mixups.", confidence = 1.0 }]

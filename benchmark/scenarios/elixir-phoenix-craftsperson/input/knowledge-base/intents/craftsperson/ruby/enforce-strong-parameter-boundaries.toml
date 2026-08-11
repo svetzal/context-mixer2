@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-strong-parameter-boundaries"
+title = "Whitelist Rails request parameters"
+category = "architecture"
+tags = ["ruby", "security", "trust-boundaries", "authorization"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to control which client-supplied fields may alter application state"
+threat = "Unfiltered mass assignment allows attackers to set privileged or unintended model attributes"
+expectation = "Rails endpoints will continue to accept untrusted structured request data"
+strategy = "Use strong parameters at controller boundaries"
+evidence = [{ type = "test", description = "Request tests prove permitted attributes are accepted and sensitive unpermitted attributes cannot be mass-assigned", required = true }]
+tradeoff = "Parameter whitelists must be updated with legitimate form changes and can silently omit new fields"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#rails-specific-guidance", summary = "Rails security guidance explicitly requires strong parameters.", confidence = 1.0 }]

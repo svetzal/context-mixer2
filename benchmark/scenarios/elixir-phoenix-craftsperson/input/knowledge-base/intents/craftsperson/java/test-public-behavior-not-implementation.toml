@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-public-behavior-not-implementation"
+title = "Test public behavior instead of implementation details"
+category = "testing"
+tags = ["java", "concurrency", "testing", "behavior", "public-boundaries", "refactor-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/test-observable-behavior" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Tests remain valid when internals are refactored without changing observable behavior."
+threat = "Assertions on private methods, internal state, or collaboration sequences freeze incidental design."
+expectation = "The code will be refactored repeatedly as requirements become clearer."
+strategy = "Prefer black-box tests through public APIs and assert externally observable outcomes."
+evidence = [{ type = "test_review", description = "Behavior tests invoke public contracts and avoid assertions on private members or incidental call structure.", required = true }]
+tradeoff = "Black-box tests can make failures less localized and may require broader fixture setup."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#testing-philosophy", summary = "Directs tests toward behavior and public APIs and away from implementation details.", confidence = 1.0 }]

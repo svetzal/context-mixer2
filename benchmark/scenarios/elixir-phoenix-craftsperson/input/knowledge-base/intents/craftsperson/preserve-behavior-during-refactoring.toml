@@ -1,0 +1,293 @@
+id = "guidelines.intent.preserve-behavior-during-refactoring"
+title = "Preserve behavior during refactoring"
+category = "refactoring"
+tags = ["behavior-preservation", "small-steps", "test-safety"]
+status = "hypothesized"
+confidence = 0.98
+capability = "Internal design can improve without silently changing externally relied-upon behavior."
+threat = "Structural cleanup and behavior change become entangled, making regressions difficult to distinguish from intended outcomes."
+expectation = "Healthy codebases will require recurring internal change while consumers continue relying on current contracts."
+strategy = "Establish a green behavior baseline, refactor in small steps, and keep protected behavior passing throughout."
+evidence = [{ type = "test_history", description = "Behavior tests pass before, during, and after the refactoring, with any intended behavior change isolated explicitly.", required = true }]
+tradeoff = "Characterization tests and small steps increase the time needed for a broad structural improvement."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/ruby-ecosystem/agents/ruby-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#your-workflow", summary = "Refactors through small verified steps.", confidence = 1.0 }, { type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#when-refactoring", summary = "Starts from a green baseline and preserves coverage through small refactors.", confidence = 1.0 }, { type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#for-refactoring", summary = "Refactors behind behavior-preserving tests.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; refactor series — 87 pricing tests green after every step:
+(def ^:private discount-rates
+  {:gold 0.10 :silver 0.05 :bronze 0.02})  ; was a cond ladder
+
+(defn discount-for [customer]
+  (get discount-rates (:tier customer) 0.0))
+
+;; assertions untouched: same inputs, same observable totals.
+;; the new :vip tier ships as a separate change with its own
+;; failing test first
+'''
+bad = '''
+;; commit message: "refactor pricing (no behavior change)"
+(defn discount-for [customer]
+  (get {:gold 0.10 :silver 0.05} (:tier customer) 0.0))
+
+; the old cond ladder also gave :bronze 0.02 — silently
+; dropped mid-"refactor"; two tests were edited to the new
+; totals so the suite stayed green while behavior changed
+'''
+
+[examples.cpp]
+good = '''
+$ ctest                        # green baseline before touching
+  214/214 tests passed
+$ git log --oneline -3
+  a3f refactor: rename applyDeal -> applyPromotion
+  b71 refactor: inline redundant CartTotals wrapper
+  c02 refactor: extract PricingPolicy from Checkout
+$ ctest                        # green after every small step
+  214/214 tests passed
+# behavior diff across the whole series: none, by evidence
+'''
+bad = '''
+$ git show --stat HEAD
+  "refactor checkout"
+   checkout.cpp    | 402 ++++++++-------
+   pricing.cpp     | 220 +++++-----
+   promo_rules.cpp |  61 ++--    # also changes rounding mode
+$ ctest
+  3 FAILED: PricingTest.*
+# Regression or intended? Nobody can tell — structural
+# cleanup and behavior change landed entangled in one blob.
+'''
+
+[examples.csharp]
+good = '''
+$ dotnet test     # green baseline before any change
+  Passed! 214
+
+$ git log --oneline -3
+  c41 refactor: extract TaxCalculator (no behavior)
+  b90 refactor: remove redundant OrderMapper
+  a12 test: characterize rounding at boundaries
+
+$ dotnet test     # green after every small step
+  Passed! 217
+'''
+bad = '''
+$ git show --format=%s --stat HEAD | head -3
+  refactor pricing (also fixes rounding? and vat?)
+   23 files changed, 1102 insertions(+),
+      987 deletions(-)
+
+$ dotnet test
+  Failed! 6
+# which failures are the intended "fix" and which
+# are regressions? nobody can distinguish anymore
+'''
+
+[examples.elixir]
+good = '''
+$ mix test              # baseline: 214 tests, 0 failures
+
+step 1: extract Pricing.rate/1      -> mix test: green
+step 2: inline legacy total_v2/1    -> mix test: green
+step 3: rename disc -> discount     -> mix test: green
+
+The intended behavior change (new premium tier) is
+deferred to its own change set, opened with its own
+failing test — structure and behavior never entangle.
+'''
+bad = '''
+# one "refactor" commit that also changes the rounding
+- def total(c), do: Float.round(sum(c), 2)
++ def total(cart) do
++   cart |> lines() |> money_sum() |> Money.round(:down)
++ end
+
+# tests rewritten in the same diff to expect the new
+# numbers — a regression and an intended change are now
+# indistinguishable in history
+'''
+
+[examples.go]
+good = '''
+$ git log --oneline
+c9e2f1a Rename applyRate to applyTaxRate      [suite green]
+b4d8a37 Extract taxLine helper from Total     [suite green]
+a1f6c02 Characterization tests for legacy tax rounding
+
+# rounding stays half-up throughout; the planned switch to
+# banker's rounding ships later as its own tested change
+'''
+bad = '''
+ // commit message: "Refactor: tidy up tax calculation"
+-	return total.Round(2)     // half-up; invoices rely on it
++	return total.RoundBank(2) // half-even, slipped in silently
+
+-	if got != "13.45" {
++	if got != "13.44" { // test edited to bless the new output
+'''
+
+[examples.java]
+good = '''
+$ git log --oneline
+e91acce refactor: inline TotalsHelper        (suite green)
+c72d1fa refactor: extract InvoiceTotals      (suite green)
+b13e9d0 test: characterize mixed-VAT rounding
+        (green baseline captured before anything moved)
+
+# the intended behavior change shipped separately, labeled:
+f00d234 feat: round half-up per FIN-2231 (updates 3 tests)
+'''
+bad = '''
+$ git show --stat 4a5b6c7
+  refactor: clean up invoice module
+  41 files changed, 2100 insertions(+), 1900 deletions(-)
+
+$ git diff 4a5b6c7^ 4a5b6c7 -- src/test/
+  - assertEquals(new BigDecimal("10.05"), total);
+  + assertEquals(new BigDecimal("10.04"), total);
+
+# a rounding change rode in as "cleanup", and the tests
+# were edited to match it instead of protecting behavior
+'''
+
+[examples.kotlin]
+good = '''
+$ ./gradlew test         # green baseline captured first
+BUILD SUCCESSFUL — 214 tests
+
+# step 1: extract TaxPolicy          -> suite green
+# step 2: collapse redundant DTO     -> suite green
+# step 3: rename internals           -> suite green
+
+# the one intended behavior change ships as its own commit
+'''
+bad = '''
+// commit message: "refactor invoice module"
+fun tax(amount: Money): Money =
+    amount * rate // was amount.times(rate).round(HALF_UP)
+// the "refactor" silently switched rounding to truncation
+// while the suite was already red, so nobody can tell the
+// regression apart from the restructuring
+'''
+
+[examples.python]
+good = '''
+$ pytest -q            # green baseline before any change
+128 passed
+
+$ git log --oneline
+d4e10 Extract TariffTable from PricingService  (128 passed)
+b21f7 Inline redundant PricingHelper           (128 passed)
+a90c3 Rename charge_v2 -> charge               (128 passed)
+
+# the intended behavior change (new tariff rates) ships
+# separately, with its own failing-then-passing test
+'''
+bad = '''
+$ git show --stat 3f7a1c9
+    Refactor pricing module
+
+ src/pricing.py | 412 +++++++++++++-----------
+
+# restructures the module AND switches rounding from
+# bankers' to half-up in the same commit; the failing
+# test tonight could be a regression or the "cleanup",
+# and there is no way to tell which
+'''
+
+[examples.ruby]
+good = '''
+$ git log --oneline
+  a3 feat: add EU VAT rate (new tests, isolated commit)
+  a2 refactor: inline dead discount branch (suite green)
+  a1 refactor: extract TaxCalculator from Invoice (suite green)
+
+The suite ran green before, between, and after each step;
+the one intended behavior change lives alone in a3.
+'''
+bad = '''
+# commit labelled "refactor: extract TaxCalculator"
+-    total * 0.13
++    TaxCalculator.new(region: region).apply(total) # now 0.15
+
+# structure AND behavior changed together; the suite was red
+# for three days mid-rework, failures triaged as "expected
+# churn" — so the silent rate change shipped unnoticed
+'''
+
+[examples.rust]
+good = '''
+$ cargo test pricing::            # green baseline first
+test result: ok. 14 passed
+
+# step 1: extract RateTable         -> cargo test: ok
+# step 2: inline the dead branch    -> cargo test: ok
+# step 3: rename to quote()         -> cargo test: ok
+
+# the intended behavior change ships separately in the
+# next commit, with its own test
+'''
+bad = '''
+# one "refactor" commit: moved modules, renamed functions,
+# AND changed rounding from half-up to banker's
+
+$ cargo test
+test pricing::rounds_half_up ... FAILED
+
+# test edited to match the new output so the suite passes:
+-    assert_eq!(quote(&cart), Cents(1001));
++    assert_eq!(quote(&cart), Cents(1000));
+# regression or intention? the diff can no longer say
+'''
+
+[examples.swift]
+good = '''
+$ swift test                      # green baseline first
+  412 passed
+
+Step 1: extract PriceCalculator (move only)  -> tests green
+Step 2: inline redundant wrapper             -> tests green
+Step 3: rename to reflect domain terms       -> tests green
+
+The intended behavior change (new tax rule) is excluded —
+it lands separately with its own failing-first test.
+'''
+bad = '''
+Commit: "Refactor pricing + fix tax edge case + cleanup"
+
+  PriceCalculator.swift      | 210 +++++-----
+  PriceCalculatorTests.swift |  74 ++--   # expectations
+                                          # edited to match
+
+Tests were rewritten in the same commit to bless the new
+outputs — regression and intent are indistinguishable.
+'''
+
+[examples.typescript]
+good = '''
+$ npx vitest run          # green baseline before any edit
+216 passed
+
+Step 1: extract PricingRules (structure only) — 216 passed
+Step 2: inline the dead branch            — 216 passed
+Step 3: the intended behavior change ships separately,
+        with its own failing-then-passing test.
+
+$ git log --oneline -1
+c3d4e5f refactor: extract PricingRules (no behavior change)
+'''
+bad = '''
+$ git show --stat HEAD | tail -1
+ 23 files changed, 1841 insertions(+), 1608 deletions(-)
+
+commit message: "refactor pricing module"
+
+# ...yet 4 tests were edited to expect different totals.
+$ npx vitest run
+216 passed (4 assertions rewritten to match new behavior)
+# Regression or intention? The change can no longer say.
+'''

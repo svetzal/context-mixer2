@@ -1,0 +1,17 @@
+id = "guidelines.intent.sender-owned-channel-closure"
+title = "Make channel completion the sender's responsibility"
+category = "reliability"
+tags = ["go", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Receivers can determine reliably when a stream has completed without racing channel closure."
+threat = "A receiver or competing sender closing a channel can panic active senders or truncate data."
+expectation = "Channels will connect goroutines whose completion times vary independently."
+strategy = "Have the sending owner close the channel and have receivers consume until closure."
+evidence = [{ type = "test", description = "Concurrency tests exercise normal and early completion without send-on-closed-channel panics or stranded receivers.", required = true }]
+tradeoff = "Single closure ownership requires extra coordination when a channel has multiple producers."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#concurrency-patterns", summary = "Assigns channel closure to senders and tells receivers to read until closed.", confidence = 1.0 }]

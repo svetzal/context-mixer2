@@ -1,0 +1,17 @@
+id = "guidelines.intent.start-branches-from-main"
+title = "Start change branches from the current main line"
+category = "delivery"
+tags = ["go", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "A change begins from the repository's accepted integration baseline."
+threat = "Branches based on stale or nested work inherit unrelated divergence and surprise conflicts."
+expectation = "Multiple changes will be developed concurrently while main continues to advance."
+strategy = "Branch new work from main rather than from another in-progress branch."
+evidence = [{ type = "history_check", description = "The feature branch merge base is a main commit current when work began and contains no dependency on unrelated feature branches.", required = true }]
+tradeoff = "This policy does not fit trunk-only or stacked-branch workflows and may require rebasing dependent work."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#small-safe-increments", summary = "Explicitly instructs contributors to branch from main.", confidence = 1.0 }]

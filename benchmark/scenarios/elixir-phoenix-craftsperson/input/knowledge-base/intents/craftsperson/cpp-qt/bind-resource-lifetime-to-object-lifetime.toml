@@ -1,0 +1,17 @@
+id = "guidelines.intent.bind-resource-lifetime-to-object-lifetime"
+title = "Bind resources to object lifetime"
+category = "reliability"
+tags = ["cpp", "qt", "build-and-delivery", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Resources release exactly once on every exit path."
+threat = "Manual cleanup leaks or double-releases."
+expectation = "Control flow will gain exits and exceptions."
+strategy = "Use RAII for every acquired resource."
+evidence = [{ type = "gate", description = "Analyzers find no bypassable manual lifecycle.", required = true }]
+tradeoff = "Wrappers add types and hide exact release timing."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

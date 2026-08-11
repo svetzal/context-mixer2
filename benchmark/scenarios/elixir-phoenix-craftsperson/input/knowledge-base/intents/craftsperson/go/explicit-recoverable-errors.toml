@@ -1,0 +1,17 @@
+id = "guidelines.intent.explicit-recoverable-errors"
+title = "Represent recoverable failure with returned errors"
+category = "reliability"
+tags = ["go", "error-handling", "error-modeling", "recoverability", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Callers retain control over expected failure and recovery behavior."
+threat = "Using panic for ordinary failure bypasses normal control flow and can terminate unrelated work."
+expectation = "Runtime inputs and external dependencies will fail in recoverable ways during normal operation."
+strategy = "Return errors explicitly and reserve panic for truly unrecoverable conditions."
+evidence = [{ type = "test", description = "Tests exercise expected failure paths through returned errors, and review finds no panic used for recoverable conditions.", required = true }]
+tradeoff = "Explicit error plumbing makes call chains more verbose and requires handling at each boundary."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#error-handling-patterns", summary = "Requires explicit returned errors and limits panic to truly unrecoverable situations.", confidence = 1.0 }]

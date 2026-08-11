@@ -1,0 +1,17 @@
+id = "guidelines.intent.eafp-failure-handling"
+title = "Handle operation failure at the point it occurs"
+category = "design"
+tags = ["python", "testing", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Code remains correct when state changes between a precondition check and the attempted operation."
+threat = "Look-before-you-leap checks duplicate operation rules and create time-of-check/time-of-use races."
+expectation = "Filesystem, mapping, and concurrent state can change independently between observations."
+strategy = "Prefer EAFP: attempt the operation and handle its specific expected exception instead of pre-checking mutable state."
+evidence = [{ type = "review", description = "Operations with race-prone or redundant preconditions use a direct attempt and narrowly scoped exception handling, with a test for the failure path.", required = true }]
+tradeoff = "Exception-driven control flow can obscure expected branches and may be slower when failure is common."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#error-handling", summary = "The source explicitly prefers EAFP over LBYL.", confidence = 0.98 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.correct-remembered-state-lifetimes"
+title = "Match Compose state retention to semantic lifetime"
+category = "design"
+tags = ["kotlin", "android", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to retain derived or user state for exactly as long as intended across recomposition and recreation."
+threat = "Misused remember APIs reset user input, retain stale values, or repeat expensive calculations."
+expectation = "Compose screens will gain richer local state and more frequent recomposition."
+strategy = "Choose remember, rememberSaveable, and derivedStateOf according to whether state is ephemeral, saveable, or computed."
+evidence = [{ type = "gate", description = "Recomposition and recreation tests verify state retention and derived-state invalidation at the intended boundaries.", required = true }]
+tradeoff = "Choosing and testing retention semantics adds UI-state complexity."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#compose-ui", summary = "The source instructs correct use of remember, rememberSaveable, and derivedStateOf.", confidence = 1.0 }]

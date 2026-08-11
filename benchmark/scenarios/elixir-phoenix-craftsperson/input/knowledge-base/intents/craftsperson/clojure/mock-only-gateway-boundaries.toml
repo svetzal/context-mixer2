@@ -1,0 +1,17 @@
+id = "guidelines.intent.mock-only-gateway-boundaries"
+title = "Mock owned gateway contracts, not library internals"
+category = "testing"
+tags = ["clojure", "testing", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to keep tests stable across third-party library implementation changes"
+threat = "Mocks of library internals bind tests to private call shapes rather than application-owned contracts"
+expectation = "Third-party libraries will upgrade and reorganize internals without preserving test seams"
+strategy = "Wrap third-party interactions in owned gateways and mock only those gateway or boundary protocols"
+evidence = [{ type = "test", description = "Test doubles implement application-owned gateway contracts and no test redefines or intercepts third-party library internals", required = true }]
+tradeoff = "Even narrow integrations require a wrapper before they can be isolated in tests"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#1-functional-purity", summary = "The source twice prohibits mocking library internals and requires a gateway wrapper first.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.give-specific-actionable-review-feedback"
+title = "Make review feedback specific and actionable"
+category = "collaboration"
+tags = ["ruby", "security", "testing", "code-review", "feedback", "remediation"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-review-feedback-actionable" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability for an author to act on review feedback without guessing the desired change"
+threat = "Vague judgments identify dissatisfaction but provide no verifiable path to improvement"
+expectation = "Reviewers will repeatedly ask contributors to improve code they did not write"
+strategy = "Name the exact code, proposed transformation, and intended outcome in feedback"
+evidence = [{ type = "review", description = "Each requested change identifies a concrete location or behavior and a specific action whose completion can be verified", required = true }]
+tradeoff = "Specific suggestions take longer and can prematurely narrow the author's solution space"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#communication-style", summary = "The source contrasts a precise method extraction request with vague cleanliness feedback.", confidence = 1.0 }]

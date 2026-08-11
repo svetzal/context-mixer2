@@ -1,0 +1,341 @@
+id = "guidelines.intent.cover-edge-cases-and-failure-paths"
+title = "Cover edge cases and failure paths"
+category = "testing"
+tags = ["edge-cases", "failure-paths", "risk-based-testing"]
+status = "hypothesized"
+confidence = 0.98
+capability = "The system retains intentional behavior at boundaries and under expected failure conditions."
+threat = "A happy-path suite passes while empty, malformed, extreme, concurrent, or failed interactions regress."
+expectation = "Production inputs and dependencies will exercise conditions absent from the primary example."
+strategy = "Identify meaningful boundaries and failure modes and specify their observable outcomes with focused tests."
+evidence = [{ type = "test_review", description = "Tests cover representative valid boundaries, invalid inputs, empty cases, and expected dependency failures for changed behavior.", required = true }]
+tradeoff = "Additional cases increase suite size and can overfit hypothetical failures if selected without risk judgment."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#testing-guidance", summary = "Tests edge cases and failure behavior explicitly.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#tests-are-the-executable-spec", summary = "Exercises edge cases and failure modes.", confidence = 1.0 }, { type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#testing-philosophy", summary = "Covers boundaries and edge cases with behavior tests.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(deftest parse-quantity-accepts-valid-boundaries
+  (is (= 1 (parse-quantity "1")))
+  (is (= 999 (parse-quantity "999"))))
+
+(deftest parse-quantity-rejects-invalid-input
+  (is (nil? (parse-quantity "")))
+  (is (nil? (parse-quantity "abc")))
+  (is (nil? (parse-quantity "0")))      ; below minimum
+  (is (nil? (parse-quantity "1000")))) ; above maximum
+
+(deftest order-survives-inventory-outage
+  (with-fake-inventory {:status :down}
+    (is (= :queued (:state (place-order valid-order))))))
+'''
+bad = '''
+(deftest parse-quantity-works
+  ; the only test: one comfortable value
+  (is (= 5 (parse-quantity "5"))))
+
+; "", "abc", "0", "1000", and inventory-service downtime are
+; all unspecified — regressions there ship silently
+'''
+
+[examples.cpp]
+good = '''
+TEST(ParseQuantity, AcceptsTypicalValue) {
+  EXPECT_EQ(parseQuantity("12"), 12);
+}
+TEST(ParseQuantity, RejectsEmptyInput) {
+  EXPECT_FALSE(tryParseQuantity("").has_value());
+}
+TEST(ParseQuantity, RejectsNegativeAndOverflow) {
+  EXPECT_FALSE(tryParseQuantity("-3").has_value());
+  EXPECT_FALSE(tryParseQuantity("999999999999").has_value());
+}
+TEST(ParseQuantity, ReportsFeedTimeoutAsRetryable) {
+  EXPECT_EQ(fetchWith(TimeoutFeed{}).error(), Err::Retryable);
+}
+'''
+bad = '''
+TEST(ParseQuantity, Works) {
+  EXPECT_EQ(parseQuantity("12"), 12);   // only the happy path
+}
+// "", "-3", overflow, and feed timeouts: all unspecified.
+// parseQuantity("") currently returns 0 — nobody decided that,
+// and the next refactor is free to change it silently.
+'''
+
+[examples.csharp]
+good = '''
+[Theory]
+[InlineData(0)]
+[InlineData(-1)]
+public void Rejects_non_positive_payer_counts(int payers) =>
+    FluentActions.Invoking(() => Bill.Split(100m, payers))
+        .Should().Throw<ArgumentOutOfRangeException>();
+
+[Fact]
+public void Remainder_cent_goes_to_first_payer() =>
+    Bill.Split(100m, 3)[0].Should().Be(33.34m);
+
+[Fact]
+public void Empty_bill_yields_zero_shares() =>
+    Bill.Split(0m, 2).Should().AllBeEquivalentTo(0m);
+'''
+bad = '''
+[Fact]
+public void Splits_bill() // the one round, happy case
+{
+    var shares = Bill.Split(90m, 3);
+    shares.Should().AllBeEquivalentTo(30m);
+}
+// zero payers, negative amounts, and non-dividing
+// totals are all unspecified — free to regress
+'''
+
+[examples.elixir]
+good = '''
+describe "parse_quantity/1" do
+  test "accepts a plain integer string" do
+    assert {:ok, 3} = Parser.parse_quantity("3")
+  end
+
+  test "rejects zero, negatives, and garbage" do
+    assert {:error, _} = Parser.parse_quantity("0")
+    assert {:error, _} = Parser.parse_quantity("-2")
+    assert {:error, _} = Parser.parse_quantity("lots")
+  end
+
+  test "empty input is its own distinct outcome" do
+    assert {:error, :empty} = Parser.parse_quantity("")
+  end
+end
+'''
+bad = '''
+describe "parse_quantity/1" do
+  # only the happy path; what "", "-2", or "lots" do is
+  # unspecified and free to regress silently
+  test "parses a quantity" do
+    assert {:ok, 3} = Parser.parse_quantity("3")
+  end
+end
+'''
+
+[examples.go]
+good = '''
+func TestParseAmount(t *testing.T) {
+	cases := map[string]struct {
+		in  string
+		err error
+	}{
+		"typical amount": {"10.50", nil},
+		"empty input":    {"", ErrEmptyAmount},
+		"negative":       {"-3.00", ErrNegativeAmount},
+		"sub-cent":       {"1.005", ErrPrecision},
+	}
+	for name, tc := range cases {
+		if _, err := ParseAmount(tc.in); !errors.Is(err, tc.err) {
+			t.Fatalf("%s: got %v, want %v", name, err, tc.err)
+		}
+	}
+}
+'''
+bad = '''
+func TestParseAmount(t *testing.T) {
+	// only the path that always worked
+	got, err := ParseAmount("10.50")
+	if err != nil || got != 1050 {
+		t.Fatalf("got %d, %v", got, err)
+	}
+	// "", "-3.00", "1.005", "1e309" all reach production first
+}
+'''
+
+[examples.java]
+good = '''
+@Test void emptyCartTotalsZero() {
+    assertEquals(Money.ZERO, checkout.total(Cart.empty()));
+}
+
+@Test void rejectsNegativeQuantity() {
+    assertThrows(IllegalArgumentException.class,
+        () -> new LineItem("sku-1", -1));
+}
+
+@Test void paymentTimeoutReportsRetryableFailure() {
+    gateway.failWith(new TimeoutException());
+    assertEquals(Status.RETRYABLE, checkout.pay(cart).status());
+}
+'''
+bad = '''
+// the only test: one populated cart, gateway always succeeds
+@Test void checkoutWorks() {
+    var cart = new Cart(List.of(new LineItem("sku-1", 2)));
+
+    var result = checkout.pay(cart);
+
+    assertEquals(Status.PAID, result.status());
+}
+// empty carts, negative quantities, and gateway timeouts
+// can all regress while this suite stays green
+'''
+
+[examples.kotlin]
+good = '''
+@Test fun `empty basket is rejected before payment`() {
+    assertThat(checkout(Basket())).isEqualTo(Rejected.Empty)
+}
+
+@Test fun `gateway timeout surfaces as retryable failure`() =
+    runTest {
+        coEvery { gateway.charge(any()) } throws
+            TimeoutException()
+        assertThat(checkout(basket)).isEqualTo(Failed.Gateway)
+    }
+'''
+bad = '''
+@Test fun `checkout works`() = runTest {
+    // only the happy path is specified; empty baskets,
+    // gateway timeouts, and over-limit quantities are
+    // all unprotected against regression
+    val result = checkout(basketWith(oneItem))
+    assertThat(result).isEqualTo(Success)
+}
+'''
+
+[examples.python]
+good = '''
+@pytest.mark.parametrize("raw", ["", "abc", "-1", "1e999"])
+def test_rejects_invalid_amounts(raw):
+    with pytest.raises(InvalidAmount):
+        parse_amount(raw)
+
+def test_zero_is_a_valid_amount():
+    assert parse_amount("0") == Decimal("0")
+
+def test_gateway_timeout_is_reported_as_retryable():
+    gateway = StubGateway(error=TimeoutError())
+    assert charge(gateway, an_order()) is ChargeResult.RETRY
+'''
+bad = '''
+def test_parse_amount():
+    # only the sunny path; empty, negative, and overflow
+    # behavior is unspecified and free to regress
+    assert parse_amount("12.50") == Decimal("12.50")
+
+def test_charge():
+    gateway = StubGateway(response="ok")
+    assert charge(gateway, an_order()) is ChargeResult.PAID
+'''
+
+[examples.ruby]
+good = '''
+RSpec.describe Discount do
+  it "applies 10% at exactly the 100.00 threshold" do
+    expect(Discount.for(total: 100.00)).to eq(10.00)
+  end
+
+  it "returns zero discount for an empty order" do
+    expect(Discount.for(total: 0)).to eq(0)
+  end
+
+  it "rejects negative totals" do
+    expect { Discount.for(total: -1) }
+      .to raise_error(ArgumentError)
+  end
+end
+'''
+bad = '''
+RSpec.describe Discount do
+  # only the comfortable middle; the threshold boundary, empty
+  # orders, and invalid totals can all regress silently
+  it "discounts a normal order" do
+    expect(Discount.for(total: 250.00)).to eq(25.00)
+  end
+end
+'''
+
+[examples.rust]
+good = '''
+#[test]
+fn parses_valid_row() {
+    assert_eq!(parse("a,1").unwrap(), Row::new("a", 1));
+}
+#[test]
+fn rejects_empty_input() {
+    assert!(matches!(parse(""), Err(ParseError::Empty)));
+}
+#[test]
+fn rejects_non_numeric_count() {
+    assert!(matches!(parse("a,x"), Err(ParseError::BadCount)));
+}
+#[test]
+fn surfaces_source_read_failure() {
+    assert!(matches!(load(&FailingSrc), Err(LoadError::Io(_))));
+}
+'''
+bad = '''
+// the suite is green and says nothing about the edges
+#[test]
+fn parses_row() {
+    assert_eq!(parse("a,1").unwrap(), Row::new("a", 1));
+}
+// empty input, malformed counts, and source failures all
+// regress without a single test noticing
+'''
+
+[examples.swift]
+good = '''
+@Test func splitsEvenAmounts() throws {
+    #expect(try split(cents: 900, ways: 3) == [300, 300, 300])
+}
+@Test func distributesRemainderToFirstShares() throws {
+    #expect(try split(cents: 1000, ways: 3) == [334, 333, 333])
+}
+@Test func rejectsZeroParticipants() {
+    #expect(throws: SplitError.noParticipants) {
+        try split(cents: 1000, ways: 0)
+    }
+}
+@Test func rejectsNegativeAmounts() {
+    #expect(throws: SplitError.negativeAmount) {
+        try split(cents: -100, ways: 2)
+    }
+}
+'''
+bad = '''
+@Test func splitWorks() throws {
+    // only the friendly case; zero ways, remainder cents,
+    // and negative amounts can regress unnoticed
+    #expect(try split(cents: 900, ways: 3) == [300, 300, 300])
+}
+'''
+
+[examples.typescript]
+good = '''
+describe("parseQuantity", () => {
+  it("accepts a plain positive integer", () => {
+    expect(parseQuantity("3")).toEqual({ ok: true, value: 3 });
+  });
+  it("rejects zero and negatives", () => {
+    expect(parseQuantity("0").ok).toBe(false);
+    expect(parseQuantity("-2").ok).toBe(false);
+  });
+  it("rejects empty and non-numeric input", () => {
+    expect(parseQuantity("").ok).toBe(false);
+    expect(parseQuantity("abc").ok).toBe(false);
+  });
+});
+'''
+bad = '''
+describe("parseQuantity", () => {
+  // Only sunny-day inputs; empty, zero, negative, and junk
+  // are all unspecified and free to regress.
+  it("works", () => {
+    expect(parseQuantity("3")).toEqual({ ok: true, value: 3 });
+  });
+  it("works again", () => {
+    expect(parseQuantity("10")).toEqual({ ok: true, value: 10 });
+  });
+});
+'''

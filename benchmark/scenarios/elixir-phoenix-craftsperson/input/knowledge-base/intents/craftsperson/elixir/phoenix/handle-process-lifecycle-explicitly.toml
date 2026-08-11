@@ -1,0 +1,17 @@
+id = "guidelines.intent.handle-process-lifecycle-explicitly"
+title = "Handle process lifecycle explicitly"
+category = "reliability"
+tags = ["elixir", "phoenix", "concurrency", "error-handling", "build-and-delivery", "structured-concurrency"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "OTP processes initialize responsively, handle their protocol, and release owned resources predictably."
+threat = "Blocking initialization, unhandled expected messages, or missing cleanup creates startup failures and leaked resources."
+expectation = "Process protocols and resource ownership will grow as services gain responsibilities."
+strategy = "Handle expected messages explicitly, defer post-init work with handle_continue/2, and implement terminate/2 when owned resources require cleanup."
+evidence = [{ type = "lifecycle_test", description = "Tests cover expected messages, nonblocking startup with deferred work, and cleanup for each externally owned resource.", required = true }]
+tradeoff = "Explicit lifecycle callbacks add branches and cleanup guarantees remain limited for untrappable termination."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#otp-best-practices", summary = "Combines explicit message handling, handle_continue post-init work, and terminate cleanup guidance.", confidence = 1.0 }]

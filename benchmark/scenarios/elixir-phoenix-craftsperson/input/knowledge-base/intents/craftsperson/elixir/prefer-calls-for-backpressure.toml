@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-calls-for-backpressure"
+title = "Prefer calls when back-pressure matters"
+category = "reliability"
+tags = ["elixir", "concurrency", "error-handling", "backpressure", "resource-bounds"]
+relations = [
+  { type = "specializes", target = "craftsperson/bound-concurrent-work" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Clients know whether requested work was accepted and cannot silently overwhelm a server mailbox."
+threat = "Fire-and-forget casts accumulate faster than a process can handle them and hide failure from callers."
+expectation = "Load spikes and slow handlers will create sustained pressure on shared processes."
+strategy = "Use GenServer.call/3 for request-response work and default to calls over casts when uncertain, with an appropriate timeout."
+evidence = [{ type = "load_test", description = "Under overload, callers block or time out observably rather than allowing unbounded mailbox growth.", required = true }]
+tradeoff = "Synchronous calls couple caller latency to the server and can propagate timeouts or bottlenecks."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#otp-best-practices", summary = "Distinguishes calls from casts and prefers calls when in doubt to preserve back-pressure.", confidence = 1.0 }]

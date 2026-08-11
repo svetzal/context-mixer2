@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-functional-core-from-effects"
+title = "Isolate a deterministic core from effects"
+category = "architecture"
+tags = ["cpp", "qt", "testing", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business logic is testable without external systems."
+threat = "I/O and mutation make decisions nondeterministic."
+expectation = "Infrastructure will change independently of policy."
+strategy = "Keep core functions pure and effects in a shell."
+evidence = [{ type = "gate", description = "Core tests run without services, stores, devices, or event loops.", required = true }]
+tradeoff = "Mapping and orchestration add ceremony."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

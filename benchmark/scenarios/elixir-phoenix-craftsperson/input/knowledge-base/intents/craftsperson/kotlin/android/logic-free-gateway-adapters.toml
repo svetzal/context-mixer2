@@ -1,0 +1,17 @@
+id = "guidelines.intent.logic-free-gateway-adapters"
+title = "Keep integration adapters behaviorally thin"
+category = "architecture"
+tags = ["kotlin", "android", "testing", "gateways", "business-logic", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-gateways-logic-free" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to concentrate business decisions in fast, deterministic core tests."
+threat = "Business logic embedded in I/O adapters becomes expensive to test and easy to miss."
+expectation = "External integrations will multiply while core rules continue to evolve."
+strategy = "Limit gateway implementations to translating and delegating I/O; move custom logic into the core."
+evidence = [{ type = "gate", description = "Gateway review finds only protocol translation and delegation, or identifies custom logic covered by tests and scheduled for extraction.", required = true }]
+tradeoff = "Moving logic out can require additional domain types and mapping layers."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#unit-tests-junit-5--mockk", summary = "The source says gateway classes should have no logic and advises moving any custom gateway logic into the core.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-mutable-default-state"
+title = "Avoid shared mutable default state"
+category = "design"
+tags = ["python", "uv", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Each function call receives independent mutable state unless sharing is explicit."
+threat = "A mutable default is allocated once and silently carries data between calls."
+expectation = "Functions with collection defaults will be invoked repeatedly within long-lived processes and tests."
+strategy = "Use an immutable sentinel such as None and allocate the mutable object inside each call."
+evidence = [{ type = "test", description = "Repeated calls without the optional collection do not observe mutations made by earlier calls, and static checks flag mutable defaults.", required = true }]
+tradeoff = "Sentinel handling adds a branch and requires distinguishing omission from an explicit null-like value."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#common-mistakes-to-avoid", summary = "Shows the shared-list default bug and prescribes a None sentinel with per-call allocation.", confidence = 1.0 }]

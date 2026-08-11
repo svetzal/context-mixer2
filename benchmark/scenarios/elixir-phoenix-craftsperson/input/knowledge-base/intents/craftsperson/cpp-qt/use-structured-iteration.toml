@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-structured-iteration"
+title = "Use structured modern iteration"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Collection traversal expresses the data operation without manual indexing or tuple-access hazards."
+threat = "Boilerplate loops obscure intent and invite bounds, increment, or element-selection mistakes."
+expectation = "More algorithms will operate over ranges and associative containers."
+strategy = "Prefer range-based loops and structured bindings when manual iterator control is unnecessary."
+evidence = [{ type = "review", description = "Straightforward traversal uses range loops and tuple-like elements use structured bindings unless manual control is justified.", required = true }]
+tradeoff = "High-level iteration can hide copies and is awkward when mutation or iterator control is essential."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "Recommends structured bindings and range-based for loops.", confidence = 1.0 }]

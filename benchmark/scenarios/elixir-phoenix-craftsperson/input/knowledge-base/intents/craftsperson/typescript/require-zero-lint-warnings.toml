@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-zero-lint-warnings"
+title = "Treat every lint warning as a completion failure"
+category = "quality"
+tags = ["typescript", "static-analysis", "error-handling", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to keep statically detectable quality problems from accumulating"
+threat = "Tolerated warnings become background noise that hides new defects and normalizes exceptions"
+expectation = "The codebase and lint rules will evolve while many contributors add changes"
+strategy = "Run the configured linter and require a zero-warning result"
+evidence = [{ type = "gate", description = "npm run lint exits successfully and reports zero warnings", required = true }]
+tradeoff = "A zero-warning policy can block delivery on low-risk style findings or newly introduced rules"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "The QA process makes npm run lint with zero warnings mandatory and non-negotiable.", confidence = 1.0 }]

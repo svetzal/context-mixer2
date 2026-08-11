@@ -1,0 +1,17 @@
+id = "guidelines.intent.behavioral-compose-ui-tests"
+title = "Protect user-visible Compose behavior"
+category = "design"
+tags = ["kotlin", "android", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to detect regressions in user interactions and resulting UI state."
+threat = "Implementation-only tests can pass while taps, typing, navigation, or rendered outcomes fail."
+expectation = "Compose screens will add interactions and state-dependent presentation."
+strategy = "Write Compose UI tests around user actions and observable state updates rather than implementation structure."
+evidence = [{ type = "gate", description = "Tests drive semantic user interactions and assert visible outcomes without relying on internal composable hierarchy details.", required = true }]
+tradeoff = "Behavioral UI tests are slower and more sensitive to environment and animation timing than unit tests."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#ui-tests-compose-ui-test", summary = "The source requires UI tests of user interactions and state updates focused on behavior.", confidence = 1.0 }]

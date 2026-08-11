@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-behavior-red-green-refactor"
+title = "Develop behavior through red-green-refactor"
+category = "testing"
+tags = ["csharp", "concurrency", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "New behavior is specified observably and protected from regression before its implementation settles."
+threat = "Implementation-first work can encode misunderstood requirements and produce tests that merely ratify existing code."
+expectation = "Requirements and designs will be refined incrementally as features are added."
+strategy = "Write an executable behavioral specification that fails first, make it pass, and then refactor while keeping it green."
+evidence = [{ type = "test_trace", description = "A new behavior has a focused automated test that was observed failing for the expected reason before the implementation and remains green after refactoring.", required = true }]
+tradeoff = "Test-first development adds short-term iteration overhead and can be awkward during exploratory or infrastructure-heavy work."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#testing-philosophy", summary = "Treats tests as executable specifications and requires red first and green always; incremental development repeats red-green-refactor for new features.", confidence = 1.0 }]

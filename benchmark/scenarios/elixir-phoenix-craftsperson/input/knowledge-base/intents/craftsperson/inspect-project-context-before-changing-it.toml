@@ -1,0 +1,284 @@
+id = "guidelines.intent.inspect-project-context-before-changing-it"
+title = "Inspect project context before changing it"
+category = "delivery"
+tags = ["discovery", "project-conventions", "change-safety"]
+status = "hypothesized"
+confidence = 0.98
+capability = "Changes preserve the project's deliberate architecture, constraints, workflows, and compatibility promises."
+threat = "A locally plausible change silently violates conventions or invariants that are visible elsewhere in the project."
+expectation = "Contributors will often begin with incomplete context, especially when moving between projects or working through agents."
+strategy = "Read the project's guidance, build configuration, nearby code, tests, and change history before making a substantive decision."
+evidence = [{ type = "change_review", description = "The change follows documented project conventions and names any deliberately changed invariant.", required = true }]
+tradeoff = "Context gathering delays the first edit and can surface more constraints than the immediate task appears to require."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md", "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#detect--preserve-invariants-mandatory", summary = "Requires inspection of project guidance, manifests, toolchains, CI, and existing patterns before substantive change.", confidence = 1.0 }, { type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#working-with-project-context", summary = "Requires project conventions to be understood and respected before implementation.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; Read AGENTS.md and handlers/orders.clj before this edit:
+;; this codebase returns cognitect anomaly maps and never
+;; throws across handler boundaries — middleware relies on it.
+(defn get-invoice [{:keys [path-params]}]
+  (if-let [inv (invoices/find (:id path-params))]
+    {:status 200 :body inv}
+    {:status 404
+     :body #:cognitect.anomalies{:category :not-found}}))
+'''
+bad = '''
+(defn get-invoice [{:keys [path-params]}]
+  ; first edit with zero context read: throws across the
+  ; handler boundary in a codebase where every other handler
+  ; returns anomaly maps and middleware depends on that
+  (or (invoices/find (:id path-params))
+      (throw (IllegalArgumentException. "no such invoice"))))
+'''
+
+[examples.cpp]
+good = '''
+$ cat CONTRIBUTING.md          # read the guidance first
+  "All public APIs return Result<T>; exceptions are
+   reserved for programmer errors."
+$ grep -rn "Result<" src/api/ | head    # confirm live pattern
+$ git log --oneline -3 -- src/api/orders.cpp
+
+# New endpoint follows the established contract:
+Result<Refund> requestRefund(OrderId id, Money amount);
+'''
+bad = '''
+// Dropped into src/api/ without reading a single neighbor.
+// Every other endpoint returns Result<T>; this one throws —
+// callers' error handling silently never fires.
+Refund requestRefund(OrderId id, Money amount) {
+  if (!ledger.contains(id))
+    throw std::runtime_error("no such order");  // new invention
+  return ledger.refund(id, amount);
+}
+'''
+
+[examples.csharp]
+good = '''
+$ grep -i clock AGENTS.md
+  All timestamps are UTC; inject IClock, never
+  use DateTime.Now.
+$ grep -rn "IClock" src/Ordering | head -1
+  OrderService.cs:12: private readonly IClock _clock;
+
+// change follows the convention the project chose
+public Order Place(Cart cart) =>
+    new(cart.Items, placedAt: _clock.UtcNow);
+'''
+bad = '''
+// first edit, zero context gathered — violates the
+// project-wide IClock convention visible one file over
+public Order Place(Cart cart) =>
+    new(cart.Items, placedAt: DateTime.Now);
+// local time on a UTC system: every daylight-saving
+// change now reorders the order history
+'''
+
+[examples.elixir]
+good = '''
+Before the first edit:
+  CONTRIBUTING.md      -> contexts own all Repo access
+  lib/shop/orders/     -> pattern: context+schema+query
+  git log -5 lib/shop  -> queries were JUST moved out of
+                          the web layer, deliberately
+
+The change follows suit: the new query lands in the
+Orders context; the controller stays Repo-free.
+'''
+bad = '''
+# first edit, zero reconnaissance: a Repo call dropped
+# into a controller, in a codebase whose convention —
+# documented and enforced everywhere else — is that
+# contexts own all data access
+def show(conn, %{"id" => id}) do
+  order = Repo.get!(Order, id) |> Repo.preload(:items)
+  render(conn, :show, order: order)
+end
+'''
+
+[examples.go]
+good = '''
+# before touching retry.go: read the guidance and the history
+$ head -3 CONTRIBUTING.md
+  Duration constants live in internal/config; changes to retry
+  behavior need a note in docs/operations.md.
+$ git log --oneline -2 internal/retry/retry.go
+9a1c44d Cap backoff at 30s (incident #412 follow-up)
+1f0e2b7 Add jitter to avoid thundering herd
+
+# change keeps the cap, adds to config, updates operations.md
+'''
+bad = '''
+// "cleanup" PR from someone who read only this one function
+func backoff(attempt int) time.Duration {
+	// removed the 30s cap — "seemed arbitrary"
+	// (it was added after incident #412; git log, doc.go, and
+	// docs/operations.md all say so — none were opened)
+	return time.Duration(1<<attempt) * time.Second
+}
+'''
+
+[examples.java]
+good = '''
+Before the first edit:
+  read CONTRIBUTING.md, AGENTS.md, build.gradle
+  grepped how the existing 14 handlers register routes
+  found ADR-011: "timestamps are UTC Instant, never local"
+
+record AuditEntry(Instant occurredAt, String actor) {}
+
+// registered the same way as every other handler
+routes.register("/audit", new AuditHandler(clock));
+'''
+bad = '''
+// dropped in without reading ADR-011 ("UTC Instant only")
+// or noticing how the other 14 handlers register
+class AuditController {
+    LocalDateTime occurredAt = LocalDateTime.now(); // local tz
+
+    AuditController() {
+        Server.GLOBAL.addRoute("/audit", this);
+        // bypasses RouteRegistry — invisible to the
+        // middleware every other route relies on
+    }
+}
+'''
+
+[examples.kotlin]
+good = '''
+// AGENTS.md, read before editing:
+//   "Money is always Money(minorUnits: Long). Never Double."
+// rg "class Money" confirmed the existing type and helpers.
+
+fun applyCredit(balance: Money, credit: Money): Money =
+    balance - credit
+// the change follows the documented convention instead of
+// inventing a second money representation
+'''
+bad = '''
+// first edit made minutes into the session; AGENTS.md and
+// the existing Money type were never opened
+fun applyCredit(balance: Double, credit: Double): Double =
+    balance - credit
+// every other module uses Money(minorUnits); this quietly
+// reintroduces the float-rounding bugs the project-wide
+// convention exists to prevent
+'''
+
+[examples.python]
+good = '''
+$ grep -A1 -i timezone CONTRIBUTING.md
+All persisted timestamps are UTC; convert at the edges.
+
+$ rg "datetime.now" src/ | head -1
+src/billing/clock.py:    return datetime.now(tz=UTC)
+
+# the change follows the convention the project already has
+def issued_at() -> datetime:
+    return datetime.now(tz=UTC)
+'''
+bad = '''
+# first edit in the repo, nothing read beforehand
+def issued_at() -> datetime:
+    return datetime.now()   # naive local time in a codebase
+                            # where every other timestamp is
+                            # UTC by documented convention
+
+# invoices now sort wrongly against every stored timestamp
+'''
+
+[examples.ruby]
+good = '''
+Before editing app/services/refund_service.rb:
+  - CONTRIBUTING.md: services return Result, never raise
+  - neighboring services: all use Result.ok / Result.err
+  - git log --follow: raising was removed on purpose in #482
+
+The change follows the discovered convention:
+
+  def call
+    charge ? Result.ok(refund) : Result.err(:no_charge)
+  end
+'''
+bad = '''
+# first edit in the repo, nothing read first; every sibling
+# service returns Result — this one now raises
+class RefundService
+  def call
+    raise NoChargeError unless charge # callers expect Result
+    Result.ok(refund)
+  end
+end
+'''
+
+[examples.rust]
+good = '''
+Before touching the retry logic:
+
+  CONTRIBUTING.md          -> "all timeouts live in config/"
+  src/net/mod.rs           -> a shared backoff helper exists
+  git log src/net/retry.rs -> cap lowered after an incident
+                              (2026-03, issue #482)
+
+Change: reuse net::backoff, keep the lowered cap, add the
+new timeout to config/ beside the others.
+'''
+bad = '''
+// dropped in without reading the neighbors:
+// duplicates the existing net::backoff helper and silently
+// re-raises a retry cap that history shows was lowered
+// after the 2026-03 outage (#482)
+const MAX_RETRIES: u32 = 50; // project had set this to 3
+fn my_backoff(attempt: u32) -> Duration {
+    Duration::from_millis(100 * 2u64.pow(attempt))
+}
+'''
+
+[examples.swift]
+good = '''
+Before adding the /orders endpoint:
+  CONTRIBUTING.md   -> "all requests go through APIRoute"
+  APIRoute.swift    -> siblings show auth + retry handling
+  git log Network/  -> retry policy added after INC-83
+
+Change: one new APIRoute case, inheriting auth and retry.
+No new URLSession, no convention silently broken.
+'''
+bad = '''
+// first edit, zero context read: hand-rolls a request while
+// every sibling endpoint goes through APIRoute
+let url = URL(string: "https://api.example.com/v9/orders")!
+var req = URLRequest(url: url)
+req.httpMethod = "POST"
+// skips the auth-header helper and the INC-83 retry policy
+let (data, _) = try await URLSession.shared.data(for: req)
+'''
+
+[examples.typescript]
+good = '''
+$ grep -A2 "date handling" CONTRIBUTING.md
+All timestamps are UTC ISO-8601 strings at rest;
+convert at the presentation edge only.
+
+$ rg "toLocaleString" src/ | wc -l
+0
+
+// Change follows the invariant it just confirmed:
+export const stampOrder = (order: Order): Order =>
+  ({ ...order, createdAt: new Date().toISOString() });
+'''
+bad = '''
+// Written without reading a single neighbouring file.
+// Every other module stores UTC ISO-8601 strings; this one
+// writes locale-dependent display text into the database.
+export function stampOrder(order: Order): Order {
+  return {
+    ...order,
+    createdAt: new Date().toLocaleString(), // breaks invariant
+  };
+}
+'''

@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralized-build-conventions"
+title = "Keep Gradle policy consistent and reusable"
+category = "delivery"
+tags = ["kotlin", "android", "gradle", "dependencies", "build-and-delivery", "builds"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to change common build behavior once and apply it coherently across modules."
+threat = "Copy-pasted module build scripts drift in compiler, quality, and Android configuration."
+expectation = "Module count and shared build requirements will increase."
+strategy = "Move reusable build logic into buildSrc or convention plugins."
+evidence = [{ type = "gate", description = "Repeated build configuration is represented by tested convention code and module scripts contain only local differences.", required = true }]
+tradeoff = "Custom build logic adds its own API, testing needs, and configuration-time complexity."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#build-configuration", summary = "The source directs shared build logic to buildSrc or convention plugins.", confidence = 1.0 }]

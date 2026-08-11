@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-comprehensive-simplecov-coverage"
+title = "Cover changed Ruby behavior comprehensively"
+category = "testing"
+tags = ["ruby", "simplecov", "testing", "error-handling", "coverage", "risk"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to detect unexercised paths introduced or altered by a change"
+threat = "Green examples can leave new branches and error paths unexecuted"
+expectation = "Feature growth and refactoring will continually create new control-flow paths"
+strategy = "Run RSpec with SimpleCov and require comprehensive coverage of new and changed code"
+evidence = [{ type = "gate", description = "SimpleCov reports the project's required coverage with no unexplained uncovered lines or branches in new or changed code", required = true }]
+tradeoff = "Coverage targets can encourage low-value examples and do not prove assertions are meaningful"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#quality-gates-non-negotiable", summary = "The quality gate requires SimpleCov to show comprehensive coverage of new or changed code.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.repl-driven-design"
+title = "Design code for rapid REPL exploration"
+category = "design"
+tags = ["clojure", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to inspect and exercise small units of behavior interactively during development"
+threat = "Tightly coupled initialization and opaque execution paths force slow whole-system feedback loops"
+expectation = "Developers will need to investigate unfamiliar behavior and validate changes incrementally"
+strategy = "Shape functions and namespaces so they can be loaded, evaluated, and explored independently at the REPL"
+evidence = [{ type = "review", description = "Changed pure namespaces load without starting infrastructure and representative functions can be invoked with literal data at the REPL", required = true }]
+tradeoff = "Optimizing boundaries for interactive use can add indirection and setup helpers not required at runtime"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#core-philosophy", summary = "REPL-driven development requires design for interactive exploration and testing.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.time-bound-async-operations"
+title = "Time-bound external async operations"
+category = "reliability"
+tags = ["python", "uv", "concurrency", "dependencies", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.84
+capability = "An unresponsive dependency cannot hold an async operation open indefinitely."
+threat = "Network or service calls can hang forever, consuming tasks and preventing completion or shutdown."
+expectation = "External dependencies will occasionally become slow, partitioned, or nonresponsive."
+strategy = "Wrap bounded external awaits in explicit asyncio timeouts chosen for the operation."
+evidence = [{ type = "test", description = "A simulated nonresponsive dependency is cancelled at the configured deadline and produces the documented timeout outcome.", required = true }]
+tradeoff = "A fixed deadline can abort legitimate slow work and requires policy for retry, cleanup, and user-visible errors."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#asyncawait-best-practices", summary = "Presents asyncio.timeout around an external fetch as the correct timeout-handling pattern.", confidence = 0.9 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-async-error-causes"
+title = "Translate asynchronous failures without losing their cause"
+category = "reliability"
+tags = ["typescript", "concurrency", "error-handling", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to present domain-appropriate async errors while retaining diagnostic provenance"
+threat = "Broad catch blocks flatten distinct failures or discard the original exception"
+expectation = "Network and parsing operations will fail for multiple reasons that require diagnosis"
+strategy = "Preserve already-classified errors and wrap unexpected failures with a domain error whose cause references the original"
+evidence = [{ type = "test", description = "Async failure tests distinguish expected domain errors and verify an unexpected error is reachable through the translated error's cause", required = true }]
+tradeoff = "Error translation adds classes and branching and can produce nested error chains callers must understand"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#nodejs-patterns", summary = "The async example preserves ApiError and wraps other failures as a network error with cause.", confidence = 1.0 }]

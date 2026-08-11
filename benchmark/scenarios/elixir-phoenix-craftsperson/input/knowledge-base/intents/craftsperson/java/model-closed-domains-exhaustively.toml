@@ -1,0 +1,17 @@
+id = "guidelines.intent.model-closed-domains-exhaustively"
+title = "Model closed domains for compiler-checked exhaustiveness"
+category = "design"
+tags = ["java", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "All valid variants of a closed domain are represented explicitly and handled exhaustively."
+threat = "Open hierarchies and sprawling conditionals permit unhandled variants and scattered type checks."
+expectation = "Closed domain models will evolve by adding or changing variants, making missed branches a recurring defect risk."
+strategy = "Use sealed types with pattern matching and switch expressions for genuinely closed domain hierarchies."
+evidence = [{ type = "compile_gate", description = "Closed-domain switches compile exhaustively without default branches that conceal missing variants.", required = true }]
+tradeoff = "Sealed hierarchies restrict external extension and can add type declarations where an enum would be simpler."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#modern-java-mastery", summary = "Recommends sealed types and pattern matching for explicit closed hierarchies and compiler-verified exhaustiveness.", confidence = 1.0 }]

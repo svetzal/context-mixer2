@@ -1,0 +1,17 @@
+id = "guidelines.intent.gradual-leiningen-migration"
+title = "Modernize Leiningen projects without breaking their workflows"
+category = "delivery"
+tags = ["clojure", "leiningen", "testing", "documentation", "build-and-delivery", "tooling"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to adopt modern Clojure tooling while keeping an existing project operable"
+threat = "An abrupt build-system replacement can break established plugins, automation, and contributor workflows"
+expectation = "Long-lived Leiningen projects will need modernization while still supporting current delivery obligations"
+strategy = "Respect the existing Leiningen structure, document deps.edn advantages, and migrate only through gradual compatible steps"
+evidence = [{ type = "gate", description = "Existing Leiningen build, test, and release commands remain passing after each modernization step", required = true }, { type = "documentation", description = "The proposed migration records affected tooling and a reversible next step", required = true }]
+tradeoff = "Running legacy and modern conventions in parallel prolongs duplication and migration effort"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#build-system-preferences", summary = "Existing Leiningen structures are to be respected while gradual migration opportunities are suggested and compatibility maintained.", confidence = 1.0 }]

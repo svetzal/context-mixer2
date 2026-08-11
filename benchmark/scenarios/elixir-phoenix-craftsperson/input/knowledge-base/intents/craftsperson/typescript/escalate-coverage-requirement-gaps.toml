@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-coverage-requirement-gaps"
+title = "Escalate requirement gaps exposed by tests"
+category = "testing"
+tags = ["typescript", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to define correct behavior for uncovered cases before encoding assumptions"
+threat = "Coverage work exposes an unspecified path and the implementer invents a product rule"
+expectation = "Edge-case testing will reveal states that requirements did not address"
+strategy = "Ask the user to resolve behavioral gaps discovered while expanding test coverage"
+evidence = [{ type = "decision-record", description = "The uncovered case and user-confirmed expected outcome are recorded and represented by a test", required = true }]
+tradeoff = "Waiting for a requirement decision can block completion of otherwise useful coverage improvements"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#escalation-strategy", summary = "Test coverage that reveals gaps in requirements explicitly triggers user guidance.", confidence = 1.0 }]

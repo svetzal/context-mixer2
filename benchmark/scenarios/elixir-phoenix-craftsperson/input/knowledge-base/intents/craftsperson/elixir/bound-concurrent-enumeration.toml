@@ -1,0 +1,17 @@
+id = "guidelines.intent.bound-concurrent-enumeration"
+title = "Bound concurrent enumeration"
+category = "reliability"
+tags = ["elixir", "concurrency", "dependencies", "backpressure", "resource-bounds"]
+relations = [
+  { type = "specializes", target = "craftsperson/bound-concurrent-work" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Batch concurrency remains responsive without exhausting workers, connections, or memory."
+threat = "Unbounded task creation and infinite waits overwhelm dependencies or leave work permanently stuck."
+expectation = "Collection sizes, downstream latency, and runtime capacity will vary in production."
+strategy = "Use Task.async_stream/3 with intentional max_concurrency and a finite timeout backed by an operational plan."
+evidence = [{ type = "load_test", description = "Concurrency tests show active work never exceeds the configured bound and stalled items time out with an observable result.", required = true }]
+tradeoff = "Bounds reduce peak throughput and finite timeouts can abort legitimately slow operations."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#common-mistakes", summary = "Prescribes Task.async_stream back-pressure, intentional concurrency, and finite timeouts unless operations justify infinity.", confidence = 1.0 }]

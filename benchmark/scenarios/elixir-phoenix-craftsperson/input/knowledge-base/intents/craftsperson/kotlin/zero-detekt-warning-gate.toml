@@ -1,0 +1,17 @@
+id = "guidelines.intent.zero-detekt-warning-gate"
+title = "Resolve static-analysis warnings before completion"
+category = "quality"
+tags = ["kotlin", "detekt", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to prevent detectable Kotlin defects and complexity smells from accumulating."
+threat = "Ignored Detekt warnings normalize debt and conceal newly introduced problems in an ever-growing baseline."
+expectation = "The codebase and rule set will grow, increasing the volume and variety of statically detectable risks."
+strategy = "Run Detekt on every change and resolve all warnings rather than carrying them forward."
+evidence = [{ type = "gate", description = "./gradlew detekt exits successfully with no unresolved warnings on the delivered revision.", required = true }]
+tradeoff = "Zero-warning enforcement can block delivery on low-value findings or require rule tuning as the codebase evolves."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#mandatory-quality-gates", summary = "The source requires Detekt and resolution of all warnings.", confidence = 1.0 }]

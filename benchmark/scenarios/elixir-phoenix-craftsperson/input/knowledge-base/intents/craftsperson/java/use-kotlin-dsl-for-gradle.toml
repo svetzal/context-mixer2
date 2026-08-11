@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-kotlin-dsl-for-gradle"
+title = "Use Kotlin DSL for Gradle builds"
+category = "delivery"
+tags = ["java", "gradle", "build-and-delivery", "builds", "configuration", "reproducibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Gradle build logic benefits from typed, discoverable configuration that Java teams can navigate."
+threat = "Stringly typed or opaque build scripts allow configuration mistakes to surface late."
+expectation = "Gradle projects will accumulate plugins and custom logic that need safe refactoring."
+strategy = "Prefer build.gradle.kts and typed Kotlin build logic for Gradle projects."
+evidence = [{ type = "manifest", description = "New or substantially revised Gradle build files use Kotlin DSL unless repository compatibility documents another choice.", required = true }]
+tradeoff = "Kotlin DSL can configure more slowly and some plugin examples or APIs remain easier to use from Groovy."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#build-and-dependency-management", summary = "Prefers Gradle's Kotlin DSL.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.justify-dangerous-casts"
+title = "Justify type-safety escape hatches"
+category = "documentation"
+tags = ["cpp", "qt", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Low-level interoperation remains auditable."
+threat = "reinterpret_cast and const removal can cause UB."
+expectation = "Legacy and hardware APIs may force escape hatches."
+strategy = "Document a narrow invariant for dangerous casts and never mutate originally const storage."
+evidence = [{ type = "gate", description = "Each dangerous cast has rationale and targeted evidence.", required = true }]
+tradeoff = "Rationale cannot make an invalid cast safe."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#red-flags-to-catch", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

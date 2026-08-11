@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimize-production-dependencies"
+title = "Minimize production dependencies"
+category = "dependencies"
+tags = ["elixir", "dependencies", "supply-chain", "complexity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/minimize-dependency-surface" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Production code retains a small, understood third-party risk surface."
+threat = "Unnecessary or loosely constrained packages introduce supply-chain, compatibility, and maintenance risk."
+expectation = "Dependencies will publish breaking, vulnerable, or abandoned releases over the application's lifetime."
+strategy = "Add a dependency only when its current value justifies the additional supply-chain and maintenance surface."
+evidence = [{ type = "manifest_review", description = "Every production dependency has a documented current use and removable or redundant packages are absent.", required = true }]
+tradeoff = "The team may implement small capabilities locally and must perform deliberate version updates."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#dependency-management", summary = "Requires dependencies to remain minimal and audited.", confidence = 1.0 }]

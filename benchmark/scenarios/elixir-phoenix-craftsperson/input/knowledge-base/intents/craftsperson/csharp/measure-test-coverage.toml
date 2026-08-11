@@ -1,0 +1,17 @@
+id = "guidelines.intent.measure-test-coverage"
+title = "Measure whether new code is exercised"
+category = "testing"
+tags = ["csharp", "testing", "error-handling", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Maintainers can detect behavior added without corresponding automated test execution."
+threat = "A green suite can conceal new files, branches, or error paths that no test reaches."
+expectation = "Delivery pressure and code growth will make omissions difficult to spot by inspection alone."
+strategy = "Collect coverage with coverlet during dotnet test and inspect coverage of changed code."
+evidence = [{ type = "coverage_gate", description = "The coverlet report shows that newly introduced domain behavior and its meaningful branches are exercised by tests.", required = true }]
+tradeoff = "Coverage collection slows tests and the metric can reward execution without meaningful assertions."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#testing-philosophy", summary = "Requires coverlet coverage collection; the mandatory gates require new code to be tested.", confidence = 1.0 }]

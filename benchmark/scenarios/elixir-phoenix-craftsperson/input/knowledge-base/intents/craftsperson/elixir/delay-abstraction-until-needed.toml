@@ -1,0 +1,17 @@
+id = "guidelines.intent.delay-abstraction-until-needed"
+title = "Delay abstraction until evidence demands it"
+category = "design"
+tags = ["elixir", "concurrency", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The design remains easy to change while the problem and its variation points are still being discovered."
+threat = "Premature indirection freezes guessed similarities into interfaces that resist real requirements."
+expectation = "Early implementations will reveal patterns and exceptions that cannot be predicted reliably."
+strategy = "Prefer the minimal entity set, inline premature abstractions, and refactor only after patterns emerge."
+evidence = [{ type = "diff_review", description = "New abstractions are justified by demonstrated repetition or variation rather than hypothetical reuse.", required = true }]
+tradeoff = "Some duplication and later refactoring are accepted while evidence accumulates."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Prioritizes minimal entities and tells implementers to inline abstractions until patterns emerge.", confidence = 1.0 }]

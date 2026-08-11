@@ -1,0 +1,17 @@
+id = "guidelines.intent.idiomatic-kotlin-expression"
+title = "Keep Kotlin code aligned with language idioms"
+category = "design"
+tags = ["kotlin", "android", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Ability for Kotlin developers and tools to read and evolve code using familiar language constructs."
+threat = "Java-shaped or bespoke patterns obscure intent and bypass Kotlin's safer modeling features."
+expectation = "The codebase will be maintained by developers familiar with evolving Kotlin conventions."
+strategy = "Use appropriate Kotlin idioms such as extension functions, data classes, sealed classes, and destructuring."
+evidence = [{ type = "gate", description = "Static analysis and review find no avoidable Java-style patterns and verify that selected idioms clarify rather than obscure behavior.", required = true }]
+tradeoff = "Aggressive use of idioms can be unfamiliar, over-clever, or harder to debug for mixed-experience teams."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#code-quality", summary = "The source explicitly calls for idiomatic Kotlin and names preferred constructs.", confidence = 1.0 }]

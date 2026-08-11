@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-ambiguous-requirements"
+title = "Clarify ambiguous requirements before implementation"
+category = "collaboration"
+tags = ["csharp", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Implementation decisions reflect the user's intended behavior and acceptable tradeoffs."
+threat = "Unilateral assumptions turn ambiguity into confidently implemented but incorrect requirements."
+expectation = "Business requests and design constraints will frequently be incomplete or admit several valid interpretations."
+strategy = "Surface the ambiguity, explain materially different options, and obtain user direction before committing to a consequential interpretation."
+evidence = [{ type = "decision_trace", description = "A materially ambiguous requirement has recorded options, consequences, and the user's chosen interpretation before implementation proceeds.", required = true }]
+tradeoff = "Clarification interrupts flow and can delay work when the user is unavailable."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#communication-style", summary = "Requires clarifying questions when requirements are ambiguous; the decision framework requires consultation when tradeoffs are unclear.", confidence = 1.0 }]

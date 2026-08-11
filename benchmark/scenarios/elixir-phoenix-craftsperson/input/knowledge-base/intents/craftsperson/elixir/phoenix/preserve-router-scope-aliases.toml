@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-router-scope-aliases"
+title = "Preserve router scope aliases"
+category = "design"
+tags = ["elixir", "phoenix", "dependencies", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Routes resolve to the intended modules without duplicated or misleading namespaces."
+threat = "Redundant aliases inside scope blocks double-prefix route modules or obscure actual resolution."
+expectation = "Router scopes will group more administrative and domain-specific routes."
+strategy = "Rely on the optional alias supplied by scope and write route modules relative to it."
+evidence = [{ type = "router_test", description = "Compiled routes resolve each scoped LiveView or controller to the intended fully qualified module with no redundant alias declarations.", required = true }]
+tradeoff = "Route declarations depend on surrounding scope context and are less self-contained when read in isolation."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#router-and-scoping", summary = "Warns that scope prefixes route aliases and forbids redundant aliases.", confidence = 1.0 }]

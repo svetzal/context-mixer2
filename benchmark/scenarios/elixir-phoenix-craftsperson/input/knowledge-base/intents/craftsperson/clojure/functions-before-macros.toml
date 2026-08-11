@@ -1,0 +1,17 @@
+id = "guidelines.intent.functions-before-macros"
+title = "Prefer functions until macro expansion is necessary"
+category = "design"
+tags = ["clojure", "testing", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to compose, test, pass, and inspect abstractions as ordinary runtime values"
+threat = "Unnecessary macros introduce compile-time semantics, hidden evaluation rules, and tooling complexity"
+expectation = "Convenience abstractions will be proposed as repeated patterns emerge"
+strategy = "Implement abstractions as functions unless the requirement cannot be expressed with function evaluation semantics"
+evidence = [{ type = "review", description = "Every introduced macro documents the evaluation or syntax capability that an ordinary function cannot provide", required = true }]
+tradeoff = "Avoiding macros can leave some call sites more verbose and may defer useful domain-specific syntax"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#core-philosophy", summary = "Macro use is prescribed only when functions do not suffice.", confidence = 1.0 }]

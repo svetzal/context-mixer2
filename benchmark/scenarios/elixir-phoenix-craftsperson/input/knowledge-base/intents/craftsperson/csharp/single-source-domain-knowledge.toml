@@ -1,0 +1,17 @@
+id = "guidelines.intent.single-source-domain-knowledge"
+title = "Keep each domain decision in one source"
+category = "design"
+tags = ["csharp", "security", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A business rule or shared concept can be changed coherently in one authoritative place."
+threat = "Duplicated knowledge creates several locations that must change together and eventually diverge."
+expectation = "Domain rules and representations will evolve after their first implementation."
+strategy = "Extract repeated knowledge into a shared concept when it represents the same decision, without abstracting merely similar code."
+evidence = [{ type = "change_impact_review", description = "A representative domain-rule change requires one authoritative edit, and shared abstractions do not conflate independently changing concepts.", required = true }]
+tradeoff = "Centralization can introduce indirection and a premature abstraction can couple concepts that should evolve separately."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#engineering-principles-simple-design-heuristics", summary = "Prioritizes eliminating knowledge duplication while warning against over-abstraction.", confidence = 1.0 }]

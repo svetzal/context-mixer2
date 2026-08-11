@@ -1,0 +1,17 @@
+id = "guidelines.intent.model-absence-with-optional"
+title = "Model expected absence with optional"
+category = "design"
+tags = ["cpp", "qt", "error-handling", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Callers distinguish no-value from errors and sentinels."
+threat = "Nulls and magic values make absence implicit."
+expectation = "Lookups will legitimately find nothing."
+strategy = "Return optional for expected absence."
+evidence = [{ type = "gate", description = "Tests cover engaged and empty results.", required = true }]
+tradeoff = "Optional carries no diagnostic context."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#error-handling", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

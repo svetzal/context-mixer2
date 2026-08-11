@@ -1,0 +1,17 @@
+id = "guidelines.intent.refactor-in-green-increments"
+title = "Refactor through small verified steps"
+category = "refactoring"
+tags = ["go", "concurrency", "testing", "error-handling", "behavior-preservation", "small-steps"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-behavior-during-refactoring" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Structural improvement can proceed while preserving known behavior at every checkpoint."
+threat = "Large refactors combine many possible causes of regression and make failures difficult to localize or reverse."
+expectation = "Maintainability work will touch code with existing consumers and behavior contracts."
+strategy = "Make small refactoring steps and return the test suite to green after each step."
+evidence = [{ type = "workflow", description = "Refactoring history consists of narrow steps, each independently passing the relevant test suite.", required = true }]
+tradeoff = "Incremental refactoring takes more intermediate work and may temporarily retain awkward transitional structure."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#small-safe-increments", summary = "Requires small refactoring steps with tests passing at each step.", confidence = 1.0 }]

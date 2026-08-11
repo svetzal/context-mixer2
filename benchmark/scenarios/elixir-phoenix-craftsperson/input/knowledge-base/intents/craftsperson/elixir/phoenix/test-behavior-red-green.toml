@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-behavior-red-green"
+title = "Specify behavior through red-green tests"
+category = "testing"
+tags = ["elixir", "phoenix", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Required behavior remains executable and stable while implementations evolve."
+threat = "Implementation-led tests encode internal structure or miss the requirement the code was meant to satisfy."
+expectation = "Internal designs will be refactored more often than externally meaningful behavior changes."
+strategy = "Write a failing behavior-focused test first, pass it with the simplest implementation, and use descriptive ExUnit assertions and names."
+evidence = [{ type = "test", description = "Tests describe observable outcomes, fail before the behavior exists, and survive implementation-only refactors.", required = true }]
+tradeoff = "Test-first work adds an up-front design step and can feel slower for exploratory changes."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#engineering-principles-your-north-star", summary = "Treats tests as executable specifications and prescribes red-green behavior testing.", confidence = 1.0 }]

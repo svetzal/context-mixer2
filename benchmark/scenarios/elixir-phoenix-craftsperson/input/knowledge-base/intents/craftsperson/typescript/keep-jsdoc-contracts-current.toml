@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-jsdoc-contracts-current"
+title = "Keep JSDoc aligned with code contracts"
+category = "design"
+tags = ["typescript", "documentation", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability for callers to understand exported behavior, constraints, and usage at the point of use"
+threat = "Stale or vague API comments misrepresent the implementation and create false confidence"
+expectation = "Exported contracts will change while editor tooling continues to surface their comments"
+strategy = "Update JSDoc descriptions whenever the documented contract changes"
+evidence = [{ type = "review", description = "Changed exported APIs have JSDoc whose parameters, returns, errors, and constraints agree with the implementation and tests", required = true }]
+tradeoff = "Maintaining comments duplicates some type-visible information and can create another source of drift"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "Documentation sync explicitly requires JSDoc comments with clear descriptions to be updated.", confidence = 1.0 }]

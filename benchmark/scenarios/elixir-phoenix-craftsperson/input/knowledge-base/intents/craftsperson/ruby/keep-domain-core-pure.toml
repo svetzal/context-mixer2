@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-domain-core-pure"
+title = "Keep domain calculations pure"
+category = "architecture"
+tags = ["ruby", "testing", "dependencies", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to reason about and test domain behavior deterministically"
+threat = "I/O and hidden side effects make domain results depend on environment and execution order"
+expectation = "Domain rules will grow in complexity and need fast, reliable verification"
+strategy = "Implement domain logic as side-effect-free transformations in a functional core"
+evidence = [{ type = "test", description = "Core domain tests require no database, network, filesystem, clock, or other external fixture and return repeatable results for the same inputs", required = true }]
+tradeoff = "Pure functions require explicit data flow and may duplicate data-shaping at boundaries"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#functional-core-imperative-shell", summary = "The example and principle require pure domain logic without I/O or side effects.", confidence = 1.0 }]

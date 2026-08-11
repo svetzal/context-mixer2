@@ -1,0 +1,17 @@
+id = "guidelines.intent.validate-external-inputs"
+title = "Validate data at external trust boundaries"
+category = "architecture"
+tags = ["go", "validation", "trust-boundaries", "security"]
+relations = [
+  { type = "specializes", target = "craftsperson/validate-untrusted-input-at-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The system admits only data that satisfies the assumptions of its internal behavior."
+threat = "Malformed or hostile external input reaches trusted code and triggers corruption, injection, or resource abuse."
+expectation = "APIs, files, users, and external services will provide unexpected and adversarial values."
+strategy = "Validate inputs, with particular rigor at every external boundary, before using them internally."
+evidence = [{ type = "test", description = "Boundary tests reject malformed, oversized, missing, and domain-invalid external inputs with documented errors before side effects occur.", required = true }]
+tradeoff = "Validation adds code and latency and can reject novel but harmless values when constraints are too strict."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#enforce-security-standards", summary = "Requires validating all inputs, especially those from external sources.", confidence = 1.0 }]

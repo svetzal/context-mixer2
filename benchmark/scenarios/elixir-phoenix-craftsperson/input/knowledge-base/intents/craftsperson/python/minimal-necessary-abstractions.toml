@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimal-necessary-abstractions"
+title = "Delay abstractions and features until concrete need emerges"
+category = "design"
+tags = ["python", "testing", "build-and-delivery", "yagni", "scope-control", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The codebase remains simple enough to change in response to demonstrated requirements."
+threat = "Speculative features and premature abstractions add entities, constrain design, and preserve guesses as architecture."
+expectation = "Future requirements are uncertain and observed patterns may differ from current predictions."
+strategy = "Build the simplest working solution, remove speculative work, and introduce abstractions only after a real pattern or need appears."
+evidence = [{ type = "review", description = "Every new abstraction and feature is justified by a current requirement or at least one concrete repeated pattern rather than a hypothetical future use.", required = true }]
+tradeoff = "Deferring generalization can cause small later rewrites and may temporarily leave intentional duplication in place."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#small-safe-increments", summary = "The source combines minimal entities, YAGNI, simplest-working implementation, and inlining premature abstractions.", confidence = 1.0 }]

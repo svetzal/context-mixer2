@@ -1,0 +1,17 @@
+id = "guidelines.intent.standardize-dotnet-build-surface"
+title = "Standardize builds on the .NET CLI and SDK projects"
+category = "delivery"
+tags = ["csharp", "testing", "dependencies", "formatting", "build-and-delivery", "builds"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Contributors and automation can build, test, format, and package a project through a predictable cross-environment interface."
+threat = "IDE-only or bespoke build machinery creates hidden local dependencies and inconsistent results."
+expectation = "The project will be built by different developers, editors, and CI hosts over its lifetime."
+strategy = "Use SDK-style project files and the dotnet CLI as the foundation for build, test, format, and pack workflows."
+evidence = [{ type = "clean_environment_gate", description = "A clean environment with the declared .NET SDK can run the documented dotnet build, test, format, and pack operations without IDE-only state.", required = true }]
+tradeoff = "Standard CLI workflows may expose less customization or convenience than IDE-specific and bespoke build systems."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#build--project-management", summary = "Establishes the dotnet CLI and SDK-style project files as the build foundation.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.tie-lambda-connections-to-context-lifetimes"
+title = "Tie lambda connections to context lifetime"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Callbacks stop before captured state dies."
+threat = "Context-free lambdas can outlive captures."
+expectation = "Senders and receivers will die independently."
+strategy = "Provide a QObject context for lambda connects."
+evidence = [{ type = "gate", description = "Destroying context prevents later callback execution.", required = true }]
+tradeoff = "The wrong context can suppress intended work."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#signals-and-slots", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

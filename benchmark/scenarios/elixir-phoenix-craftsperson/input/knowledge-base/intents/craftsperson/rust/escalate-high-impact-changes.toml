@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-high-impact-changes"
+title = "Escalate high-impact invariant changes"
+category = "dependencies"
+tags = ["rust", "security", "dependencies", "vulnerability-management", "lifecycle-risk"]
+relations = [
+  { type = "specializes", target = "craftsperson/audit-dependency-risk" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Humans retain authority over compatibility, safety, and supply-chain decisions with broad consequences."
+threat = "An agent treats a locally convenient change as routine even though it widens unsafe code, changes compatibility, or adds material dependency risk."
+expectation = "Autonomous implementation will encounter decisions whose impact extends beyond the immediate task."
+strategy = "Pause and request authorization before raising MSRV, switching editions or runtimes, widening unsafe or FFI, changing default features, removing public items, or adding materially risky dependencies."
+evidence = [{ type = "audit", description = "High-impact diffs are linked to an explicit user authorization or decision record.", required = true }]
+tradeoff = "Escalation interrupts flow and can delay otherwise technically straightforward work."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#detect--preserve-invariants-mandatory", summary = "Enumerates changes that require immediate user escalation.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-uncertain-critical-decisions"
+title = "Escalate uncertain critical decisions"
+category = "design"
+tags = ["rust", "security", "performance", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Product and architectural decisions remain grounded in user intent when evidence is incomplete or values conflict."
+threat = "An agent guesses critical business logic or silently chooses among incompatible design, security, performance, or compatibility tradeoffs."
+expectation = "Implementation work will encounter ambiguous requirements and tensions that code inspection alone cannot resolve."
+strategy = "Stop, present options with tradeoffs and a recommendation, and seek user guidance for critical uncertainty or conflicting requirements."
+evidence = [{ type = "decision_audit", description = "Critical ambiguous choices have an explicit user disposition recorded before implementation proceeds.", required = true }]
+tradeoff = "Escalation reduces autonomy and can pause progress while awaiting a human response."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#when-uncertain", summary = "Requires presenting options and asking rather than guessing critical business logic or invariant changes.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.disclose-quality-compromises"
+title = "Disclose temporary quality compromises"
+category = "design"
+tags = ["java", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Stakeholders can distinguish verified production work from consciously incomplete exploration."
+threat = "An unstated skipped test or relaxed practice becomes invisible risk and may be mistaken for accepted quality."
+expectation = "Spikes, incidents, and deadlines will occasionally make the normal engineering standard impractical."
+strategy = "State every quality compromise, its reason, affected scope, and the condition for returning to the normal standard."
+evidence = [{ type = "decision_record", description = "Any skipped test or gate has a visible rationale, bounded scope, explicit approval where required, and a restoration condition.", required = true }]
+tradeoff = "Disclosure adds process around temporary work and does not itself ensure the compromise is later repaired."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#behavioral-guidelines", summary = "Requires compromises such as skipping a test for a spike to be stated explicitly.", confidence = 1.0 }]

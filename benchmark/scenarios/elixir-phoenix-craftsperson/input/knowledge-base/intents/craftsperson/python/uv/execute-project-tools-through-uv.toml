@@ -1,0 +1,17 @@
+id = "guidelines.intent.execute-project-tools-through-uv"
+title = "Execute project-aware tools through uv"
+category = "delivery"
+tags = ["python", "uv", "testing", "dependencies", "static-analysis", "tooling"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Project commands consistently see the project's installed code, interpreter, and dependency set."
+threat = "Direct command execution accidentally uses a global executable or the wrong virtual environment."
+expectation = "Contributors will have different tools and Python environments installed globally."
+strategy = "Run tests, linters, type checkers, applications, and project scripts through uv run without manually activating the virtual environment."
+evidence = [{ type = "workflow_gate", description = "Project scripts, documentation, and CI invoke project-aware tools with uv run and do not depend on an activated shell environment.", required = true }]
+tradeoff = "Every invocation gains a uv prefix and workflows cannot rely on generic direct executable commands."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#running-project-tools", summary = "Requires uv run for tools that need project code and rejects manual virtual-environment activation.", confidence = 1.0 }]

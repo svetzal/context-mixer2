@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-green-ci-before-merge"
+title = "Require green CI before integration"
+category = "quality"
+tags = ["python", "uv", "build-and-delivery", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The shared mainline contains only changes that pass the repository's automated checks."
+threat = "Merging a failing branch transfers known regressions and broken gates to every contributor."
+expectation = "Concurrent work will depend on main remaining a usable integration baseline."
+strategy = "Do not merge until all required CI checks are green."
+evidence = [{ type = "ci_gate", description = "Every required check for the integration revision completed successfully before merge.", required = true }]
+tradeoff = "Flaky or capacity-constrained CI can delay urgent changes even when local evidence is strong."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#workflow--collaboration", summary = "Requires CI to be green before merging.", confidence = 1.0 }]

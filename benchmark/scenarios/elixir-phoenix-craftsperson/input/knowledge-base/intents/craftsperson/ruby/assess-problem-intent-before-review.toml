@@ -1,0 +1,17 @@
+id = "guidelines.intent.assess-problem-intent-before-review"
+title = "Review code against the problem it intends to solve"
+category = "collaboration"
+tags = ["ruby", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to distinguish locally polished code from a correct solution to the requested problem"
+threat = "A review focused only on syntax and structure can approve code that solves the wrong problem"
+expectation = "Change requests and implementations will sometimes diverge in subtle ways"
+strategy = "Establish the problem and intended outcome before evaluating the implementation"
+evidence = [{ type = "review", description = "The review states the intended outcome and traces the changed behavior to that outcome before recommending implementation refinements", required = true }]
+tradeoff = "Reconstructing problem intent adds review time and may require stakeholder clarification"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#when-reviewing-code", summary = "The first review step asks what problem the code solves and whether it reveals that intent.", confidence = 1.0 }]

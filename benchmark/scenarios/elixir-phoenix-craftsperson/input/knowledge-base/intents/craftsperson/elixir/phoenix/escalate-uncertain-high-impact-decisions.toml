@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-uncertain-high-impact-decisions"
+title = "Escalate uncertain high-impact decisions"
+category = "performance"
+tags = ["elixir", "phoenix", "security", "performance", "profiling", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-from-measurement" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Irreversible or requirement-sensitive choices reflect stakeholder intent rather than implementer assumptions."
+threat = "Local optimization silently changes requirements, architecture, security posture, or clarity guarantees."
+expectation = "Heuristics will conflict and evidence will sometimes expose ambiguity beyond technical authority."
+strategy = "Surface tensions and seek user guidance for requirement conflicts, architectural security findings, unclear behavior, and clarity-performance compromises."
+evidence = [{ type = "decision_record", description = "High-impact work with unresolved tradeoffs records the options, conflict, and explicit stakeholder direction before implementation proceeds.", required = true }]
+tradeoff = "Escalation interrupts flow and delays decisions that an implementer might otherwise make quickly."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#escalation-strategy", summary = "Lists requirement, security, coverage, documentation, and performance tensions that require user guidance.", confidence = 1.0 }]

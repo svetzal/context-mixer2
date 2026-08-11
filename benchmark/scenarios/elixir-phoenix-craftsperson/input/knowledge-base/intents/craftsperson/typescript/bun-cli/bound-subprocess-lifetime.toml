@@ -1,0 +1,17 @@
+id = "guidelines.intent.bound-subprocess-lifetime"
+title = "Bound every subprocess lifetime"
+category = "reliability"
+tags = ["typescript", "bun", "cli", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The CLI can regain control when an invoked program hangs or never exits."
+threat = "An unbounded child process can block the command indefinitely and retain resources."
+expectation = "External commands will run under variable load and may deadlock, prompt interactively, or malfunction."
+strategy = "Assign every subprocess a finite timeout and kill it when the deadline expires."
+evidence = [{ type = "test", description = "A subprocess-gateway integration test invokes a non-terminating fixture, observes termination within the configured deadline, and verifies the timeout failure path.", required = true }]
+tradeoff = "A timeout can terminate legitimate long-running work and requires selecting or exposing suitable duration policy."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#subprocess-execution", summary = "Says subprocess calls must always handle timeouts and demonstrates killing the process after a default deadline.", confidence = 1.0 }]

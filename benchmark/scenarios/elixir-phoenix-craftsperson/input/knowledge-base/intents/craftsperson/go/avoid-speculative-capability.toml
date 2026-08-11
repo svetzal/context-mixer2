@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-speculative-capability"
+title = "Build only capabilities required now"
+category = "design"
+tags = ["go", "testing", "build-and-delivery", "yagni", "scope-control", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Delivery effort stays focused on validated business needs."
+threat = "Speculative features and extension points consume effort and create maintenance obligations before their value is known."
+expectation = "Future requirements will remain uncertain and may differ from today's guesses."
+strategy = "Apply YAGNI and defer code until a current requirement or observed pressure justifies it."
+evidence = [{ type = "review", description = "Every behavior and extension point in the change traces to a current success criterion or demonstrated need.", required = true }]
+tradeoff = "Deferral can require later rework when a foreseeable capability finally becomes necessary."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#small-safe-increments", summary = "Explicitly says to avoid speculative work using YAGNI.", confidence = 1.0 }]

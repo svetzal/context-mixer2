@@ -1,0 +1,17 @@
+id = "guidelines.intent.record-dependency-audit-provenance"
+title = "Record dependency audit provenance for high assurance"
+category = "delivery"
+tags = ["rust", "dependencies", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "High-assurance projects can trace which dependency code has been reviewed and under what criteria."
+threat = "Automated advisory and policy checks pass while unaudited dependency code remains trusted without review evidence."
+expectation = "Security-sensitive projects will need assurance beyond the absence of currently published advisories."
+strategy = "Use cargo-vet to maintain structured audit provenance for dependencies when the repository's assurance level warrants it."
+evidence = [{ type = "provenance_gate", description = "cargo-vet verifies that required dependency criteria are covered by trusted audits or explicitly accepted exemptions.", required = true }]
+tradeoff = "Producing and maintaining dependency audits requires specialized reviewer time and can slow upgrades."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#security-and-supply-chain", summary = "Recommends cargo-vet audit provenance as an optional control for high-assurance repositories.", confidence = 1.0 }]

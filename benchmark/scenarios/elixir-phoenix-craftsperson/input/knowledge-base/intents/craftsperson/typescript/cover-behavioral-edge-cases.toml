@@ -1,0 +1,17 @@
+id = "guidelines.intent.cover-behavioral-edge-cases"
+title = "Cover meaningful behavioral edge cases"
+category = "testing"
+tags = ["typescript", "testing", "error-handling", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to preserve correct behavior at boundaries and exceptional inputs"
+threat = "Happy-path-only tests allow rare or limiting conditions to regress unnoticed"
+expectation = "Production inputs and states will include empty, invalid, extreme, and failure cases"
+strategy = "Add explicit tests for edge cases implied by the contract and identified risks"
+evidence = [{ type = "test", description = "The suite includes named cases for each relevant boundary, invalid input, absence, and failure path introduced or changed", required = true }]
+tradeoff = "Edge-case coverage increases suite size and requires judgment about which possibilities are meaningful"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "The required test-with-coverage process explicitly calls for edge cases to be covered.", confidence = 1.0 }]

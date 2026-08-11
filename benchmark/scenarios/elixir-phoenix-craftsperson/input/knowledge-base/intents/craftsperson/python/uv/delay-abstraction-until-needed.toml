@@ -1,0 +1,17 @@
+id = "guidelines.intent.delay-abstraction-until-needed"
+title = "Delay abstraction until need is demonstrated"
+category = "design"
+tags = ["python", "uv", "concurrency", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The design remains direct and easy to change until recurring structure provides evidence for abstraction."
+threat = "Premature indirection encodes guessed commonality and makes simple behavior harder to follow."
+expectation = "Early understanding of future variation will be incomplete and patterns will emerge through implementation."
+strategy = "Keep the smallest necessary entities, inline premature abstractions, and refactor only after need or repetition is evident."
+evidence = [{ type = "review", description = "Every new abstraction has multiple concrete uses or a documented present constraint that justifies it.", required = true }]
+tradeoff = "Waiting can produce temporary duplication and may require a later cross-cutting refactor."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#simple-design-heuristics", summary = "Requires minimal entities and repeats in self-correction that premature abstractions should be inlined until patterns emerge.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.const-metadata-for-stable-values"
+title = "Mark stable compile-time values as constants when needed"
+category = "design"
+tags = ["clojure", "performance", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.82
+capability = "Ability to avoid repeated Var lookup for values whose identity is intentionally fixed"
+threat = "Treating stable hot-path values as ordinary dynamic Vars introduces unnecessary indirection"
+expectation = "Small lookup costs may become material in measured frequently executed code"
+strategy = "Apply const metadata selectively to truly stable values where performance analysis warrants inlining"
+evidence = [{ type = "review", description = "Each const-marked Var is immutable by contract and has a documented performance reason for compile-time inlining", required = true }, { type = "benchmark", description = "A benchmark demonstrates that constant inlining contributes to the required hot-path target", required = true }]
+tradeoff = "Inlining can leave dependent namespaces using stale values until recompilation and removes runtime redefinition flexibility"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#6-performance-considerations", summary = "The performance checklist explicitly asks for const metadata where needed.", confidence = 1.0 }]

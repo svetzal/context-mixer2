@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-data-structures-by-shape"
+title = "Choose data structures by shape"
+category = "design"
+tags = ["elixir", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Data shape and access expectations are apparent and enforced by the chosen representation."
+threat = "Generic containers hide invariants and invite invalid access patterns as data evolves."
+expectation = "Stable domain records, dynamic key-value data, and optional call configuration will evolve differently."
+strategy = "Use structs for known shapes, maps for dynamic data, and keyword lists for options."
+evidence = [{ type = "static_review", description = "Known domain entities are structs, dynamic records are maps, and optional call configuration uses keyword lists.", required = true }]
+tradeoff = "Explicit structs and conversion at boundaries add boilerplate compared with using maps everywhere."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#core-language-patterns", summary = "Assigns structs, maps, and keyword lists distinct roles according to data shape and use.", confidence = 1.0 }]

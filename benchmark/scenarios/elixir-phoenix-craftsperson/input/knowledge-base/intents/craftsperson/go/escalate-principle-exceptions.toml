@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-principle-exceptions"
+title = "Make exceptions to design heuristics explicit"
+category = "collaboration"
+tags = ["go", "error-handling", "decision-making", "escalation", "tradeoffs"]
+relations = [
+  { type = "specializes", target = "craftsperson/escalate-consequential-tradeoffs" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The team can deliberately accept a local design exception without silently weakening shared principles."
+threat = "Unilateral exceptions become unexplained precedent and erode the reasoning behind the design baseline."
+expectation = "Real constraints will occasionally justify violating otherwise useful simple-design heuristics."
+strategy = "Consult the user before a deliberate heuristic violation and explain the reason and tradeoff."
+evidence = [{ type = "decision_record", description = "Each intentional heuristic exception records the affected rule, constraint, user agreement, and accepted downside.", required = true }]
+tradeoff = "Escalation adds coordination cost and can over-formalize small local judgments."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#simple-design-heuristics-in-priority-order", summary = "Calls the heuristics guidance rather than iron laws and requires user consultation when breaking them.", confidence = 1.0 }]

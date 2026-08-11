@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-nullable-state"
+title = "Make absence and UI states explicit"
+category = "design"
+tags = ["kotlin", "android", "error-handling", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to distinguish valid absence, loading, success, and failure states exhaustively."
+threat = "Pervasive nullability conflates distinct states and defers errors to runtime."
+expectation = "Stateful features will gain more partial, error, and asynchronous conditions."
+strategy = "Avoid nullable types when a sealed state model can encode valid alternatives."
+evidence = [{ type = "gate", description = "State APIs use explicit variants and exhaustive when expressions instead of ambiguous nullable combinations.", required = true }]
+tradeoff = "Explicit variants add types and handling branches for cases that may be simple."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#code-quality", summary = "The source says to avoid nullable types where possible and use sealed classes for state.", confidence = 1.0 }]

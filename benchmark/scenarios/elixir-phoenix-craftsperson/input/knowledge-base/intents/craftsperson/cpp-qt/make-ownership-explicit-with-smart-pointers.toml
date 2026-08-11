@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-ownership-explicit-with-smart-pointers"
+title = "Make heap ownership explicit"
+category = "reliability"
+tags = ["cpp", "qt", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Readers and tools can identify owners."
+threat = "Raw owning pointers obscure transfer and cleanup."
+expectation = "Ownership paths will evolve."
+strategy = "Use make_unique or make_shared, never raw owning new/delete."
+evidence = [{ type = "gate", description = "No raw new/delete expresses non-Qt ownership.", required = true }]
+tradeoff = "Smart pointers do not prevent cycles."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

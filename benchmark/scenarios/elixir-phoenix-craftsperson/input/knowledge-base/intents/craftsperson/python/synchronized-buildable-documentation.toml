@@ -1,0 +1,17 @@
+id = "guidelines.intent.synchronized-buildable-documentation"
+title = "Keep documentation buildable and synchronized with behavior"
+category = "documentation"
+tags = ["python", "documentation", "build-and-delivery", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Users and maintainers can rely on documentation and examples as accurate guides to the current system."
+threat = "Implementation changes leave examples, docstrings, and generated documentation stale or broken."
+expectation = "Public and internal behavior will change more frequently than documentation is manually revisited."
+strategy = "Review docs and docstrings with each change, update examples to current behavior, and verify the MkDocs build."
+evidence = [{ type = "gate", description = "`mkdocs build` succeeds and scoped review confirms changed APIs have matching examples and documented contracts.", required = true }]
+tradeoff = "Documentation synchronization adds work to every behavior change and can delay completion of otherwise working code."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#quality-assurance-process", summary = "The source requires reviewing docs, updating docstrings and examples, and building MkDocs before completion.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-version-appropriate-layouts"
+title = "Preserve version-appropriate Phoenix layouts"
+category = "design"
+tags = ["elixir", "phoenix", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Pages receive the application's shared shell, flash rendering, and request context under the installed Phoenix version."
+threat = "Applying Phoenix 1.8 layout conventions to 1.7 or vice versa duplicates wrappers, loses flash output, or breaks rendering."
+expectation = "Projects will remain on different Phoenix versions while guidance increasingly targets 1.8."
+strategy = "Keep the established root/app layout flow on 1.7 and use the Layouts.app function-component boundary with centralized flash rendering on 1.8."
+evidence = [{ type = "render_test", description = "Under the project's declared Phoenix version, representative pages render one application shell and flash messages through the designated layout module.", required = true }]
+tradeoff = "Version-aware conventions complicate shared guidance and defer newer layout patterns in older applications."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#phoenix-17-vs-18-compatibility", summary = "Distinguishes the 1.7 root/app layout approach from Phoenix 1.8 function-component layouts and centralized flash behavior.", confidence = 1.0 }]

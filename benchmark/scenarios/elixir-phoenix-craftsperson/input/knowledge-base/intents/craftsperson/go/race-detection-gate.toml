@@ -1,0 +1,17 @@
+id = "guidelines.intent.race-detection-gate"
+title = "Gate concurrent code on dynamic race detection"
+category = "quality"
+tags = ["go", "concurrency", "testing", "dependencies", "persistence", "test-gate"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Memory accesses exercised by tests remain free of unsynchronized data races."
+threat = "Timing-dependent races can corrupt state while evading normal deterministic test runs."
+expectation = "The codebase will use goroutines and shared runtime state under varied scheduling."
+strategy = "Run the complete Go test suite with the race detector before completion."
+evidence = [{ type = "gate", description = "go test -race ./... exits successfully with no race reports.", required = true }]
+tradeoff = "Race-enabled tests are substantially slower and only detect races on executed paths."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#concurrency-patterns", summary = "Requires tests to run with the race detector.", confidence = 1.0 }]

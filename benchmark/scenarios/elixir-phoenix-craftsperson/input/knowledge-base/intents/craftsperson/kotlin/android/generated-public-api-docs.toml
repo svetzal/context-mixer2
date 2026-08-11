@@ -1,0 +1,17 @@
+id = "guidelines.intent.generated-public-api-docs"
+title = "Keep public APIs discoverable and usable"
+category = "documentation"
+tags = ["kotlin", "android", "documentation", "dependencies", "error-handling", "public-api"]
+relations = [
+  { type = "specializes", target = "craftsperson/document-public-contracts" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for module consumers to understand public contracts and apply them correctly."
+threat = "Undocumented signatures omit lifecycle, failure, and usage semantics, increasing misuse."
+expectation = "Public APIs and their consumers will multiply across modules."
+strategy = "Write KDoc with usage examples for every public API and generate Dokka documentation."
+evidence = [{ type = "gate", description = "./gradlew dokkaHtml succeeds and API review finds KDoc and a usable example for each public declaration.", required = true }]
+tradeoff = "Documentation generation and examples add maintenance and can drift from behavior."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#documentation-standards", summary = "The source requires Dokka generation, KDoc for all public APIs, and usage examples.", confidence = 1.0 }]

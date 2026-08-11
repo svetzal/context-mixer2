@@ -1,0 +1,17 @@
+id = "guidelines.intent.public-api-internal-separation"
+title = "Separate supported public APIs from internal helpers"
+category = "refactoring"
+tags = ["clojure", "concurrency", "dependencies", "behavior-preservation", "small-steps", "test-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-behavior-during-refactoring" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to refactor implementation details without breaking consumers"
+threat = "Unmarked helpers become accidental public contracts that external callers depend on"
+expectation = "Consumers and maintainers will infer support commitments from accessible vars"
+strategy = "Define a clear public surface and mark or place internal helpers so they are not mistaken for supported APIs"
+evidence = [{ type = "review", description = "Every public var in a changed namespace is intentionally supported; implementation helpers are private or reside in an explicitly internal namespace", required = true }]
+tradeoff = "A curated API can require forwarding functions or namespace indirection and limits opportunistic reuse of internals"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#4-namespace-organization", summary = "Namespace organization explicitly separates the public API from internal helpers.", confidence = 1.0 }]

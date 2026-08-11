@@ -1,0 +1,17 @@
+id = "guidelines.intent.drive-behavior-with-red-green-refactor"
+title = "Drive new behavior through red, green, refactor"
+category = "testing"
+tags = ["ruby", "concurrency", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to demonstrate that new production code is necessary and behaviorally correct"
+threat = "Implementation-first work can produce unverified behavior and tests that merely ratify the code"
+expectation = "New features will continually add cases whose intended behavior must be made explicit"
+strategy = "Write a failing behavior spec, implement the simplest passing solution, then refactor under green tests"
+evidence = [{ type = "trace", description = "Development evidence shows the new spec failing for the intended reason before the implementation and passing afterward", required = true }]
+tradeoff = "Strict test-first cycles add ceremony and can be awkward for exploratory or integration-heavy work"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#when-implementing-features", summary = "Feature implementation is explicitly structured as failing spec, simplest pass, then refactor.", confidence = 1.0 }]

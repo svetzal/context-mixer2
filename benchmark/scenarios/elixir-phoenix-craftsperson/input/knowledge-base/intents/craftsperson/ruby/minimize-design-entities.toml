@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimize-design-entities"
+title = "Use the fewest design entities the behavior needs"
+category = "design"
+tags = ["ruby", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to navigate and modify a design without unnecessary conceptual overhead"
+threat = "Unneeded classes, modules, mixins, and indirection multiply the entities maintainers must understand"
+expectation = "Incremental feature work tends to accumulate abstractions faster than it removes them"
+strategy = "Remove entities and indirection that do not carry a meaningful responsibility"
+evidence = [{ type = "review", description = "Every introduced class, module, mixin, or delegation layer has a distinct responsibility that cannot be expressed more simply", required = true }]
+tradeoff = "A minimal design may defer abstractions that become useful after later requirements emerge"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#simple-design-heuristics-in-priority-order", summary = "The fourth heuristic calls for removing unnecessary indirection and design entities.", confidence = 1.0 }]

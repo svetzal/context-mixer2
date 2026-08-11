@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-invalid-states-unrepresentable"
+title = "Make invalid domain states unrepresentable"
+category = "design"
+tags = ["swift", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Domain invariants are preserved whenever values are constructed and passed through the system."
+threat = "Primitive or weakly constrained representations allow invalid combinations to reach runtime behavior."
+expectation = "Domain models will gain states and call sites, making scattered validation incomplete and difficult to maintain."
+strategy = "Use Swift's type system, constrained initializers, and exhaustive enums to encode valid states and transitions."
+evidence = [{ type = "type_check", description = "Representative invalid domain combinations fail to compile or cannot be created through the public initializer surface.", required = true }]
+tradeoff = "Richer types require more declarations, conversion at boundaries, and migration when domain rules change."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#swift-language-mastery", summary = "Directs engineers to leverage Swift's type system so invalid states cannot be represented.", confidence = 1.0 }]

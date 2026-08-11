@@ -1,0 +1,17 @@
+id = "guidelines.intent.compose-over-inheritance"
+title = "Compose behavior instead of extending inheritance trees"
+category = "design"
+tags = ["csharp", "dependencies", "build-and-delivery", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Behavior can vary in focused parts without coupling every variant to a shared class hierarchy."
+threat = "Deep inheritance spreads base-class assumptions and makes changes affect distant subclasses."
+expectation = "New behavioral combinations will emerge that do not fit a single stable taxonomy."
+strategy = "Build behavior from small focused collaborators and dependency injection instead of deep inheritance hierarchies."
+evidence = [{ type = "design_review", description = "Behavioral variation is implemented through composed collaborators, and inheritance is shallow and justified by a true subtype relationship.", required = true }]
+tradeoff = "Composition introduces more objects and wiring and can make the execution path less immediately visible."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#composition-over-inheritance", summary = "Favors small focused types and dependency-injected composition while rejecting deep inheritance hierarchies.", confidence = 1.0 }]

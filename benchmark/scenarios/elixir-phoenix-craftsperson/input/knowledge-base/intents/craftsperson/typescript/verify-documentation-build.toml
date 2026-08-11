@@ -1,0 +1,17 @@
+id = "guidelines.intent.verify-documentation-build"
+title = "Require the documentation site to build"
+category = "quality"
+tags = ["typescript", "documentation", "build-and-delivery", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to publish usable project documentation after code changes"
+threat = "Broken links, syntax, imports, or site configuration make documentation undeployable"
+expectation = "Documentation content and tooling will evolve alongside implementation"
+strategy = "Build the documentation site as a completion gate"
+evidence = [{ type = "gate", description = "The repository's documentation build command exits successfully with the changed content", required = true }]
+tradeoff = "A docs build increases local and CI duration and may fail due to unrelated documentation tooling"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "The documentation sync step requires verifying that docs build successfully.", confidence = 1.0 }]

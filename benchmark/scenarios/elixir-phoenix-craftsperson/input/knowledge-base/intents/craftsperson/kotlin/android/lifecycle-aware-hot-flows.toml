@@ -1,0 +1,17 @@
+id = "guidelines.intent.lifecycle-aware-hot-flows"
+title = "Expose lifecycle-aware observable UI state"
+category = "reliability"
+tags = ["kotlin", "android", "persistence", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability for UI collectors to receive current state without keeping upstream work active unnecessarily."
+threat = "Legacy observable types or eagerly active streams waste resources and behave inconsistently across collector lifecycles."
+expectation = "Compose screens will enter and leave observation frequently."
+strategy = "Prefer StateFlow or SharedFlow and convert UI state with stateIn using SharingStarted.WhileSubscribed(5000)."
+evidence = [{ type = "gate", description = "UI-facing streams are StateFlow or SharedFlow and stateIn configurations stop upstream work after the prescribed subscriber timeout.", required = true }]
+tradeoff = "A fixed five-second grace period may retain work too long or restart it too often for unusual screens."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#coroutines--flow", summary = "The source prefers StateFlow/SharedFlow and prescribes stateIn with WhileSubscribed(5000) for UI state.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.flow-only-for-asynchronous-streams"
+title = "Use Flow only when stream semantics are asynchronous"
+category = "reliability"
+tags = ["kotlin", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to represent lazy data processing with the simplest abstraction that preserves required timing and cancellation behavior."
+threat = "Using Flow for synchronous iteration adds suspension complexity, while Sequence cannot express asynchronous backpressure and cancellation."
+expectation = "Developers will face both synchronous lazy collections and asynchronous data streams."
+strategy = "Choose Flow for asynchronous streams needing backpressure or cancellation and Sequence for synchronous lazy evaluation."
+evidence = [{ type = "review", description = "Each Flow-producing API has an asynchronous, backpressure, or cancellation requirement; purely synchronous lazy pipelines use Sequence.", required = true }]
+tradeoff = "Choosing different abstractions creates conversion boundaries when a pipeline later changes between synchronous and asynchronous behavior."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#when-to-use-flow-vs-sequences", summary = "The source distinguishes Flow from Sequence by async, backpressure, cancellation, and synchronous lazy semantics.", confidence = 1.0 }]

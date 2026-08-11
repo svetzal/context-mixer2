@@ -1,0 +1,17 @@
+id = "guidelines.intent.kotlin-edge-case-regression-tests"
+title = "Exercise Kotlin behavior at input boundaries"
+category = "testing"
+tags = ["kotlin", "testing", "error-handling", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to preserve correct behavior for empty, absent, and boundary-valued inputs."
+threat = "Happy-path examples leave common edge failures undiscovered."
+expectation = "Production inputs will include empty collections, null values, and values at domain limits."
+strategy = "Add explicit tests for empty collections, null values, and relevant boundary conditions."
+evidence = [{ type = "test", description = "Each input-bearing behavior has representative empty, absent where nullable, minimum, maximum, and just-outside-boundary cases as applicable.", required = true }]
+tradeoff = "Edge-case matrices increase suite size and can become repetitive for heavily composed APIs."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#error-prevention", summary = "The source explicitly requires tests for empty collections, null values, and boundary conditions.", confidence = 1.0 }]

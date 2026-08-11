@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-language-and-ecosystem-idioms"
+title = "Use language and ecosystem idioms deliberately"
+category = "design"
+tags = ["idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "related-to", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Code communicates naturally to maintainers who know its language and ecosystem."
+threat = "Generic or transplanted patterns obscure intent and work against the language's semantics, tooling, and community expectations."
+expectation = "Each language and framework will provide distinctive constructs whose appropriate use cannot be captured by language-neutral design advice alone."
+strategy = "Prefer current, well-understood language and ecosystem idioms when they clarify intent, while requiring a concrete reason for surprising or unusually clever constructs."
+evidence = [{ type = "review", description = "Language-specific constructs follow current ecosystem practice and any deliberate departure has an explicit rationale.", required = true }]
+tradeoff = "Idiomatic code can be less familiar to newcomers and ecosystem conventions can change over time."
+scope = { project = "guidelines", paths = ["plugins"] }
+sources = [{ type = "synthesis", ref = "intents", summary = "Generalizes recurring language-idiom guidance across the craftsperson inventories.", confidence = 0.97 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.readable-test-specifications"
+title = "Make tests readable behavioral specifications"
+category = "testing"
+tags = ["clojure", "testing", "error-handling", "readability", "executable-specification", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-tests-readable-specifications" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability for maintainers to infer intended behavior and diagnose failures from the test suite"
+threat = "Opaque names and overcomplicated fixtures conceal what a failure means"
+expectation = "Tests will outlive their original authors and become a primary source of contract knowledge"
+strategy = "Use focused fixtures, descriptive test and testing names, and direct expected-value assertions"
+evidence = [{ type = "review", description = "Each changed test name and nested testing label state the behavior or condition being specified, and a failure identifies the violated contract", required = true }]
+tradeoff = "Descriptive tests are more verbose and may repeat context across cases"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#5-testing", summary = "Tests are required to be readable and well named.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#unit-tests-structure", summary = "The sample organizes direct assertions under descriptive testing labels.", confidence = 0.9 }]

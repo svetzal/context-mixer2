@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-gateways-logicless"
+title = "Keep gateways as logicless adapters"
+category = "testing"
+tags = ["python", "uv", "testing", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business policy remains independently testable and is not trapped inside infrastructure wrappers."
+threat = "Custom decisions accumulate in gateway classes where tests require real or heavily simulated I/O."
+expectation = "External adapters will be replaced and core policy will need faster, deterministic tests."
+strategy = "Keep gateway classes as thin wrappers around libraries and move custom logic into the functional core."
+evidence = [{ type = "architecture_review", description = "Gateway methods contain only translation and delegation; business decisions are implemented and tested in core modules.", required = true }]
+tradeoff = "Moving logic inward can require additional data-transfer types and orchestration between core and adapter."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#functional-core-imperative-shell", summary = "Says gateway classes should be thin wrappers with no logic to test.", confidence = 1.0 }]

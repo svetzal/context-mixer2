@@ -1,0 +1,17 @@
+id = "guidelines.intent.resolve-consequential-uncertainty-with-the-user"
+title = "Resolve consequential uncertainty with the user"
+category = "testing"
+tags = ["swift", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Implementation and architectural choices remain aligned with actual user intent."
+threat = "Guessing through ambiguity, uncovered edge cases, or competing designs can commit the project to the wrong behavior."
+expectation = "Requirements will be incomplete and significant decisions will sometimes lack a uniquely correct technical answer."
+strategy = "Ask for clarification, present valid options and tradeoffs, and obtain confirmation before breaking design heuristics or making significant architectural choices."
+evidence = [{ type = "decision_record", description = "A consequential ambiguous requirement or design fork has a recorded user choice, including options and tradeoffs, before implementation proceeds.", required = true }]
+tradeoff = "Waiting for clarification interrupts flow and can delay decisions the engineer could have made reversibly."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#when-to-seek-clarification", summary = "Forbids guessing and requires user consultation for ambiguity, multiple valid approaches, uncovered edge cases, heuristic conflicts, and significant architecture changes.", confidence = 1.0 }]

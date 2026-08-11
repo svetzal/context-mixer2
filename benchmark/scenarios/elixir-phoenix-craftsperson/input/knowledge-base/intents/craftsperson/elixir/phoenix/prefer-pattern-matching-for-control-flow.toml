@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-pattern-matching-for-control-flow"
+title = "Prefer pattern matching for control flow"
+category = "design"
+tags = ["elixir", "phoenix", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Function variants and data-shape assumptions remain explicit at the point of dispatch."
+threat = "Nested conditionals obscure which shapes are accepted and which branch handles each case."
+expectation = "Domain inputs will gain variants and failure shapes over time."
+strategy = "Match in function heads and use head-pattern base cases for recursion before reaching for conditional bodies."
+evidence = [{ type = "review_observation", description = "Variant dispatch and recursive base cases are visible in function heads unless a conditional has a documented clarity advantage.", required = true }]
+tradeoff = "Multiple clauses can scatter a function's logic and unfamiliar readers may find pattern-heavy dispatch less obvious."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#core-language-patterns", summary = "Prefers matching over conditionals and function-head clauses for dispatch and recursion.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.mutate-dependencies-through-uv"
+title = "Mutate dependency declarations through uv"
+category = "delivery"
+tags = ["python", "uv", "dependencies", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Dependency metadata, lock state, and environment state remain synchronized after additions and removals."
+threat = "Hand edits update one dependency representation while leaving the lockfile or environment stale."
+expectation = "Dependencies will be added, removed, imported, and upgraded throughout the project lifecycle."
+strategy = "Use uv add, uv remove, and uv lock upgrade operations instead of manually editing dependency declarations."
+evidence = [{ type = "change_review", description = "Dependency changes are accompanied by the uv-generated metadata and lockfile updates expected from the corresponding uv command.", required = true }]
+tradeoff = "Some advanced manifest edits are less direct through CLI commands and uv may rewrite more lockfile content than a hand edit."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#dependency-management", summary = "Requires uv add and uv remove for dependencies and forbids hand-editing pyproject.toml for them.", confidence = 1.0 }]

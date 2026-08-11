@@ -1,0 +1,17 @@
+id = "guidelines.intent.distinguish-empty-maps-explicitly"
+title = "Distinguish empty maps explicitly"
+category = "design"
+tags = ["elixir", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Logic that requires an empty map rejects non-empty maps reliably."
+threat = "The pattern %{} is mistaken for an empty-map match even though it accepts every map."
+expectation = "Map-shaped inputs will gain optional and dynamic keys over time."
+strategy = "Use an is_map guard with map_size(map) == 0 when emptiness is the actual invariant."
+evidence = [{ type = "test", description = "The empty-map branch accepts %{} and a non-empty map test proves that branch is not selected.", required = true }]
+tradeoff = "The explicit guard is more verbose than a visually suggestive pattern."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#core-language-patterns", summary = "Warns that %{} matches any map and prescribes map_size/1 for a truly empty map.", confidence = 1.0 }]

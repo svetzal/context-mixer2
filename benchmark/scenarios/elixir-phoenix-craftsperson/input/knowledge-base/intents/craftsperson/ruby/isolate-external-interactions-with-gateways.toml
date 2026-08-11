@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-external-interactions-with-gateways"
+title = "Put every external interaction behind a gateway"
+category = "architecture"
+tags = ["ruby", "persistence", "gateways", "external-systems", "dependency-inversion"]
+relations = [
+  { type = "specializes", target = "craftsperson/put-gateways-at-external-boundaries" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to change or substitute external systems without spreading integration details through domain code"
+threat = "Direct database, API, filesystem, and HTTP access couples business behavior to volatile I/O libraries"
+expectation = "External services, libraries, and infrastructure will change independently of domain rules"
+strategy = "Route all external interactions through explicit gateway classes"
+evidence = [{ type = "architecture", description = "Dependency inspection finds database, API, filesystem, and HTTP library calls only inside named gateway classes", required = true }]
+tradeoff = "Gateway classes add interfaces and files around operations that may initially appear trivial"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "The Gateway Pattern directs every external interaction through gateway classes.", confidence = 1.0 }]

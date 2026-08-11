@@ -1,0 +1,17 @@
+id = "guidelines.intent.incremental-layered-delivery"
+title = "Preserve testable progress through architectural layers"
+category = "design"
+tags = ["kotlin", "android", "testing", "error-handling", "build-and-delivery", "idioms"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to validate feature behavior in small steps before full UI integration."
+threat = "Building all layers at once delays feedback and makes failures hard to localize."
+expectation = "Features will span data, domain, and presentation responsibilities."
+strategy = "Implement incrementally through data, domain, and presentation layers with testable boundaries at each step."
+evidence = [{ type = "gate", description = "Change history and tests show independently verifiable layer increments rather than one inseparable end-to-end addition.", required = true }]
+tradeoff = "Layer-by-layer work can create temporary scaffolding and defer visible UI progress."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#problem-solving-approach", summary = "The source prescribes incremental implementation in testable data, domain, and presentation layers.", confidence = 1.0 }]

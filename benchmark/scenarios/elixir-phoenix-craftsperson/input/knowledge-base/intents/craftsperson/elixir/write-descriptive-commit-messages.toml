@@ -1,0 +1,17 @@
+id = "guidelines.intent.write-descriptive-commit-messages"
+title = "Write descriptive commit messages"
+category = "delivery"
+tags = ["elixir", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Future maintainers can understand why a change entered the history."
+threat = "Generic commit subjects erase intent and turn regression archaeology into diff reconstruction."
+expectation = "Operational questions and regressions will be investigated after the original context is gone."
+strategy = "Describe the concrete behavior or purpose introduced by each commit."
+evidence = [{ type = "history_review", description = "Each commit subject names the behavior or purpose of the change without relying on ticket context.", required = true }]
+tradeoff = "Crafting precise history takes time and imperfectly summarized commits may still require reading the diff."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#workflow--collaboration", summary = "Requires descriptive commit messages and gives a behavior-focused example.", confidence = 1.0 }]

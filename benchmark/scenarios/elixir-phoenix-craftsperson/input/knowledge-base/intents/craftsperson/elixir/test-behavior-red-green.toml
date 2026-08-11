@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-behavior-red-green"
+title = "Clarify requirements through red-green tests"
+category = "testing"
+tags = ["elixir", "concurrency", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A requested behavior is made concrete before implementation choices obscure the requirement."
+threat = "Implementation begins from assumptions that are never demonstrated as a failing observable example."
+expectation = "Requirements will be incomplete and implementation ideas will arrive before edge behavior is settled."
+strategy = "Write a failing test first and make it pass with the simplest implementation before refactoring."
+evidence = [{ type = "workflow_observation", description = "A new behavior is represented by a test that fails without the implementation and passes after the smallest enabling change.", required = true }]
+tradeoff = "Test-first work adds an up-front design step and can feel slower for exploratory changes."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Prescribes tests-first red-green development with the simplest passing implementation.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.base-change-branches-on-main"
+title = "Base change branches on main"
+category = "delivery"
+tags = ["rust", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Isolated work begins from the project's current integration baseline."
+threat = "A branch starts from an obsolete or unrelated line and accumulates hidden divergence before integration."
+expectation = "Main will continue changing while multiple pieces of work are developed independently."
+strategy = "Create work branches from main and refresh their relationship to the integration baseline before merging."
+evidence = [{ type = "version_control_check", description = "The branch merge base is an appropriate main commit and integration does not include unrelated ancestral changes.", required = true }]
+tradeoff = "Keeping a branch current with main can require rebasing or conflict resolution during active development."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#workflow--collaboration", summary = "Requires branching from main for all work before green-CI integration.", confidence = 1.0 }]

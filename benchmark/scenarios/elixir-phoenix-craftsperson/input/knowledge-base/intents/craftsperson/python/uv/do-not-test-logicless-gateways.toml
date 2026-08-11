@@ -1,0 +1,17 @@
+id = "guidelines.intent.do-not-test-logicless-gateways"
+title = "Do not unit-test logicless gateways"
+category = "testing"
+tags = ["python", "uv", "testing", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The test suite concentrates on project-owned behavior rather than duplicating third-party library tests."
+threat = "Tests for pass-through adapters become brittle mirrors of vendor calls without proving domain behavior."
+expectation = "Gateway libraries and call signatures will evolve independently from the core policy."
+strategy = "Omit unit tests for pure I/O-isolating gateways; if a gateway contains custom logic, move that logic to the core before testing it."
+evidence = [{ type = "test_review", description = "Gateway tests exist only for documented project-owned behavior, and logicless delegation is not mocked call-for-call.", required = true }]
+tradeoff = "Adapter wiring defects may be discovered only by integration tests or runtime checks."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#tests-are-the-executable-spec", summary = "Directs against testing I/O-isolating gateways unless they contain custom logic, which should move to the core.", confidence = 1.0 }]

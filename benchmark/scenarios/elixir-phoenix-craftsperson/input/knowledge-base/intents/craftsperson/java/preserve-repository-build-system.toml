@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-repository-build-system"
+title = "Preserve the repository's established build system"
+category = "quality"
+tags = ["java", "documentation", "build-and-delivery", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Contributors can build and verify Java projects through one familiar, repository-supported toolchain."
+threat = "Introducing a competing build system fragments automation, documentation, and contributor knowledge."
+expectation = "Work will span both Maven and Gradle repositories with established conventions and CI integrations."
+strategy = "Default new Java builds to Maven, but continue using Gradle when the repository clearly establishes it."
+evidence = [{ type = "manifest", description = "Changes use the existing Maven or Gradle wrapper and do not introduce a second build system without an explicit migration decision.", required = true }]
+tradeoff = "Preserving the incumbent build can retain limitations that a migration might solve."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#build-and-dependency-management", summary = "Defaults to Maven unless the existing repository clearly uses Gradle.", confidence = 1.0 }]

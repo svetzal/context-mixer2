@@ -1,0 +1,17 @@
+id = "guidelines.intent.account-for-async-stream-overprocessing"
+title = "Account for async-stream overprocessing"
+category = "reliability"
+tags = ["elixir", "concurrency", "backpressure", "resource-bounds"]
+relations = [
+  { type = "specializes", target = "craftsperson/bound-concurrent-work" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "A bounded request for concurrent results does not silently violate side-effect or work-budget expectations."
+threat = "Enum.take/2 stops consuming results after concurrent tasks have already begun extra work."
+expectation = "Concurrent streams will process side-effectful or costly items where executing more than requested matters."
+strategy = "Design async-stream consumption with in-flight overprocessing in mind and avoid take-based limits when exact execution counts are required."
+evidence = [{ type = "concurrency_test", description = "A side-effect-counting test proves the chosen design never exceeds its documented execution allowance when only a prefix of results is requested.", required = true }]
+tradeoff = "Exact work limits may require lower concurrency, explicit cancellation, or a custom scheduler that reduces throughput."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#common-mistakes", summary = "Warns that Enum.take/2 on async streams can allow extra concurrent items to be processed.", confidence = 1.0 }]

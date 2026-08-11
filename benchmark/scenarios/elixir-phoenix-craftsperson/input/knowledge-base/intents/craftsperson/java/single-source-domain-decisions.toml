@@ -1,0 +1,17 @@
+id = "guidelines.intent.single-source-domain-decisions"
+title = "Single-source each domain decision"
+category = "design"
+tags = ["java", "security", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "One business-rule change can be made in one authoritative place."
+threat = "The same knowledge encoded in several locations drifts and requires synchronized edits."
+expectation = "Domain policy will change and apparently identical code fragments will evolve for different reasons."
+strategy = "Remove duplication of knowledge and extract a shared abstraction only when multiple sites encode the same decision."
+evidence = [{ type = "change_review", description = "A representative business-rule change touches one authoritative implementation, and identical code is retained when it represents independent decisions.", required = true }]
+tradeoff = "Centralizing a decision introduces indirection and can accidentally couple code that only looks similar."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Defines knowledge duplication as multiple places that must change for the same reason and distinguishes it from merely identical code.", confidence = 1.0 }]

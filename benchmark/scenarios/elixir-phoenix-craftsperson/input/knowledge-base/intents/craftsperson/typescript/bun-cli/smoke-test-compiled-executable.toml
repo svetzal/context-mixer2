@@ -1,0 +1,17 @@
+id = "guidelines.intent.smoke-test-compiled-executable"
+title = "Smoke-test the compiled executable"
+category = "design"
+tags = ["typescript", "bun", "cli", "testing", "build-and-delivery", "idioms"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The artifact delivered to users can start and execute as a standalone program."
+threat = "Source-level tests can pass while bundling, compilation, permissions, or runtime initialization leave the distributable unusable."
+expectation = "Users will run compiled Bun binaries rather than the development source tree."
+strategy = "Build the standalone executable as a completion gate and run a minimal invocation of that exact artifact."
+evidence = [{ type = "build_smoke", description = "The documented `bun build ... --compile` command succeeds and the resulting binary starts without crashing under a minimal help or version invocation.", required = true }]
+tradeoff = "Artifact builds and smoke runs lengthen feedback cycles and require platform-specific build infrastructure."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#quality-assurance-process", summary = "Makes building the executable and verifying that the compiled binary starts without crashing mandatory.", confidence = 1.0 }]

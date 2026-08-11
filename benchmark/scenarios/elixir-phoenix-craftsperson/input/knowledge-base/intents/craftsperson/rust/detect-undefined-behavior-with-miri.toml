@@ -1,0 +1,17 @@
+id = "guidelines.intent.detect-undefined-behavior-with-miri"
+title = "Detect undefined behavior with Miri"
+category = "quality"
+tags = ["rust", "testing", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Unsafe and FFI code can be exercised against Rust's interpreter-level validity rules."
+threat = "Undefined behavior remains latent because ordinary tests observe only successful native executions."
+expectation = "Low-level code will rely on aliasing, initialization, pointer, and provenance assumptions that the type system cannot fully enforce."
+strategy = "Run applicable tests under nightly Miri for unsafe, FFI, or otherwise memory-model-sensitive code."
+evidence = [{ type = "miri_gate", description = "cargo +nightly miri test passes for the supported high-risk test surface, with exclusions documented.", required = true }]
+tradeoff = "Miri is slow, requires nightly, does not support every platform interaction, and explores only executed paths."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#optional-but-recommended-for-unsafeffi-or-security-critical-code", summary = "Recommends Miri to detect undefined behavior in unsafe code.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralized-gradle-version-catalog"
+title = "Centralize dependency coordinates in a Gradle version catalog"
+category = "delivery"
+tags = ["kotlin", "gradle", "security", "testing", "dependencies", "builds"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to inspect and update shared dependency versions consistently across modules."
+threat = "Repeated literal versions drift and make security or compatibility upgrades incomplete."
+expectation = "The project will add modules and related library families such as Kotlin, Ktor, and Kotest."
+strategy = "Declare and group dependency versions in gradle/libs.versions.toml and reference shared versions from catalog aliases."
+evidence = [{ type = "static_check", description = "Build scripts contain no duplicated dependency-version literals where a catalog alias or shared versions.ref applies.", required = true }]
+tradeoff = "Catalog indirection makes a dependency declaration less self-contained and adds naming conventions to maintain."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#build-and-dependency-management", summary = "The source requires centralized, grouped versions and shared version references in a Gradle catalog.", confidence = 1.0 }]

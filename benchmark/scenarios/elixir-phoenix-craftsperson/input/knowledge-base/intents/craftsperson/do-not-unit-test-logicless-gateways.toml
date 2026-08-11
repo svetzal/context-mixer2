@@ -1,0 +1,343 @@
+id = "guidelines.intent.do-not-unit-test-logicless-gateways"
+title = "Do not unit-test logicless gateways"
+category = "testing"
+tags = ["gateways", "unit-testing", "test-value"]
+status = "hypothesized"
+confidence = 0.97
+capability = "The test suite spends effort on decisions and integration contracts rather than reproducing trivial forwarding code."
+threat = "Unit tests for mechanical adapters mirror implementation details and create maintenance cost without protecting meaningful behavior."
+expectation = "A well-factored gateway will contain little or no policy of its own."
+strategy = "Test decisions in the core and verify gateway behavior with focused integration or contract tests only where the boundary adds real risk."
+evidence = [{ type = "test_review", description = "Gateway tests cover translation or integration risk, while trivial forwarding wrappers have no mirrored unit tests.", required = true }]
+tradeoff = "A very thin adapter can still contain a wiring defect that is found only by an integration test or production exercise."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#functional-core-imperative-shell", summary = "Directs tests toward logic and away from logicless gateway wrappers.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#functional-core-imperative-shell", summary = "Does not unit-test gateway wrappers that contain no decisions.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#testing-strategy", summary = "Avoids unit tests for logicless gateways.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defn fetch-customer [http-get id]
+  (http-get (str "/customers/" id)))  ; forwarding only, no test
+
+;; effort goes to the decisions:
+(deftest overdue-customer-is-flagged
+  (is (:overdue? (assess {:balance 50 :due "2026-01-01"}))))
+
+;; and one contract test where the boundary carries real risk:
+(deftest ^:integration customer-api-shape
+  (is (= #{:id :name :balance}
+         (set (keys (fetch-customer live-get "42"))))))
+'''
+bad = '''
+(deftest fetch-customer-calls-http
+  ; mirrors a one-line decision-free wrapper: breaks on any
+  ; rename while proving nothing about real integration
+  (with-redefs [client/get (fn [url] {:url url})]
+    (is (= {:url "/customers/42"} (fetch-customer "42")))))
+
+(deftest fetch-customer-uses-str
+  (with-redefs [client/get identity]
+    (is (string? (fetch-customer "42")))))
+'''
+
+[examples.cpp]
+good = '''
+// SqlOrderStore::save forwards to QSqlQuery — no unit test
+// mirrors it. The boundary's real risk (SQL, mapping, schema)
+// is covered once, against an actual database:
+TEST(SqlOrderStoreIT, RoundTripsAnOrder) {
+  auto db = openTempDb();
+  SqlOrderStore store{db};
+  store.save(sampleOrder("A-17"));
+  EXPECT_EQ(store.load("A-17")->id(), "A-17");
+}
+'''
+bad = '''
+TEST(SqlOrderStore, CallsExecWithInsertSql) {
+  MockQuery q;   // mirrors the forwarding code line for line
+  EXPECT_CALL(q, prepare("INSERT INTO orders VALUES (?, ?)"));
+  EXPECT_CALL(q, addBindValue(_)).Times(2);
+  EXPECT_CALL(q, exec()).WillOnce(Return(true));
+  SqlOrderStore{&q}.save(sampleOrder("A-17"));
+}
+// Breaks on any rewording of the SQL, passes even if the
+// schema is wrong — cost without protection.
+'''
+
+[examples.csharp]
+good = '''
+// forwarding wrapper — no unit test mirrors it
+public Task<Order?> Find(Guid id) =>
+    _db.Orders.FindAsync(id).AsTask();
+
+// the boundary risk is covered once, for real
+[Fact]
+public async Task Saved_order_reloads_intact()
+{
+    await using var db = TestDb.Fresh();
+    await new OrderStore(db).Save(Sample.Order);
+    var found = await new OrderStore(db)
+        .Find(Sample.Order.Id);
+    found.Should().BeEquivalentTo(Sample.Order);
+}
+'''
+bad = '''
+[Fact]
+public async Task Find_calls_FindAsync_with_the_id()
+{
+    var db = Substitute.For<IAppDb>();
+    var store = new OrderStore(db);
+
+    await store.Find(Sample.OrderId);
+
+    // restates the one-line wrapper, protects nothing,
+    // and breaks whenever the forwarding call changes
+    await db.Orders.Received(1)
+        .FindAsync(Sample.OrderId);
+}
+'''
+
+[examples.elixir]
+good = '''
+# the trivial forwarder carries no mirrored unit test
+defmodule Users.Gateway do
+  def get_user(id), do: Repo.get(User, id)
+end
+
+# the real boundary risk gets one integration test:
+@tag :integration
+test "get_user/1 loads a persisted user by id" do
+  %{id: id} = insert(:user)
+  assert %User{id: ^id} = Users.Gateway.get_user(id)
+end
+'''
+bad = '''
+test "get_user/1 calls Repo.get with User and the id" do
+  # restates the one-line adapter in mock form; proves
+  # only that the mock was configured as written
+  expect(RepoMock, :get, fn User, 42 -> %User{id: 42} end)
+
+  assert %User{id: 42} = Users.Gateway.get_user(42)
+  verify!(RepoMock)
+end
+'''
+
+[examples.go]
+good = '''
+// the gateway only forwards; its one test targets real
+// integration risk instead of restating the wrapper
+func TestUserGatewayRoundTrip(t *testing.T) {
+	srv := httptest.NewServer(stubUserAPI(t))
+	defer srv.Close()
+
+	g := NewUserGateway(srv.URL)
+	u, err := g.FindUser(context.Background(), "u1")
+	if err != nil || u.ID != "u1" {
+		t.Fatalf("got %+v, %v", u, err)
+	}
+}
+'''
+bad = '''
+// unit test mirrors the one-line wrapper, call for call
+func TestFindUserCallsGet(t *testing.T) {
+	m := new(MockHTTPClient)
+	m.On("Get", "/users/u1").Return(okResponse, nil)
+
+	g := UserGateway{client: m}
+	g.FindUser(context.Background(), "u1")
+
+	m.AssertCalled(t, "Get", "/users/u1") // restates the impl
+	// no defect could be caught here that compiling didn't
+	// already catch, yet every wrapper refactor breaks it
+}
+'''
+
+[examples.java]
+good = '''
+// the trivial forwarding wrapper has no mirrored unit test;
+// the risky translation gets one real integration test
+@Testcontainers
+class OrderGatewayIntegrationTest {
+
+    @Test
+    void persistsAndRehydratesMoneyAsMinorUnits() {
+        gateway.save(orderTotalling("19.99"));
+
+        assertEquals(new BigDecimal("19.99"),
+            gateway.findById(orderId).total());
+    }
+}
+'''
+bad = '''
+// restates the adapter line by line with mocks
+@Test void saveDelegatesToRepository() {
+    var repo = mock(CrudRepository.class);
+    var gateway = new OrderGateway(repo);
+
+    gateway.save(order);
+
+    verify(repo).save(order);  // mirrors the implementation;
+}                              // protects no real behavior
+// breaks on every rename, catches no mapping defect
+'''
+
+[examples.kotlin]
+good = '''
+class HttpUserGateway(val client: HttpClient) : Users {
+    override suspend fun find(id: UserId): UserDto =
+        client.get("/users/${id.value}").body() // forwards only
+}
+// no unit test mirrors that line; the boundary risk is
+// covered once by a contract test against a recorded
+// real server response
+'''
+bad = '''
+@Test fun `find calls client with the right url`() = runTest {
+    val client = mockk<HttpClient>()
+    coEvery { client.get("/users/7") } returns userResponse
+    HttpUserGateway(client).find(UserId(7))
+    // restates the adapter line by line; breaks on every
+    // rename and proves nothing about the real boundary
+    coVerify(exactly = 1) { client.get("/users/7") }
+}
+'''
+
+[examples.python]
+good = '''
+class S3DocumentStore:
+    def save(self, doc: Document) -> None:
+        self._client.put_object(
+            Bucket=self._bucket, Key=doc.id, Body=doc.body)
+
+# no unit test mirrors that forwarding; the real risk is
+# wiring, covered once at the boundary:
+@pytest.mark.integration
+def test_saved_document_round_trips_through_real_bucket():
+    store = S3DocumentStore(localstack_client(), "docs")
+    store.save(Document(id="a", body=b"hi"))
+    assert store.load("a").body == b"hi"
+'''
+bad = '''
+def test_save_calls_put_object():
+    client = Mock()
+    store = S3DocumentStore(client, "docs")
+
+    store.save(Document(id="a", body=b"hi"))
+
+    # restates the forwarding line argument-for-argument;
+    # proves nothing about S3, breaks on any rename
+    client.put_object.assert_called_once_with(
+        Bucket="docs", Key="a", Body=b"hi")
+'''
+
+[examples.ruby]
+good = '''
+class PaymentGateway
+  def charge(amount_cents:, token:)
+    Stripe::Charge.create(amount: amount_cents, source: token)
+  end
+end
+
+# no unit test mirroring the forwarding line; the boundary is
+# covered once by a contract test against Stripe test mode
+it "charges via the test-mode API", :integration do
+  charge = gateway.charge(amount_cents: 500, token: test_token)
+  expect(charge.status).to eq("succeeded")
+end
+'''
+bad = '''
+it "calls Stripe::Charge.create with the right args" do
+  # restates the wrapper line for line
+  expect(Stripe::Charge).to receive(:create)
+    .with(amount: 500, source: "tok_x")
+
+  gateway.charge(amount_cents: 500, token: "tok_x")
+  # proves nothing about Stripe; breaks on any rename
+end
+'''
+
+[examples.rust]
+good = '''
+// forwarding-only gateway: no mirrored unit test
+impl UserStore for PgUserStore {
+    fn find(&self, id: UserId) -> Result<User, StoreError> {
+        self.pool.query_one(FIND_USER, &[&id.0])?.try_into()
+    }
+}
+// the real risk is translation — one contract test covers it
+#[test]
+fn pg_row_maps_uuid_and_email_into_user() {
+    let user = with_test_db(|db| PgUserStore::new(db)
+        .find(seeded_user_id()))
+        .unwrap();
+    assert_eq!(user.email.as_str(), "seed@example.com");
+}
+'''
+bad = '''
+// unit test restates the forwarding line with a mock pool
+#[test]
+fn find_calls_query_one_with_find_user_sql() {
+    let mut pool = MockPool::new();
+    pool.expect_query_one()
+        .with(eq(FIND_USER), eq(params(7)))
+        .times(1)
+        .returning(|_, _| Ok(user_row()));
+    PgUserStore { pool }.find(UserId(7)).unwrap();
+    // mirrors the implementation; protects no behavior and
+    // breaks on any harmless rewrite of the adapter
+}
+'''
+
+[examples.swift]
+good = '''
+// The forwarding wrapper gets no mirrored unit test.
+// The real boundary risk (SQL, row mapping) is covered once
+// by an integration test against an ephemeral database.
+@Test func savedUserRoundTrips() async throws {
+    let store = UserStore(db: try await TestDatabase.ephemeral())
+    try await store.save(User(name: "Ada"))
+
+    let found = try await store.find(name: "Ada")
+    #expect(found?.name == "Ada")
+}
+'''
+bad = '''
+@Test func saveCallsInsert() async throws {
+    let mock = MockDatabase()
+    let store = UserStore(db: mock)
+
+    try await store.save(user)
+
+    // mirrors the one-line wrapper: proves save() calls
+    // insert(), which the code already plainly shows
+    #expect(mock.insertCalls == [user.record])
+}
+'''
+
+[examples.typescript]
+good = '''
+// Thin forwarder — no unit test mirrors it.
+export const saveUser = (u: User): Promise<void> =>
+  db.put("users", u.id, toRow(u));
+
+// The mapping is where the risk lives; test that directly,
+// and cover the real db in one integration test.
+it("serializes tags to a comma-joined column", () => {
+  expect(toRow(aUser({ tags: ["a", "b"] })).tags).toBe("a,b");
+});
+'''
+bad = '''
+// Restates the wrapper line-for-line with mocks; it can
+// only prove the code calls what the code calls.
+it("saveUser calls db.put with the row", async () => {
+  const put = vi.fn().mockResolvedValue(undefined);
+  const db = { put };
+
+  await saveUser(db, someUser);
+
+  expect(put).toHaveBeenCalledWith(
+    "users", someUser.id, toRow(someUser),
+  );
+});
+'''

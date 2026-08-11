@@ -1,0 +1,17 @@
+id = "guidelines.intent.constrain-test-doubles-to-boundaries"
+title = "Mock only owned boundaries"
+category = "testing"
+tags = ["cpp", "qt", "concurrency", "testing", "test-doubles", "boundaries"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Core tests survive library and internal refactors."
+threat = "Mocks of library internals couple tests to unowned details."
+expectation = "Libraries will evolve independently."
+strategy = "Wrap external interactions in owned gateway interfaces and mock only them."
+evidence = [{ type = "gate", description = "Core tests contain no third-party-internal mocks.", required = true }]
+tradeoff = "Gateways can hide integration mismatches."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

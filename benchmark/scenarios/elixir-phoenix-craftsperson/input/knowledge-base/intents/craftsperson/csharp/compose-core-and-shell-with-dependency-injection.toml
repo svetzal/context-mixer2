@@ -1,0 +1,17 @@
+id = "guidelines.intent.compose-core-and-shell-with-dependency-injection"
+title = "Compose core and shell through dependency injection"
+category = "architecture"
+tags = ["csharp", "testing", "dependencies", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Runtime implementations can be selected and replaced without changing domain behavior."
+threat = "Constructing infrastructure dependencies inside business code hard-wires environments and frustrates isolated tests."
+expectation = "Production, test, and future deployment environments will require different implementations of boundary contracts."
+strategy = "Inject boundary contracts and assemble their concrete imperative-shell implementations at the composition root."
+evidence = [{ type = "composition_review", description = "Core services receive boundary contracts from outside, and concrete gateway construction occurs only in the application composition root.", required = true }]
+tradeoff = "Dependency injection adds registration indirection and runtime wiring failures that direct construction avoids."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#functional-core-imperative-shell", summary = "Directs dependency injection to wire imperative shells to functional cores.", confidence = 1.0 }]

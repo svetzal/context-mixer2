@@ -1,0 +1,17 @@
+id = "guidelines.intent.targeted-kotlin-inlining"
+title = "Inline only performance-critical Kotlin abstractions"
+category = "design"
+tags = ["kotlin", "performance", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "Ability to remove meaningful higher-order call overhead without broadly increasing generated code."
+threat = "Hot-path lambda and call overhead can erode performance, while indiscriminate inlining bloats bytecode."
+expectation = "Some abstractions will appear on measured performance-critical paths as the application scales."
+strategy = "Use inline functions selectively for performance-critical code."
+evidence = [{ type = "gate", description = "Each non-trivial inline declaration is justified by profiling or a concrete reified/non-local-control need, and benchmark evidence shows the intended benefit where performance is claimed.", required = true }]
+tradeoff = "Inlining can increase bytecode size, expose implementation details to callers, and complicate debugging and binary compatibility."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#core-identity", summary = "The source reserves inline functions for performance-critical code.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.render-collections-with-comprehensions"
+title = "Render template collections with comprehensions"
+category = "design"
+tags = ["elixir", "phoenix", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Repeated template content participates correctly in HEEx rendering and change tracking."
+threat = "Side-effect enumeration emits no tracked template output or produces confusing rendering behavior."
+expectation = "Dynamic collections will be updated incrementally by LiveView."
+strategy = "Use output-producing for comprehensions rather than Enum.each inside HEEx templates."
+evidence = [{ type = "template_test", description = "Collection tests render one addressable element per item and template code contains no Enum.each used for output.", required = true }]
+tradeoff = "Complex iteration logic must be prepared before rendering or expressed within comprehension constraints."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#collections", summary = "Forbids Enum.each for template content and requires for comprehensions.", confidence = 1.0 }]

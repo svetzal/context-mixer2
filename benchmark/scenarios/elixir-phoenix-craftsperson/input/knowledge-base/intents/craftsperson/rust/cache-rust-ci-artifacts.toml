@@ -1,0 +1,17 @@
+id = "guidelines.intent.cache-rust-ci-artifacts"
+title = "Cache Rust CI dependencies and build artifacts"
+category = "delivery"
+tags = ["rust", "dependencies", "performance", "build-and-delivery", "tooling", "project-management"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Nontrivial Rust projects receive timely CI feedback without rebuilding unchanged dependencies on every run."
+threat = "Repeated registry downloads and full recompilation make quality gates prohibitively slow."
+expectation = "Rust build cost will grow with dependency count, workspace size, and comprehensive gate coverage."
+strategy = "Cache Cargo registry and git sources plus target artifacts keyed by Cargo.lock and toolchain, using sccache or a Rust cache action where effective."
+evidence = [{ type = "ci_observation", description = "CI logs show cache hits for unchanged lockfile and toolchain inputs and materially reduced warm-build duration.", required = true }]
+tradeoff = "Build caches consume storage, require invalidation policy, and can occasionally mask environment-sensitive build issues."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#ci-caching-guidance", summary = "Mandates caching Cargo sources and target artifacts keyed by lockfile and toolchain.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.control-upload-submission-explicitly"
+title = "Control upload submission explicitly"
+category = "reliability"
+tags = ["elixir", "phoenix", "data-integrity", "transactions", "database-constraints"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "The server knows when an upload is complete and can coordinate it with form validation and persistence."
+threat = "Automatic uploads race form submission or persist files before the surrounding operation is accepted."
+expectation = "Forms will combine upload progress, validation errors, cancellation, and retry behavior."
+strategy = "Use manual LiveView uploads rather than auto_upload tied implicitly to form submission."
+evidence = [{ type = "integration_test", description = "Upload tests prove a file is consumed only by the explicit submit path and failed form validation does not orphan a committed upload.", required = true }]
+tradeoff = "Manual upload flows require more event handling and progress-state management."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#file-uploads", summary = "Requires manual uploads and rejects auto_upload with form submission.", confidence = 1.0 }]

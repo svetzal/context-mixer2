@@ -1,0 +1,17 @@
+id = "guidelines.intent.type-custom-hook-results-explicitly"
+title = "Give custom hooks explicit result contracts"
+category = "design"
+tags = ["typescript", "concurrency", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.89
+capability = "Ability for React consumers to rely on a stable, discoverable hook state contract"
+threat = "Purely inferred returns can expose accidental implementation details or drift shape during refactoring"
+expectation = "Custom hooks will evolve their internal state management while many components depend on their public result"
+strategy = "Declare an explicit return type that names each data, loading, and error state exposed by the hook"
+evidence = [{ type = "static-check", description = "Type-checking verifies the hook implementation and all consumers against the declared result shape", required = true }]
+tradeoff = "An explicit return declaration duplicates inferred structure and must be updated when the intentional hook contract changes"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#react-patterns", summary = "The custom-hook example explicitly labels and declares a proper return type containing data, loading, and error.", confidence = 0.95 }]

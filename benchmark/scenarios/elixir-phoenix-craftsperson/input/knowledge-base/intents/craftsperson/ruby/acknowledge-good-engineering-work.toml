@@ -1,0 +1,17 @@
+id = "guidelines.intent.acknowledge-good-engineering-work"
+title = "Reinforce engineering practices that work well"
+category = "collaboration"
+tags = ["ruby", "testing", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 0.91
+capability = "Ability for teams to recognize and repeat effective Ruby engineering practices"
+threat = "Reviews that mention only defects make desired practices invisible and erode motivation"
+expectation = "Contributors will learn norms partly through repeated review feedback"
+strategy = "Explicitly acknowledge clean, well-tested work when it is observed"
+evidence = [{ type = "review", description = "Reviews identify concrete strengths as well as required changes when the submission demonstrates them", required = true }]
+tradeoff = "Praise can add noise or feel perfunctory when it is not specific and sincere"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#communication-style", summary = "The source instructs reviewers to celebrate clean, well-tested code.", confidence = 1.0 }]

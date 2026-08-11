@@ -1,0 +1,17 @@
+id = "guidelines.intent.audit-gem-vulnerabilities"
+title = "Reject dependencies with known vulnerabilities"
+category = "dependencies"
+tags = ["ruby", "security", "dependencies", "vulnerability-management", "lifecycle-risk"]
+relations = [
+  { type = "specializes", target = "craftsperson/audit-dependency-risk" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to ship Ruby applications without known vulnerable gem versions"
+threat = "Published advisories can turn otherwise unchanged dependencies into exploitable attack surfaces"
+expectation = "The vulnerability status of the dependency graph will change after gems are selected"
+strategy = "Run `bundle exec bundler-audit check` and remediate reported vulnerabilities before completion"
+evidence = [{ type = "gate", description = "`bundle exec bundler-audit check` exits successfully against a current advisory database", required = true }]
+tradeoff = "Remediation may force disruptive upgrades or block delivery when no compatible fix exists"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#quality-gates-non-negotiable", summary = "Bundler Audit must report no known vulnerabilities before completion.", confidence = 1.0 }]

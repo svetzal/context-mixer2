@@ -1,0 +1,17 @@
+id = "guidelines.intent.document-exported-api"
+title = "Document every exported Go contract"
+category = "documentation"
+tags = ["go", "documentation", "dependencies", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Consumers can understand the purpose and contract of public packages, types, and functions without reading their implementation."
+threat = "Undocumented exports force callers to infer behavior and propagate incorrect assumptions."
+expectation = "The public API surface and its consumer population will grow over time."
+strategy = "Write clear, complete Go doc comments for every exported package, type, and function."
+evidence = [{ type = "static_check", description = "Documentation linting reports no exported package, type, or function without a conforming Go doc comment.", required = true }]
+tradeoff = "Comprehensive API comments add authoring and maintenance work and can mislead if allowed to become stale."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#synchronize-documentation", summary = "Requires clear complete Go doc comments for all exported types, functions, and packages.", confidence = 1.0 }]

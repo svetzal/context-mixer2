@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimal-explicit-namespace-dependencies"
+title = "Keep namespace dependencies minimal and explicit"
+category = "design"
+tags = ["clojure", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to understand and change a namespace without importing an unnecessary dependency graph"
+threat = "Broad or hidden dependencies increase coupling, load-time behavior, and change impact"
+expectation = "The application and its library graph will grow over time"
+strategy = "Declare namespace dependencies visibly and require each dependency to serve the namespace's responsibility"
+evidence = [{ type = "review", description = "Every require or import in a changed namespace is used, explicitly aliased where appropriate, and belongs to that namespace's stated responsibility", required = true }]
+tradeoff = "Strict dependency locality can require small facade namespaces and more explicit wiring"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#4-namespace-organization", summary = "Namespace review requires dependencies to be minimal and explicit.", confidence = 1.0 }]

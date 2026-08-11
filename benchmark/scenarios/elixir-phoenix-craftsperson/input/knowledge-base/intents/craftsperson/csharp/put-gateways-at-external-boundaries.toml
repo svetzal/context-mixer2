@@ -1,0 +1,17 @@
+id = "guidelines.intent.put-gateways-at-external-boundaries"
+title = "Put owned gateways at external boundaries"
+category = "architecture"
+tags = ["csharp", "testing", "dependencies", "persistence", "gateways", "external-systems"]
+relations = [
+  { type = "specializes", target = "craftsperson/put-gateways-at-external-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "External systems can be replaced, simulated, or unavailable without contaminating the domain model."
+threat = "Direct database, API, file-system, and HTTP dependencies spread vendor-specific details through application code."
+expectation = "External services and libraries will change contracts, implementations, and availability over time."
+strategy = "Route every external interaction through a focused application-owned gateway interface."
+evidence = [{ type = "import_boundary", description = "Only gateway adapters depend on external client or persistence libraries, and core code refers to application-owned contracts.", required = true }]
+tradeoff = "Gateway interfaces and adapters add code, indirection, and mapping around otherwise direct library calls."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#functional-core-imperative-shell", summary = "Requires all database, API, filesystem, and HTTP interactions to pass through gateway interfaces.", confidence = 1.0 }]

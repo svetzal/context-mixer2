@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-zero-credo-warnings"
+title = "Enforce zero strict Credo warnings"
+category = "quality"
+tags = ["elixir", "credo", "documentation", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The codebase maintains a consistent, statically checked quality baseline."
+threat = "Suppressed or tolerated lint findings normalize patterns that reduce clarity or conceal defects."
+expectation = "The codebase and Credo rule set will grow, increasing pressure to waive inconvenient findings."
+strategy = "Run mix credo --strict, resolve every warning, and permit suppression only when necessary and documented."
+evidence = [{ type = "gate", description = "mix credo --strict reports zero warnings and any disable directive carries a specific rationale.", required = true }]
+tradeoff = "Strict lint compliance can consume time on low-impact findings and occasionally require documented exceptions."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#quality-assurance-process", summary = "Declares zero strict Credo warnings mandatory and strongly limits suppressions.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.composable-small-transformations"
+title = "Express data processing as small composable transformations"
+category = "design"
+tags = ["clojure", "concurrency", "testing", "build-and-delivery", "cohesion", "single-responsibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to rearrange, reuse, and test individual stages of data processing"
+threat = "Monolithic transformations couple validation, parsing, enrichment, and aggregation into indivisible behavior"
+expectation = "Processing rules and their ordering will change as business requirements grow"
+strategy = "Build focused transformation functions and connect them with readable threading forms"
+evidence = [{ type = "test", description = "Each nontrivial transformation stage has direct tests independent of the full pipeline", required = true }, { type = "review", description = "Pipeline order and intermediate operations are visible in a threading form or equally explicit composition", required = true }]
+tradeoff = "More small functions create additional names and can scatter a simple workflow if split too aggressively"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#2-data-design", summary = "Data transformations are expected to be composable and clear.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#compose-small-functions", summary = "The improvement example simplifies a transformation pipeline into idiomatic composable steps.", confidence = 0.95 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#simplify-with-threading", summary = "Threading is shown as the preferred presentation for sequential data flow.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.demonstrate-recommendations-with-code"
+title = "Demonstrate Ruby recommendations with examples"
+category = "design"
+tags = ["ruby", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability for developers to translate review advice into an applicable implementation"
+threat = "Abstract guidance can be interpreted inconsistently or remain too vague to apply"
+expectation = "Suggested improvements will often involve Ruby idioms unfamiliar to the recipient"
+strategy = "Accompany nontrivial recommendations with focused code examples"
+evidence = [{ type = "review", description = "A recommendation that changes structure or idiom includes a minimal example showing the proposed shape in context", required = true }]
+tradeoff = "Example code costs review time and may be copied without adapting it to local constraints"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#communication-style", summary = "The agent explicitly says to show rather than tell by providing code examples.", confidence = 1.0 }]

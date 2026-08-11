@@ -1,0 +1,17 @@
+id = "guidelines.intent.capture-closure-bindings"
+title = "Capture loop-dependent closure bindings"
+category = "design"
+tags = ["python", "uv", "concurrency", "dependencies", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Deferred callables retain the value intended when each callable was created."
+threat = "Python's late-bound closures cause every generated callable to observe the loop variable's final value."
+expectation = "Code will build callbacks and functions dynamically inside loops or comprehensions."
+strategy = "Capture changing loop values at definition time, such as through a default argument or explicit factory."
+evidence = [{ type = "test", description = "A test invokes every generated callable after loop completion and observes the distinct value intended for each definition.", required = true }]
+tradeoff = "Default-argument capture is a Python-specific idiom that can surprise readers and complicate signatures."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#common-mistakes-to-avoid", summary = "Demonstrates late-binding closure failure and value capture at definition time.", confidence = 1.0 }]

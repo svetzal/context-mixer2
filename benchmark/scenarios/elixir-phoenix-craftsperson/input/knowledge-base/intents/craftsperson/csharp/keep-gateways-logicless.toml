@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-gateways-logicless"
+title = "Keep gateway adapters free of business logic"
+category = "testing"
+tags = ["csharp", "testing", "dependencies", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business rules remain in the deterministic core rather than becoming trapped in infrastructure adapters."
+threat = "Branching and transformation inside gateways makes domain behavior dependent on external libraries and hard to test."
+expectation = "Adapters will be replaced or upgraded while business decisions need to remain stable."
+strategy = "Keep gateway implementations as thin wrappers and move custom decision logic into the core."
+evidence = [{ type = "adapter_review", description = "Gateway implementations delegate and translate at the boundary without business-rule branching; any nontrivial rule is exercised in a core test.", required = true }]
+tradeoff = "Logicless adapters can require additional data-transfer types and orchestration to move decisions into the core."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#functional-core-imperative-shell", summary = "Says gateway classes should be thin wrappers with no logic to test.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-immutable-state"
+title = "Prefer immutable state"
+category = "design"
+tags = ["swift", "concurrency", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "State transitions remain local, explicit, and safe to reason about across call sites and tasks."
+threat = "Pervasive mutation and global mutable state create hidden temporal coupling and races."
+expectation = "More features and concurrent execution will increase the number of readers and writers of shared data."
+strategy = "Prefer immutable values and explicit state transitions, avoiding global mutable state."
+evidence = [{ type = "static_review", description = "New shared state is immutable by default; every mutable global or cross-component store has an explicit synchronization and ownership justification.", required = true }]
+tradeoff = "Immutable updates can allocate copies and require more explicit state threading or transformation code."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#common-patterns-and-anti-patterns", summary = "Prefers immutability over mutation and explicitly rejects global mutable state.", confidence = 1.0 }]

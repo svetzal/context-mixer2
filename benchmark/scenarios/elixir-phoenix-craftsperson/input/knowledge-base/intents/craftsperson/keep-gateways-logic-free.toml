@@ -1,0 +1,368 @@
+id = "guidelines.intent.keep-gateways-logic-free"
+title = "Keep gateways free of business logic"
+category = "architecture"
+tags = ["gateways", "business-logic", "separation-of-concerns"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business decisions remain visible, portable, and directly testable in the core."
+threat = "Policy accumulates in adapters where it becomes coupled to infrastructure and difficult to exercise without that infrastructure."
+expectation = "Gateway code will already need mechanical translation, transport, and persistence concerns."
+strategy = "Limit gateway implementations to translating and forwarding data; move branching policy and transformation decisions into the core."
+evidence = [{ type = "architecture_review", description = "Gateway implementations contain only boundary mechanics while domain decisions have direct core tests.", required = true }]
+tradeoff = "Strictly thin gateways can require extra data mappings and orchestration functions for small integrations."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#code-improvement-patterns", summary = "Keeps gateway adapters thin and logic-free.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#functional-core-imperative-shell", summary = "Moves decisions out of gateway adapters and into the core.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Keeps gateways thin and free of business logic.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; core — the policy, directly testable:
+(defn price-with-loyalty [price {:keys [tier]}]
+  (case tier :gold (* price 0.9) :silver (* price 0.95) price))
+
+;; gateway — translation and forwarding only:
+(defn fetch-price [http sku]
+  (-> (http {:url (str "/prices/" sku)})
+      :body
+      (json/read-str :key-fn keyword)
+      :price))
+'''
+bad = '''
+(defn fetch-price [http sku customer]
+  (let [p (-> (http {:url (str "/prices/" sku)})
+              :body (json/read-str :key-fn keyword) :price)]
+    ; discount policy buried in the HTTP adapter — it can
+    ; only be exercised through a stubbed web call now
+    (case (:tier customer)
+      :gold   (* p 0.9)
+      :silver (* p 0.95)
+      p)))
+'''
+
+[examples.cpp]
+good = '''
+// Gateway: translate and forward — nothing else.
+std::optional<Customer> HttpCrm::findCustomer(Email e) {
+  auto rsp = http_.get("/customers?email=" + e.encoded());
+  if (rsp.status == 404) return std::nullopt;
+  return toCustomer(rsp.json());       // pure mapping
+}
+
+// Policy lives in the core, tested with no HTTP anywhere:
+bool qualifiesForCredit(const Customer& c) {
+  return c.tenure() > Months{6} && !c.hasChargebacks();
+}
+'''
+bad = '''
+std::optional<Customer> HttpCrm::findCustomer(Email e) {
+  auto rsp = http_.get("/customers?email=" + e.encoded());
+  auto c = toCustomer(rsp.json());
+  // business policy trapped inside the HTTP adapter:
+  if (c.tenure() > Months{6} && !c.hasChargebacks())
+    c.markCreditApproved();
+  if (c.country() == "US")
+    c.applyStateTaxRules();     // exercising this needs a CRM
+  return c;
+}
+'''
+
+[examples.csharp]
+good = '''
+public sealed class StripeGateway : IPaymentGateway
+{
+    // translate and forward — nothing else
+    public async Task<PaymentResult> Charge(Payment p)
+    {
+        var res = await _client.Charges.CreateAsync(
+            new() { Amount = p.Cents,
+                    Currency = p.Currency });
+        return PaymentResult.From(res.Status);
+    }
+}
+// vip discount and small-charge waiver live in the
+// core, with direct fast tests
+'''
+bad = '''
+public sealed class StripeGateway : IPaymentGateway
+{
+    public async Task<PaymentResult> Charge(Payment p)
+    {
+        // business policy hiding inside the adapter:
+        // untestable without stripe plumbing
+        var cents = p.Customer.IsVip
+            ? (long)(p.Cents * 0.9) : p.Cents;
+        if (cents < 50) return PaymentResult.Waived;
+        var res = await _client.Charges.CreateAsync(
+            new() { Amount = cents });
+        return PaymentResult.From(res.Status);
+    }
+}
+'''
+
+[examples.elixir]
+good = '''
+# the pricing decision lives in the core, directly tested
+defmodule Payments do
+  def chargeable_amount(%Order{total: t}) when t > 10_000,
+    do: trunc(t * 0.98)
+
+  def chargeable_amount(%Order{total: t}), do: t
+end
+
+# the gateway only translates and forwards
+defmodule Payments.StripeGateway do
+  def charge(amount),
+    do: Stripe.Charge.create(%{amount: amount})
+end
+'''
+bad = '''
+defmodule Payments.StripeGateway do
+  def charge(order) do
+    # bulk-discount policy buried inside the adapter —
+    # exercising it now requires Stripe (or mocking it)
+    amount =
+      if order.total > 10_000,
+        do: trunc(order.total * 0.98),
+        else: order.total
+
+    Stripe.Charge.create(%{amount: amount})
+  end
+end
+'''
+
+[examples.go]
+good = '''
+// the gateway translates and forwards; discount policy lives
+// in the core where it is tested directly
+func (g *StripeGateway) Charge(ctx context.Context, p Payment) error {
+	req := toStripeRequest(p) // mapping only
+	if _, err := g.client.Do(ctx, req); err != nil {
+		return fmt.Errorf("stripe charge %s: %w", p.ID, err)
+	}
+	return nil
+}
+'''
+bad = '''
+func (g *StripeGateway) Charge(ctx context.Context, p Payment) error {
+	// loyalty discount: business policy hiding in the adapter,
+	// unreachable by tests without a Stripe stub
+	if p.Customer.LoyaltyYears > 5 {
+		p.Amount = p.Amount * 90 / 100
+	}
+	if p.Amount > 50_000 && p.Customer.Region == "EU" {
+		p.NeedsReview = true // and so is this compliance rule
+	}
+	_, err := g.client.Do(ctx, toStripeRequest(p))
+	return err
+}
+'''
+
+[examples.java]
+good = '''
+// the decision lives in the core, directly testable
+static Money chargeableAmount(Order order) {
+    var amount = order.total();
+    return order.customer().isVip()
+        ? amount.percent(90)
+        : amount;
+}
+
+// the gateway only translates and forwards
+class StripeGateway implements Payments {
+    Receipt charge(Money amount) {
+        return Receipt.from(stripe.charge(amount.cents()));
+    }
+}
+'''
+bad = '''
+class StripeGateway {
+    Receipt charge(Order order) {
+        var amount = order.total();
+        if (order.customer().isVip()) {   // pricing policy
+            amount = amount.percent(90);  // buried in adapter
+        }
+        if (amount.lessThan(MIN_CHARGE)) {// another decision
+            return Receipt.skipped();     // only reachable
+        }                                 // with Stripe wired
+        return Receipt.from(stripe.charge(amount.cents()));
+    }
+}
+'''
+
+[examples.kotlin]
+good = '''
+class StripeGateway(private val api: StripeApi) : Payments {
+    override suspend fun charge(req: ChargeRequest) =
+        api.createCharge(req.toParams()).toChargeResult()
+    // translate and forward — nothing else
+}
+
+// the policy stays in the core, with direct fast tests
+fun discounted(req: ChargeRequest): Money =
+    if (req.customer.isVip) req.amount * 90 / 100
+    else req.amount
+'''
+bad = '''
+class StripeGateway(private val api: StripeApi) : Payments {
+    override suspend fun charge(
+        req: ChargeRequest,
+    ): ChargeResult {
+        // business policy trapped inside the adapter —
+        // unreachable without Stripe plumbing
+        val amount = if (req.customer.isVip)
+            req.amount * 90 / 100 else req.amount
+        if (amount < Money(50)) return ChargeResult.FeeWaived
+        return api.createCharge(req.copy(amount = amount)
+            .toParams()).toChargeResult()
+    }
+}
+'''
+
+[examples.python]
+good = '''
+class StripeGateway:
+    def charge(self, amount: Money, token: str) -> ChargeId:
+        # translate and forward — nothing else
+        resp = self._client.charges.create(
+            amount=amount.cents, currency=amount.currency,
+            source=token)
+        return ChargeId(resp["id"])
+
+def amount_to_charge(order: Order) -> Money:
+    # the pricing decision lives in the core, tested there
+    return order.total.discounted(order.customer.tier_rate)
+'''
+bad = '''
+class StripeGateway:
+    def charge(self, order: Order, token: str) -> ChargeId:
+        amount = order.total
+        # pricing policy trapped inside the payment adapter:
+        # untestable without Stripe, invisible to the core
+        if order.customer.tier == "gold":
+            amount *= Decimal("0.9")
+        if order.total.cents > 100_000:
+            amount -= Money(cents=500)
+        resp = self._client.charges.create(
+            amount=amount.cents, source=token)
+        return ChargeId(resp["id"])
+'''
+
+[examples.ruby]
+good = '''
+# gateway: translate and forward, nothing else
+class SmsGateway
+  def send_code(phone:, body:)
+    twilio.messages.create(to: phone, body: body)
+  end
+end
+
+# policy lives in the core, tested without Twilio
+def code_message(user:, code:)
+  greeting = user.locale == "fr" ? "Votre code" : "Your code"
+  "#{greeting}: #{code}"
+end
+'''
+bad = '''
+class SmsGateway
+  def send_code(user:, code:)
+    # business policy trapped inside the adapter
+    return if user.suspended? || user.quiet_hours?(Time.now)
+    body = user.locale == "fr" ? "Votre code" : "Your code"
+    body += " (retry)" if user.attempts > 1
+    twilio.messages.create(to: user.phone, body: "#{body}: #{code}")
+  end # none of these decisions testable without Twilio stubbed
+end
+'''
+
+[examples.rust]
+good = '''
+// the gateway only translates and forwards
+impl PaymentGateway for StripeGateway {
+    fn charge(&self, req: Charge) -> Result<Receipt, PayErr> {
+        let resp = self.client.post("/charges", req.to_form())?;
+        Receipt::try_from(resp)
+    }
+}
+// the discount decision lives in the core, tested directly
+pub fn amount_due(order: &Order) -> Cents {
+    if order.total() >= Cents(10_000) {
+        order.total().less_percent(5)
+    } else {
+        order.total()
+    }
+}
+'''
+bad = '''
+impl PaymentGateway for StripeGateway {
+    fn charge(&self, order: &Order) -> Result<Receipt, PayErr> {
+        // discount policy buried in the adapter — it can only
+        // be exercised through a live Stripe call now
+        let mut amount = order.total();
+        if amount >= Cents(10_000) {
+            amount = amount.less_percent(5);
+        }
+        let resp = self.client.post("/charges", form(amount))?;
+        Receipt::try_from(resp)
+    }
+}
+'''
+
+[examples.swift]
+good = '''
+// Core owns the pricing decision; it is tested directly.
+func chargeableAmount(for order: Order) -> Decimal {
+    order.customer.isVIP ? order.total * 0.9 : order.total
+}
+
+// Gateway only translates and forwards.
+struct StripeGateway: PaymentGateway {
+    func charge(_ amount: Decimal) async throws {
+        try await stripe.createCharge(cents(amount))
+    }
+}
+'''
+bad = '''
+struct StripeGateway {
+    func charge(_ order: Order) async throws {
+        var amount = order.total
+        // pricing policy hiding inside the adapter —
+        // exercising it now requires Stripe plumbing
+        if order.customer.isVIP { amount *= 0.9 }
+        if order.items.count > 10 { amount -= 5 }
+        try await stripe.createCharge(cents(amount))
+    }
+}
+'''
+
+[examples.typescript]
+good = '''
+// Gateway: translate and forward, nothing else.
+export class HttpRateGateway implements RateSource {
+  constructor(private readonly http: Http) {}
+  async current(code: string): Promise<Rate> {
+    const res = await this.http.get(`/rates/${code}`);
+    return { code, value: res.data.value };
+  }
+}
+
+// Policy lives in the core, tested without any HTTP.
+export const applyMarkup = (r: Rate): Rate =>
+  ({ ...r, value: r.value * 1.02 });
+'''
+bad = '''
+// Markup policy and fallback rules trapped in the adapter;
+// exercising them now requires a live HTTP stack.
+export class HttpRateGateway implements RateSource {
+  private lastKnown = 1;
+  constructor(private readonly http: Http) {}
+  async current(code: string): Promise<Rate> {
+    const res = await this.http.get(`/rates/${code}`);
+    let value = res.data.value * 1.02;      // business markup
+    if (code === "USD") value += 0.001;     // special case
+    if (value <= 0) value = this.lastKnown; // fallback policy
+    this.lastKnown = value;
+    return { code, value };
+  }
+}
+'''

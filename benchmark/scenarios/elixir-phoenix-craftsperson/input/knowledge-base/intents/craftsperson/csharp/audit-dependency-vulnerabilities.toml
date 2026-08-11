@@ -1,0 +1,17 @@
+id = "guidelines.intent.audit-dependency-vulnerabilities"
+title = "Audit dependency vulnerabilities before delivery"
+category = "design"
+tags = ["csharp", "security", "dependencies", "build-and-delivery", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Known security defects in the resolved dependency graph are detected before software is accepted."
+threat = "Third-party packages can acquire disclosed vulnerabilities without changes to application source."
+expectation = "Vulnerability intelligence and package advisories will continue changing independently of release work."
+strategy = "Run dotnet list package --vulnerable and integrate OWASP Dependency-Check into CI."
+evidence = [{ type = "security_gate", description = "Both the .NET package audit and CI dependency scan report no unresolved known vulnerabilities in the resolved graph.", required = true }]
+tradeoff = "Scanners add CI time, may disagree or report false positives, and can force compatibility-risking upgrades."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#quality-enforcement", summary = "Requires the dotnet vulnerability audit and OWASP Dependency-Check in CI.", confidence = 1.0 }]

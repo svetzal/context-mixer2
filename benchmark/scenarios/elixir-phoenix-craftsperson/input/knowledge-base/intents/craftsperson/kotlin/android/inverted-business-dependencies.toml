@@ -1,0 +1,17 @@
+id = "guidelines.intent.inverted-business-dependencies"
+title = "Keep business logic independent of infrastructure implementations"
+category = "design"
+tags = ["kotlin", "android", "testing", "dependencies", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to reuse and test business rules without constructing Android, network, or persistence implementations."
+threat = "Direct dependencies from domain logic to concrete infrastructure make business behavior hard to isolate and replace."
+expectation = "Infrastructure libraries, service providers, and persistence choices will change independently of business policy."
+strategy = "Make business logic depend on abstractions and place implementation dependencies behind those abstractions."
+evidence = [{ type = "gate", description = "Dependency graph checks or review show domain modules importing interfaces but not concrete Retrofit, Room, filesystem, or sensor implementations.", required = true }]
+tradeoff = "Abstractions add types and wiring and can be premature for stable, trivial integrations."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#architectural-principles", summary = "The source explicitly mandates dependency inversion for business logic.", confidence = 1.0 }]

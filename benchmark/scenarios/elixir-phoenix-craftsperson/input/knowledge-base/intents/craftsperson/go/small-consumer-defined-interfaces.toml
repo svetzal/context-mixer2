@@ -1,0 +1,17 @@
+id = "guidelines.intent.small-consumer-defined-interfaces"
+title = "Define narrow interfaces beside their consumers"
+category = "reliability"
+tags = ["go", "dependencies", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Consumers depend only on the behavior they need and can substitute boundary implementations independently."
+threat = "Provider-owned, broad interfaces couple consumers to unrelated methods and make changes ripple across packages."
+expectation = "Implementations and external dependencies will evolve at different rates from their consumers."
+strategy = "Use small, focused, often single-method interfaces defined close to the consuming code."
+evidence = [{ type = "architecture_review", description = "Consumer packages declare minimal interfaces containing only methods they call, with no provider convenience methods.", required = true }]
+tradeoff = "Consumer-local interfaces can multiply similar interface types and require adapters between packages."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#composition-over-inheritance", summary = "Requires small focused interfaces and places definitions close to their consumers.", confidence = 1.0 }]

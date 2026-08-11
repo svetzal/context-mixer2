@@ -1,0 +1,17 @@
+id = "guidelines.intent.aggregate-errors-only-at-boundaries"
+title = "Aggregate errors only at application boundaries"
+category = "reliability"
+tags = ["rust", "concurrency", "error-handling", "diagnostics", "observability"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-error-context" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Applications can present unified failures without losing the causal information generated in lower layers."
+threat = "Early conversion into a generic application error destroys context needed for diagnosis or recovery."
+expectation = "Binary applications need convenient top-level error handling while internal layers remain semantically precise."
+strategy = "Preserve context through core layers and aggregate errors only at an application or process boundary."
+evidence = [{ type = "test", description = "Boundary-level errors retain source chains or structured context from the originating failure.", required = true }]
+tradeoff = "Maintaining error sources and conversions creates extra mapping code across layers."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#error-handling", summary = "Allows binary error aggregation only after context has been preserved.", confidence = 1.0 }]

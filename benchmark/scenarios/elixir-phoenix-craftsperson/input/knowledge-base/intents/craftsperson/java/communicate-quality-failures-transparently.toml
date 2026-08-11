@@ -1,0 +1,17 @@
+id = "guidelines.intent.communicate-quality-failures-transparently"
+title = "Communicate quality failures transparently"
+category = "quality"
+tags = ["java", "error-handling", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Collaborators can see what failed, why the remediation changed the code, and whether verification recovered."
+threat = "Silent fixes or vague status reports conceal known risk and prevent informed review."
+expectation = "Automated gates will fail during normal development and others will depend on accurate handoffs."
+strategy = "Surface each failure immediately, explain the root-cause fix, and report the result of the complete rerun."
+evidence = [{ type = "workflow_trace", description = "A gate-failure trace names the check and affected location, explains the corrective change, and records the successful or remaining rerun result.", required = true }]
+tradeoff = "Detailed status communication adds interruption and reporting overhead during rapid iterations."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#when-quality-gates-fail", summary = "Requires immediate failure reporting, an explanation of the fix, and explicit rerun results.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.dependency-security-review-gate"
+title = "Run dependency security analysis for every completed review"
+category = "dependencies"
+tags = ["clojure", "security", "dependencies", "error-handling", "vulnerability-management", "lifecycle-risk"]
+relations = [
+  { type = "specializes", target = "craftsperson/audit-dependency-risk" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to detect when a reviewed change leaves the dependency graph exposed to known vulnerabilities"
+threat = "Code and manifest changes can introduce or retain vulnerable direct and transitive dependencies without visible application failures"
+expectation = "Dependency resolution and vulnerability intelligence will change between reviews"
+strategy = "Run the configured NVD dependency audit before completing every code review"
+evidence = [{ type = "gate", description = "clojure -M:nvd completes successfully for the reviewed dependency graph with no unaccepted findings", required = true }]
+tradeoff = "Scanning every review adds latency and can block unrelated work on disputed, newly published, or temporarily unfixable findings"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-gates-mandatory", summary = "The NVD security audit is mandatory before any code review is complete.", confidence = 1.0 }]

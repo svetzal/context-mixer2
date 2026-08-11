@@ -1,0 +1,17 @@
+id = "guidelines.intent.mock-owned-boundaries-only"
+title = "Mock owned boundary interfaces only"
+category = "testing"
+tags = ["java", "concurrency", "testing", "dependencies", "test-doubles", "boundaries"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Unit tests isolate external effects without coupling to third-party implementation details."
+threat = "Mocking libraries and internals makes tests brittle under refactoring and dependency upgrades."
+expectation = "External libraries will change APIs and internal behavior independently from domain policy."
+strategy = "Wrap third-party interactions in owned gateway interfaces and mock only those boundary contracts."
+evidence = [{ type = "test_review", description = "Test doubles implement application-owned gateway interfaces; no test mocks library internals or private collaborators.", required = true }]
+tradeoff = "Owned wrappers add interfaces, adapters, and mapping code around otherwise direct library calls."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#testing-philosophy", summary = "Forbids mocking library internals and requires third-party libraries to be wrapped behind gateway interfaces.", confidence = 1.0 }]

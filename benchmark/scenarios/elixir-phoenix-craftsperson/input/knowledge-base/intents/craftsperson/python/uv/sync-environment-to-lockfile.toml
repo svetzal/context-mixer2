@@ -1,0 +1,17 @@
+id = "guidelines.intent.sync-environment-to-lockfile"
+title = "Synchronize the environment to the lockfile"
+category = "dependencies"
+tags = ["python", "uv", "dependencies", "reproducibility", "lockfiles", "build-stability"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-dependency-resolution-reproducible" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Local execution reflects the dependency state recorded by the repository."
+threat = "A stale virtual environment passes or fails checks using packages that no longer match project state."
+expectation = "Pulls, branch changes, and dependency updates will alter the committed resolution."
+strategy = "Run uv sync after cloning or pulling, selecting only the dependency groups required for the workflow."
+evidence = [{ type = "environment_gate", description = "uv sync completes from a fresh checkout and subsequent project commands run without undeclared or stale packages.", required = true }]
+tradeoff = "Synchronization can remove locally installed conveniences and adds setup time after repository changes."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#dependency-management", summary = "Requires uv sync after cloning or pulling so the environment matches the lockfile.", confidence = 1.0 }]

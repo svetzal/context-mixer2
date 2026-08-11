@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-blocking-io-out-of-async"
+title = "Keep blocking I/O out of async tasks"
+category = "reliability"
+tags = ["python", "uv", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The event loop remains responsive while async operations wait on external work."
+threat = "A blocking library call inside an async function stalls every task sharing the loop."
+expectation = "Async services will integrate with libraries that expose only synchronous APIs."
+strategy = "Use nonblocking clients or move unavoidable blocking I/O to an executor rather than calling it on the event-loop thread."
+evidence = [{ type = "concurrency_test", description = "A responsiveness test shows unrelated scheduled tasks continue to run while the integration performs its slow I/O.", required = true }]
+tradeoff = "Executor handoff adds thread scheduling, context propagation, and shutdown complexity."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#asyncawait-best-practices", summary = "Forbids mixing asyncio with blocking I/O unless the blocking call is moved to an executor.", confidence = 1.0 }]

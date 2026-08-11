@@ -1,0 +1,17 @@
+id = "guidelines.intent.narrow-unknown-inputs"
+title = "Narrow unknown values before use"
+category = "design"
+tags = ["typescript", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to retain type safety when data has not yet been proven to match a contract"
+threat = "The any type disables checking and lets invalid operations propagate through the codebase"
+expectation = "Untyped libraries and external inputs will continue to introduce values of uncertain shape"
+strategy = "Represent uncertain values as unknown and narrow them with explicit type guards"
+evidence = [{ type = "static-check", description = "Changed code contains no unjustified any and cannot access unknown values until a guard proves the required shape", required = true }]
+tradeoff = "Type guards add runtime branches and maintenance when input shapes evolve"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#type-system-patterns", summary = "The source explicitly prefers unknown over any followed by narrowing with type guards.", confidence = 1.0 }]

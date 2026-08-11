@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-swiftlint"
+title = "Gate changes on SwiftLint compliance"
+category = "design"
+tags = ["swift", "swiftlint", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Swift code consistently satisfies the project's statically enforceable style and safety rules."
+threat = "Manual review misses recurring violations and lets local conventions drift."
+expectation = "More contributors and generated changes will make reviewer-only enforcement inconsistent."
+strategy = "Run SwiftLint as a mandatory completion gate and fix violations rather than silently suppressing them."
+evidence = [{ type = "gate", description = "swiftlint lint exits successfully with no violations for the candidate change.", required = true }]
+tradeoff = "Strict lint rules can reject reasonable code, add configuration maintenance, and consume time on nonbehavioral changes."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#quality-gates-mandatory", summary = "Makes a violation-free SwiftLint run mandatory before commit or completion.", confidence = 1.0 }]

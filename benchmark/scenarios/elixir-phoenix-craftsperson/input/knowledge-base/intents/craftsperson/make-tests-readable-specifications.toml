@@ -1,0 +1,300 @@
+id = "guidelines.intent.make-tests-readable-specifications"
+title = "Make tests readable behavioral specifications"
+category = "testing"
+tags = ["readability", "executable-specification", "behavior"]
+status = "hypothesized"
+confidence = 0.98
+capability = "A reader can learn required behavior and diagnose a failure directly from the test suite."
+threat = "Opaque names, oversized arrangements, and incidental assertions hide what a test protects."
+expectation = "Tests will serve as the most current executable account of behavior for maintainers and agents."
+strategy = "Give each test one behavior, intention-revealing names, visible arrange-act-assert flow, and assertions on meaningful outcomes."
+evidence = [{ type = "test_review", description = "Each test states one behavior and its failure identifies the violated expectation without reading implementation code.", required = true }]
+tradeoff = "More explicit test structure can repeat setup and produce longer suites."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/python-ecosystem/agents/python-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#unit-tests-structure", summary = "Makes tests readable behavioral specifications.", confidence = 1.0 }, { type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#testing-patterns", summary = "Structures tests as readable specifications.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#testing-patterns", summary = "Uses behavior-describing test names and separable setup.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(deftest expired-coupon-is-rejected-at-checkout
+  ;; arrange
+  (let [cart   (cart-with {:total 100})
+        coupon (expired-coupon "SAVE10")
+        ;; act
+        result (apply-coupon cart coupon)]
+    ;; assert
+    (is (= :coupon/expired (:error result)))
+    (is (= 100 (:total result)) "total is unchanged")))
+'''
+bad = '''
+(deftest test2
+  (let [x (setup)]  ; 40-line fixture defined in another ns
+    (is (= 100 (:t (f x "SAVE10"))))
+    (is (:e2 (f x "BOGUS")))
+    (is (nil? (:e2 (f x "SAVE10"))))
+    (is (= 3 (count @log)))))  ; incidental — why 3?
+; when this fails, which behavior broke? only the
+; implementation knows
+'''
+
+[examples.cpp]
+good = '''
+TEST(Refunds, RejectsRefundLargerThanOriginalCharge) {
+  // arrange
+  auto payment = paidPayment(Money{50});
+
+  // act
+  auto result = refund(payment, Money{80});
+
+  // assert
+  EXPECT_EQ(result.error(), Err::ExceedsCharge);
+}
+'''
+bad = '''
+TEST(RefundTest, Test3) {
+  auto p = h.mk(50, 2, true, "x", cfg_);  // what is any of this
+  h.prep(p);
+  h.go();
+  auto r = refund(p, Money{80});
+  EXPECT_FALSE(r.ok());
+  EXPECT_EQ(h.log().size(), 7u);   // incidental assertion
+  EXPECT_TRUE(h.flag_);            // asserts... something
+}
+// failure message: "h.flag_ is false" — violated rule unknown
+'''
+
+[examples.csharp]
+good = '''
+[Fact]
+public void Late_return_accrues_daily_fee_after_grace()
+{
+    var rental = RentalDueDaysAgo(days: 5);
+
+    var fee = rental.LateFee(graceDays: 2);
+
+    fee.Should().Be(Money.Cad(3 * DailyLateFee));
+}
+'''
+bad = '''
+[Fact]
+public void Test12()
+{
+    var r = Helper.Make(1, 5, true, null, 2);
+    var x = r.Calc();
+    Assert.True(x > 0);         // which behavior?
+    Assert.Equal(4, Helper.N);  // incidental global
+    Assert.NotNull(r.Inner);    // structural noise
+}
+'''
+
+[examples.elixir]
+good = '''
+test "an expired coupon does not reduce the order total" do
+  order = build(:order, total: 100)
+  coupon = build(:coupon, expires_on: ~D[2020-01-01])
+
+  {:ok, priced} = Pricing.apply_coupon(order, coupon)
+
+  assert priced.total == 100
+end
+'''
+bad = '''
+test "test1" do
+  x = run_all(prep(fixtures(:everything)), 3)
+
+  assert x
+  assert length(elem(x, 1).items) != 0 or true
+  # when this fails, which behavior was violated?
+  # nobody — including its author — can say
+end
+'''
+
+[examples.go]
+good = '''
+func TestExpiredCouponIsRejectedAtCheckout(t *testing.T) {
+	cart := cartWith(t, item("book", 1200))
+	coupon := couponExpiredOn(t, "2026-01-01")
+
+	err := cart.Apply(coupon)
+
+	if !errors.Is(err, ErrCouponExpired) {
+		t.Fatalf("want ErrCouponExpired, got %v", err)
+	}
+}
+'''
+bad = '''
+func TestCoupon2(t *testing.T) {
+	h := setup(t, true, false, 3, "x", nil) // what do these mean?
+	r := h.run()
+	if r.code != 4 {
+		t.Fatal("bad result") // which expectation broke? why 4?
+	}
+	if len(h.log) > 0 && h.flags["z"] {
+		t.Error("log not empty") // incidental assertion
+	}
+}
+'''
+
+[examples.java]
+good = '''
+@Test
+void refundRestoresGiftCardBalance() {
+    var card = GiftCard.withBalance(euros(50));
+    card.charge(euros(20));
+
+    card.refund(euros(20));
+
+    assertEquals(euros(50), card.balance());
+}
+'''
+bad = '''
+@Test
+void test3() {
+    var h = TestHarness.mk(CFG, true, null, 7);
+    h.run();
+    assertEquals(50, h.a().get(0).x()); // which expectation?
+    assertNotNull(h.b());               // incidental
+    assertTrue(h.log().size() > 0);     // incidental
+}
+// a failure here names no behavior; diagnosis requires
+// reading the harness and the implementation
+'''
+
+[examples.kotlin]
+good = '''
+@Test
+fun `invoice 31 days overdue accrues 5 percent late fee`() {
+    val invoice = anInvoice(total = 100_00, overdueDays = 31)
+
+    val total = invoice.totalWithFees()
+
+    assertThat(total).isEqualTo(Money(105_00))
+}
+'''
+bad = '''
+@Test
+fun test7() {
+    val x = helper.setup(true, null, 31, listOf(1, 2), false)
+    x.run()
+    assertThat(x.state).isNotNull()  // which behavior?
+    assertThat(x.flags[3]).isTrue()  // incidental internals
+}
+'''
+
+[examples.python]
+good = '''
+def test_expired_coupon_is_rejected_at_checkout():
+    coupon = a_coupon(expires=YESTERDAY)
+    cart = a_cart(items=[BOOK])
+
+    result = apply_coupon(cart, coupon)
+
+    assert result == CouponRejected(reason="expired")
+    # name + arrange/act/assert state the rule; the failure
+    # message alone names the violated expectation
+'''
+bad = '''
+def test_1():
+    c = setup_all(True, False, 3, None, "X9")   # of what?
+    r = run(c)
+    assert r[0] == 7
+    assert len(r[1]) != 0
+    assert helper_check(r, c.flags)
+    # fails as "assert False" — which behavior broke, and
+    # what was even required, is anyone's guess
+'''
+
+[examples.ruby]
+good = '''
+RSpec.describe Cart do
+  it "removes the line when quantity drops to zero" do
+    cart = Cart.new(lines: [Line.new(sku: "A1", qty: 1)])
+
+    cart.decrement(sku: "A1")
+
+    expect(cart.lines).to be_empty
+  end
+end
+'''
+bad = '''
+RSpec.describe Cart do
+  it "works" do
+    c = build_cart_with_everything # 40-line opaque helper
+    c.decrement(sku: "A1")
+    expect(c.lines.size).to eq(c.initial_size - 1)
+    expect(c.instance_variable_get(:@dirty)).to be true # why?
+    expect(c.audit_log.last).to match(/decr/) # incidental
+  end
+end
+'''
+
+[examples.rust]
+good = '''
+#[test]
+fn expired_coupon_is_rejected_at_checkout() {
+    let coupon = Coupon::expired_days_ago(1);
+    let cart = Cart::with_total(Cents(5_000));
+
+    let result = cart.apply(&coupon);
+
+    assert_eq!(result, Err(CouponError::Expired));
+}
+'''
+bad = '''
+#[test]
+fn test2() {
+    let mut h = Harness::default_setup_full(); // 40-line setup
+    h.step(1); h.step(2); h.flag = true; h.step(3);
+    assert!(h.ok());               // which expectation failed?
+    assert_eq!(h.state.len(), 7);  // incidental
+    assert!(h.log.contains("x"));  // incidental
+}
+'''
+
+[examples.swift]
+good = '''
+@Test func expiredCouponIsRejectedAtCheckout() throws {
+    let coupon = Coupon.expired(daysAgo: 1)
+    let cart = Cart(items: [.book], coupon: coupon)
+
+    let outcome = cart.checkout()
+
+    #expect(outcome == .rejected(.couponExpired))
+}
+'''
+bad = '''
+@Test func test17() throws {
+    let c = TestHelper.shared.makeC(1, true, nil, 3)
+    let r = c.go()
+    // which behavior is protected? read the 40-line shared
+    // helper and the tuple layout to find out
+    #expect(r.0 == 2 && r.1 != nil && TestHelper.shared.flag)
+}
+'''
+
+[examples.typescript]
+good = '''
+it("declines a withdrawal that exceeds the balance", () => {
+  const account = anAccount({ balance: 50 });
+
+  const result = account.withdraw(80);
+
+  expect(result).toEqual({
+    ok: false,
+    error: "insufficient-funds",
+  });
+});
+'''
+bad = '''
+it("test2", () => {
+  const a = setup(cfg, true, 50, null, FLAGS.X | FLAGS.Y);
+  a.init();
+  a.sync();
+  a.run();
+  const r = a.w(80);
+  expect(r.o).toBe(false);
+  expect(a.internal.ledger.rows.length).toBe(17);
+  expect(spy).toHaveBeenCalledTimes(3); // why 3?
+});
+'''

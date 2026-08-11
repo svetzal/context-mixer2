@@ -1,0 +1,17 @@
+id = "guidelines.intent.bound-external-work-with-timeouts"
+title = "Time-bound operations that consume external resources"
+category = "design"
+tags = ["go", "concurrency", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The service recovers resources when external work stalls or exceeds its useful lifetime."
+threat = "Unbounded blocking calls retain goroutines, connections, and memory until the process is exhausted."
+expectation = "External systems and networks will sometimes hang or respond more slowly than the service can tolerate."
+strategy = "Derive contexts with explicit timeouts for resource-consuming external operations."
+evidence = [{ type = "test", description = "Timeout tests demonstrate stalled external calls terminate within the configured bound and release their goroutines.", required = true }]
+tradeoff = "Timeouts can abort work that would eventually succeed and require careful tuning for variable latency."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#enforce-security-standards", summary = "Requires context timeouts to prevent resource exhaustion.", confidence = 1.0 }]

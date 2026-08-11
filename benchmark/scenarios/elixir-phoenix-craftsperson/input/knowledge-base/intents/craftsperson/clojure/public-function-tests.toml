@@ -1,0 +1,17 @@
+id = "guidelines.intent.public-function-tests"
+title = "Specify every public function with automated tests"
+category = "testing"
+tags = ["clojure", "testing", "behavior", "public-boundaries", "refactor-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/test-observable-behavior" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to change implementations while preserving every supported public behavior"
+threat = "Untested public entry points acquire accidental behavior and regress without detection"
+expectation = "Callers will depend on public functions as the codebase evolves"
+strategy = "Give every public function direct, readable clojure.test coverage"
+evidence = [{ type = "test", description = "An inventory of public vars maps each public function to at least one named test exercising its contract", required = true }]
+tradeoff = "Per-function tests increase suite size and can overfit implementations if written below the contract level"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-tools-you-wield", summary = "Every public function is required to have tests.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#5-testing", summary = "The review methodology checks coverage of all public functions.", confidence = 1.0 }]

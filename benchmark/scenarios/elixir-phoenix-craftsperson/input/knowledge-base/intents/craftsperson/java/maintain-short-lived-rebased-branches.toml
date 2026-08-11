@@ -1,0 +1,17 @@
+id = "guidelines.intent.maintain-short-lived-rebased-branches"
+title = "Maintain short-lived rebased branches"
+category = "delivery"
+tags = ["java", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Parallel Java work integrates with a readable history and minimal divergence from main."
+threat = "Long-lived branches accumulate conflicts and merge commits that obscure the change sequence."
+expectation = "Multiple contributors will change nearby code while feature work is in progress."
+strategy = "Branch from main, keep branches short-lived, and rebase them onto current main before integration."
+evidence = [{ type = "history_review", description = "Feature branches have limited divergence and integrate without avoidable merge commits or stale-base conflicts.", required = true }]
+tradeoff = "Rebasing rewrites branch history and requires coordination when a branch is shared."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#version-control-and-collaboration", summary = "Directs branches to start from main, remain short-lived, and rebase for clean history.", confidence = 1.0 }]

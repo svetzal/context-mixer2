@@ -1,0 +1,290 @@
+id = "guidelines.intent.minimize-dependency-surface"
+title = "Minimize dependency surface"
+category = "dependencies"
+tags = ["supply-chain", "complexity", "maintainability"]
+status = "hypothesized"
+confidence = 0.97
+capability = "The system retains a small, understandable supply-chain and compatibility surface."
+threat = "Convenience dependencies add transitive code, upgrade constraints, vulnerabilities, and operational behavior disproportionate to their value."
+expectation = "Every dependency will evolve, disclose vulnerabilities, or eventually require replacement independently from the application."
+strategy = "Add a dependency only when its maintained capability clearly outweighs implementing or using an existing local or platform capability."
+evidence = [{ type = "dependency_review", description = "Each new dependency has a current use, maintenance rationale, and no simpler adequate existing alternative.", required = true }]
+tradeoff = "Avoiding a dependency can create locally maintained code that is less mature than a well-supported library."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/elixir-ecosystem/agents/elixir-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#project-structure--tooling", summary = "Keeps namespace and project dependencies minimal and explicit.", confidence = 1.0 }, { type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#quality-assurance-process", summary = "Minimizes production and specialized dependencies.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#security-and-supply-chain", summary = "Minimizes dependency and supply-chain surface.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; needed: left-pad an id, capitalize a label
+(defn pad-id [id]
+  (format "%08d" id))
+
+(defn title-label [s]
+  (str/capitalize s))
+
+; solved with clojure.core and the JDK — deps.edn untouched,
+; nothing new to audit, upgrade, or trust
+'''
+bad = '''
+;; deps.edn additions for the same two helpers:
+{:deps
+ {funcool/cuerdas {:mvn/version "2023.11.09-407"}   ; strings
+  org.apache.commons/commons-lang3
+  {:mvn/version "3.14.0"}                           ; strings
+  com.taoensso/encore {:mvn/version "3.98.0"}}}     ; "utils"
+
+; three libraries and their transitive trees on the upgrade
+; treadmill — to pad an id and capitalize a label
+'''
+
+[examples.cpp]
+good = '''
+// Need: left-pad an id to 8 chars. The standard library
+// already covers it — no new third-party code taken on.
+std::string padId(std::string id) {
+  if (id.size() < 8)
+    id.insert(0, 8 - id.size(), '0');
+  return id;
+}
+// Dependency review note: nothing added; supply-chain
+// surface unchanged.
+'''
+bad = '''
+# vcpkg.json — three new dependency trees to pad a string
+{ "dependencies": [
+    "boost-algorithm",
+    "abseil",
+    "leftpad-cpp"        // unmaintained since 2019
+] }
+# each brings transitive code, upgrade constraints, and CVE
+# surface; total in-house code replaced: five lines
+'''
+
+[examples.csharp]
+good = '''
+// need: zero-pad ids, slugify titles — the BCL
+// already covers both; no package added
+var padded = id.PadLeft(8, '0');
+var slug = string.Join('-',
+    title.ToLowerInvariant().Split(' ',
+        StringSplitOptions.RemoveEmptyEntries));
+'''
+bad = '''
+$ git diff App.csproj
++ <PackageReference Include="LeftPad.NET"
++     Version="0.9.1" />  <!-- one call site -->
++ <PackageReference Include="SlugMaster3000"
++     Version="1.0.0-beta2" /> <!-- 1 maintainer,
++                                  last push 2023 -->
+
+var padded = LeftPad.Pad(id, 8);
+var slug = SlugMaster.Slug(title);
+'''
+
+[examples.elixir]
+good = '''
+# mix.exs — every dep has a current use and no simpler
+# existing alternative
+defp deps do
+  [
+    {:req, "~> 0.5"},    # retries + telemetry we rely on
+    {:jason, "~> 1.4"}   # JSON across the whole app
+  ]
+end
+
+# declined this sprint, with reasons in the PR:
+#   :timex — DateTime/Calendar cover our two use sites
+#   :uuid  — Ecto.UUID.generate/0 is already here
+'''
+bad = '''
+# mix.exs — a dependency per convenience
+defp deps do
+  [
+    {:left_pad_ex, "~> 0.1"},  # String.pad_leading/3
+    {:uuid, "~> 1.1"},         # Ecto.UUID already here
+    {:httpoison, "~> 2.0"},    # :req already in tree
+    {:poison, "~> 5.0"},       # Jason already in tree
+    {:timex, "~> 3.7"}         # used once, for now/0
+  ]
+end
+# five supply chains adopted to avoid five one-liners
+'''
+
+[examples.go]
+good = '''
+// the current need is lowercase-and-hyphenate; the stdlib
+// already does it, so no new supply-chain surface is added
+func slugify(title string) string {
+	s := strings.ToLower(strings.TrimSpace(title))
+	return strings.ReplaceAll(s, " ", "-")
+}
+'''
+bad = '''
+import (
+	// 41 transitive modules, a CVE feed to watch, and an
+	// upgrade treadmill — for one lowercase-and-hyphenate call
+	"github.com/megacorp/stringtoolkit/v7"
+)
+
+func slugify(title string) string {
+	return stringtoolkit.New().Lower().Trim().Hyphenate().
+		Apply(title)
+}
+'''
+
+[examples.java]
+good = '''
+PR note: declined adding commons-lang3 (a 2.9 MB jar) for
+one call site. The platform already covers the need:
+
+    static boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
+No new transitive code, licenses, CVE feed, or upgrade
+obligations for a capability the JDK ships.
+'''
+bad = '''
+// build.gradle — four new suppliers, one utility call each
+implementation 'org.apache.commons:commons-lang3:3.14.0'
+implementation 'com.google.guava:guava:33.0.0-jre'
+implementation 'commons-io:commons-io:2.15.1'
+implementation 'org.modelmapper:modelmapper:3.2.0'
+
+// the actual usage found in the codebase:
+//   StringUtils.isBlank(name)  <- s.isBlank() exists
+//   Lists.newArrayList()       <- new ArrayList<>() exists
+//   IOUtils.toString(in)       <- in.readAllBytes() exists
+'''
+
+[examples.kotlin]
+good = '''
+// need: pad an id to 8 digits for display
+fun padId(id: Int): String = id.toString().padStart(8, '0')
+// the stdlib already does this; adding a utility library
+// for one call would buy a transitive tree, upgrade
+// obligations, and CVE surface for zero new capability —
+// reviewed and declined in the change description
+'''
+bad = '''
+// build.gradle.kts
+dependencies {
+    implementation("org.apache.commons:commons-lang3:3.14.0")
+    implementation("com.google.guava:guava:33.0.0-jre")
+}
+// both added for a single call:
+fun padId(id: Int): String =
+    StringUtils.leftPad(id.toString(), 8, '0')
+'''
+
+[examples.python]
+good = '''
+from datetime import UTC, datetime
+from pathlib import Path
+
+def backup_name(source: Path) -> str:
+    # stdlib covers this; no new supply-chain surface
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    return f"{source.stem}-{stamp}.bak"
+'''
+bad = '''
+import arrow          # datetime formatting, once
+import inflection     # snake_case a string, once
+import shortuuid      # could be uuid4().hex[:8]
+
+def backup_name(source: Path) -> str:
+    # three deps (plus transitive trees, CVEs, and upgrade
+    # duty) to build one filename
+    stamp = arrow.utcnow().format("YYYYMMDDTHHmmss")
+    name = inflection.underscore(source.stem)
+    return f"{name}-{stamp}-{shortuuid.uuid()[:8]}.bak"
+'''
+
+[examples.ruby]
+good = '''
+# Gemfile diff for this feature: (none)
+#
+# one formatting need, served by the standard library —
+# no new supply-chain or upgrade surface
+def order_ref(id:)
+  format("ORD-%08d", id)
+end
+'''
+bad = '''
+# Gemfile — three transitive trees for one format call
+gem "activesupport"    # pulled in only for a padding helper
+gem "padrino-helpers"  # unused beyond number_with_pad
+gem "left-pad-rb"      # unmaintained since 2019
+
+def order_ref(id:)
+  LeftPad.pad(id.to_s, 8, "0").prepend("ORD-")
+end
+'''
+
+[examples.rust]
+good = '''
+# Cargo.toml — nothing here without a current use
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+# PR note: considered `padding-helpers` for the report
+# column layout; `format!` width specifiers already do it:
+pub fn pad_left(s: &str, width: usize) -> String {
+    format!("{s:>width$}")
+}
+'''
+bad = '''
+# Cargo.toml — ~90 transitive crates to avoid 6 lines of std
+[dependencies]
+padding-helpers = "0.2"   # pads strings; unmaintained 2023
+envy = "0.4"              # reads one env var
+config = "0.14"           # also reads that env var
+chrono = "0.4"            # only used for Utc::now()
+rand = "0.8"              # one shuffle in a test helper
+'''
+
+[examples.swift]
+good = '''
+// Foundation already covers the need — no new package.
+extension String {
+    var slugified: String {
+        lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+            .filter { $0.isLetter || $0.isNumber || $0 == "-" }
+    }
+}
+'''
+bad = '''
+// Package.swift — a dependency tree for one function
+dependencies: [
+    // last commit 3 years ago, pulls 4 transitive packages
+    .package(url: "https://github.com/x/SwiftSlugKit.git",
+             from: "0.3.1"),
+]
+
+import SwiftSlugKit
+let slug = SlugEngine.default.makeSlug(title)
+'''
+
+[examples.typescript]
+good = '''
+// A three-line local helper beats a transitive subtree.
+export const chunk = <T>(xs: T[], size: number): T[][] =>
+  xs.length === 0 ? []
+    : [xs.slice(0, size), ...chunk(xs.slice(size), size)];
+
+// zod stays: schema validation is maintained capability we
+// should not rebuild — rationale recorded in the PR.
+'''
+bad = '''
+$ npm install lodash left-pad is-odd moment uuid-tools \
+    tiny-chunk just-clone
++ 7 packages, 214 transitive dependencies added
+
+// The entire payoff for that surface:
+import chunk from "tiny-chunk";
+
+const pages = chunk(rows, 10);
+'''

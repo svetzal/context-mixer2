@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-context-sensitive-tradeoffs"
+title = "Escalate context-sensitive tradeoffs"
+category = "collaboration"
+tags = ["java", "security", "performance", "decision-making", "escalation", "tradeoffs"]
+relations = [
+  { type = "specializes", target = "craftsperson/escalate-consequential-tradeoffs" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Decisions involving business priorities reflect stakeholder context rather than hidden technical preference."
+threat = "Engineers silently choose performance, readability, flexibility, or simplicity without authority over the underlying priority."
+expectation = "Design heuristics will conflict with project constraints and the correct balance will vary by business context."
+strategy = "Explain the viable options and consult the user when a tradeoff requires business or project judgment."
+evidence = [{ type = "decision_record", description = "A high-impact tradeoff records options, consequences, and explicit stakeholder direction before the choice is finalized.", required = true }]
+tradeoff = "Escalation interrupts flow and delays decisions that an implementer could otherwise make quickly."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#when-stuck-or-uncertain", summary = "Requires user consultation when tradeoffs such as performance versus readability or flexibility versus simplicity need business context.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.write-code-for-human-readers"
+title = "Optimize code for the next human reader"
+category = "design"
+tags = ["typescript", "readability", "clarity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for maintainers to understand behavior and change code without reconstructing hidden intent"
+threat = "Cryptic names and opaque signatures force readers to infer contracts from implementation details"
+expectation = "Future maintainers will encounter the code without the original author's context"
+strategy = "Use intention-revealing names and signatures that make contracts explicit"
+evidence = [{ type = "review", description = "A reviewer can describe each changed unit's purpose and contract from its names and signature without tracing its implementation", required = true }]
+tradeoff = "More explicit names and signatures can be verbose and require ongoing editorial effort"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Code is communication and should reveal intent to the next human reader.", confidence = 1.0 }]

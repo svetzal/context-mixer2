@@ -1,0 +1,17 @@
+id = "guidelines.intent.start-simple-then-refactor"
+title = "Start with the simplest working design, then refactor"
+category = "refactoring"
+tags = ["typescript", "concurrency", "testing", "behavior-preservation", "small-steps", "test-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-behavior-during-refactoring" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to discover an appropriate design from working behavior rather than guesses"
+threat = "Designing the final structure before behavior is understood embeds untested assumptions"
+expectation = "Implementation and tests will reveal better boundaries than advance speculation"
+strategy = "Implement the simplest behavior that passes, then improve its structure while preserving tests"
+evidence = [{ type = "trace", description = "The change history or review shows a working behavior-preserving baseline followed by refactoring with tests remaining green", required = true }]
+tradeoff = "The intermediate solution may be inelegant and refactoring adds an additional work step"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "The source says to build the simplest thing that could work and then refactor.", confidence = 1.0 }]

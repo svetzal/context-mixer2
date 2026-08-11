@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolated-component-injection"
+title = "Keep components independently testable"
+category = "design"
+tags = ["kotlin", "android", "testing", "dependencies", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to exercise each component without assembling the full Android application or real infrastructure."
+threat = "Hidden construction and hard-coded collaborators make behavior inseparable from environment setup."
+expectation = "Components will be refactored and tested across unit, integration, and UI boundaries."
+strategy = "Give components clear dependency injection points and avoid hidden collaborator creation."
+evidence = [{ type = "gate", description = "Unit tests instantiate components with controlled collaborators without starting Android runtime infrastructure.", required = true }]
+tradeoff = "Injection seams expand constructors and setup even when a dependency currently has one implementation."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#architectural-principles", summary = "The source states that every component should be testable in isolation with clear injection points.", confidence = 1.0 }]

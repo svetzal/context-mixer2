@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-build-configuration-explicit"
+title = "Make build configuration intent explicit"
+category = "delivery"
+tags = ["csharp", "build-and-delivery", "builds", "configuration", "reproducibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Maintainers can determine why a build behaves as it does from versioned configuration."
+threat = "Implicit defaults and hidden convention make builds surprising and allow behavior to drift unnoticed."
+expectation = "SDK defaults, environments, and maintainers will change over the project's lifetime."
+strategy = "Declare consequential build settings visibly instead of relying on implicit magic."
+evidence = [{ type = "configuration_review", description = "Compatibility, analysis, packaging, and other consequential build choices are visible in versioned project or repository configuration.", required = true }]
+tradeoff = "Explicit configuration is more verbose and can duplicate stable defaults that would otherwise require no maintenance."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#build--project-management", summary = "Says to make intent visible in configuration and avoid implicit magic.", confidence = 1.0 }]

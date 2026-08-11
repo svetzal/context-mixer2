@@ -1,0 +1,17 @@
+id = "guidelines.intent.build-standard-python-distributions"
+title = "Build standard Python distributions through uv"
+category = "delivery"
+tags = ["python", "uv", "dependencies", "build-and-delivery", "tooling", "project-management"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.88
+capability = "A publishable project produces installable artifacts understood by standard Python package tooling."
+threat = "Source-only or custom packaging paths omit one distribution form or diverge from declared project metadata."
+expectation = "Libraries and applications may need to be installed outside the development checkout or published to a package index."
+strategy = "Use uv build to produce both a wheel and source distribution from project metadata."
+evidence = [{ type = "build_gate", description = "uv build succeeds from a clean checkout and the resulting wheel and sdist can each be inspected or installed as the declared project version.", required = true }]
+tradeoff = "Maintaining two artifact formats adds packaging configuration and validation work even when only one format is consumed."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#building-and-publishing", summary = "Prescribes uv build and identifies wheel and sdist as its distribution outputs.", confidence = 1.0 }]

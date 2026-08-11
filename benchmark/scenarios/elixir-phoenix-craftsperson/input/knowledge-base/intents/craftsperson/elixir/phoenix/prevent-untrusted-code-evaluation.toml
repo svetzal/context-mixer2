@@ -1,0 +1,17 @@
+id = "guidelines.intent.prevent-untrusted-code-evaluation"
+title = "Prevent untrusted code evaluation"
+category = "architecture"
+tags = ["elixir", "phoenix", "validation", "trust-boundaries", "security"]
+relations = [
+  { type = "specializes", target = "craftsperson/validate-untrusted-input-at-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "User-controlled text cannot execute code with application privileges."
+threat = "Dynamic evaluation converts untrusted input into remote code execution."
+expectation = "Features will accept templates, formulas, snippets, or other text that may resemble executable Elixir."
+strategy = "Never pass untrusted input to Code.eval_string, EEx.eval_string, or equivalent evaluation APIs."
+evidence = [{ type = "security_test", description = "Tainted-input analysis and adversarial tests show user-controlled text reaches only data parsers, never evaluation sinks.", required = true }]
+tradeoff = "User-programmable features require a constrained parser or sandbox rather than convenient native evaluation."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#phoenix-security-non-negotiable", summary = "Categorically forbids evaluating or executing untrusted user input.", confidence = 1.0 }]

@@ -1,0 +1,340 @@
+id = "guidelines.intent.delay-abstraction-until-evidence"
+title = "Delay abstraction until evidence justifies it"
+category = "design"
+tags = ["abstraction", "evidence", "duplication"]
+status = "hypothesized"
+confidence = 0.98
+capability = "The design remains easy to change while its real variation points are still being discovered."
+threat = "Premature indirection freezes guessed similarities into interfaces that resist actual requirements."
+expectation = "Concrete implementations will reveal patterns and exceptions that cannot be predicted reliably in advance."
+strategy = "Tolerate local duplication and extract an abstraction only after repeated evidence reveals a stable concept or variation point."
+evidence = [{ type = "design_review", description = "Each new abstraction is justified by demonstrated repetition, variation, or substitution rather than hypothetical reuse.", required = true }]
+tradeoff = "Some duplication and later refactoring are accepted while evidence accumulates."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/elixir-ecosystem/agents/elixir-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "Delays abstraction until repetition demonstrates it.", confidence = 1.0 }, { type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Inlines premature abstractions until patterns emerge.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Defers abstractions until a pattern demands them.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defn email-receipt [order]
+  {:to (:email order) :subject "Receipt"
+   :body (receipt-text order)})
+
+(defn email-refund [order]
+  {:to (:email order) :subject "Refund"
+   :body (refund-text order)})
+; similar shape, left duplicated — a second occurrence is not
+; yet evidence of a stable "notification" concept
+'''
+bad = '''
+(defprotocol NotificationStrategy
+  (render [this order])
+  (subject [this order]))
+
+(defrecord ReceiptStrategy []
+  NotificationStrategy
+  (render [_ order] (receipt-text order))
+  (subject [_ _] "Receipt"))
+; only one implementation exists or is planned; the protocol
+; froze a guessed seam before any real variation appeared
+'''
+
+[examples.cpp]
+good = '''
+// Second exporter duplicates a little formatting; kept inline
+// until a third format reveals what actually varies.
+std::string exportCsv(const Report& r) {
+  return join(r.rows(), ",");
+}
+std::string exportTsv(const Report& r) {
+  return join(r.rows(), "\t");   // near-twin, tolerated for now
+}
+'''
+bad = '''
+// One concrete format exists; "we'll need more someday".
+class IExportStrategy {
+public:
+  virtual ~IExportStrategy() = default;
+  virtual std::string render(const Report&) = 0;
+  virtual void configure(const StrategyOptions&) = 0;
+};
+class CsvStrategy final : public IExportStrategy {};
+// Sole implementation, sole caller. When XML arrived, its
+// needs didn't fit the guessed interface — which now resists.
+'''
+
+[examples.csharp]
+good = '''
+// two call sites, shapes still diverging — keep them
+// concrete until a third case shows the real seam
+public static string InvoiceFileName(Invoice i) =>
+    $"invoice-{i.Number}-{i.IssuedOn:yyyyMMdd}.pdf";
+
+public static string ReceiptFileName(Receipt r) =>
+    $"receipt-{r.Number}-{r.PaidOn:yyyyMMdd}.pdf";
+'''
+bad = '''
+// one caller today, but "we might add document kinds"
+public interface INameableDocument
+{
+    string Prefix { get; }
+    string Number { get; }
+    DateOnly Stamp { get; }
+}
+
+public abstract class DocumentNamer<T>
+    where T : INameableDocument
+{
+    public virtual string Name(T doc) =>
+        $"{doc.Prefix}-{doc.Number}-{doc.Stamp:yyyyMMdd}.pdf";
+}
+'''
+
+[examples.elixir]
+good = '''
+# one real caller today; the direct call stays direct
+defmodule Notifications do
+  def deliver(msg), do: Mailer.send(msg)
+end
+
+# NOTE: SMS is still in discovery. If it lands we extract
+# a contract THEN — shaped by two real implementations,
+# not one guess.
+'''
+bad = '''
+# one caller, one channel — but a full plug-in system
+defmodule Notifier do
+  @callback deliver(msg :: String.t()) ::
+              :ok | {:error, term()}
+end
+
+defmodule Notifier.Registry do
+  def adapters,
+    do: Application.get_env(:app, :notifiers, [])
+end
+
+defmodule Notifier.Email do
+  @behaviour Notifier
+  def deliver(msg), do: Mailer.send(msg)
+end
+'''
+
+[examples.go]
+good = '''
+// two call sites still look alike; kept concrete until a third
+// use or a real variation proves the shared concept
+func invoiceTotal(lines []Line) Money {
+	var t Money
+	for _, l := range lines {
+		t = t.Add(l.Net())
+	}
+	return t
+}
+
+// quoteTotal is similar today — and free to diverge tomorrow
+'''
+bad = '''
+// one implementation exists; the interface is a guess
+type TotalStrategy interface {
+	Total(ctx context.Context, lines []Line) (Money, error)
+}
+
+type StrategyResolver struct {
+	strategies map[string]TotalStrategy // holds exactly one entry
+}
+
+func (r *StrategyResolver) Resolve(kind string) TotalStrategy {
+	return r.strategies[kind] // every caller passes "default"
+}
+'''
+
+[examples.java]
+good = '''
+// second similar report tolerated as duplication for now;
+// extract a shared concept when a third case proves it stable
+final class DailySalesReport {
+    String render(List<Sale> sales) {
+        return "Daily: " + sales.size() + " sales";
+    }
+}
+
+final class WeeklySalesReport {
+    String render(List<Sale> sales) {
+        return "Weekly: " + sales.size() + " sales";
+    }
+}
+'''
+bad = '''
+// one concrete report exists; a framework guards guesses
+interface Report<T, F extends Formatter<T>> {
+    String render(List<T> rows, F formatter);
+}
+
+abstract class AbstractReportBase<T, F extends Formatter<T>>
+        implements Report<T, F> {
+    protected abstract String title(); // one subclass ever
+}
+
+final class DailySalesReport
+        extends AbstractReportBase<Sale, SaleFormatter> {
+    protected String title() { return "Daily"; }
+}
+'''
+
+[examples.kotlin]
+good = '''
+// two similar exporters, kept concrete on purpose
+fun exportInvoices(month: Month): Csv =
+    Csv(invoiceRepo.forMonth(month).map { it.toRow() })
+
+fun exportReceipts(month: Month): Csv =
+    Csv(receiptRepo.forMonth(month).map { it.toRow() })
+// duplication tolerated until a third exporter shows where
+// the real variation point is
+'''
+bad = '''
+// one concrete use exists; this hierarchy is a guess
+abstract class AbstractExporter<T, F : ExportFormat>(
+    protected val hooks: List<ExportHook<T>>, // never used
+) {
+    open fun preProcess(items: List<T>): List<T> = items
+    abstract fun transform(item: T): F
+    open fun postProcess(result: F): F = result
+}
+class InvoiceExporter :
+    AbstractExporter<Invoice, Csv>(emptyList())
+'''
+
+[examples.python]
+good = '''
+def render_html(report: Report) -> str:
+    rows = "".join(
+        f"<tr><td>{r.name}</td></tr>" for r in report.rows
+    )
+    return f"<table>{rows}</table>"
+
+# NOTE: a second format has not been requested; extract a
+# Renderer protocol when a real second implementation shows
+# up and reveals the actual variation point
+'''
+bad = '''
+class ReportRenderer(Protocol):
+    def render(self, report: Report) -> str: ...
+
+class RendererFactory:
+    def create(self, kind: str) -> ReportRenderer:
+        # one format exists; "kind" is a guessed variation
+        # point frozen into an interface on day one
+        match kind:
+            case "html": return HtmlRenderer()
+            case _: raise UnsupportedFormat(kind)
+'''
+
+[examples.ruby]
+good = '''
+# two similar mailers left as duplication — the shape has not
+# stabilized; extract when a third real variant appears
+def welcome_email(user:)
+  Mail.deliver(to: user.email, subject: "Welcome!",
+               body: render("welcome", user: user))
+end
+
+def receipt_email(order:)
+  Mail.deliver(to: order.email, subject: "Your receipt",
+               body: render("receipt", order: order))
+end
+'''
+bad = '''
+# one caller, one format — abstraction built from a guess
+class NotificationStrategyFactory
+  REGISTRY = { email: EmailStrategy }.freeze # only entry ever
+
+  def self.for(channel:)
+    REGISTRY.fetch(channel).new # frozen guess resists change
+  end
+
+  class EmailStrategy
+    def deliver(payload:) = Mail.deliver(**payload)
+  end
+end
+'''
+
+[examples.rust]
+good = '''
+// two variants stay inline; extraction waits for a third
+// real case to reveal the actual variation point
+fn shipping(dest: &Dest) -> Cents {
+    match dest {
+        Dest::Domestic(kg) => Cents(500) + per_kg(*kg, 120),
+        Dest::Us(kg) => Cents(900) + per_kg(*kg, 180),
+    }
+}
+'''
+bad = '''
+// one implementor; guessed similarity frozen into a trait
+pub trait RateStrategy {
+    fn base(&self) -> Cents;
+    fn per_kg_rate(&self) -> Cents;
+    fn surcharge(&self, _kg: u32) -> Cents { Cents(0) } // unused
+}
+pub struct DomesticRates; // the only implementor anywhere
+impl RateStrategy for DomesticRates {
+    fn base(&self) -> Cents { Cents(500) }
+    fn per_kg_rate(&self) -> Cents { Cents(120) }
+}
+'''
+
+[examples.swift]
+good = '''
+// Two similar needs, tolerated as duplication for now.
+func csvLine(for order: Order) -> String {
+    "\(order.id),\(order.total)"
+}
+
+func csvLine(for refund: Refund) -> String {
+    "\(refund.id),\(refund.amount)"
+}
+// extract a shared concept when a third case proves the
+// shape — duplication is cheaper than the wrong interface
+'''
+bad = '''
+protocol ReportSink {
+    associatedtype Output
+    func write(_ report: Report) -> Output
+}
+
+struct CSVSink: ReportSink {
+    func write(_ report: Report) -> String { report.csv }
+}
+// one conformer, no second case in sight — the guessed
+// interface now dictates what any future exporter must fit
+'''
+
+[examples.typescript]
+good = '''
+// Similar shape twice — kept concrete until a third use
+// proves a stable concept worth extracting.
+export async function fetchUser(id: string): Promise<User> {
+  const res = await api.get(`/users/${id}`);
+  return UserSchema.parse(res.data);
+}
+export async function fetchOrder(id: string): Promise<Order> {
+  const res = await api.get(`/orders/${id}`);
+  return OrderSchema.parse(res.data);
+}
+'''
+bad = '''
+// One caller exists, yet a framework is born; the guessed
+// variation points are now frozen into a public contract.
+interface Repo<T, K, F extends Filter<T>> {
+  byId(id: K): Promise<T>;
+  query(f: F, page?: Pagination): Promise<Page<T>>;
+}
+export abstract class BaseRestRepo<T, K, F extends Filter<T>>
+  implements Repo<T, K, F> {
+  abstract readonly path: string;
+  abstract byId(id: K): Promise<T>;
+  abstract query(f: F, page?: Pagination): Promise<Page<T>>;
+}
+'''

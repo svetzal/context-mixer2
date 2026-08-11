@@ -1,0 +1,17 @@
+id = "guidelines.intent.current-platform-compatibility"
+title = "Stay compatible with the evolving Android platform"
+category = "design"
+tags = ["kotlin", "android", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to run safely on supported Android versions without relying on removed or discouraged behavior."
+threat = "Platform updates and deprecations make previously valid APIs unsafe or unsupported."
+expectation = "Android releases and target-SDK requirements will continue to change."
+strategy = "Continuously review Android platform updates and deprecations and migrate affected code deliberately."
+evidence = [{ type = "gate", description = "Target-SDK upgrade checks show no unaddressed platform deprecations and tests pass on the supported API matrix.", required = true }]
+tradeoff = "Compatibility work consumes capacity and may require version guards or dropping older devices."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#continuous-improvement", summary = "The source requires staying current with Android platform updates and deprecations.", confidence = 1.0 }]

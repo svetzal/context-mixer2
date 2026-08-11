@@ -1,0 +1,17 @@
+id = "guidelines.intent.focused-functions"
+title = "Keep behavior changes locally comprehensible"
+category = "design"
+tags = ["kotlin", "android", "testing", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to understand, test, and modify a unit of behavior without unrelated context."
+threat = "Large multi-purpose functions entangle responsibilities and enlarge regression scope."
+expectation = "Incremental feature growth will otherwise accumulate branches and side effects in existing functions."
+strategy = "Keep functions small, focused, and responsible for one coherent behavior."
+evidence = [{ type = "gate", description = "Complexity checks and review identify no functions combining unrelated decisions or side effects.", required = true }]
+tradeoff = "Excessive decomposition can scatter simple flows across too many tiny functions."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#code-quality", summary = "The source explicitly requires small, focused, single-responsibility functions.", confidence = 1.0 }]

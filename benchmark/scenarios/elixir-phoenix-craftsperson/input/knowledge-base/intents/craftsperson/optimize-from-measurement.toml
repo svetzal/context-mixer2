@@ -1,0 +1,315 @@
+id = "guidelines.intent.optimize-from-measurement"
+title = "Optimize from measurement"
+category = "performance"
+tags = ["profiling", "evidence", "optimization"]
+status = "hypothesized"
+confidence = 0.96
+capability = "Performance work improves an important observed constraint without sacrificing clarity for imagined bottlenecks."
+threat = "Speculative optimization adds complexity while targeting code that does not materially affect real workloads."
+expectation = "Human intuition about bottlenecks will often be wrong and workload priorities will vary by project."
+strategy = "Define the performance requirement, measure a representative baseline, optimize the demonstrated bottleneck, and compare the result."
+evidence = [{ type = "benchmark", description = "A representative measurement shows the change improves a stated performance requirement without unacceptable regression elsewhere.", required = true }]
+tradeoff = "Measurement infrastructure takes time and may not reproduce every production workload or long-tail condition."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#6-performance-considerations", summary = "Defines critical performance targets and optimizes measured hotspots.", confidence = 1.0 }, { type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#decision-making-framework", summary = "Reserves specialized performance primitives for demonstrated need.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#optional-for-performance-sensitive-code", summary = "Benchmarks performance-sensitive code before relying on optimization claims.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; requirement: report render p95 < 200ms (SLO dashboard)
+;; baseline (criterium, prod-shaped 50k rows): 640ms
+;; profile: 82% of time re-parsing dates inside the row loop
+(defn render-report [rows]
+  (let [parse (memoize parse-date)]   ; the measured hotspot
+    (mapv #(row-html (update % :date parse)) rows)))
+;; after, same benchmark: 96ms — SLO met, no regression in
+;; the memory profile
+'''
+bad = '''
+(defn render-report [rows]
+  ; rewrote with transients because it "felt slow" — no
+  ; stated requirement, no baseline, no profile
+  (loop [r (seq rows), acc (transient [])]
+    (if r
+      (recur (next r) (conj! acc (row-html (first r))))
+      (persistent! acc))))
+; the actual bottleneck (date re-parsing) is untouched;
+; clarity was spent and nothing measurable was bought
+'''
+
+[examples.cpp]
+good = '''
+Requirement: catalog search p95 < 150ms (SLO doc, sec 3).
+
+Baseline (perf + representative 10k-query replay):
+  p95 = 412ms; 71% of samples inside SkuIndex::rescan().
+Change: cache the rescan result; invalidate on catalog write.
+After, same replay: p95 = 96ms; write path unchanged (+0.4%).
+
+Benchmark committed: bench/sku_index_bench.cpp (Google
+Benchmark), wired into the nightly perf job as a guardrail.
+'''
+bad = '''
+// No profile, no stated requirement — "malloc is slow, right?"
+char g_scratch[64 * 1024];              // hand-rolled arena...
+void* fastAlloc(std::size_t n) {        // ...in the config
+  static std::size_t used = 0;          // loader, which runs
+  void* p = g_scratch + used;           // exactly once at boot
+  used += (n + 15) & ~std::size_t{15};
+  return p;                             // no bounds, no free
+}
+// complexity added to a path no measurement ever implicated
+'''
+
+[examples.csharp]
+good = '''
+# requirement: p95 search under 200ms (SLO doc §3)
+$ dotnet run -c Release --project bench
+  Search/baseline   p95 412ms
+
+# profile: 78% of time in Regex.Match per row
+# change: compile the pattern once, reuse it
+$ dotnet run -c Release --project bench
+  Search/compiled   p95 96ms   (allocs unchanged)
+
+$ dotnet test
+  Passed! 214 tests
+'''
+bad = '''
+// no requirement, no baseline — "for performance"
+public string JoinTags(IEnumerable<string> tags)
+{
+    // hand-rolled to dodge LINQ "overhead" in a path
+    // that runs once per deploy
+    var sb = new StringBuilder(4096);
+    foreach (var t in tags) sb.Append(t).Append(',');
+    return sb.Length == 0
+        ? "" : sb.ToString(0, sb.Length - 1);
+}
+'''
+
+[examples.elixir]
+good = '''
+Requirement: /reports p95 under 500ms (currently 2.1s)
+
+$ mix run bench/report_bench.exs      # benchee baseline
+  build_rows    1.92 s   <- 91% of the budget lives here
+
+Fix: replace the N+1 lookups in build_rows with one
+preload. Then compare against the same benchmark:
+
+$ mix run bench/report_bench.exs
+  build_rows    140 ms   (p95 now 310ms — requirement met)
+'''
+bad = '''
+# no requirement, no baseline — "maps felt slow here",
+# so the readable pipeline became a hand-rolled loop
+def total(items), do: t(items, 0)
+
+defp t([], acc), do: acc
+defp t([%{p: p, q: q} | rest], acc),
+  do: t(rest, acc + p * q)
+
+# a later profile put this path at 0.3% of request time;
+# the clarity was spent on nothing
+'''
+
+[examples.go]
+good = '''
+// pprof on a prod trace: 62% of request time in sortLines;
+// stated requirement: p95 render < 200ms
+func BenchmarkSortLines(b *testing.B) {
+	lines := loadFixture(b, "testdata/prod-sample.txt")
+	for b.Loop() {
+		sortLines(lines)
+	}
+}
+
+// before: 480ms/op — after comparator change: 68ms/op
+// staging replay p95: 143ms; requirement met, change kept
+'''
+bad = '''
+// no profile, no requirement, no baseline — "maps feel slow"
+type shardedUserCache struct {
+	shards [64]struct {
+		mu sync.Mutex
+		m  map[string]*User
+	}
+}
+
+func (c *shardedUserCache) shard(k string) int {
+	return int(fnv1a(k) % 64) // complexity added, win unmeasured
+}
+
+// the actual bottleneck (an N+1 query) remains untouched
+'''
+
+[examples.java]
+good = '''
+Perf note (PR #482):
+  Requirement: p95 search < 300 ms       (SLO doc, section 4)
+  Baseline (JMH + replayed prod traces): p95 612 ms
+  Profile: 71% of time in Category.matches —
+           the regex was recompiled on every call
+  Change:  precompile Pattern once per category
+  After:   p95 187 ms, p99 240 ms; allocations -38%
+  Checked: no other endpoint regressed (dash, 2026-07-20)
+'''
+bad = '''
+// no requirement, no baseline, no profile — "felt slow",
+// so a readable stream became hand-rolled index juggling
+for (int i = 0, n = cats.size(); i < n; ++i) {
+    final Category c = cats.get(i);
+    if (c != null & c.matches(q)) {  // & to "save a branch"
+        out.add(c);
+    }
+}
+// still slow: the actual cost was the regex recompiled
+// inside matches(), which was never measured
+'''
+
+[examples.kotlin]
+good = '''
+// requirement: p95 tokenize < 200ms on 1MB documents
+// JMH baseline: 340ms; profiler: 78% in Regex compilation
+private val tokenPattern = Regex("\\w+") // hoisted once
+
+fun tokenize(text: String): List<String> =
+    tokenPattern.findAll(text).map { it.value }.toList()
+
+// same benchmark after the change: p95 = 140ms — met
+'''
+bad = '''
+// never measured; "felt slow", so clarity was spent on a
+// hand-rolled scanner nobody asked for
+fun tokenize(text: String): List<String> {
+    val out = ArrayList<String>(text.length / 4) // guess
+    var i = 0
+    while (i < text.length) {
+        i = scanWordManually(text, i, out) // the hot path
+    }                                      // was the DB call
+    return out
+}
+'''
+
+[examples.python]
+good = '''
+Requirement: nightly import finishes 50k rows in < 2 s.
+
+$ python -m pytest tests/perf --benchmark-only
+baseline    4.81 s   # profile: 92% in per-row INSERT
+
+change: batch rows with executemany(page_size=500)
+
+after       1.37 s   # requirement met; full-suite runtime
+                     # unchanged, profile attached to PR
+'''
+bad = '''
+# no requirement stated, no baseline measured
+def parse_ids(text: str) -> list[int]:
+    res: list[int] = []
+    app = res.append           # cached lookup "for speed"
+    for chunk in text.split(","):
+        app(int(chunk, 10))
+    return res
+# readability spent on a path profiling never flagged;
+# the actual bottleneck (N+1 queries) is untouched
+'''
+
+[examples.ruby]
+good = '''
+Requirement: search endpoint p95 < 200ms (SLO doc).
+
+$ ruby benchmarks/search_bench.rb        # baseline first
+  before: p95 412ms — 88% of time in Product.search N+1
+
+Fix: preload variants (single query).
+
+  after:  p95 121ms, allocations -63%, suite green.
+Benchmark committed at benchmarks/search_bench.rb.
+'''
+bad = '''
+# no requirement, no baseline, no measurement — just vibes
+def search(term:)
+  # readable AR scope rewritten as hand-rolled SQL "for speed";
+  # the actual cost was an N+1 elsewhere, still present
+  DB.fetch("SELECT * FROM products WHERE name LIKE ?",
+           "%#{term}%")
+    .map { |r| Product.allocate.tap { |p| p.init_with(r) } }
+end
+'''
+
+[examples.rust]
+good = '''
+Requirement: p95 import under 2s for 50k rows.
+
+$ cargo bench import_50k              # baseline
+import_50k    time: [3.41 s 3.44 s 3.48 s]
+# profile: 78% of time in per-row String allocation
+
+Change: reuse a single row buffer across iterations.
+
+$ cargo bench import_50k              # compared after
+import_50k    time: [1.58 s 1.62 s 1.66 s]   # target met
+'''
+bad = '''
+// no requirement, no baseline, no profile — "felt slow"
+fn import(input: &[u8]) -> Vec<Row> {
+    // hand-rolled unsafe parser replacing the clear one;
+    // a later measurement put 92% of wall time in the
+    // network fetch this function never touches
+    unsafe { simd_split_unchecked(input) }
+        .iter()
+        .map(Row::from_chunk)
+        .collect()
+}
+'''
+
+[examples.swift]
+good = '''
+Requirement: feed decode under 16 ms p95 on iPhone 12.
+Baseline (os_signpost, 500 recorded payloads):
+  41 ms p95 — 87% inside ISO8601 date parsing.
+
+Change: reuse one cached ISO8601DateFormatter per decode.
+After: 12 ms p95, memory flat.
+Benchmark committed as FeedDecodePerfTests, threshold 16 ms.
+'''
+bad = '''
+// no requirement, no baseline — "dictionaries feel slow"
+final class Feed {
+    private var cache = NSCache<NSString, Entry>()
+    private let pool = UnsafeMutablePointer<Entry>
+        .allocate(capacity: 4096)  // arena for ~30 items
+}
+// profiling later showed decode was never the bottleneck;
+// the complexity stays, the jank remains
+'''
+
+[examples.typescript]
+good = '''
+Requirement: search endpoint p95 under 200 ms.
+
+$ node bench/search.bench.mjs --baseline
+p95 412 ms — profile attributes 78% to per-row JSON.parse
+
+Change: parse the payload once per request, not per row.
+
+$ node bench/search.bench.mjs
+p95 143 ms (baseline 412 ms). Requirement met; write path
+unchanged (p95 88 ms -> 87 ms).
+'''
+bad = '''
+// No requirement, no baseline, no profile — just a hunch.
+// A readable reduce became a manual bitwise loop for a
+// list that averages 14 items per request.
+export function total(lines: Line[]): number {
+  let t = 0;
+  let i = lines.length;
+  while (i--) {
+    t = (t + ((lines[i]!.cents | 0) * (lines[i]!.qty | 0))) | 0;
+  } // the | 0 now silently caps totals at 2^31 cents
+  return t;
+}
+'''

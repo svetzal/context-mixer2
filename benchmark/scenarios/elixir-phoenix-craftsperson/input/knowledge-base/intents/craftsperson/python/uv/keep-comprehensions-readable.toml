@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-comprehensions-readable"
+title = "Keep comprehensions shallow and readable"
+category = "design"
+tags = ["python", "uv", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Compact transformations remain understandable without mentally executing deeply nested expression syntax."
+threat = "Nested comprehensions compress multiple control-flow decisions into an opaque expression."
+expectation = "Transformations will gain filtering and nesting as data shapes become more complex."
+strategy = "Use list, dict, and set comprehensions for simple transformations, but switch to explicit loops beyond two nesting levels."
+evidence = [{ type = "static_review", description = "Comprehensions are at most two levels deep and each can be explained as one simple transformation or filter.", required = true }]
+tradeoff = "Explicit loops use more lines and can obscure the high-level transformation with mutation mechanics."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#comprehensions-and-generators", summary = "Encourages comprehensions for simple transformations and caps nesting at two levels.", confidence = 1.0 }]

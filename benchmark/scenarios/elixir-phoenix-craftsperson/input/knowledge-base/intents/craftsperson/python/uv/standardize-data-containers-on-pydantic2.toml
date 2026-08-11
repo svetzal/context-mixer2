@@ -1,0 +1,17 @@
+id = "guidelines.intent.standardize-data-containers-on-pydantic2"
+title = "Standardize data containers on Pydantic 2"
+category = "design"
+tags = ["python", "uv", "pydantic", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Data containers enforce validation and share one serialization and schema model across layers."
+threat = "Multiple container frameworks produce inconsistent construction, validation, serialization, and schema behavior."
+expectation = "Internal and external data models will cross API, persistence, and domain boundaries."
+strategy = "Represent data containers as Pydantic 2 models rather than dataclasses."
+evidence = [{ type = "static_review", description = "Project-owned data containers subclass Pydantic 2 BaseModel and no dataclass is introduced for that role.", required = true }]
+tradeoff = "Pydantic adds a runtime dependency, construction overhead, and framework-specific semantics to internal models."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#data-structures", summary = "Mandates Pydantic 2 models instead of dataclasses for data containers to unify validation, serialization, and schemas.", confidence = 1.0 }]

@@ -1,0 +1,369 @@
+id = "guidelines.intent.put-gateways-at-external-boundaries"
+title = "Put gateways at external boundaries"
+category = "architecture"
+tags = ["gateways", "external-systems", "dependency-inversion"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Core behavior can evolve and be tested independently from external systems and vendor implementations."
+threat = "Database, network, filesystem, clock, platform, or vendor details leak into decision-making code."
+expectation = "External services and infrastructure will be unavailable in tests and will change on a different cadence from domain policy."
+strategy = "Route each external interaction through a narrow application-owned gateway contract at the system boundary."
+evidence = [{ type = "architecture_review", description = "External implementation types and calls remain behind owned boundary contracts.", required = true }]
+tradeoff = "Gateway contracts add mapping and indirection and can become ceremony around stable trivial APIs."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#code-improvement-patterns", summary = "Places external interactions behind gateway protocols.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Requires gateways at external boundaries.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Isolates external effects behind application-owned gateways.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defprotocol Rates   ; narrow, application-owned contract
+  (rate-for [this currency]))
+
+;; core depends only on the contract:
+(defn convert [rates amount currency]
+  (* amount (rate-for rates currency)))
+
+;; vendor detail lives at the boundary, swappable:
+(defrecord HttpRates [http]
+  Rates
+  (rate-for [_ ccy]
+    (-> (http (str "/rates/" ccy)) :body :rate)))
+'''
+bad = '''
+(defn convert [amount currency]
+  ; vendor HTTP call inside the decision — the core now
+  ; needs a live endpoint to compute a multiplication
+  (let [resp (client/get
+              (str "https://fx.example.com/rates/" currency)
+              {:as :json})]
+    (* amount (get-in resp [:body :rate]))))
+'''
+
+[examples.cpp]
+good = '''
+// Application-owned contract at the boundary:
+struct PaymentGateway {
+  virtual ~PaymentGateway() = default;
+  virtual Result<Receipt> charge(Money, CardToken) = 0;
+};
+
+// Core sees only the contract it owns:
+Result<Receipt> Checkout::settle(const Cart& cart) {
+  return gateway_.charge(cart.total(), cart.cardToken());
+}
+// adapters/stripe_gateway.cpp is the only file in the
+// tree that includes <stripe/stripe.h>
+'''
+bad = '''
+#include <stripe/stripe.h>     // vendor SDK inside the core
+
+Result<Receipt> Checkout::settle(const Cart& cart) {
+  stripe::Client client(std::getenv("STRIPE_KEY"));
+  stripe::ChargeRequest req;   // vendor types shape the domain
+  req.amount_cents = cart.total().cents();
+  auto rsp = client.charges().create(req);
+  if (rsp.http_status == 402) return Err::CardDeclined;
+  return Receipt{rsp.body["id"].asString()};
+}
+// testing settle() now requires Stripe; so does leaving them
+'''
+
+[examples.csharp]
+good = '''
+public interface IRateSource   // owned contract
+{
+    Task<TaxRate> For(Province p, CancellationToken ct);
+}
+
+// core depends on the contract, never the vendor
+public sealed class Pricer(IRateSource rates)
+{
+    public async Task<decimal> Total(Order o,
+        CancellationToken ct) =>
+        o.Net * (1 + (await rates
+            .For(o.Province, ct)).Value);
+}
+'''
+bad = '''
+public sealed class Pricer
+{
+    public async Task<decimal> Total(Order o)
+    {
+        // vendor SDK and SQL inside decision code:
+        // untestable without a real database
+        using var conn =
+            new SqlConnection(Config.ConnString);
+        var rate = await conn.QuerySingleAsync<decimal>(
+            "select rate from tax where prov = @p",
+            new { p = o.Province.Code });
+        return o.Net * (1 + rate);
+    }
+}
+'''
+
+[examples.elixir]
+good = '''
+# a narrow owned contract at the boundary
+defmodule Pricing.WeatherPort do
+  @callback storm?(city :: String.t()) :: boolean()
+end
+
+defmodule Pricing do
+  @weather Application.compile_env(:app, :weather_port)
+
+  # the decision never sees HTTP, URLs, or vendor types
+  def surge_multiplier(city) do
+    if @weather.storm?(city), do: 1.5, else: 1.0
+  end
+end
+'''
+bad = '''
+defmodule Pricing do
+  def surge_multiplier(city) do
+    # vendor client, URL, and response shape all inside
+    # decision-making code; testing the 1.5x rule now
+    # needs a network (or a mock of someone else's API)
+    %Req.Response{body: body} =
+      Req.get!("https://api.wx.example/v1/#{city}")
+
+    if body["storm"], do: 1.5, else: 1.0
+  end
+end
+'''
+
+[examples.go]
+good = '''
+// the core depends on an owned contract; postgres lives in
+// one adapter behind it at the boundary
+type CreditScores interface {
+	Score(ctx context.Context, id string) (int, error)
+}
+
+func ApproveLoan(ctx context.Context, cs CreditScores, id string) error {
+	score, err := cs.Score(ctx, id)
+	if err != nil {
+		return fmt.Errorf("score lookup %s: %w", id, err)
+	}
+	if score < 640 {
+		return ErrDeclined
+	}
+	return nil
+}
+'''
+bad = '''
+// vendor SQL and driver types inside the decision logic
+func ApproveLoan(ctx context.Context, db *sql.DB, id string) error {
+	row := db.QueryRowContext(ctx,
+		`SELECT score FROM credit_reports WHERE id = $1`, id)
+	var score int
+	if err := row.Scan(&score); err != nil {
+		return err
+	}
+	if score < 640 { // the rule is untestable without postgres
+		return ErrDeclined
+	}
+	return nil
+}
+'''
+
+[examples.java]
+good = '''
+// the core depends only on owned contracts
+interface Subscriptions {
+    List<Subscription> dueBy(Instant time);
+}
+interface Payments {
+    void charge(CustomerId id, Money amount);
+}
+
+class SubscriptionRenewal {
+    void renewDue(Instant now) {
+        subscriptions.dueBy(now).forEach(s ->
+            payments.charge(s.customer(), s.fee()));
+    }
+}
+// DynamoDbSubscriptions / StripePayments sit at the edge
+'''
+bad = '''
+class SubscriptionRenewal {
+    void renewDue() {
+        var items = DynamoDbClient.create()   // vendor SDK
+            .scan(r -> r.tableName("subs"))   // inside the
+            .items();                         // decision code
+        for (var item : items) {
+            var renewAt = Instant.parse(
+                item.get("renewAt").s());
+            if (Instant.now().isAfter(renewAt)) {
+                new StripeClient(API_KEY)     // second vendor
+                    .charge(item.get("cust").s());
+            }
+        }
+    }
+}
+'''
+
+[examples.kotlin]
+good = '''
+interface ExchangeRates {               // owned contract
+    suspend fun rate(from: Currency, to: Currency): Rate
+}
+
+class PricingService(private val rates: ExchangeRates) {
+    suspend fun quote(p: Product, target: Currency): Money =
+        p.basePrice.convert(rates.rate(p.currency, target))
+} // the core never sees HTTP, JSON, or the vendor SDK
+'''
+bad = '''
+class PricingService(private val http: OkHttpClient) {
+    suspend fun quote(p: Product, target: Currency): Money {
+        // vendor URL, wire format, and HTTP client leak
+        // straight into decision-making code
+        val req = Request.Builder()
+            .url("https://fx.vendor.example/v1/${p.currency}")
+            .build()
+        val body = http.newCall(req).execute().body!!.string()
+        val rate = JSONObject(body).getDouble("mid")
+        return Money((p.basePrice.cents * rate).toLong())
+    }
+}
+'''
+
+[examples.python]
+good = '''
+class DocumentStore(Protocol):   # owned contract, at the edge
+    def fetch(self, doc_id: DocId) -> Document: ...
+
+def summarize(doc_id: DocId, store: DocumentStore) -> Summary:
+    doc = store.fetch(doc_id)
+    return Summary(words=len(doc.body.split()))
+
+class S3DocumentStore:           # vendor detail stays here
+    def fetch(self, doc_id: DocId) -> Document:
+        obj = self._s3.get_object(Bucket=self._b, Key=doc_id)
+        return Document(body=obj["Body"].read().decode())
+'''
+bad = '''
+def summarize(doc_id: str) -> Summary:
+    s3 = boto3.client("s3")   # vendor call inside the
+    obj = s3.get_object(      # decision-making code
+        Bucket="docs", Key=doc_id)
+    body = obj["Body"].read().decode()
+    return Summary(words=len(body.split()))
+    # counting words now requires AWS credentials, and a
+    # vendor swap touches every function like this one
+'''
+
+[examples.ruby]
+good = '''
+# owned contract at the boundary; vendor details stop here
+class FixerRateSource
+  def usd_to(currency:)
+    body = http.get("/latest?to=#{currency}").body
+    JSON.parse(body).fetch("rate")
+  end
+end
+
+# core depends only on the narrow owned contract
+def convert(cents:, currency:, rates:)
+  (cents * rates.usd_to(currency: currency)).round
+end
+'''
+bad = '''
+def convert(cents:, currency:)
+  # vendor URL, HTTP client, and JSON schema inside the core
+  res = Net::HTTP.get(URI(
+    "https://api.fixer.io/latest?to=#{currency}"
+  ))
+  rate = JSON.parse(res)["rates"][currency] # vendor shape leak
+  (cents * rate).round # untestable without the live API
+end
+'''
+
+[examples.rust]
+good = '''
+// the core sees only an application-owned contract
+pub trait RateSource {
+    fn rate(&self, from: Ccy, to: Ccy) -> Result<Rate, RateErr>;
+}
+pub fn convert(src: &impl RateSource, amt: Money, to: Ccy)
+    -> Result<Money, RateErr> {
+    Ok(amt * src.rate(amt.ccy(), to)?)
+}
+// the vendor type appears only inside the adapter
+pub struct EcbHttpRates { client: reqwest::blocking::Client }
+'''
+bad = '''
+// vendor client and wire format leak into the decision
+pub fn convert(client: &reqwest::blocking::Client, amt: Money,
+               to: Ccy) -> Result<Money, ConvErr> {
+    let body: serde_json::Value = client
+        .get(format!("https://api.ecb.example/{}", to.code()))
+        .send()?
+        .json()?; // core behavior now needs live HTTP to test
+    let rate = body["rates"][to.code()].as_f64()
+        .ok_or(ConvErr::UnexpectedShape)?;
+    Ok(amt * rate)
+}
+'''
+
+[examples.swift]
+good = '''
+protocol BillingStatusProviding {
+    func isDelinquent(_ user: User) async throws -> Bool
+}
+
+struct PricingEngine {
+    let billing: BillingStatusProviding
+    func discount(for user: User) async throws -> Decimal {
+        try await billing.isDelinquent(user) ? 0 : 0.1
+    }
+}
+// StripeBillingGateway implements the contract at the edge;
+// the core never names the vendor
+'''
+bad = '''
+struct PricingEngine {
+    func discount(for user: User) async throws -> Decimal {
+        // vendor URL and transport inside decision code
+        let url = URL(string:
+            "https://api.stripe.com/v1/customers/\(user.id)")!
+        let (data, _) = try await URLSession.shared
+            .data(from: url)
+        let c = try JSONDecoder()
+            .decode(StripeCustomer.self, from: data)
+        return c.delinquent ? 0 : 0.1
+    }
+}
+'''
+
+[examples.typescript]
+good = '''
+// Owned contract; the core depends on this, not on Stripe.
+export interface PaymentGateway {
+  charge(cents: number, token: string): Promise<ChargeResult>;
+}
+
+// Decision code sees only the boundary contract.
+export async function checkout(
+  cart: Cart, pay: PaymentGateway,
+): Promise<ChargeResult> {
+  return pay.charge(totalCents(cart), cart.paymentToken);
+}
+'''
+bad = '''
+import Stripe from "stripe";
+
+// Vendor SDK constructed and called inside decision code;
+// core tests need Stripe, and changing vendors rewrites
+// business logic.
+export async function checkout(cart: Cart): Promise<void> {
+  const stripe = new Stripe(process.env.STRIPE_KEY!);
+  const intent = await stripe.paymentIntents.create({
+    amount: totalCents(cart), currency: "usd",
+    payment_method: cart.paymentToken, confirm: true,
+  });
+  if (intent.status !== "succeeded")
+    throw new Error("payment failed");
+}
+'''

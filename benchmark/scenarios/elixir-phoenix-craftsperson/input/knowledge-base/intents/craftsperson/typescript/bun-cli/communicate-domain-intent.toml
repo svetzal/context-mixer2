@@ -1,0 +1,17 @@
+id = "guidelines.intent.communicate-domain-intent"
+title = "Make code communicate domain intent"
+category = "design"
+tags = ["typescript", "bun", "cli", "dependencies", "readability", "clarity"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Maintainers can infer domain concepts, contracts, and responsibilities directly from the code."
+threat = "Cryptic names, opaque signatures, and arbitrary module boundaries hide why the system is shaped as it is."
+expectation = "Future maintainers will need to change unfamiliar CLI behavior without relying on its original author."
+strategy = "Choose intention-revealing names and signatures, and align module boundaries with domain concepts."
+evidence = [{ type = "review", description = "A maintainer unfamiliar with the change can explain each changed module's responsibility and public contract from its names and signatures without consulting implementation details.", required = true }]
+tradeoff = "More explicit names and domain-shaped modules can be verbose and require refactoring as the domain vocabulary evolves."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Declares code to be communication and asks names, signatures, and module boundaries to reveal intent.", confidence = 1.0 }]

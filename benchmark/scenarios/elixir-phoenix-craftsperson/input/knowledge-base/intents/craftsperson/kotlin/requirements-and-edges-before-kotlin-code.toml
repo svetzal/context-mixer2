@@ -1,0 +1,17 @@
+id = "guidelines.intent.requirements-and-edges-before-kotlin-code"
+title = "Clarify behavior and edge cases before implementation"
+category = "testing"
+tags = ["kotlin", "testing", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to implement the intended business behavior without avoidable rework."
+threat = "Coding against ambiguous requirements bakes accidental assumptions into APIs and tests."
+expectation = "Feature requests will omit some business rules, failure behavior, and boundary cases."
+strategy = "Clarify business logic and edge cases before choosing types or writing implementation code."
+evidence = [{ type = "review", description = "Feature acceptance criteria or tests identify normal, failure, and boundary behavior before the implementation is considered complete.", required = true }]
+tradeoff = "Up-front clarification delays visible coding and cannot eliminate every uncertainty."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#workflow-pattern", summary = "The source begins feature work by understanding requirements and clarifying business logic and edge cases.", confidence = 1.0 }]

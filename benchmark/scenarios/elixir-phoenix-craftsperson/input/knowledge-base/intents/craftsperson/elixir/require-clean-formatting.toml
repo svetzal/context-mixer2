@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-clean-formatting"
+title = "Require canonical formatting"
+category = "quality"
+tags = ["elixir", "formatting", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Source formatting stays deterministic and does not consume review attention."
+threat = "Style drift creates noisy diffs and hides substantive changes."
+expectation = "Many contributors and automated tools will edit the same Elixir code."
+strategy = "Gate completion on mix format --check-formatted under the pinned toolchain."
+evidence = [{ type = "gate", description = "mix format --check-formatted exits successfully in CI for the complete source tree.", required = true }]
+tradeoff = "Contributors must accept formatter output and toolchain-sensitive reformatting may block otherwise correct work."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#quality-assurance-process", summary = "Makes the formatter check the first mandatory completion gate.", confidence = 1.0 }]

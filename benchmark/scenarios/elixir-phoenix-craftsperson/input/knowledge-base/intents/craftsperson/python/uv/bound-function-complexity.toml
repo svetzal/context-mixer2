@@ -1,0 +1,17 @@
+id = "guidelines.intent.bound-function-complexity"
+title = "Bound function complexity"
+category = "design"
+tags = ["python", "uv", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Individual functions remain locally understandable and testable as control flow grows."
+threat = "Branching and nested control flow concentrate too many decisions in one function."
+expectation = "Features will add conditional behavior to existing paths over time."
+strategy = "Keep McCabe complexity at or below 10 and extract cohesive, well-named private functions when the bound is exceeded."
+evidence = [{ type = "static_gate", description = "Configured complexity checks report no function above McCabe 10.", required = true }]
+tradeoff = "Mechanical extraction can scatter one workflow across too many small functions and obscure the overall flow."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Sets a McCabe complexity ceiling of 10 and directs decomposition of more complex functions.", confidence = 1.0 }]

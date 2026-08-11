@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralized-version-catalog"
+title = "Keep dependency versions consistent across modules"
+category = "delivery"
+tags = ["kotlin", "android", "dependencies", "builds", "configuration", "reproducibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to upgrade and audit libraries from a single coherent dependency inventory."
+threat = "Scattered version declarations create incompatible module combinations and hidden drift."
+expectation = "The application will add modules and update Compose, Retrofit, Android plugins, and other libraries."
+strategy = "Declare versions, libraries, and plugins in gradle/libs.versions.toml and reference the catalog from modules."
+evidence = [{ type = "gate", description = "Build-file inspection finds no unexplained hard-coded dependency versions outside the version catalog, and dependency resolution is consistent.", required = true }]
+tradeoff = "Catalog indirection makes the resolved coordinate less visible at a call site and adds alias maintenance."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#version-catalogs-gradlelibsversionstoml", summary = "The source presents version catalogs as the Gradle dependency-management pattern.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.reset-streams-for-derived-views"
+title = "Reset streams for derived collection views"
+category = "reliability"
+tags = ["elixir", "phoenix", "security", "persistence", "data-integrity", "transactions"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Filtered, pruned, or refreshed collection views exactly match authoritative query results."
+threat = "Treating streams as enumerable or deleting guessed items leaves stale or incomplete client state."
+expectation = "Users will repeatedly change filters while underlying records also change."
+strategy = "Refetch the authoritative collection and restream it with reset: true when deriving a new view."
+evidence = [{ type = "liveview_test", description = "Successive filter and refresh operations render exactly the latest query result with no stale stream items.", required = true }]
+tradeoff = "Resetting refetches and retransmits the collection instead of applying a minimal local delta."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#stream-limitations", summary = "Says streams are not enumerable and requires refetch plus reset for filtering, pruning, and refresh.", confidence = 1.0 }]

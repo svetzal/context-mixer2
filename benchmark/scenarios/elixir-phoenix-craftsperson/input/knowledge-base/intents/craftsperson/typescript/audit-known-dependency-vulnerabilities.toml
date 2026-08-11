@@ -1,0 +1,17 @@
+id = "guidelines.intent.audit-known-dependency-vulnerabilities"
+title = "Gate changes on known dependency vulnerabilities"
+category = "delivery"
+tags = ["typescript", "security", "dependencies", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to avoid shipping dependencies with known exploitable defects"
+threat = "Published vulnerabilities remain invisible when dependency metadata is not audited"
+expectation = "New advisories will be disclosed after dependencies have entered the project"
+strategy = "Run npm audit and resolve every high or critical finding before completion"
+evidence = [{ type = "gate", description = "npm audit reports no unresolved high or critical severity findings for the candidate dependency graph", required = true }]
+tradeoff = "Remediation may force disruptive upgrades or block delivery when no compatible fix exists"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "A dependency security audit is mandatory and high or critical findings must be addressed immediately.", confidence = 1.0 }]

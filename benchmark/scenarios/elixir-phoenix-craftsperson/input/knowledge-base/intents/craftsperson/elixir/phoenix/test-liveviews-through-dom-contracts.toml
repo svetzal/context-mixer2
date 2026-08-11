@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-liveviews-through-dom-contracts"
+title = "Test LiveViews through DOM contracts"
+category = "quality"
+tags = ["elixir", "phoenix", "testing", "formatting", "persistence", "error-handling"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "UI tests verify user-observable structure and interaction without coupling to serialized HTML."
+threat = "Raw HTML and text assertions break on harmless formatting or parser changes and miss interaction semantics."
+expectation = "Templates will be restyled and LiveViewTest parsing will evolve from Floki toward browser-like LazyHTML behavior."
+strategy = "Use Phoenix.LiveViewTest element selectors, stable IDs, render_change/render_submit, and modern-browser-compatible CSS selectors; use LazyHTML only to diagnose selector failures."
+evidence = [{ type = "test_review", description = "LiveView tests select elements and assert outcomes rather than comparing raw HTML, and pass under the supported LazyHTML engine.", required = true }]
+tradeoff = "Stable selectors must be designed and maintained, and presence checks can miss visual regressions."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#liveview-testing", summary = "Requires selector-based outcome tests and explains LazyHTML compatibility after LiveView 1.1.", confidence = 1.0 }]

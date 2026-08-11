@@ -1,0 +1,17 @@
+id = "guidelines.intent.narrow-unknown-inputs"
+title = "Narrow unknown inputs before use"
+category = "design"
+tags = ["typescript", "bun", "cli", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Unverified values cannot acquire trusted operations or properties until their shape is established."
+threat = "`any` bypasses static checking and lets malformed external values propagate as if they were valid."
+expectation = "Arguments, configuration, parsed data, and third-party results will continue to enter through weakly typed boundaries."
+strategy = "Represent untrusted values as `unknown` and narrow them with explicit type guards before access."
+evidence = [{ type = "static_check", description = "The typecheck passes with no unapproved `any`, and boundary tests exercise type guards against valid and malformed representative values.", required = true }]
+tradeoff = "Narrowing requires guard code and can be verbose for complex or frequently changing payloads."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#type-system-patterns", summary = "Prefers unknown over any and requires narrowing through type guards, with both examples and red flags reinforcing it.", confidence = 1.0 }]

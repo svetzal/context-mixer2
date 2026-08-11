@@ -1,0 +1,17 @@
+id = "guidelines.intent.put-gateways-at-external-boundaries"
+title = "Put gateways at every external boundary"
+category = "architecture"
+tags = ["java", "persistence", "gateways", "external-systems", "dependency-inversion"]
+relations = [
+  { type = "specializes", target = "craftsperson/put-gateways-at-external-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The application controls stable contracts for databases, APIs, filesystems, and HTTP interactions."
+threat = "Direct third-party calls spread vendor APIs through the codebase and make replacement or isolation expensive."
+expectation = "External services, libraries, and persistence technologies will evolve independently from application needs."
+strategy = "Route every external interaction through a small application-owned gateway interface."
+evidence = [{ type = "architecture_gate", description = "Dependency analysis finds external I/O clients referenced only from gateway implementations and composition code.", required = true }]
+tradeoff = "Boundary interfaces add indirection and can be needless when an integration is trivial and stable."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Requires all databases, APIs, filesystems, and HTTP interactions to pass through gateway interfaces.", confidence = 1.0 }]

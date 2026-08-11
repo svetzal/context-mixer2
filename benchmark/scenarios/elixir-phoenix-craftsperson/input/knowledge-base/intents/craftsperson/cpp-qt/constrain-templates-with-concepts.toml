@@ -1,0 +1,17 @@
+id = "guidelines.intent.constrain-templates-with-concepts"
+title = "Constrain templates with concepts"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Generic contracts produce local diagnostics."
+threat = "Unconstrained substitution admits unintended types."
+expectation = "Generic APIs will gain callers."
+strategy = "Express C++20 requirements with named concepts."
+evidence = [{ type = "gate", description = "Unsupported types fail at the declared constraint.", required = true }]
+tradeoff = "Concepts require C++20 and may overconstrain."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

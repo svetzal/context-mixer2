@@ -1,0 +1,17 @@
+id = "guidelines.intent.deploy-with-mix-releases"
+title = "Deploy with Mix releases"
+category = "delivery"
+tags = ["elixir", "phoenix", "mix", "dependencies", "build-and-delivery", "tooling"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Production deployments package the application, runtime configuration, and BEAM release conventions reproducibly."
+threat = "Ad hoc runtime assembly or legacy Distillery workflows drift from current Elixir support and environment conventions."
+expectation = "Deployments will need node identity, cookies, OS-specific environment setup, and repeatable upgrades."
+strategy = "Prefer mix release, generate release templates with mix release.init, configure standard RELEASE variables through env scripts, and retain Distillery only for explicitly legacy applications."
+evidence = [{ type = "deployment_test", description = "A clean production build boots from the Mix release using documented RELEASE_NODE and RELEASE_COOKIE configuration without Distillery dependencies in current applications.", required = true }]
+tradeoff = "Release templates and runtime environment scripts add deployment-specific configuration and migration effort for legacy systems."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#releases-preferred-deployment-mechanism", summary = "Prefers mix release, standard release templates and environment variables, and limits Distillery to legacy apps.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.critical-path-full-coverage"
+title = "Hold critical paths to complete test coverage"
+category = "testing"
+tags = ["clojure", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to detect regressions through every execution branch designated as business-critical"
+threat = "Rare or difficult branches in critical workflows remain invisible to ordinary coverage targets"
+expectation = "Failures in designated critical paths will carry disproportionate operational or business impact"
+strategy = "Identify critical paths and require 100 percent measured coverage for them"
+evidence = [{ type = "gate", description = "Coverage reporting shows 100 percent coverage for each explicitly designated critical namespace or path", required = true }]
+tradeoff = "Complete coverage can drive costly tests for low-value branches and does not prove that assertions are meaningful"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-tools-you-wield", summary = "The testing foundation explicitly targets 100 percent coverage for critical paths.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-gateways-logicless"
+title = "Keep gateway adapters free of business logic"
+category = "testing"
+tags = ["java", "testing", "persistence", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business decisions remain reusable and directly testable outside infrastructure code."
+threat = "Rules embedded in database, HTTP, or library adapters become difficult to isolate and migrate."
+expectation = "External technologies and delivery mechanisms will change independently from business policy."
+strategy = "Make gateway implementations thin translations around external libraries and move custom logic into the functional core."
+evidence = [{ type = "architecture_review", description = "Gateway classes contain only boundary translation and delegation; decision branches reside in core services or functions.", required = true }]
+tradeoff = "Strictly thin adapters can create extra mapping code and fragment simple transformations."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Requires gateway classes to be thin wrappers with no logic to test.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.kotest-behavior-acceptance-specs"
+title = "Express acceptance behavior in scenario language"
+category = "design"
+tags = ["kotlin", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Ability for technical and product readers to connect executable acceptance tests to business scenarios."
+threat = "Implementation-shaped tests obscure the user-visible behavior a feature promises."
+expectation = "Features will gain multi-step acceptance scenarios and business-facing examples."
+strategy = "Use Kotest behavior specifications when Given-When-Then scenario structure improves readability."
+evidence = [{ type = "test", description = "Acceptance test reports present business conditions, actions, and outcomes as readable scenarios traceable to acceptance criteria.", required = true }]
+tradeoff = "Behavior-spec nesting can become verbose and may duplicate lower-level unit coverage."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#kotest-when-appropriate", summary = "The source selects behavior specs for readable acceptance tests.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.model-recoverable-errors-as-results"
+title = "Model recoverable failures as explicit results"
+category = "reliability"
+tags = ["typescript", "error-handling", "error-modeling", "recoverability", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability for callers to handle expected failure as part of a function's typed contract"
+threat = "Exceptions hide recoverable outcomes from signatures and encourage accidental non-handling"
+expectation = "Parsing and validation operations will routinely fail in ways callers can resolve"
+strategy = "Return a discriminated Result union for recoverable errors"
+evidence = [{ type = "static-check", description = "Callers must narrow the Result discriminator before accessing either the success value or typed error", required = true }]
+tradeoff = "Result values add branching and can become verbose across chains of operations"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#nodejs-patterns", summary = "The source presents a discriminated Result type specifically for recoverable errors.", confidence = 1.0 }]

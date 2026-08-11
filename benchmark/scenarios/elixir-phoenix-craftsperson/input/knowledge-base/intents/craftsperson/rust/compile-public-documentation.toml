@@ -1,0 +1,17 @@
+id = "guidelines.intent.compile-public-documentation"
+title = "Compile public documentation as a quality gate"
+category = "quality"
+tags = ["rust", "testing", "documentation", "error-handling", "build-and-delivery", "quality-gates"]
+relations = [
+  { type = "specializes", target = "craftsperson/honor-the-project-quality-gate" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Users can generate and navigate the crate's public API documentation from the delivered source."
+threat = "API changes leave rustdoc with broken references, invalid documentation attributes, or documentation-only build failures that ordinary tests miss."
+expectation = "Public types and documentation references will evolve alongside implementation."
+strategy = "Run cargo doc --no-deps as an independent documentation build gate."
+evidence = [{ type = "documentation_gate", description = "cargo doc --no-deps completes successfully without project-owned rustdoc failures.", required = true }]
+tradeoff = "Building documentation adds CI time and may surface warnings that require work unrelated to runtime behavior."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#mandatory-quality-gates-default-set-if-repo-doesnt-specify-its-own", summary = "Includes cargo doc --no-deps in the mandatory default Rust quality gate.", confidence = 1.0 }]

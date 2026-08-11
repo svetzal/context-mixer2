@@ -1,0 +1,17 @@
+id = "guidelines.intent.explain-technical-rationale"
+title = "Explain the rationale behind technical guidance"
+category = "delivery"
+tags = ["java", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "The team can adapt a Java practice intelligently when its original context changes."
+threat = "Unexplained prescriptions become cargo cults that are applied after their assumptions no longer hold."
+expectation = "Frameworks, constraints, and project priorities will evolve while remembered rules persist."
+strategy = "Explain why a recommended pattern protects an outcome, not merely what syntax or structure to use."
+evidence = [{ type = "review_observation", description = "A non-obvious recommendation names the failure mode it prevents and the conditions under which another choice could be preferable.", required = true }]
+tradeoff = "Rationale adds communication overhead and can distract from straightforward changes when overused."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#behavioral-guidelines", summary = "Directs the craftsperson to explain why a pattern is preferred rather than only what to do.", confidence = 1.0 }]

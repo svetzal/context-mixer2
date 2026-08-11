@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-gateways-thin"
+title = "Keep gateways free of business logic"
+category = "reliability"
+tags = ["typescript", "bun", "cli", "testing", "resource-management", "cleanup"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Domain logic remains testable in the deterministic core while gateways stay simple enough to trust as adapters."
+threat = "Custom decisions embedded in I/O wrappers become difficult to test without real infrastructure and blur architectural ownership."
+expectation = "External library and platform adapters will accumulate conveniences unless their responsibility remains constrained."
+strategy = "Keep gateways as thin wrappers and move any custom logic discovered there into pure core functions."
+evidence = [{ type = "review", description = "Gateway modules contain only argument translation and direct external calls; branches or transformations with domain meaning are implemented and tested in core modules.", required = true }]
+tradeoff = "Moving transformations out of gateways can require additional data shapes and calls across the boundary."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Requires gateway classes to be thin wrappers without logic and advises moving custom logic into the core.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-interfaces-for-contracts"
+title = "Express contracts with interfaces, not abstract classes"
+category = "design"
+tags = ["typescript", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to define substitutable contracts independently of implementation and construction"
+threat = "Abstract classes mix contract definition with inherited behavior and state"
+expectation = "Multiple implementations will need to satisfy the same contract without sharing a class hierarchy"
+strategy = "Use TypeScript interfaces to define polymorphic contracts"
+evidence = [{ type = "static-check", description = "Polymorphic collaborators satisfy interface contracts without extending an abstract base solely to obtain the contract", required = true }]
+tradeoff = "Interfaces cannot provide shared runtime behavior and may require separate composition for common implementation"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Compose Over Inherit explicitly directs using interfaces for contracts rather than abstract classes.", confidence = 1.0 }]

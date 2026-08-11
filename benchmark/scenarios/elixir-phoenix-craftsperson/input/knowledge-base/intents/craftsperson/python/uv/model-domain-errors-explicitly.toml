@@ -1,0 +1,17 @@
+id = "guidelines.intent.model-domain-errors-explicitly"
+title = "Model domain errors explicitly"
+category = "documentation"
+tags = ["python", "uv", "testing", "documentation", "error-handling", "synchronization"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Callers can distinguish expected domain failures and handle them according to the contract."
+threat = "Generic exceptions erase failure meaning and force callers to catch unrelated faults together."
+expectation = "Domain operations will gain multiple recoverable failure modes as requirements grow."
+strategy = "Raise specific custom exception classes for domain errors and document them in public docstrings."
+evidence = [{ type = "api_review", description = "Expected domain failures have dedicated exception types, documented raise conditions, and caller tests for relevant handling.", required = true }]
+tradeoff = "A domain exception hierarchy adds public API surface and must be maintained as failure semantics evolve."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#error-handling", summary = "Requires specific and custom exceptions for domain errors and documentation of exceptions.", confidence = 1.0 }]

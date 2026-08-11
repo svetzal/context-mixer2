@@ -1,0 +1,17 @@
+id = "guidelines.intent.project-coverage-floor"
+title = "Maintain a broad project test-coverage floor"
+category = "testing"
+tags = ["clojure", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to detect regressions across most executable production behavior"
+threat = "Tests cluster around convenient examples while large portions of code remain unexercised"
+expectation = "The production code surface will grow faster than informal reviewers can inspect it"
+strategy = "Measure coverage and keep aggregate production coverage above 80 percent"
+evidence = [{ type = "gate", description = "The configured coverage report exceeds 80 percent for production code", required = true }]
+tradeoff = "An aggregate threshold can reward shallow execution without meaningful assertions and can discourage necessary hard-to-test code"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-tools-you-wield", summary = "The source sets a general test coverage aim above 80 percent.", confidence = 1.0 }]

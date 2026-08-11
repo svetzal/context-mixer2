@@ -1,0 +1,17 @@
+id = "guidelines.intent.encapsulate-unsafe-behind-safe-apis"
+title = "Encapsulate unsafe code behind safe APIs"
+category = "design"
+tags = ["rust", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Most of the codebase can rely on compiler-enforced safety without revalidating low-level invariants."
+threat = "Unsafe operations spread through callers and widen the surface where memory-safety assumptions can be violated."
+expectation = "Some integrations may eventually require unsafe or FFI despite a preference for safe Rust."
+strategy = "Minimize unsafe scope and expose unsafe implementation details through a narrowly validated safe API."
+evidence = [{ type = "review", description = "Unsafe operations are localized, and external callers use safe interfaces with enforced preconditions.", required = true }]
+tradeoff = "Safe wrappers can add validation cost and may expose less flexibility than the underlying primitive."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#unsafe-and-ffi-non-negotiable-rules", summary = "Requires minimizing unsafe scope and encapsulating unsafe operations behind safe APIs.", confidence = 1.0 }]

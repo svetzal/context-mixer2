@@ -1,0 +1,17 @@
+id = "guidelines.intent.leiningen-quality-plugins"
+title = "Keep quality tooling available in Leiningen builds"
+category = "delivery"
+tags = ["clojure", "leiningen", "security", "documentation", "static-analysis", "build-and-delivery"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to run security, static-analysis, and documentation checks in a legacy Leiningen project"
+threat = "Preserving the legacy build without its quality plugins creates blind spots compared with newer project templates"
+expectation = "Leiningen projects will continue receiving production changes before any migration completes"
+strategy = "Declare lein-nvd, lein-codox, and lein-eastwood in project.clj"
+evidence = [{ type = "manifest", description = "project.clj includes functioning lein-nvd, lein-codox, and lein-eastwood plugin declarations", required = true }]
+tradeoff = "Additional plugins expand dependency resolution time and can introduce version conflicts in older builds"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#build-system-preferences", summary = "Existing Leiningen projects are required to include NVD, Codox, and Eastwood quality plugins.", confidence = 1.0 }]

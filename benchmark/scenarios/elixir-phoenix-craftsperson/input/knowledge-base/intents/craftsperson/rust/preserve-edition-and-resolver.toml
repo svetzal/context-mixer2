@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-edition-and-resolver"
+title = "Preserve the declared Rust edition and resolver"
+category = "delivery"
+tags = ["rust", "dependencies", "formatting", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The project continues to compile and resolve dependencies under its intentionally selected Rust language and Cargo semantics."
+threat = "An incidental edition or resolver change alters language behavior, dependency selection, or formatting across the workspace."
+expectation = "Rust editions and workspace resolver behavior will continue evolving independently of application features."
+strategy = "Treat the declared Rust edition and workspace resolver as invariants, including resolver 3 for Rust 2024 workspaces."
+evidence = [{ type = "diff_review", description = "Feature changes leave edition and resolver declarations unchanged unless explicitly authorized.", required = true }]
+tradeoff = "The project may defer useful edition improvements until they can be handled as a deliberate migration."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#detect--preserve-invariants-mandatory", summary = "Names Rust edition and workspace resolver configuration as invariants that must be detected and preserved.", confidence = 1.0 }]

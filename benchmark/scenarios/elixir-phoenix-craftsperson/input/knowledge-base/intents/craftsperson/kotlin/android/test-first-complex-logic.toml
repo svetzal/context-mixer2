@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-first-complex-logic"
+title = "Drive complex business logic from executable examples"
+category = "testing"
+tags = ["kotlin", "android", "concurrency", "testing", "tdd", "red-green-refactor"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to shape complex behavior around explicit outcomes and refactor it safely."
+threat = "Implementation-first work can entrench an awkward design and overlook edge cases before tests are written."
+expectation = "Business logic will gain branching rules and changing requirements."
+strategy = "Use test-driven development for complex business logic."
+evidence = [{ type = "gate", description = "For complex rule changes, focused failing tests precede implementation and remain as regression coverage.", required = true }]
+tradeoff = "Test-first work can feel slower during exploration and may overconstrain designs if examples are chosen poorly."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#problem-solving-approach", summary = "The source explicitly calls for TDD on complex business logic.", confidence = 1.0 }]

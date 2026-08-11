@@ -1,0 +1,17 @@
+id = "guidelines.intent.clean-up-test-tasks"
+title = "Clean up every task spawned by a test"
+category = "reliability"
+tags = ["python", "uv", "concurrency", "testing", "error-handling", "structured-concurrency"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Async tests remain isolated and leave the event loop in a known state."
+threat = "Background tasks survive a test, emit late failures, or interfere with subsequent tests."
+expectation = "Tests of concurrent components will sometimes create tasks explicitly."
+strategy = "Use create_task sparingly in tests and always await completion or cancellation during teardown."
+evidence = [{ type = "test_gate", description = "The async test suite exits with no pending-task warnings, unobserved task exceptions, or work crossing test boundaries.", required = true }]
+tradeoff = "Explicit teardown makes concurrency tests longer and can mask production lifecycle design that should be structured instead."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#testing-async-code", summary = "Warns that tasks created in tests must be cleaned up.", confidence = 1.0 }]

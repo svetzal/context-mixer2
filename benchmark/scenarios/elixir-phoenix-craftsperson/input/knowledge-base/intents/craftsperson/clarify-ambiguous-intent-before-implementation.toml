@@ -1,0 +1,300 @@
+id = "guidelines.intent.clarify-ambiguous-intent-before-implementation"
+title = "Clarify ambiguous intent before implementation"
+category = "collaboration"
+tags = ["requirements", "decision-making", "ambiguity"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Implemented behavior reflects the decision the product or domain actually requires."
+threat = "An implementer resolves material ambiguity by guessing and turns an unexamined assumption into code."
+expectation = "Requirements and existing behavior will sometimes conflict, omit edge cases, or admit several valid interpretations."
+strategy = "Surface consequential ambiguity with concrete options and resolve it before committing to an implementation."
+evidence = [{ type = "decision_review", description = "Material ambiguities are resolved in the task context, tests, or an explicit decision before implementation depends on them.", required = true }]
+tradeoff = "Clarification interrupts flow and may require waiting for someone with the necessary product or domain authority."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#when-to-escalate", summary = "Requires ambiguous business logic to be clarified rather than guessed.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#when-to-seek-clarification", summary = "Requires ambiguous business intent to be resolved before coding.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#when-to-seek-clarification", summary = "Requires ambiguous product behavior to be resolved before implementation.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; Ticket: "Round invoice totals to cents."
+;; Asked in the ticket thread before implementing:
+;;   Half-up (retail) or banker's rounding (finance)?
+;;   e.g. 2.345 -> 2.35 or 2.34? Affects reconciliation.
+;; Answer (product owner): banker's rounding, policy FP-12.
+(defn round-total [^BigDecimal t]
+  (.setScale t 2 java.math.RoundingMode/HALF_EVEN))
+'''
+bad = '''
+;; Ticket: "Round invoice totals to cents."
+(defn round-total [^BigDecimal t]
+  ; guesses half-up; the ticket never said which convention
+  (.setScale t 2 java.math.RoundingMode/HALF_UP))
+
+(deftest rounds-totals
+  (is (= 2.35M (round-total 2.345M))))
+; the unexamined assumption is now baked into code and test
+'''
+
+[examples.cpp]
+good = '''
+Task: "Expire idle sessions after inactivity."
+
+Before implementing, one question — "inactivity" could mean:
+  a) no HTTP requests (cheap; the LB already tracks this)
+  b) no user input events (needs a client heartbeat)
+Support tickets suggest customers expect (b), but (a) can
+ship today. Which decision do you want?
+
+Timeout is also unspecified — proposing 30 min to match the
+mobile app unless told otherwise.
+'''
+bad = '''
+// Task said: "Expire idle sessions after inactivity."
+// Both the meaning and the number were guessed; nobody asked.
+constexpr auto kIdleTimeout = std::chrono::minutes(5);
+
+bool isIdle(const Session& s) {
+  // assumes "inactivity" means no HTTP requests
+  return now() - s.lastRequestAt() > kIdleTimeout;
+}
+// support, three weeks later: "why do open editors log out?"
+'''
+
+[examples.csharp]
+good = '''
+Ticket: "Expire idle sessions after 30 minutes."
+
+dev → product: Two readings before I implement:
+  a) 30 min since last request (sliding)
+  b) 30 min since login (absolute)
+Under (b) kiosk users get logged out mid-checkout.
+Recommend (a). Which is intended?
+
+product: (a), sliding. Ticket updated to say so.
+'''
+bad = '''
+Ticket: "Expire idle sessions after 30 minutes."
+
+// the ambiguity is resolved by silent guess, in code
+public bool IsExpired(Session s) =>
+    DateTime.UtcNow - s.LoginAt >
+        TimeSpan.FromMinutes(30);
+// absolute-from-login chosen without asking; kiosks
+// now die mid-payment and nobody decided that
+'''
+
+[examples.elixir]
+good = '''
+Task: "expire stale carts"
+
+Two readings, materially different — asked before coding:
+  A) delete carts idle > 30 days   (destructive)
+  B) mark :expired, hide from checkout  (recoverable)
+
+Product chose B in the ticket. A test now pins the call:
+  test "idle cart hides from checkout but is recoverable"
+'''
+bad = '''
+Task: "expire stale carts"
+
+# guessed both the window and the semantics, silently:
+def expire_stale,
+  do: Repo.delete_all(idle_carts(days: 7))
+
+Commit: "expire stale carts as requested"
+(no question asked; 7 days and hard deletion invented)
+'''
+
+[examples.go]
+good = '''
+PR discussion, before implementation:
+
+  Me: Spec says "expire idle sessions after 30m". Two readings:
+      (a) idle = no HTTP requests; (b) idle = no user activity.
+      Our analytics heartbeat fires every 5m, so under (a) no
+      session would ever expire. Which is intended?
+  PM: (b) — heartbeats must not keep sessions alive.
+
+Test added: TestSessionExpiresDespiteAnalyticsHeartbeats
+'''
+bad = '''
+commit 4f2a91c
+    Add 30m idle session expiry
+
+    Spec said "idle"; assumed any request resets the timer.
+
+// analytics heartbeats arrive every 5m, so the guessed reading
+// means no session ever expires — discovered in production
+'''
+
+[examples.java]
+good = '''
+Task: "Expire carts after inactivity."
+
+Comment posted before writing code:
+  "Inactivity" is ambiguous here. Options:
+  (a) no page views for 30 min  (session-based)
+  (b) no cart edits for 24 h    (matches reminder email)
+  Recommend (b) — the reminder email already promises
+  customers 24 hours.
+
+Product owner: "Confirmed (b): 24 h since last cart edit."
+Test added: cartSurvives23HoursWithoutEdits()
+'''
+bad = '''
+Task: "Expire carts after inactivity."
+
+Commit, same afternoon, no questions asked:
+  "Expire carts 30 min after last page view"
+
+Support ticket, two weeks later:
+  Customers report carts vanishing while still shopping;
+  the reminder email still promises 24 hours.
+# a guess became code, and the guess was wrong
+'''
+
+[examples.kotlin]
+good = '''
+Ticket comment, posted before any code:
+
+  "Expire idle sessions" has two readings:
+    A) idle = no HTTP request for 30 min (simplest)
+    B) idle = no user input for 30 min; our SPA polls every
+       60s, so under A sessions would never expire
+  Recommend B. Confirming before I build.
+
+Resolved by product: B, polling excluded. Now implementing.
+'''
+bad = '''
+// ticket said "expire idle sessions"; implementer guessed
+fun touch(session: Session) {
+    // any request counts as activity — the assumption was
+    // never surfaced or confirmed with anyone
+    session.lastSeen = clock.now()
+}
+// the SPA polls every 60s, so no session ever expires
+'''
+
+[examples.python]
+good = '''
+Ticket #482: "Expire stale carts."
+
+Before implementing — "stale" is ambiguous and it matters:
+  A) 30 min after last item added (matches checkout SLA)
+  B) 24 h after cart creation (matches reminder-email copy)
+Recommend A; B silently drops overnight carts with items.
+
+PM: "A — 30 minutes. B would hurt conversion."
+Test added: test_cart_expires_30_min_after_last_activity
+'''
+bad = '''
+Ticket #482: "Expire stale carts."
+
+commit 9f3c2a1
+    Expire carts after 24 hours
+
+    The ticket didn't say how long "stale" is, so I went
+    with 24 hours since that felt reasonable.
+    # a guess is now shipped behavior nobody decided
+'''
+
+[examples.ruby]
+good = '''
+Ticket: "Expire stale carts."
+
+Dev comment: "Stale" is ambiguous — two readings:
+  a) no items added for 30 days
+  b) created 30+ days ago, regardless of activity
+(a) matches the retention email copy. Confirming before
+I implement.
+
+PM: Correct, (a). Ticket updated.
+
+Spec: it "expires carts idle 30 days, keeps old active carts"
+'''
+bad = '''
+Ticket: "Expire stale carts."
+
+# dev resolves the ambiguity silently and codes the guess
+def stale?(cart)
+  cart.created_at < 30.days.ago # "stale" assumed to mean "old"
+end
+
+Commit: "Implement stale cart expiry as discussed"
+# no discussion happened; active carts now vanish nightly
+'''
+
+[examples.rust]
+good = '''
+Task: "Round invoice totals."
+
+Posted in the task thread before implementing:
+
+  Rounding is ambiguous here. Options:
+    a) half-up per line  (matches the invoices we send)
+    b) banker's rounding on the total (matches the ledger)
+  They differ by up to 2 cents per invoice. Which one?
+
+Product: (a). Decision captured as a test first:
+  #[test] fn rounds_each_line_half_up() { ... }
+'''
+bad = '''
+Task: "Round invoice totals."
+
+// resolved by guessing; the assumption is now silent code
+fn round_total(total: f64) -> f64 {
+    total.round_ties_even() // (b) was never surfaced to anyone
+}
+
+Commit: "round totals as requested"
+'''
+
+[examples.swift]
+good = '''
+Task: "Round invoice totals."
+
+Before implementing, one decision is needed:
+  a) round half-up per line item (matches EU paper invoices)
+  b) round the summed total once (matches current golden files)
+These differ by up to 0.04 EUR per invoice.
+I recommend (b) — it preserves existing reconciliations.
+
+PM: agreed, (b). Please note it in Billing/README.
+-> decision recorded, then implementation begins
+'''
+bad = '''
+Task: "Round invoice totals."
+
+Commit 4f2a91c: "Round invoice totals"
+
+    // per line item seemed standard, went with that
+    let rounded = items.map { $0.total.roundedHalfUp() }
+
+No question asked; the guess ships as behavior and finance
+reconciliation breaks quietly at month end.
+'''
+
+[examples.typescript]
+good = '''
+Task: "Expire idle sessions after 30 minutes."
+
+Question raised before implementing:
+"Idle" could mean no HTTP requests, or no user input.
+  Option A: server-side last-request timestamp — simpler,
+    but a long upload counts as idle and logs the user out.
+  Option B: client heartbeat on input — covers uploads,
+    needs a new endpoint and client work.
+Recommend A unless uploads matter. Which is intended?
+'''
+bad = '''
+Task: "Expire idle sessions after 30 minutes."
+
+// Picked a meaning without asking; the guess is now code.
+const IDLE_MS = 30 * 60 * 1000;
+export const isIdle = (s: Session): boolean =>
+  Date.now() - s.lastRequestAt > IDLE_MS;
+
+// Long uploads now log users out mid-transfer.
+// Nobody decided that — it was assumed.
+'''

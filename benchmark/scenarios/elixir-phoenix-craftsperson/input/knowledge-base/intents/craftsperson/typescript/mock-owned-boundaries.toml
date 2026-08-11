@@ -1,0 +1,17 @@
+id = "guidelines.intent.mock-owned-boundaries"
+title = "Mock owned boundaries, not third-party internals"
+category = "testing"
+tags = ["typescript", "testing", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to isolate core tests behind stable interfaces the team controls"
+threat = "Mocks of library internals couple tests to volatile implementation details outside the application's ownership"
+expectation = "Third-party libraries will change their internal APIs and behaviors independently"
+strategy = "Wrap external libraries in gateway classes and mock only those gateway contracts"
+evidence = [{ type = "review", description = "Test doubles implement application-owned gateway contracts and no test replaces a third-party library's internal module or method", required = true }]
+tradeoff = "Gateway wrappers add interfaces and adapter code around libraries that might otherwise be called directly"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "The source repeatedly says to mock gateway or boundary classes and never library internals.", confidence = 1.0 }]

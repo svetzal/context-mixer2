@@ -1,0 +1,17 @@
+id = "guidelines.intent.confine-side-effects-to-imperative-shell"
+title = "Confine side effects to an imperative shell"
+category = "architecture"
+tags = ["ruby", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to locate and coordinate the application's side effects"
+threat = "Scattered Rails or CLI I/O interleaves external state changes with domain decisions"
+expectation = "Controllers, jobs, and commands will orchestrate increasing numbers of integrations"
+strategy = "Keep I/O in boundary shells that invoke a pure domain core"
+evidence = [{ type = "architecture", description = "Controllers, CLI commands, and jobs perform orchestration and I/O while delegating decisions and calculations to core objects", required = true }]
+tradeoff = "Separating shell from core creates explicit transfer objects and orchestration seams"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#functional-core-imperative-shell", summary = "Rails and CLI I/O are pushed to an imperative boundary around the pure core.", confidence = 1.0 }]

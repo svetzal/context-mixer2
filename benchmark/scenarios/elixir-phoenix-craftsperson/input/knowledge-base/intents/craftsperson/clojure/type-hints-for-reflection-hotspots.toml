@@ -1,0 +1,17 @@
+id = "guidelines.intent.type-hints-for-reflection-hotspots"
+title = "Eliminate reflection where measured performance requires it"
+category = "design"
+tags = ["clojure", "static-analysis", "performance", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "Ability to execute performance-sensitive JVM interop without avoidable reflective dispatch"
+threat = "Unresolved JVM member calls add runtime reflection overhead in hot paths"
+expectation = "Interop-heavy code may enter latency- or throughput-critical workloads"
+strategy = "Add targeted type hints where compiler reflection warnings or profiling show they are needed"
+evidence = [{ type = "static-check", description = "Compilation with reflection warnings enabled reports no reflection in designated hot paths", required = true }, { type = "benchmark", description = "The hinted path satisfies its stated performance target without changing behavior", required = true }]
+tradeoff = "Type hints couple code to JVM representations, add visual noise, and can become wrong after refactoring"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#6-performance-considerations", summary = "The performance review asks for type hints where needed.", confidence = 1.0 }]

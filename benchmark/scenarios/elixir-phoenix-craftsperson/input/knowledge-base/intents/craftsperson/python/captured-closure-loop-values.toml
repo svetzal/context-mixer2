@@ -1,0 +1,17 @@
+id = "guidelines.intent.captured-closure-loop-values"
+title = "Bind loop values when constructing deferred closures"
+category = "design"
+tags = ["python", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Each generated closure retains the value intended at its creation."
+threat = "Python's late-bound closures cause deferred calls to observe the loop's final variable value."
+expectation = "Callbacks and deferred transformations will be generated dynamically from iterables."
+strategy = "Capture changing loop values at definition time, such as through a default parameter."
+evidence = [{ type = "test", description = "Invoking closures generated across multiple loop values produces the distinct expected result for every creation value.", required = true }]
+tradeoff = "Default-argument capture is non-obvious syntax and adds parameters that are implementation details."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#common-mistakes-to-avoid", summary = "The source demonstrates the late-binding closure bug and definition-time capture correction.", confidence = 1.0 }]

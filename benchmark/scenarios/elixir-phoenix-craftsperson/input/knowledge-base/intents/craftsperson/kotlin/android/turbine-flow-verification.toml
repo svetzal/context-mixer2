@@ -1,0 +1,17 @@
+id = "guidelines.intent.turbine-flow-verification"
+title = "Verify stream emissions deterministically"
+category = "quality"
+tags = ["kotlin", "android", "concurrency", "testing", "persistence", "error-handling"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to prove the order, content, completion, and error behavior of Flow streams."
+threat = "Ad hoc collectors and timing sleeps make asynchronous tests flaky or incomplete."
+expectation = "Reactive features will add multi-emission state and event streams."
+strategy = "Use Turbine with coroutine test support for focused Flow assertions."
+evidence = [{ type = "gate", description = "Flow tests await explicit items, errors, or completion through Turbine without wall-clock sleeps.", required = true }]
+tradeoff = "Turbine adds a test dependency and requires careful handling of unconsumed events."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#flow-testing-turbine", summary = "The source prescribes Turbine and gives an emission-order test example.", confidence = 1.0 }]

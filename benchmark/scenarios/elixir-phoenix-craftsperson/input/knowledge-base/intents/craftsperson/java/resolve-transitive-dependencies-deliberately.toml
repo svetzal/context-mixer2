@@ -1,0 +1,17 @@
+id = "guidelines.intent.resolve-transitive-dependencies-deliberately"
+title = "Resolve transitive dependencies deliberately"
+category = "design"
+tags = ["java", "testing", "dependencies", "build-and-delivery", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The build has an explainable dependency graph without accidental version winners or unnecessary transitives."
+threat = "Transitive conflicts silently select incompatible artifacts or enlarge the runtime surface."
+expectation = "Third-party libraries will evolve independently and introduce overlapping dependency constraints."
+strategy = "Inspect the dependency tree, choose the intended version centrally, and add narrowly justified exclusions."
+evidence = [{ type = "dependency_trace", description = "A dependency-tree report shows one intended version for each conflict and every exclusion names the transitive edge it removes.", required = true }]
+tradeoff = "Manual exclusions can break libraries when their actual runtime requirements change."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#build-and-dependency-management", summary = "Requires dependency-tree diagnosis and deliberate transitive exclusions.", confidence = 1.0 }]

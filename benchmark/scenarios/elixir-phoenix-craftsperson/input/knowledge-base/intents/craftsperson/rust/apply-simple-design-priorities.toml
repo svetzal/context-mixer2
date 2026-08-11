@@ -1,0 +1,17 @@
+id = "guidelines.intent.apply-simple-design-priorities"
+title = "Apply simple design priorities in order"
+category = "design"
+tags = ["rust", "testing", "simplicity", "design-priorities", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/apply-simple-design-priorities" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Design tradeoffs are resolved consistently toward correct, understandable, low-duplication, minimal systems."
+threat = "Local preferences optimize abstraction or brevity at the expense of behavior, intent, or duplicated decisions."
+expectation = "Engineering changes will repeatedly force tradeoffs among correctness, clarity, duplication, and structural minimalism."
+strategy = "Prioritize passing tests, revealed intent, removal of knowledge duplication, and minimal entities in that order."
+evidence = [{ type = "review", description = "Design explanations resolve conflicts using the stated priority order and surface conflicts with user requirements.", required = true }]
+tradeoff = "A fixed priority order can underweight context-specific concerns such as performance or ecosystem convention."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#simple-design-heuristics-priority-order", summary = "Defines four ordered simple-design heuristics and requires surfacing conflicts.", confidence = 1.0 }]

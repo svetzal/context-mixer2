@@ -1,0 +1,17 @@
+id = "guidelines.intent.bounded-function-complexity"
+title = "Keep each function below the agreed complexity ceiling"
+category = "delivery"
+tags = ["python", "testing", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Individual units of behavior remain understandable, testable, and safe to change."
+threat = "Branch-heavy functions hide paths and interactions that humans and tests miss."
+expectation = "Incremental feature additions will tend to increase conditional complexity in existing functions."
+strategy = "Keep McCabe complexity at or below 10 and extract complex behavior into smaller well-named private methods."
+evidence = [{ type = "static-analysis", description = "Ruff's McCabe check reports no function with complexity greater than 10.", required = true }]
+tradeoff = "Mechanical extraction can fragment cohesive logic and force readers to jump among small methods."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#quality-assurance-process", summary = "The source sets a McCabe complexity maximum of 10 and prescribes smaller named methods.", confidence = 1.0 }]

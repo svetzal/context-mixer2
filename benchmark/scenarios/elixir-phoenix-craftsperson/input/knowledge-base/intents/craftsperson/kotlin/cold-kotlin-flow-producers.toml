@@ -1,0 +1,17 @@
+id = "guidelines.intent.cold-kotlin-flow-producers"
+title = "Keep deferred stream production cold by default"
+category = "reliability"
+tags = ["kotlin", "persistence", "build-and-delivery", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability for each stream collector to control when production starts and cancellation stops it."
+threat = "Eager or accidentally shared producers consume resources before demand and blur collector ownership."
+expectation = "Reactive pipelines will increasingly wrap I/O and generated data."
+strategy = "Use flow builders with explicit emission for cold streams."
+evidence = [{ type = "test", description = "Flow tests prove no production occurs before collection, each collection has the intended producer lifecycle, and cancellation stops emission.", required = true }]
+tradeoff = "Cold flows repeat producer work for each collector and may be inefficient when sharing is actually required."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#flow-patterns", summary = "The source prescribes flow with emit for cold streams.", confidence = 1.0 }]

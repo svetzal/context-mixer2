@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-idiom-conflicts"
+title = "Resolve conflicts between legacy conventions and idiomatic Go deliberately"
+category = "design"
+tags = ["go", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "The codebase can move toward idiomatic Go without surprising users or erasing intentional local constraints."
+threat = "Blindly preserving non-idiomatic precedent compounds maintenance cost, while unilateral rewrites can break established behavior and conventions."
+expectation = "Existing code will sometimes conflict with current Go idioms for historical or project-specific reasons."
+strategy = "Seek clarification when established code conflicts with idiomatic Go and record the chosen direction before making a consequential change."
+evidence = [{ type = "decision_record", description = "A material idiom conflict records the existing convention, idiomatic alternative, compatibility impact, and agreed resolution.", required = true }]
+tradeoff = "Escalating legacy-style conflicts adds delay and can preserve inconsistency longer while a decision is pending."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#when-to-seek-clarification", summary = "Calls for clarification when existing code conflicts with idiomatic Go patterns.", confidence = 1.0 }]

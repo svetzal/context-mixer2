@@ -1,0 +1,17 @@
+id = "guidelines.intent.document-every-unsafe-contract"
+title = "Document every unsafe contract at the call site"
+category = "documentation"
+tags = ["rust", "documentation", "dependencies", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Reviewers and maintainers can verify the invariants that make each unsafe operation sound."
+threat = "Unsafe code depends on implicit assumptions that drift or become false during later changes."
+expectation = "Unsafe call sites will be revisited by people who do not share the original author's context."
+strategy = "Require a SAFETY comment on every unsafe block that states required invariants and why they hold at that call site."
+evidence = [{ type = "static_analysis", description = "Every unsafe block is immediately accompanied by a specific SAFETY rationale covering its invariants.", required = true }]
+tradeoff = "Safety comments add maintenance burden and can become misleading if not updated with code changes."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#unsafe-and-ffi-non-negotiable-rules", summary = "Mandates SAFETY comments explaining invariants and why they hold.", confidence = 1.0 }]

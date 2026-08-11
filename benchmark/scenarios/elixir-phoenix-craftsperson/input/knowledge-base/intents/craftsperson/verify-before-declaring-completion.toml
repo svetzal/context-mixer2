@@ -1,0 +1,278 @@
+id = "guidelines.intent.verify-before-declaring-completion"
+title = "Verify before declaring completion"
+category = "quality"
+tags = ["verification", "completion", "evidence"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Completion claims accurately describe working, checked behavior rather than implementation effort or expectation."
+threat = "A contributor assumes the change works, reports success from partial checks, or hides limitations behind a confident summary."
+expectation = "Edits can appear locally correct while failing tests, integration, documentation, or environment-specific checks."
+strategy = "Self-review the diff, run proportionate evidence, inspect the results, and disclose exactly what was and was not verified."
+evidence = [{ type = "completion_report", description = "The completion report names the checks run, their outcomes, and any unverified or blocked evidence.", required = true }]
+tradeoff = "Thorough verification adds latency and can expose unrelated failures that complicate an otherwise focused task."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#self-verification", summary = "Requires self-verification against the complete quality gate.", confidence = 1.0 }, { type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#self-verification-steps", summary = "Self-reviews and transparently reports verification before delivery.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#behavioral-guidelines", summary = "Verifies evidence before declaring work complete.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+Completion report — add-vat-to-eu-orders:
+- self-reviewed the diff: 3 files, no stray edits
+- clojure -M:test — 147 tests, 0 failures
+- clj-kondo — clean
+- manual check: placed a DE order in dev; invoice shows the
+  19% VAT line
+- NOT verified: FR reduced-rate goods (no fixture exists) —
+  flagged in the change description; needs a fixture first
+'''
+bad = '''
+"All done! VAT now applies to EU orders and everything
+works as expected."
+
+; no named test run, the diff was never re-read, no order
+; was placed in any environment, and the FR reduced-rate
+; gap exists but is disclosed nowhere
+'''
+
+[examples.cpp]
+good = '''
+Done: coupon expiry fix (src/coupons.cpp).
+
+Verified:
+  - ctest full suite: 214/214 pass (log attached)
+  - manual check: expired coupon rejected in sandbox UI
+  - self-reviewed the diff; removed a stray debug qWarning()
+Not verified:
+  - Safari UI path — no macOS runner available here; needs
+    a look before release.
+'''
+bad = '''
+Done! Coupon fix is in, should work now.
+
+(The diff was never re-read. The suite wasn't run — "it's a
+small change." The sandbox check that would have caught the
+inverted comparison was skipped. A week later, production
+finds the `<` that should have been `<=`, and the summary's
+confidence is why nobody looked sooner.)
+'''
+
+[examples.csharp]
+good = '''
+Completion report — coupon expiry fix
+Ran:
+  dotnet test           → 214 passed
+  ./build.sh check      → all gates green
+  manual: expired coupon on next env →
+    422 EXPIRED_COUPON (screenshot attached)
+Not verified:
+  Safari date-picker path — no macOS runner in CI;
+  flagged for manual QA before release.
+Diff self-reviewed; removed a stray Console.WriteLine.
+'''
+bad = '''
+"Done! Coupon expiry is fixed and works everywhere."
+
+$ dotnet build          # the only command ever run
+  Build succeeded.
+
+# no test executed, endpoint never called, diff not
+# re-read; "works everywhere" is an expectation
+# dressed up as a verification
+'''
+
+[examples.elixir]
+good = '''
+Completion report:
+
+  - re-read the diff: removed a stray IO.inspect
+  - mix test: 312 passed, 0 failed
+  - forced a :timeout via Mox: retry fired twice, then
+    surfaced {:error, :timeout} as specified
+  - NOT verified: behavior under a real network
+    partition — no harness exists here; flagged as
+    untested rather than assumed
+'''
+bad = '''
+"Done! The retry logic now handles timeouts."
+
+# the diff was never re-read (a debug IO.inspect
+#   shipped to production logs)
+# mix test was never run (2 failures, discovered by
+#   the next contributor)
+# the timeout path itself: never exercised, not once —
+#   the claim describes effort, not checked behavior
+'''
+
+[examples.go]
+good = '''
+Completion report:
+
+  Change: POST /refunds returns 409 for already-refunded
+  charges.
+  Verified:
+    - go test ./internal/refund — 14 pass, incl. new 409 cases
+    - manual: refunded a charge twice on local stack, saw 409
+    - self-reviewed the diff; removed a stray debug log
+  Not verified:
+    - Stripe webhook retry path (needs staging keys — flagged)
+'''
+bad = '''
+Completion report:
+
+  "Done! Refunds fully working now."
+
+# behind the claim: the diff was never re-read, tests were not
+# run after the final edit, and the 409 path was traced by eye
+# but never executed — this describes effort, not evidence
+'''
+
+[examples.java]
+good = '''
+Completion report — retry backoff fix
+
+Verified:
+  - self-reviewed the diff (2 files, 41 lines)
+  - unit suite: 450/450 green
+  - manual probe: killed the stub server mid-call;
+    log shows 3 retries at 1s/2s/4s, then clean failure
+
+Not verified:
+  - behavior against the vendor sandbox (credentials
+    expired) — flagged for follow-up before release
+'''
+bad = '''
+Status: "Retry backoff is fixed and fully working!"
+
+What actually happened:
+  - code written; it compiles
+  - ran RetryTest only ("nothing else can be affected")
+  - the retry path itself was never executed once
+
+# the new backoff config key is misspelled and silently
+# ignored — the confident summary hid an untested claim
+'''
+
+[examples.kotlin]
+good = '''
+Done report:
+- Self-reviewed the diff; removed a stray debug log.
+- Ran: full unit suite (214 green) and detekt (clean).
+- Exercised POST /refunds on the next env: 201 returned,
+  ledger entry observed in the database.
+- NOT verified: webhook retry path — needs the prod-like
+  queue; flagged for staging validation before release.
+'''
+bad = '''
+Done report:
+- "Refunds are fixed and fully working end to end."
+
+(the diff was never re-read, the suite was never run, and
+ the endpoint was never called once — it still 500s on the
+ first request; confidence stood in for verification)
+'''
+
+[examples.python]
+good = '''
+Done: retry now uses exponential backoff with jitter.
+
+Verified:
+- pytest -q: 214 passed (3 new backoff tests included)
+- self-review of the diff: one leftover debug log removed
+- manual: killed the stub server mid-run; client recovered
+  after 2 retries (log attached)
+Not verified: behavior against the vendor's real rate
+limiter — no sandbox access from this environment.
+'''
+bad = '''
+Done — implemented exponential backoff, should work now.
+
+# no tests were run, the diff was never re-read, and the
+# retry loop raises NameError on its second attempt; the
+# confident summary is describing effort, not observed
+# behavior
+'''
+
+[examples.ruby]
+good = '''
+Done report — password-reset fix:
+  - self-reviewed the diff (2 files, no strays)
+  - bundle exec rspec spec/mailers spec/requests: 74/74 green
+  - drove the flow in dev: email arrives, reset link works
+  - NOT verified: SES delivery in prod (no sandbox access) —
+    needs a post-deploy smoke check, flagged explicitly
+'''
+bad = '''
+Done report — password-reset fix:
+  "Fixed! The mailer change should work now."
+
+  - diff never re-read (a debug `puts` is still in it)
+  - specs not run (2 were failing)
+  - flow never exercised; the reset link 404s
+  # "should work" reported as "works"
+'''
+
+[examples.rust]
+good = '''
+Completion report:
+
+  Ran: cargo test --workspace    -> 212 passed
+  Ran: cargo clippy -D warnings  -> clean
+  Manually exercised: CSV import with the 50k fixture;
+  spot-checked 5 rows against the source file.
+
+  NOT verified: Windows path handling — no Windows
+  environment here; flagged for the CI matrix.
+'''
+bad = '''
+Completion report:
+
+  "Done! Import now handles the new format."
+
+  (cargo check passed; the test suite was never run, the
+  new code path was never executed, and the summary
+  mentions neither — the first real CSV fails on row 1)
+'''
+
+[examples.swift]
+good = '''
+Done: coupon-stacking fix.
+
+Verified:
+  swift test (full suite): 412 passed, 0 failed
+  manual: stacked 2 coupons on the sandbox build; total
+  matched the spec's worked example ($18.20)
+
+Not verified:
+  App Store receipt path — needs a signed build; handed to
+  QA explicitly rather than assumed working.
+'''
+bad = '''
+Done: coupon-stacking fix. Everything works!
+
+(Only CouponTests ran; the checkout suite covering the
+changed total calculation was skipped. The app was never
+launched. "Works" here means "compiles, and I'm hopeful" —
+the gap is hidden behind a confident summary.)
+'''
+
+[examples.typescript]
+good = '''
+Completion report:
+
+- Self-reviewed the diff (2 files); removed a stray log.
+- vitest run: 214 passed, incl. 3 new specs for this fix.
+- Exercised /export manually with a 10k-row account:
+  file downloads, totals match the ledger.
+- NOT verified: the SSO login path — no test IdP available
+  locally. Flagged for a staging check before release.
+'''
+bad = '''
+"Done! The export feature is fully working and tested."
+
+Behind the claim:
+- the diff was never re-read (a console.log shipped)
+- tests last ran before Tuesday's unrelated change
+- the endpoint was never invoked end-to-end even once
+- the summary's confidence is the only evidence offered
+'''

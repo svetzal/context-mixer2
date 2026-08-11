@@ -1,0 +1,17 @@
+id = "guidelines.intent.human-owned-architecture-tradeoffs"
+title = "Escalate viable architecture choices for human judgment"
+category = "design"
+tags = ["kotlin", "android", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to choose architecture according to product context rather than hidden agent preference."
+threat = "Automatically selecting among viable patterns can lock in costs the stakeholder would value differently."
+expectation = "Some features will reasonably support MVVM, MVI, or different module boundaries."
+strategy = "Surface viable architectural alternatives and seek clarification before committing to a materially consequential choice."
+evidence = [{ type = "gate", description = "Architecture decisions enumerate alternatives, context, and the stakeholder-approved selection.", required = true }]
+tradeoff = "Decision escalation slows implementation and can overexpose technical detail."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#when-to-seek-clarification", summary = "The source says to seek clarification when multiple architectural approaches are viable.", confidence = 1.0 }]

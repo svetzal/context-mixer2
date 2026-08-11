@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-documentation-aligned"
+title = "Keep documentation aligned with behavior"
+category = "documentation"
+tags = ["elixir", "phoenix", "documentation", "dependencies", "synchronization", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Users and maintainers can rely on guides and API documentation as accurate operating instructions."
+threat = "Implementation changes leave examples, module docs, and public contracts describing obsolete behavior."
+expectation = "APIs and workflows will evolve while documentation is maintained separately from executable code."
+strategy = "Update guides, @doc, and @moduledoc with implementation changes and compile documentation with mix docs."
+evidence = [{ type = "gate", description = "mix docs succeeds and changed APIs have current examples and module or function documentation.", required = true }]
+tradeoff = "Every behavior change carries documentation work and documentation builds add another gate."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#quality-assurance-process", summary = "Requires guide review, synchronized API docs, current examples, and a successful mix docs build.", confidence = 1.0 }]

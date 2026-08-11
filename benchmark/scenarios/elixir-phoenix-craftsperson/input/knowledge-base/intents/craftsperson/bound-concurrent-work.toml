@@ -1,0 +1,18 @@
+id = "guidelines.intent.bound-concurrent-work"
+title = "Bound concurrent work and apply backpressure"
+category = "reliability"
+tags = ["concurrency", "backpressure", "resource-bounds"]
+relations = [
+  { type = "related-to", target = "craftsperson/structure-concurrent-lifetimes" },
+  { type = "related-to", target = "craftsperson/optimize-from-measurement" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The system remains responsive when offered more work than it can process immediately."
+threat = "Unbounded tasks, queues, retries, or parallel enumeration exhaust memory, connections, schedulers, or downstream capacity."
+expectation = "Production load and failure bursts will exceed the comfortable steady-state capacity of some component."
+strategy = "Set explicit concurrency, queue, retry, and timeout bounds and propagate backpressure to producers."
+evidence = [{ type = "load_test", description = "Overload tests show bounded resource growth, observable pressure, and controlled rejection or delay rather than collapse.", required = true }]
+tradeoff = "Bounds can reduce peak throughput and require product decisions about delay, rejection, and fairness."
+scope = { project = "guidelines", paths = ["plugins"] }
+sources = [{ type = "synthesis", ref = "intents", summary = "Generalizes recurring bounded parallelism, channel, stream, scheduler, and supervision guidance.", confidence = 0.97 }]

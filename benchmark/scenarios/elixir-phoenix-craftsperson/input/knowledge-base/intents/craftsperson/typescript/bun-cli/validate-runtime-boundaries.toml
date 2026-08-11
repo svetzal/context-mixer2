@@ -1,0 +1,17 @@
+id = "guidelines.intent.validate-runtime-boundaries"
+title = "Validate data at runtime boundaries"
+category = "architecture"
+tags = ["typescript", "bun", "cli", "validation", "trust-boundaries", "security"]
+relations = [
+  { type = "specializes", target = "craftsperson/validate-untrusted-input-at-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Only data proven to satisfy domain constraints enters the typed core."
+threat = "Type assertions assign trusted static types to malformed parsed or external data without runtime proof."
+expectation = "Configuration and other inputs will arrive from users and external systems outside TypeScript's guarantees."
+strategy = "Parse boundary data with an explicit runtime schema such as Zod and derive the internal TypeScript type from that schema."
+evidence = [{ type = "test", description = "Boundary tests accept valid fixtures and reject missing, mistyped, empty, and extra-invalid values through the runtime schema before core functions are called.", required = true }]
+tradeoff = "Runtime schemas add a dependency or validation layer, duplicate some constraints in executable form, and consume startup time."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#type-system-patterns", summary = "Rejects type assertions for parsed input and prescribes Zod validation at configuration boundaries.", confidence = 1.0 }]

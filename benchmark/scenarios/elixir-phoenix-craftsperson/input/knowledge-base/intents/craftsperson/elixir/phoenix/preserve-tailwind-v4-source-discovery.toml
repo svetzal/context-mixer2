@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-tailwind-v4-source-discovery"
+title = "Preserve Tailwind v4 source discovery"
+category = "design"
+tags = ["elixir", "phoenix", "build-and-delivery", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Production CSS includes utilities referenced by templates and JavaScript without legacy configuration."
+threat = "Changing Tailwind v4 imports or source directives causes required classes to be omitted from the build."
+expectation = "UI code will spread across CSS, JavaScript, and web-layer templates while older Tailwind advice remains common."
+strategy = "Retain the phx.new Tailwind v4 import and @source structure rather than introducing tailwind.config.js-era configuration."
+evidence = [{ type = "asset_gate", description = "The production asset build succeeds and a representative class from each declared source directory appears in generated CSS.", required = true }]
+tradeoff = "The project stays coupled to Tailwind v4's source-discovery syntax and custom layouts need explicit source directives."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#tailwind-css", summary = "Requires preserving Tailwind v4 import and source directives used by phx.new projects.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-green-rspec-before-completion"
+title = "Require a green RSpec suite before completion"
+category = "quality"
+tags = ["ruby", "rspec", "testing", "build-and-delivery", "test-gate", "completion"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to release changes without knowingly violating specified behavior"
+threat = "Declaring work complete while tests fail allows regressions to enter shared history"
+expectation = "Every implementation and review will eventually cross a completion or commit boundary"
+strategy = "Treat a fully passing `bundle exec rspec` run as a non-negotiable completion gate"
+evidence = [{ type = "gate", description = "`bundle exec rspec` exits successfully for the exact revision proposed as complete", required = true }]
+tradeoff = "Unrelated or flaky failures can block otherwise valid work until they are diagnosed"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#quality-gates-non-negotiable", summary = "All RSpec tests must pass before work is considered complete.", confidence = 1.0 }]

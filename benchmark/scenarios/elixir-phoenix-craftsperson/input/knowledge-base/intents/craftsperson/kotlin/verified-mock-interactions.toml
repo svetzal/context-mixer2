@@ -1,0 +1,17 @@
+id = "guidelines.intent.verified-mock-interactions"
+title = "Verify behaviorally significant boundary interactions"
+category = "testing"
+tags = ["kotlin", "testing", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to detect when orchestration silently stops invoking required collaborators."
+threat = "State-only assertions can pass even when a required external action was skipped or duplicated."
+expectation = "Application services will coordinate more gateways and side effects."
+strategy = "Use MockK interaction verification for calls that are part of observable behavior."
+evidence = [{ type = "test", description = "Orchestration tests verify the required call count and meaningful arguments for each behaviorally significant mocked gateway interaction.", required = true }]
+tradeoff = "Interaction assertions couple tests to collaboration structure and can make harmless refactors noisy."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#junit-5--mockk", summary = "The source explicitly prescribes verifying interactions with MockK.", confidence = 1.0 }]

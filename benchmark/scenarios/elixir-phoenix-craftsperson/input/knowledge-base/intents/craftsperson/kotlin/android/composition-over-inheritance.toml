@@ -1,0 +1,17 @@
+id = "guidelines.intent.composition-over-inheritance"
+title = "Preserve locally understandable behavior composition"
+category = "design"
+tags = ["kotlin", "android", "dependencies", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to combine and replace behavior without depending on fragile class hierarchies."
+threat = "Inheritance couples subclasses to parent implementation details and creates implicit behavior."
+expectation = "Features will need variants and reusable behavior that evolve independently."
+strategy = "Prefer composing collaborators and small abstractions over extending implementation classes."
+evidence = [{ type = "gate", description = "Design review shows variability expressed through composed interfaces or delegates rather than deep or implementation-coupled inheritance.", required = true }]
+tradeoff = "Composition can require more forwarding code and additional objects."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#code-quality", summary = "The source explicitly prefers composition over inheritance.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.idiomatic-python-language"
+title = "Express solutions through Python's native strengths"
+category = "design"
+tags = ["python", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Python code remains concise, recognizable, and natural to experienced Python maintainers."
+threat = "Transliterated or lowest-common-denominator code obscures standard Python semantics and accumulates ceremony."
+expectation = "The codebase will evolve under contributors who depend on common Python idioms to understand and extend it quickly."
+strategy = "Use appropriate duck typing, comprehensions, generators, context managers, decorators, unpacking, and functional techniques without dogmatism."
+evidence = [{ type = "review", description = "Review finds no hand-built control flow or abstractions where a clearer standard Python idiom directly expresses the same behavior.", required = true }]
+tradeoff = "Dense or less familiar idioms can reduce accessibility for novice Python contributors."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#core-identity--expertise", summary = "The source directs use of Python's strengths, idiomatic constructs, modern features, and pragmatic functional programming.", confidence = 0.98 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-purpose-specific-test-layers"
+title = "Use purpose-specific Java test layers"
+category = "testing"
+tags = ["java", "testing", "test-strategy", "test-pyramid", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-purpose-specific-test-layers" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business rules and assembled adapters are each verified at the cheapest realistic layer."
+threat = "A single test style yields either slow brittle suites or unverified production wiring."
+expectation = "Applications will combine pure logic with Spring, databases, and external services."
+strategy = "Use fast isolated unit tests for the functional core and integration tests with real adapters, contexts, and Testcontainers for wiring."
+evidence = [{ type = "test_inventory", description = "Core behavior runs without infrastructure, while integration tests exercise real adapter wiring and required services.", required = true }]
+tradeoff = "Multiple layers duplicate some setup and make the suite slower and more complex to maintain."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#testing-philosophy", summary = "Separates fast core unit tests from integration tests using real adapters and services.", confidence = 1.0 }]

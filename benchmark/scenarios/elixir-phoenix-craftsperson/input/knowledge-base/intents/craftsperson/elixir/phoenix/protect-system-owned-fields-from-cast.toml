@@ -1,0 +1,17 @@
+id = "guidelines.intent.protect-system-owned-fields-from-cast"
+title = "Protect system-owned fields from casting"
+category = "reliability"
+tags = ["elixir", "phoenix", "security", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ownership and other privileged fields can only be assigned from trusted server context."
+threat = "Including system-owned fields in cast lets request parameters overwrite user_id or equivalent authority data."
+expectation = "Schemas will add ownership, tenant, audit, and status fields not controlled by end users."
+strategy = "Exclude programmatically assigned fields from cast and set them explicitly from trusted structs or scope."
+evidence = [{ type = "security_test", description = "Submitting privileged field parameters does not change the persisted trusted value, while server-side assignment succeeds.", required = true }]
+tradeoff = "Internal creation paths need explicit field assignment outside the generic changeset pipeline."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#ecto-database-guidelines", summary = "Forbids programmatically set fields such as user_id from cast and requires explicit assignment for security.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.delay-abstraction-until-evidence"
+title = "Delay abstractions until patterns emerge"
+category = "design"
+tags = ["typescript", "bun", "cli", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The design can evolve from observed requirements without carrying unnecessary conceptual machinery."
+threat = "Premature abstractions encode guessed commonality and make simple behavior harder to understand or change."
+expectation = "Early implementations will reveal patterns different from those anticipated before working examples exist."
+strategy = "Prefer the minimum entities and inline provisional structure until repeated, stable patterns justify extraction."
+evidence = [{ type = "review", description = "Every new abstraction has at least two concrete consumers or a documented immediate requirement that cannot be expressed more simply.", required = true }]
+tradeoff = "Some duplication and later refactoring are accepted while waiting for reliable evidence about the right abstraction."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Prioritizes minimal entities and repeatedly directs premature abstractions to be removed or inlined.", confidence = 1.0 }]

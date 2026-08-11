@@ -1,0 +1,17 @@
+id = "guidelines.intent.ship-small-single-reason-increments"
+title = "Ship small increments with one reason to change"
+category = "delivery"
+tags = ["ruby", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to review, diagnose, and revert changes independently"
+threat = "Large multi-purpose changes entangle causes, obscure regressions, and make rollback unsafe"
+expectation = "Features and refactors will be integrated continuously by multiple contributors"
+strategy = "Work in small safe increments and commit each single-reason change atomically"
+evidence = [{ type = "review", description = "Each commit has one coherent purpose, passes its gates, and can be reverted without removing unrelated behavior", required = true }]
+tradeoff = "Fine-grained commits require more planning and can create additional history to curate"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "The source calls for small safe increments and single-reason commits.", confidence = 1.0 }]

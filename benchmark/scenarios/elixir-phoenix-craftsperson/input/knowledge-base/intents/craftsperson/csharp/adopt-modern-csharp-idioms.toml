@@ -1,0 +1,17 @@
+id = "guidelines.intent.adopt-modern-csharp-idioms"
+title = "Use modern C# idioms to express intent"
+category = "design"
+tags = ["csharp", "concurrency", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "C# code expresses domain behavior concisely with language constructs that current maintainers and tooling understand."
+threat = "Legacy or hand-rolled patterns obscure intent and duplicate capabilities already provided safely by the language and runtime."
+expectation = "The C# language and .NET runtime will continue to evolve while the codebase remains under active maintenance."
+strategy = "Use records, pattern matching, LINQ, async and await, minimal APIs, and other modern idioms when they make the behavior clearer."
+evidence = [{ type = "review", description = "New C# code uses an available modern construct where it makes the domain model or control flow materially clearer, without novelty for its own sake.", required = true }]
+tradeoff = "Modern constructs can raise the required language version and learning burden for contributors familiar with older C#."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#core-identity", summary = "Names modern C# idioms as a core craft capability.", confidence = 1.0 }]

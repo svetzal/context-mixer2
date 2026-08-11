@@ -1,0 +1,292 @@
+id = "guidelines.intent.audit-dependency-risk"
+title = "Audit dependency risk"
+category = "dependencies"
+tags = ["security", "vulnerability-management", "lifecycle-risk"]
+relations = [
+  { type = "related-to", target = "craftsperson/minimize-dependency-surface" },
+  { type = "related-to", target = "craftsperson/make-dependency-resolution-reproducible" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Known dependency vulnerabilities and lifecycle risks are detected before they become shipped exposure or emergency migration debt."
+threat = "A trusted dependency version acquires a vulnerability, becomes unmaintained, or drifts beyond safe upgrade distance after adoption."
+expectation = "Dependency risk changes independently from application code and yesterday's safe version may not remain safe."
+strategy = "Run ecosystem-appropriate vulnerability and staleness audits, triage findings by impact, and record any consciously accepted residual risk."
+evidence = [{ type = "security_gate", description = "Dependency audits report no unaddressed unacceptable findings and accepted residual risks have explicit rationale.", required = true }]
+tradeoff = "Remediation can force upgrades, compatibility work, dependency replacement, or delivery delay."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md", "plugins/python-ecosystem/agents/python-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-gates-mandatory", summary = "Runs dependency security analysis and blocks known release vulnerabilities.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#quality-gates-mandatory", summary = "Blocks known vulnerable dependencies and responds to newly disclosed risk.", confidence = 1.0 }, { type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#quality-assurance-process", summary = "Audits serious vulnerabilities and keeps dependency age visible.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; deps.edn
+{:aliases
+ {:audit
+  {:extra-deps
+   {com.github.liquidz/antq {:mvn/version "2.8.1"}
+    io.github.clj-holmes/clj-watson {:mvn/version "6.0.0"}}
+   :main-opts ["-m" "antq.core" "--reporter" "table"]}}}
+;; SECURITY.md — accepted residual risk:
+;; commons-io 2.11 CVE-2024-47554: not reachable (no user-
+;; supplied paths); revisit at the 2026-Q3 upgrade window.
+'''
+bad = '''
+;; deps.edn — last touched 2021; no audit alias, no CI scan
+{:deps
+ {cheshire/cheshire {:mvn/version "5.9.0"}
+  org.clojure/data.xml {:mvn/version "0.0.8"}
+  log4j/log4j {:mvn/version "1.2.17"}}}  ; EOL since 2015
+; nobody knows which of these has open CVEs, and nothing asks
+'''
+
+[examples.cpp]
+good = '''
+# ci/audit.yml — runs on every merge and nightly
+- name: Dependency audit
+  run: |
+    conan audit list --lockfile=conan.lock --format=json \
+      > audit.json
+    python3 ci/triage_audit.py audit.json  # fails on new CVEs
+
+# ci/accepted-risks.toml
+# CVE-2025-1104 (zlib DoS): unreachable — gzip input is local
+#   and size-capped. Revisit at next zlib release. -- svetzal
+'''
+bad = '''
+# conanfile.txt
+[requires]
+openssl/1.0.2u    # EOL since 2019 — "works fine, don't touch"
+libcurl/7.29.0    # 40+ CVEs behind current
+qt/5.6.3          # out of support, no upgrade path scoped
+
+# CI has no audit step; last CVE review: never.
+# Nobody can say which of these is exploitable in prod.
+'''
+
+[examples.csharp]
+good = '''
+# ci.yml — audit runs on every build, findings triaged
+- run: dotnet list package --vulnerable --include-transitive
+- run: dotnet list package --outdated
+
+# docs/accepted-risks.md
+CVE-2026-30105 System.Text.Json 8.0.3: parser DoS, not
+reachable (we never parse untrusted JSON in that path).
+Fix rides the .NET 10 upgrade, target 2026-09. — sv
+'''
+bad = '''
+<!-- pinned in 2021, no audit step anywhere in CI -->
+<PackageReference Include="Newtonsoft.Json"
+    Version="12.0.1" /> <!-- CVE fixed in 13.0.1 -->
+<PackageReference Include="log4net"
+    Version="2.0.8" />  <!-- unmaintained major -->
+<!-- nobody knows which of these is exploitable;
+     nobody has looked since adoption -->
+'''
+
+[examples.elixir]
+good = '''
+# mix.exs — audits run inside the standard gate
+defp aliases do
+  [
+    check: [
+      "hex.audit",
+      "deps.audit",       # fails the build on known CVEs
+      "test"
+    ]
+  ]
+end
+
+# accepted residual risk, with rationale on record:
+# :sweet_xml GHSA-2024-xxxx — parser never receives
+# untrusted input here; revisit at the 2026-09 bump.
+'''
+bad = '''
+# mix.exs
+defp aliases do
+  [
+    # audit dropped: "it kept failing the build"
+    check: ["test"]
+  ]
+end
+
+# deps.audit last ran 14 months ago; its findings were
+# never triaged and nobody owns the exposure since
+'''
+
+[examples.go]
+good = '''
+# .github/workflows/ci.yml
+- name: Vulnerability audit
+  run: govulncheck ./...
+
+# docs/dependency-risk.md
+GO-2026-0142 (yaml.v2 DoS): accepted until the Q4 migration —
+the parser only reads our own committed config, never user
+input. Owner: platform team. Review by: 2026-10-01.
+'''
+bad = '''
+# .github/workflows/ci.yml
+- name: Vulnerability audit
+  run: govulncheck ./... || true   # CI stays green, findings lost
+
+# go.mod: yaml.v2 pinned since 2022; the maintainer archived
+# the repo last year — nobody has looked, nothing is recorded
+'''
+
+[examples.java]
+good = '''
+$ mvn org.owasp:dependency-check-maven:check
+[INFO] No findings at or above CVSS 7.0
+BUILD SUCCESS
+
+# docs/accepted-risks.md
+CVE-2026-1123 (commons-imaging 1.0.4): image-parser DoS.
+Accepted 2026-07-20: we never parse untrusted images; the
+upload path only receives our own generated PNGs.
+Revisit: 2026-10 dependency review.
+'''
+bad = '''
+$ mvn org.owasp:dependency-check-maven:check
+[WARN] log4j-core 2.14.1: CVE-2021-44228 (CVSS 10.0)
+[WARN] snakeyaml 1.29: CVE-2022-1471 (CVSS 9.8)
+BUILD FAILURE
+
+# team chat, same afternoon
+"audit is red again, just disable the plugin for this
+ release — those libs have always worked fine for us"
+# no triage, no rationale, findings shipped as exposure
+'''
+
+[examples.kotlin]
+good = '''
+// build.gradle.kts — the audit is part of the gate
+tasks.named("check") { dependsOn("dependencyCheckAnalyze") }
+dependencyCheck { failBuildOnCVSS = 7.0f }
+
+// SECURITY-NOTES.md, same repo:
+// CVE-2026-1234 jackson-databind: accepted until 2026-08-01.
+// Not exploitable here — no polymorphic deserialization of
+// untrusted input. Owner: stacey. Revisit at next minor bump.
+'''
+bad = '''
+// build.gradle.kts — scanner present, permanently muted
+dependencyCheck { failBuildOnCVSS = 11.0f } // can never fail
+// CI log, ignored for six months:
+//   4 vulnerabilities found (2 HIGH), build SUCCESS
+// no triage, no owner, no revisit date; the library was
+// abandoned upstream a year ago and nobody noticed
+'''
+
+[examples.python]
+good = '''
+# ci.yml (excerpt)
+- run: uv run pip-audit --strict
+- run: uv run pip-audit --format json -o audit.json
+
+# SECURITY-NOTES.md
+Accepted risk: GHSA-56pw in pillow 10.2 (image-parse DoS).
+We never parse untrusted images; fix ships with the Q3
+platform bump. Re-review 2026-09-01. Owner: platform.
+'''
+bad = '''
+# ci.yml (excerpt)
+# - run: uv run pip-audit   # disabled: kept failing builds
+
+# requirements.txt
+requests==2.19.0   # ancient but works, don't touch
+pyyaml==5.1        # known CVEs; yaml.load() on user files
+# nobody has looked at either version since 2019
+'''
+
+[examples.ruby]
+good = '''
+# Gemfile
+gem "rails", "~> 7.1"
+gem "bundler-audit", require: false
+
+# ci.yml gate:  bundle exec bundler-audit check --update
+#
+# AUDIT.md — accepted residual risk, with rationale and owner:
+#   CVE-2026-1234 (rexml DoS): accepted until 2026-08-01.
+#   Not reachable — we never parse untrusted XML. Owner: SV
+'''
+bad = '''
+# Gemfile — pinned in 2023, no audit anywhere in the pipeline
+gem "nokogiri", "1.13.3"  # known CVEs since 2022
+gem "paperclip"           # unmaintained since 2018
+
+# ci.yml
+#   bundle exec rspec     # tests only; vulnerabilities and
+#                         # staleness are never checked
+'''
+
+[examples.rust]
+good = '''
+# ci.yml
+- run: cargo audit --deny warnings
+
+# audit.toml — accepted residual risk, with rationale
+[advisories]
+ignore = [
+  # RUSTSEC-2026-0012: localtime race in `time`; we never
+  # read local offsets. Re-triage at the next upgrade.
+  "RUSTSEC-2026-0012",
+]
+'''
+bad = '''
+# ci.yml
+# audit step deleted 2026-05: "kept failing the build"
+# - run: cargo audit
+- run: cargo build --release
+
+# Cargo.toml meanwhile still pins openssl 0.9 — EOL, two
+# known RUSTSEC advisories, no recorded acceptance anywhere
+'''
+
+[examples.swift]
+good = '''
+# ci/dependency-audit.yml
+- run: osv-scanner --lockfile Package.resolved
+- run: scripts/check-staleness.sh   # flags deps idle > 18 mo
+
+# Accepted residual risk (reviewed 2026-07-01, @svetzal):
+#   swift-soap 1.2 — CVE-2026-1123 not reachable: we never
+#   parse external DTDs. Re-evaluate at the next minor bump.
+'''
+bad = '''
+# ci/dependency-audit.yml
+# - run: osv-scanner --lockfile Package.resolved
+#   (disabled — kept failing the build on CVE "noise")
+
+- run: swift build
+# a green build is treated as "dependencies are fine";
+# the unmaintained crypto package ships another quarter
+'''
+
+[examples.typescript]
+good = '''
+$ npm audit --omit=dev
+found 1 moderate vulnerability in tar-fs@2.1.0
+
+Triage: path traversal needs attacker-supplied archives;
+we only unpack our own build artifacts. Accepted until the
+v3 upgrade lands — recorded in SECURITY_EXCEPTIONS.md with
+owner and expiry 2026-09-01.
+
+$ npx npm-check --skip-unused | grep -i unmaintained
+(none)
+'''
+bad = '''
+$ npm audit
+found 12 vulnerabilities (3 high, 1 critical)
+
+$ npm set audit false        # silence it and move on
+$ git commit -m "ship it"
+
+# No triage, no rationale, no record. The critical finding
+# rides into production alongside two packages whose last
+# release was four years ago.
+'''

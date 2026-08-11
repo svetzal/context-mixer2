@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-tests-fast-and-deterministic"
+title = "Keep tests fast and deterministic"
+category = "quality"
+tags = ["swift", "testing", "build-and-delivery", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Developers and CI can trust and run the test suite frequently for rapid feedback."
+threat = "Real I/O, time, randomness, and remote services make tests slow or flaky."
+expectation = "Suite size and execution frequency will grow with the codebase and parallel CI."
+strategy = "Use stable fixtures and controlled test doubles while excluding real I/O from behavior tests."
+evidence = [{ type = "test_gate", description = "Repeated suite runs complete within the agreed feedback budget with identical results and no network, persistence, clock, or filesystem dependency outside explicit integration suites.", required = true }]
+tradeoff = "Controlled substitutes can diverge from production integrations and require separate end-to-end coverage."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#testing-philosophy", summary = "Requires fast deterministic tests using fixtures and doubles without real I/O.", confidence = 1.0 }]

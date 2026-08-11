@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-pure-business-logic"
+title = "Keep business rules in a functional core"
+category = "architecture"
+tags = ["swift", "testing", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Business rules can be understood and verified independently of infrastructure and UI concerns."
+threat = "Interleaving domain decisions with I/O and external state makes behavior difficult to test and change safely."
+expectation = "Business rules and infrastructure integrations will evolve at different rates and need independent verification."
+strategy = "Place business rules in small, focused functions and value types with no I/O, side effects, or mutation of external state."
+evidence = [{ type = "architecture_review", description = "Domain modules can execute their rules from plain inputs and return values without initializing networking, persistence, system APIs, or UI frameworks.", required = true }]
+tradeoff = "The separation introduces mapping code and additional boundaries between domain values and infrastructure representations."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#functional-core-pure-logic", summary = "Requires business rules to live in small pure functions and structs without I/O or external mutation.", confidence = 1.0 }]

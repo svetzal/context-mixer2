@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-stream-dom-contract"
+title = "Preserve the stream DOM contract"
+category = "design"
+tags = ["elixir", "phoenix", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "LiveView can patch streamed items by stable identity without duplicating or replacing the wrong DOM nodes."
+threat = "A missing stream container mode or item ID disconnects server stream operations from rendered elements."
+expectation = "Items will be inserted, updated, deleted, and reordered incrementally."
+strategy = "Use a uniquely identified phx-update=stream parent and render each @streams item with the provided DOM ID, avoiding deprecated append and prepend modes."
+evidence = [{ type = "liveview_test", description = "Insert, update, and delete tests patch exactly the intended item and templates contain the required stream parent and item IDs.", required = true }]
+tradeoff = "Markup structure and IDs become constrained by LiveView's stream protocol."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#liveview-streams", summary = "Defines the required stream parent and item markup and rejects deprecated append and prepend update modes.", confidence = 1.0 }]

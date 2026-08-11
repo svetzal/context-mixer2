@@ -1,0 +1,317 @@
+id = "guidelines.intent.develop-behavior-red-green-refactor"
+title = "Develop behavior through red-green-refactor"
+category = "testing"
+tags = ["tdd", "red-green-refactor", "behavior"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Each behavior change begins with executable evidence and finishes with a safe opportunity to improve its design."
+threat = "Implementation precedes a falsifiable expectation, allowing tests to pass for the wrong reason or omit the requested behavior."
+expectation = "Frequent changes need fast feedback that distinguishes missing behavior from regression and refactoring."
+strategy = "Write a decisively failing behavior test, make it pass with the smallest coherent change, then refactor while keeping it green."
+evidence = [{ type = "test_history", description = "The new test demonstrably fails without the behavior, passes with it, and protects subsequent refactoring.", required = true }]
+tradeoff = "Strict test-first work can feel slow during exploration when the desired behavior is still being discovered."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/ruby-ecosystem/agents/ruby-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "Clarifies behavior through red-green testing.", confidence = 1.0 }, { type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#when-implementing-features", summary = "Drives new behavior through red, green, and refactor.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#engineering-practices", summary = "Treats tests as executable specifications and uses red-green-refactor.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; 1. red — written first, watched fail:
+(deftest applies-bulk-discount-at-ten-units
+  (is (= 90.0 (line-total {:price 10.0 :qty 10}))))
+;; => FAIL: expected 90.0, actual 100.0
+
+;; 2. green — smallest coherent change:
+(defn line-total [{:keys [price qty]}]
+  (cond-> (* price qty) (>= qty 10) (* 0.9)))
+
+;; 3. refactor under the green bar: extracted bulk-rate;
+;;    the test is unchanged and still passing
+'''
+bad = '''
+(defn line-total [{:keys [price qty]}]
+  (cond-> (* price qty) (>= qty 10) (* 0.9)))
+
+(deftest line-total-test
+  ; written afterwards; asserts whatever the code produced
+  ; and was never observed failing — a wrong 0.9 also "passes"
+  (is (= (line-total {:price 10.0 :qty 10})
+         (line-total {:price 10.0 :qty 10}))))
+'''
+
+[examples.cpp]
+good = '''
+// Step 1 (red): committed failing — expired card must decline.
+TEST(Charge, DeclinesExpiredCard) {
+  auto result = charge(cardExpired(), Money{50});
+  EXPECT_EQ(result.error(), Err::CardExpired);
+}
+// Step 2 (green): smallest change in charge() makes it pass.
+// Step 3 (refactor): merged duplicate expiry checks while the
+// test stayed green. History shows fail -> pass -> still pass.
+'''
+bad = '''
+Result charge(const Card& c, Money m) { /* written first */ }
+
+// Test added afterwards; never once observed failing.
+TEST(Charge, DeclinesExpiredCard) {
+  auto result = charge(cardExpired(), Money{50});
+  EXPECT_TRUE(result.ok() || !result.ok());  // always passes
+}
+// Delete the expiry check entirely: suite is still green,
+// so the test protects nothing and proves nothing.
+'''
+
+[examples.csharp]
+good = '''
+# red — spec first, watch it fail for the right reason
+$ dotnet test --filter Bulk_discount_over_10_units
+  Failed: expected 90.00, found 100.00
+
+# green — smallest coherent change in PricingPolicy
+$ dotnet test --filter Bulk_discount_over_10_units
+  Passed!
+
+# refactor — extract DiscountTier, suite stays green
+$ dotnet test
+  Passed! 214 tests
+'''
+bad = '''
+// written after the implementation, never seen red
+[Fact]
+public void Applies_bulk_discount()
+{
+    var policy = new PricingPolicy();
+    var total = policy.Total(units: 10, price: 10m);
+    total.Should().Be(policy.Total(10, 10m));
+    // compares the code to itself — passes for any
+    // answer, including a missing discount
+}
+'''
+
+[examples.elixir]
+good = '''
+$ mix test test/cart_test.exs      # red first, on purpose
+  1) test "empty cart totals to zero"
+     ** (UndefinedFunctionError) Cart.total/1
+
+# smallest coherent change to green:
+def total(%Cart{items: []}), do: Money.zero()
+
+$ mix test test/cart_test.exs      # green — now refactor
+  1 test, 0 failures
+'''
+bad = '''
+# implementation written first; test added afterwards,
+# asserting whatever the code already happens to return
+def total(%Cart{items: items}),
+  do: Enum.sum_by(items, & &1.price)
+
+test "total works" do
+  # never seen red — passes even if the rule is wrong
+  assert Cart.total(cart) == Cart.total(cart)
+end
+'''
+
+[examples.go]
+good = '''
+$ git log --oneline -3
+77c1b2a Refactor: extract slidingWindow type (suite stays green)
+5b9e0d4 Enforce 100 req/min per API key (new test passes)
+2a4f8c1 Failing test: 101st request in a minute is rejected
+
+# the test was watched failing for the right reason before any
+# limiter code existed, so green now means the behavior is real
+'''
+bad = '''
+// written after the implementation, never seen failing
+func TestLimiter(t *testing.T) {
+	l := NewLimiter(100)
+	allowed := l.Allow("key-1")
+	if allowed != true && allowed != false { // cannot fail
+		t.Fatal("unreachable")
+	}
+	// passes whether the limiter limits anything or not
+}
+'''
+
+[examples.java]
+good = '''
+$ git log --oneline -3
+c41d9aa refactor: extract SENIOR_AGE constant (suite green)
+b32c815 feat: senior discount at 65 (test passes)
+a17f204 test: seniorDiscountAppliesAt65
+        (ran red first: expected 0.10, got 0.00 —
+         proves the behavior was genuinely absent)
+
+@Test void seniorDiscountAppliesAt65() {
+    assertEquals(new BigDecimal("0.10"),
+        pricing.discountFor(new Customer(65)));
+}
+'''
+bad = '''
+// implementation shipped first; test written after, never
+// observed failing
+@Test void discountWorks() {
+    var expected = pricing.discountFor(new Customer(65));
+
+    var actual = pricing.discountFor(new Customer(65));
+
+    assertEquals(expected, actual);
+    // asserts the code against itself — green for ANY
+    // behavior, including the wrong one
+}
+'''
+
+[examples.kotlin]
+good = '''
+// commit 1 — red: the test exists first and is seen to fail
+@Test fun `late fee applies after 30 days overdue`() {
+    val invoice = invoiceOverdueBy(days = 31)
+    assertThat(invoice.totalWithFees())
+        .isEqualTo(Money(105_00))
+}
+// FAILED: expected 105_00 but was 100_00 <- proves the test
+// commit 2 — green: smallest change adds the late fee
+// commit 3 — refactor: extract LateFeePolicy, still green
+'''
+bad = '''
+// implementation written first; the test was added after
+// and has never been observed failing
+@Test fun `late fee`() {
+    val invoice = invoiceOverdueBy(days = 31)
+    // asserts the code against itself — passes for any
+    // implementation, including a broken one
+    assertThat(invoice.totalWithFees())
+        .isEqualTo(invoice.totalWithFees())
+}
+'''
+
+[examples.python]
+good = '''
+$ pytest -q -k bulk_discount       # red: expectation first
+F  test_bulk_orders_get_ten_percent_off
+   assert price(qty=100) == Decimal("90.00")  # got 100.00
+
+$ pytest -q -k bulk_discount       # green: smallest change
+1 passed
+
+$ pytest -q                        # refactor stays green
+42 passed
+'''
+bad = '''
+$ git log --oneline src/pricing.py
+b41f2 Add bulk discount
+a17c9 Add test for bulk discount   # written after the code
+
+$ pytest -q -k bulk_discount
+1 passed
+# never observed failing — with the discount line commented
+# out it still passes, so it specifies nothing
+'''
+
+[examples.ruby]
+good = '''
+# 1. red — written first, fails: Cart#total not implemented
+it "totals line items with quantity" do
+  cart = Cart.new(items: [Item.new(price: 5, qty: 3)])
+  expect(cart.total).to eq(15)
+end
+
+# 2. green — smallest change that passes
+def total = items.sum { |i| i.price * i.qty }
+
+# 3. refactor on green — extracted Item#subtotal, suite green
+'''
+bad = '''
+# implementation written first...
+def total = items.sum { |i| i.price * i.qty }
+
+# ...test added afterward, never seen failing
+it "totals line items" do
+  cart = Cart.new(items: [])
+  expect(cart.total).to eq(0) # passes even if total is broken
+end
+'''
+
+[examples.rust]
+good = '''
+$ cargo test rejects_expired_token        # red first
+test rejects_expired_token ... FAILED
+
+// smallest change that makes it pass
+fn validate(t: &Token, now: Instant) -> Result<(), AuthError> {
+    if t.expires_at <= now {
+        return Err(AuthError::Expired);
+    }
+    Ok(())
+}
+
+$ cargo test rejects_expired_token   # green, then refactor
+test rejects_expired_token ... ok
+'''
+bad = '''
+// implementation written first; the test came after and
+// asserts whatever the code already does
+fn validate(t: &Token, now: Instant) -> Result<(), AuthError> {
+    if t.expires_at <= now {
+        return Err(AuthError::Expired);
+    }
+    Ok(())
+}
+#[test]
+fn validate_works() {
+    let t = token_expiring_in(60);
+    assert!(validate(&t, Instant::now()).is_ok()); // never red
+}
+'''
+
+[examples.swift]
+good = '''
+// 1. Red — failed first: "expected .zero, got nil"
+@Test func emptyCartTotalsToZero() {
+    #expect(Cart(items: []).total == .zero)
+}
+
+// 2. Green — smallest change in Cart.total made it pass.
+// 3. Refactor — extracted Money.sum(_:); the test above
+//    stayed green throughout and protected the cleanup.
+'''
+bad = '''
+// written after the implementation, from the implementation
+@Test func totalWorks() {
+    let cart = Cart(items: [])
+    // asserts the code against itself — cannot fail
+    #expect(cart.total == cart.total)
+}
+// never seen red, so it proves nothing about the behavior
+'''
+
+[examples.typescript]
+good = '''
+// 1. Red — ran first, failed: applyLateFee did not exist.
+it("adds a 5% late fee after the due date", () => {
+  const invoice = { total: 100, dueDate: past };
+  expect(applyLateFee(invoice, today).total).toBe(105);
+});
+
+// 2. Green — smallest coherent change that passes.
+export const applyLateFee = (inv: Invoice, on: Date): Invoice =>
+  on > inv.dueDate ? { ...inv, total: inv.total * 1.05 } : inv;
+
+// 3. Refactor freely; the test stays green throughout.
+'''
+bad = '''
+// Implementation first; the test came after and asserts
+// whatever the code already does. It has never failed.
+export const applyLateFee = (inv: Invoice, on: Date): Invoice =>
+  on > inv.dueDate ? { ...inv, total: inv.total * 1.05 } : inv;
+
+it("applyLateFee", () => {
+  const inv = { total: 100, dueDate: past };
+  const actual = applyLateFee(inv, today);
+  // passes for the wrong reason — compares code to itself
+  expect(actual).toEqual(applyLateFee(inv, today));
+});
+'''

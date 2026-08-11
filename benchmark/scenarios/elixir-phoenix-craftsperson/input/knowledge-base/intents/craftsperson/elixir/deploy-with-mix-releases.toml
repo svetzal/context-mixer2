@@ -1,0 +1,17 @@
+id = "guidelines.intent.deploy-with-mix-releases"
+title = "Deploy with Mix releases"
+category = "delivery"
+tags = ["elixir", "mix", "dependencies", "build-and-delivery", "tooling", "project-management"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Production deployments package the application and BEAM runtime reproducibly with current supported tooling."
+threat = "Ad hoc runtime assembly or legacy Distillery workflows drift from current Elixir support and environment conventions."
+expectation = "Applications will need repeatable builds and upgrades across production hosts."
+strategy = "Prefer mix release, generate templates with mix release.init when customization is needed, and retain Distillery only for explicitly legacy applications."
+evidence = [{ type = "deployment_test", description = "A clean production build boots from a Mix release and current applications have no Distillery dependency.", required = true }]
+tradeoff = "Release templates and runtime environment scripts add deployment-specific configuration and migration effort for legacy systems."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#releases-preferred-deployment-mechanism", summary = "Prefers Mix releases and limits Distillery to applications that explicitly require the legacy mechanism.", confidence = 1.0 }]

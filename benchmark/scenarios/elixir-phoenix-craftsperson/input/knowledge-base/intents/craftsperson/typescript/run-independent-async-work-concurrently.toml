@@ -1,0 +1,17 @@
+id = "guidelines.intent.run-independent-async-work-concurrently"
+title = "Run independent asynchronous operations concurrently"
+category = "reliability"
+tags = ["typescript", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to complete independent I/O within the latency of the slowest operation rather than their sum"
+threat = "Sequential awaits serialize unrelated work and compound response time"
+expectation = "Services will aggregate data from multiple independent asynchronous sources"
+strategy = "Start independent promises together and await them with Promise.all"
+evidence = [{ type = "test", description = "A timing or scheduling test demonstrates independent operations overlap and all results are available before continuation", required = true }]
+tradeoff = "Concurrent work increases instantaneous resource use and Promise.all fails the aggregate when any member rejects"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#nodejs-patterns", summary = "The Node.js guidance labels Promise.all over independent fetches as the correct concurrent pattern.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.refactor-existing-design-incrementally"
+title = "Refactor existing design incrementally"
+category = "refactoring"
+tags = ["java", "concurrency", "behavior-preservation", "small-steps", "test-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-behavior-during-refactoring" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "A working Java system can improve without discarding context or destabilizing unrelated behavior."
+threat = "Sweeping redesigns misunderstand existing constraints and create broad regression surfaces."
+expectation = "Legacy and unfamiliar codebases will require quality improvements while continuing to deliver."
+strategy = "Understand the current design first, propose focused refactorings, and land them in behavior-preserving increments."
+evidence = [{ type = "change_review", description = "A refactoring diff preserves public behavior with tests and limits structural change to one identified design pressure.", required = true }]
+tradeoff = "Incremental refactoring can leave temporary inconsistency and take longer than a clean rewrite."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#behavioral-guidelines", summary = "Requires respect for existing code, understanding before sweeping proposals, and incremental refactoring.", confidence = 1.0 }]

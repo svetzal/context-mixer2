@@ -1,0 +1,17 @@
+id = "guidelines.intent.treat-compiler-errors-as-design-feedback"
+title = "Treat compiler diagnostics as design feedback"
+category = "reliability"
+tags = ["rust", "error-handling", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ownership and type constraints improve the design instead of being bypassed by tactical workarounds."
+threat = "Contributors silence unfamiliar compiler errors without understanding the underlying violated model."
+expectation = "Rust's compiler will expose design problems and unfamiliar diagnostics during nontrivial changes."
+strategy = "Use borrow-checker diagnostics as design feedback and consult rustc --explain for unfamiliar error codes."
+evidence = [{ type = "review", description = "Fixes address the ownership or type design and do not merely obscure the triggering diagnostic.", required = true }]
+tradeoff = "Revisiting design takes longer than applying a local clone, wrapper, or suppression."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#ownership-and-borrowing", summary = "Directs developers to treat borrow-checker diagnostics as feedback and use rustc --explain.", confidence = 1.0 }]

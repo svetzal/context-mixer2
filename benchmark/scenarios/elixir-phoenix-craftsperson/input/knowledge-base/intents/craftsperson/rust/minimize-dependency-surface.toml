@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimize-dependency-surface"
+title = "Minimize dependency and supply-chain surface"
+category = "dependencies"
+tags = ["rust", "security", "dependencies", "build-and-delivery", "supply-chain", "complexity"]
+relations = [
+  { type = "specializes", target = "craftsperson/minimize-dependency-surface" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The project remains economical to build, audit, ship, and trust."
+threat = "Convenience dependencies increase compile time, binary size, transitive code, license obligations, and compromise exposure."
+expectation = "New features will create recurring opportunities to add crates for small amounts of functionality."
+strategy = "Keep dependencies minimal, prefer maintained crates with clear security posture, and assess transitive cost before adding one."
+evidence = [{ type = "dependency_review", description = "Each added dependency has a recorded maintenance, security, license, compile-time, size, and transitive-cost rationale.", required = true }]
+tradeoff = "Implementing functionality locally can cost more engineering time and may be less mature than a third-party crate."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#workspace-and-dependency-management", summary = "Calls for minimal audited dependencies and consideration of compile, binary, and supply-chain cost.", confidence = 1.0 }]

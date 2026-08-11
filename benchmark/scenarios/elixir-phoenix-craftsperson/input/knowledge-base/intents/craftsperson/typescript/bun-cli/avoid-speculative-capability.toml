@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-speculative-capability"
+title = "Build only capabilities demanded now"
+category = "design"
+tags = ["typescript", "bun", "cli", "testing", "build-and-delivery", "yagni"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The product remains easy to change because every behavior serves a demonstrated requirement."
+threat = "Speculative features create unused code, extra states, and maintenance obligations based on guesses."
+expectation = "Future needs are uncertain and are likely to differ from today's predictions."
+strategy = "Apply YAGNI: implement the simplest behavior that satisfies current evidence and remove speculative additions."
+evidence = [{ type = "review", description = "Every new behavior maps to an accepted requirement or failing test, with no dormant options, modes, or extension points justified only by hypothetical use.", required = true }]
+tradeoff = "A real later requirement may require revisiting the design instead of activating a prebuilt extension."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Explicitly invokes YAGNI, the simplest thing that could work, and removal of speculative features.", confidence = 1.0 }]

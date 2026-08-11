@@ -1,0 +1,17 @@
+id = "guidelines.intent.configure-release-runtime-through-env-scripts"
+title = "Configure release runtime through environment scripts"
+category = "delivery"
+tags = ["elixir", "security", "testing", "documentation", "build-and-delivery", "builds"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "A release receives host-specific runtime identity and secrets without rebuilding the application artifact."
+threat = "Node names, cookies, and environment-specific settings become compiled into artifacts or configured inconsistently across hosts."
+expectation = "The same release artifact will run on multiple operating systems and deployment environments."
+strategy = "Set release environment variables through env.sh or env.bat and document standard variables such as RELEASE_NODE and RELEASE_COOKIE."
+evidence = [{ type = "deployment_test", description = "The same release artifact boots under two environment configurations and observes the documented RELEASE_NODE and RELEASE_COOKIE values.", required = true }]
+tradeoff = "Environment scripts introduce OS-specific deployment files and secret-distribution obligations."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#releases-preferred-deployment-mechanism", summary = "Directs release environment variables through env scripts and names the standard node and cookie variables.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-virtual-destructors-for-polymorphic-bases"
+title = "Require virtual polymorphic destruction"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Deletion through bases runs the full destructor chain."
+threat = "Nonvirtual destruction leaks or causes UB."
+expectation = "More implementations will be owned through interfaces."
+strategy = "Give deletable polymorphic bases virtual destructors."
+evidence = [{ type = "gate", description = "Analysis finds no deletable polymorphic base without one.", required = true }]
+tradeoff = "Virtual destruction adds vtable coupling."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#red-flags-to-catch", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

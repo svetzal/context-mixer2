@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-critical-performance-requirements"
+title = "Define critical performance targets before optimizing"
+category = "collaboration"
+tags = ["clojure", "testing", "performance", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to choose and verify optimizations against an agreed performance outcome"
+threat = "Unspecified performance expectations lead to premature complexity or a result that misses operational needs"
+expectation = "Some changes will be performance-critical without stating latency, throughput, scale, or resource limits"
+strategy = "Ask the user to define critical performance characteristics and acceptance thresholds before choosing an optimization"
+evidence = [{ type = "decision-record", description = "The change context records workload shape, metric, target, and measurement environment before performance-specific code is accepted", required = true }]
+tradeoff = "Benchmark definition and user coordination delay implementation and may be disproportionate for exploratory work"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#when-to-escalate", summary = "Critical but unspecified performance characteristics are an explicit escalation trigger.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.route-external-effects-through-gateways"
+title = "Route external effects through explicit gateways"
+category = "architecture"
+tags = ["swift", "testing", "gateways", "external-systems", "dependency-inversion"]
+relations = [
+  { type = "specializes", target = "craftsperson/put-gateways-at-external-boundaries" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "External systems can be replaced, controlled, and tested without contaminating domain logic."
+threat = "Direct calls to networking, persistence, system APIs, or the file system couple behavior to uncontrollable I/O."
+expectation = "External libraries and services will change and tests will need deterministic substitutes."
+strategy = "Put each external interaction behind a clear gateway protocol and a thin imperative-shell adapter that delegates to the functional core."
+evidence = [{ type = "architecture_gate", description = "Imports or calls for external I/O occur only in gateway adapters, while consumers depend on gateway protocols.", required = true }]
+tradeoff = "Gateway protocols and adapters add types, wiring, and translation code even for simple integrations."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#imperative-shell-io-boundary", summary = "Requires all external interactions to pass through protocol boundaries implemented by thin adapters.", confidence = 1.0 }]

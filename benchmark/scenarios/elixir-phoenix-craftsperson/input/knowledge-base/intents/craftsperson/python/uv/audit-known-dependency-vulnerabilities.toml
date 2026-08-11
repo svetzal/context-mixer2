@@ -1,0 +1,17 @@
+id = "guidelines.intent.audit-known-dependency-vulnerabilities"
+title = "Audit dependencies for known vulnerabilities"
+category = "delivery"
+tags = ["python", "uv", "security", "dependencies", "build-and-delivery", "tooling"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Releases avoid dependency versions with publicly known exploitable defects."
+threat = "Transitive or direct packages can acquire disclosed vulnerabilities without code changes in the project."
+expectation = "Advisory databases and dependency releases will continue to change after dependencies are selected."
+strategy = "Run pip-audit through uvx as a mandatory completion gate."
+evidence = [{ type = "security_gate", description = "uvx pip-audit completes and reports no unaddressed vulnerability prohibited by policy.", required = true }]
+tradeoff = "Audit databases can lag, produce false positives, or report findings with no immediately compatible fix."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Mandates pip-audit to detect known dependency vulnerabilities.", confidence = 1.0 }]

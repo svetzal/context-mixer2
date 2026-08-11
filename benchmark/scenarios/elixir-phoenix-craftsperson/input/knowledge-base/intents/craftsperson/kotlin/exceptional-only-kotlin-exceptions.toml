@@ -1,0 +1,17 @@
+id = "guidelines.intent.exceptional-only-kotlin-exceptions"
+title = "Reserve exceptions for genuinely exceptional conditions"
+category = "design"
+tags = ["kotlin", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to distinguish expected domain outcomes from abnormal execution failures."
+threat = "Using exceptions for ordinary control flow obscures contracts and creates non-local behavior."
+expectation = "Callers will compose more operations with both expected rejection cases and infrastructure failures."
+strategy = "Return typed outcomes for expected cases and throw only for exceptional conditions."
+evidence = [{ type = "review", description = "Thrown exceptions correspond to abnormal failures, while validation, absence, and expected business rejection are represented in return types.", required = true }]
+tradeoff = "The boundary between expected and exceptional is contextual and may require adapters between Kotlin and exception-oriented libraries."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#error-handling", summary = "The source explicitly says to throw exceptions only for exceptional conditions.", confidence = 1.0 }]

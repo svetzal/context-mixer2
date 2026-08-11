@@ -1,0 +1,17 @@
+id = "guidelines.intent.zero-warning-lint-and-format"
+title = "Keep source uniformly formatted and free of lint warnings"
+category = "quality"
+tags = ["python", "documentation", "formatting", "static-analysis", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "The codebase retains a consistent, mechanically checkable quality baseline."
+threat = "Accumulated lint debt and style drift hide meaningful defects in routine warning noise."
+expectation = "Many changes and contributors will otherwise normalize warnings and inconsistent formatting over time."
+strategy = "Format source with Ruff, require `ruff check src` to report zero warnings, and allow suppressions only when necessary and documented."
+evidence = [{ type = "gate", description = "`ruff format --check src` and `ruff check src` both exit successfully with no warnings or undocumented noqa suppressions.", required = true }]
+tradeoff = "A zero-warning policy can block delivery on low-risk style findings and requires maintenance as lint rules evolve."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#quality-assurance-process", summary = "The source mandates Ruff formatting and zero lint warnings and strongly limits noqa suppression.", confidence = 1.0 }]

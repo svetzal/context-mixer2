@@ -1,0 +1,17 @@
+id = "guidelines.intent.security-advisory-awareness"
+title = "Respond to newly disclosed dependency risk"
+category = "dependencies"
+tags = ["kotlin", "android", "security", "dependencies", "vulnerability-management", "lifecycle-risk"]
+relations = [
+  { type = "specializes", target = "craftsperson/audit-dependency-risk" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to identify and remediate security exposure between scheduled feature changes."
+threat = "New CVEs can invalidate the safety of a dependency version after it was accepted."
+expectation = "OWASP and CVE databases will publish new advisories continuously."
+strategy = "Monitor relevant security advisories and feed findings into dependency updates and the mandatory vulnerability gate."
+evidence = [{ type = "gate", description = "Dependency inventory is checked against current advisory feeds and material findings have documented remediation or time-bounded acceptance.", required = true }]
+tradeoff = "Monitoring produces alert noise and recurring upgrade work even when exploitability is low."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#continuous-improvement", summary = "The source explicitly requires staying current with OWASP and CVE security advisories.", confidence = 1.0 }]

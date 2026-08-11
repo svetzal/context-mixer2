@@ -1,0 +1,17 @@
+id = "guidelines.intent.run-doctests-alongside-nextest"
+title = "Run doctests alongside cargo nextest"
+category = "delivery"
+tags = ["rust", "cargo", "testing", "documentation", "tooling", "project-management"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Documentation examples remain compiled and behaviorally verified when the project uses a faster test runner."
+threat = "Teams assume nextest covers all cargo test behavior and silently stop running doctests."
+expectation = "Projects will adopt cargo nextest for speed while continuing to publish rustdoc examples."
+strategy = "Run cargo test --doc separately whenever cargo nextest is the primary test command."
+evidence = [{ type = "ci_gate", description = "CI configuration using nextest includes an explicit successful doctest step.", required = true }]
+tradeoff = "A separate doctest invocation adds CI time and another command to maintain."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#testing-strategy", summary = "Warns that nextest omits doctests and requires cargo test --doc separately.", confidence = 1.0 }]

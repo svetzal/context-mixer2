@@ -1,0 +1,17 @@
+id = "guidelines.intent.parametrized-behavior-cases"
+title = "Express equivalent behavior cases as data"
+category = "design"
+tags = ["python", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "A family of input-output examples can expand without duplicating test procedure."
+threat = "Copy-pasted tests for equivalent cases drift and hide the common behavioral rule."
+expectation = "Boundary values and representative examples will grow as requirements are clarified."
+strategy = "Use pytest parametrization when cases share the same setup, action, and assertion."
+evidence = [{ type = "review", description = "Tests with identical procedure and only varying inputs or expected values are represented by one parametrized specification with readable case data.", required = true }]
+tradeoff = "Large parameter tables can make individual failures less descriptive and discourage case-specific setup when it becomes necessary."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#parametrized-tests", summary = "The source includes pytest parametrization as the preferred pattern for multiple equivalent cases.", confidence = 0.94 }]

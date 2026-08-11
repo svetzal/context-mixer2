@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-tests-reveal-one-behavior"
+title = "Make each test reveal one behavior"
+category = "design"
+tags = ["java", "testing", "error-handling", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "A failing test communicates the specific business behavior that regressed."
+threat = "Broad, poorly named tests mix concepts and force maintainers to reverse-engineer the failure."
+expectation = "Suites will accumulate cases and be debugged by people unfamiliar with the original implementation."
+strategy = "Give tests descriptive behavior names, organize related cases with JUnit 5 constructs, and keep each test focused on one assertion concept."
+evidence = [{ type = "review", description = "Each test name states an observable outcome and a single failure identifies one behavior rather than several unrelated concepts.", required = true }]
+tradeoff = "Fine-grained tests increase test count and may repeat arrangement code."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#testing-philosophy", summary = "Requires descriptive tests with one assertion concept and recommends JUnit 5 organization features.", confidence = 1.0 }]

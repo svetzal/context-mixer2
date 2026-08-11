@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-green-ci-before-merge"
+title = "Require green CI before merge"
+category = "quality"
+tags = ["java", "testing", "dependencies", "build-and-delivery", "test-gate", "completion"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The shared mainline contains only revisions that passed the repository's automated quality policy."
+threat = "Locally unverified or environment-dependent changes break the integration branch for everyone."
+expectation = "Contributors will use different machines and may omit parts of the full gate locally."
+strategy = "Prevent pull-request merge until all configured tests and quality gates pass in CI."
+evidence = [{ type = "ci_gate", description = "Branch protection or merge policy requires the complete CI workflow to succeed for the merged revision.", required = true }]
+tradeoff = "Mandatory CI increases lead time and can block delivery on flaky or unavailable infrastructure."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#version-control-and-collaboration", summary = "Requires green CI with all tests and quality gates before pull requests merge.", confidence = 1.0 }]

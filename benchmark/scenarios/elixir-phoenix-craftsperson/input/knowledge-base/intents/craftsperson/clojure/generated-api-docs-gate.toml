@@ -1,0 +1,17 @@
+id = "guidelines.intent.generated-api-docs-gate"
+title = "Keep generated API documentation buildable"
+category = "documentation"
+tags = ["clojure", "documentation", "build-and-delivery", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to publish a navigable API reference from the current source"
+threat = "Documentation drift and malformed docstrings silently break downstream reference generation"
+expectation = "The public API and its generated documentation will change together"
+strategy = "Generate Codox output into docs as a mandatory completion check"
+evidence = [{ type = "gate", description = "clojure -X:codox completes successfully and produces the configured docs output", required = true }]
+tradeoff = "Generated artifacts and generator configuration add build time and maintenance, and may create noisy diffs if committed"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-tools-you-wield", summary = "Codox is the prescribed API documentation generator and outputs to docs.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-gates-mandatory", summary = "Codox generation is a mandatory completion command.", confidence = 1.0 }]

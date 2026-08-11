@@ -1,0 +1,17 @@
+id = "guidelines.intent.kotlin-owned-boundary-test-doubles"
+title = "Mock owned boundaries instead of library internals"
+category = "testing"
+tags = ["kotlin", "testing", "dependencies", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to isolate core behavior in tests without coupling tests to third-party implementation details."
+threat = "Mocking library internals makes tests brittle across dependency upgrades and verifies behavior the team does not own."
+expectation = "External databases, APIs, filesystems, and HTTP libraries will change independently of domain code."
+strategy = "Place external interactions behind owned gateway interfaces and mock only those interfaces."
+evidence = [{ type = "static_check", description = "Test imports and mock declarations target project-owned gateway interfaces; no third-party concrete client or library internal is mocked.", required = true }]
+tradeoff = "Owned gateways add interfaces, adapters, and mapping code around otherwise direct library calls."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#test-structure", summary = "The source repeatedly requires mocking only gateway or boundary interfaces and wrapping third-party libraries first.", confidence = 1.0 }]

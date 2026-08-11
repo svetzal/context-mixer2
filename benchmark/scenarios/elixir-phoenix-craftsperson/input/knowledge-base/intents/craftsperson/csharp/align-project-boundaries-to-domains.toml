@@ -1,0 +1,17 @@
+id = "guidelines.intent.align-project-boundaries-to-domains"
+title = "Align project boundaries with domains"
+category = "design"
+tags = ["csharp", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "A solution can evolve domain areas independently while remaining easy to navigate."
+threat = "Arbitrary project partitioning or a monolithic structure entangles unrelated concepts and spreads changes across the solution."
+expectation = "Business domains and team ownership will grow or change at different rates."
+strategy = "Organize a lean multi-project solution around meaningful domain boundaries."
+evidence = [{ type = "dependency_review", description = "Project responsibilities and references correspond to domain boundaries, with no project existing solely as ceremonial indirection.", required = true }]
+tradeoff = "Multiple projects increase build configuration, reference management, and navigation overhead."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#build--project-management", summary = "Calls for lean multi-project solutions organized along domain boundaries.", confidence = 1.0 }]

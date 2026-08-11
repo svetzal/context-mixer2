@@ -1,0 +1,17 @@
+id = "guidelines.intent.formatting-gate"
+title = "Prevent formatting drift from entering completed work"
+category = "design"
+tags = ["kotlin", "android", "formatting", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 1
+capability = "Ability to maintain a mechanically consistent Kotlin codebase."
+threat = "Inconsistent formatting creates review noise and merge churn."
+expectation = "Many contributors and automated changes will touch shared Kotlin sources."
+strategy = "Require ./gradlew ktlintCheck to pass before work is complete."
+evidence = [{ type = "gate", description = "The recorded completion run shows ktlintCheck passing with no formatting violations.", required = true }]
+tradeoff = "Mandatory formatting can cause unrelated churn and adds gate time."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#quality-gates-mandatory", summary = "The source makes ktlintCheck a mandatory completion gate.", confidence = 1.0 }]

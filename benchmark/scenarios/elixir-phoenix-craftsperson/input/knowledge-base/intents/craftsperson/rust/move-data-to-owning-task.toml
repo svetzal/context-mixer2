@@ -1,0 +1,17 @@
+id = "guidelines.intent.move-data-to-owning-task"
+title = "Move data to the task that owns it"
+category = "reliability"
+tags = ["rust", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Concurrent code has clear ownership and minimizes coordination hazards."
+threat = "Shared mutable state introduces contention, synchronization complexity, and race-prone reasoning."
+expectation = "Async and multithreaded services will distribute work across tasks and threads."
+strategy = "Prefer transferring ownership to the responsible task or thread over sharing mutable state."
+evidence = [{ type = "review", description = "Concurrent flows use message or ownership transfer where feasible, with shared mutation justified explicitly.", required = true }]
+tradeoff = "Ownership transfer can require channels, data movement, or architectural changes that add latency or plumbing."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#ownership-and-borrowing", summary = "Prefers moving data to the owning task or thread instead of shared mutable state.", confidence = 1.0 }]

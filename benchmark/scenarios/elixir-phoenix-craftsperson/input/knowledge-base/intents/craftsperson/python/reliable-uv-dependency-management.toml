@@ -1,0 +1,17 @@
+id = "guidelines.intent.reliable-uv-dependency-management"
+title = "Use one fast and reproducible dependency workflow"
+category = "delivery"
+tags = ["python", "uv", "dependencies", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.91
+capability = "Contributors can resolve and install project dependencies consistently and quickly."
+threat = "Mixed dependency tools and inconsistent resolution produce environment drift and slow feedback."
+expectation = "Dependencies and development environments will be recreated across contributors and automation."
+strategy = "Use uv as the project's dependency-management interface."
+evidence = [{ type = "gate", description = "A clean environment can install and run project checks using the committed uv project metadata and lock state without invoking a second resolver.", required = true }]
+tradeoff = "The project depends on an additional tool and contributors familiar with pip or Poetry must learn a different workflow."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#dependency-management", summary = "The source explicitly selects uv for fast, reliable dependency management.", confidence = 0.96 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-public-api-semantics"
+title = "Preserve public API and SemVer promises"
+category = "architecture"
+tags = ["rust", "concurrency", "security", "trust-boundaries", "authorization"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Downstream consumers can upgrade without unannounced source or behavioral breakage."
+threat = "Refactoring removes public items or changes observable behavior while appearing locally safe."
+expectation = "Published crates will accumulate external consumers whose usage is not visible in the repository."
+strategy = "Treat public API behavior as an invariant, require authorization before removals, and use cargo-semver-checks where appropriate."
+evidence = [{ type = "ci_gate", description = "SemVer compatibility checks and behavior tests show no unauthorized public regression.", required = true }]
+tradeoff = "Compatibility obligations preserve APIs that the project might otherwise simplify or replace."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#detect--preserve-invariants-mandatory", summary = "Requires preserving public API behavior and SemVer promises and considering cargo-semver-checks.", confidence = 1.0 }]

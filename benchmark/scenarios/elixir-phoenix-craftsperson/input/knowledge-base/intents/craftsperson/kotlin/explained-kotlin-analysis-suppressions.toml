@@ -1,0 +1,17 @@
+id = "guidelines.intent.explained-kotlin-analysis-suppressions"
+title = "Make every static-analysis exception auditable"
+category = "quality"
+tags = ["kotlin", "static-analysis", "error-handling", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to distinguish deliberate rule exceptions from hidden or forgotten debt."
+threat = "Unexplained suppressions can mask defects and proliferate through copying."
+expectation = "Occasional framework constraints or false positives will make some suppressions unavoidable."
+strategy = "Permit narrowly scoped warning suppressions only with a nearby explanation of why the rule does not apply."
+evidence = [{ type = "static_check", description = "Every suppression annotation or configuration exclusion has a scoped rationale adjacent to it, and broad blanket suppressions are absent.", required = true }]
+tradeoff = "Rationale comments add maintenance burden and can become stale when rules or code change."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#quality-gate-enforcement", summary = "The source requires comments explaining any warning suppression.", confidence = 1.0 }]

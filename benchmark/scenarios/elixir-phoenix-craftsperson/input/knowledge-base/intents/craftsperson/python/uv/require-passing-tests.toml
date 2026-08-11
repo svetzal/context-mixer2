@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-passing-tests"
+title = "Require all tests to pass before completion"
+category = "quality"
+tags = ["python", "uv", "testing", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Delivered changes preserve all behavior currently protected by the test suite."
+threat = "Known regressions are normalized or hidden by considering work complete despite failing tests."
+expectation = "Changes will affect behavior outside the immediately edited code and the suite will accumulate regression checks."
+strategy = "Treat a clean uv run pytest result as a non-negotiable completion gate."
+evidence = [{ type = "gate", description = "uv run pytest exits successfully with no failed or errored tests.", required = true }]
+tradeoff = "Unrelated flaky or stale tests can block otherwise valid delivery until their ownership is resolved."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Makes passing all tests mandatory before code is complete.", confidence = 1.0 }]

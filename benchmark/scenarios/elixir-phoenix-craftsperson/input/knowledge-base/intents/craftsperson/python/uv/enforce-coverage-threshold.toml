@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-coverage-threshold"
+title = "Enforce the project's coverage threshold"
+category = "testing"
+tags = ["python", "uv", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The exercised share of the codebase does not silently decline as behavior is added or changed."
+threat = "A green test suite can leave newly added paths entirely unexecuted."
+expectation = "Feature growth will continually add branches and modules that are easy to omit from tests."
+strategy = "Run pytest with coverage and require the configured threshold before completion."
+evidence = [{ type = "coverage_gate", description = "uv run pytest --cov succeeds and reports coverage at or above the repository threshold.", required = true }]
+tradeoff = "A numeric threshold can reward low-value execution and adds runtime without proving assertion quality."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Mandates pytest coverage above the project's threshold.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-illegal-states-unrepresentable"
+title = "Make invalid state combinations unrepresentable"
+category = "design"
+tags = ["typescript", "testing", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to prevent invalid application states before runtime"
+threat = "Loosely related optional fields admit combinations the domain does not support"
+expectation = "State machines will gain variants and new consumers that otherwise construct partial states"
+strategy = "Model mutually exclusive states with discriminated unions and variant-specific data"
+evidence = [{ type = "static-check", description = "Type-checking rejects construction or handling of state combinations outside the declared variants", required = true }]
+tradeoff = "Precise unions add type declarations and require explicit handling when new variants are introduced"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#type-system-patterns", summary = "The type-system guidance says to make illegal states unrepresentable using discriminated unions for state machines.", confidence = 1.0 }]

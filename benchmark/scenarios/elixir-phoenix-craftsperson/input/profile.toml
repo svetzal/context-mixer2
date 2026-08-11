@@ -1,0 +1,23 @@
+id = "elixir-phoenix-craftsperson"
+version = "0.1.0"
+description = "Use for Phoenix web applications, including LiveView, HEEx, Ecto, OTP, security, testing, and interface work."
+surface = "agent"
+budget_tokens = 30000
+
+[select]
+categories = [
+  "architecture",
+  "collaboration",
+  "delivery",
+  "dependencies",
+  "design",
+  "documentation",
+  "performance",
+  "quality",
+  "reliability",
+  "testing",
+]
+tags = ["phoenix"]
+
+[content]
+include = ["guidance", "rationale", "evidence"]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.capture-subprocess-diagnostics"
+title = "Capture subprocess diagnostics"
+category = "architecture"
+tags = ["typescript", "bun", "cli", "concurrency", "error-handling", "gateways"]
+relations = [
+  { type = "specializes", target = "craftsperson/put-gateways-at-external-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The CLI can preserve the output needed to consume and explain an external command's outcome."
+threat = "Discarded or conflated output removes result data and the diagnostics needed to investigate failures."
+expectation = "External tools will communicate useful results and errors through distinct stdout and stderr streams."
+strategy = "Capture stdout and stderr separately and return them across the subprocess gateway boundary."
+evidence = [{ type = "test", description = "A subprocess fixture writes distinct markers to stdout and stderr, and the gateway returns each marker intact in the correct field.", required = true }]
+tradeoff = "Buffering output consumes memory and delays streaming feedback for verbose or long-running commands."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#subprocess-execution", summary = "Requires subprocess output capture and demonstrates separately piped stdout and stderr.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.descriptive-names"
+title = "Name code after its intent"
+category = "design"
+tags = ["go", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A future reader can infer the role of a symbol without reconstructing local context."
+threat = "Abbreviations and generic names conceal domain meaning and increase cognitive load."
+expectation = "Maintainers unfamiliar with the original implementation context will change the code."
+strategy = "Use descriptive names that reveal intent and reserve abbreviations for universally understood terms."
+evidence = [{ type = "review", description = "Identifiers communicate domain purpose without unexplained abbreviations or generic placeholders such as data, thing, or manager.", required = true }]
+tradeoff = "More descriptive names are longer and can become verbose in tightly scoped code."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#code-is-communication", summary = "Requires descriptive names that reveal intent and limits abbreviations.", confidence = 1.0 }]

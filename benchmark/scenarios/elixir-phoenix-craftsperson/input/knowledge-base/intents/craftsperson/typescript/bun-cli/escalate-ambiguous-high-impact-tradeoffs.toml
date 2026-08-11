@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-ambiguous-high-impact-tradeoffs"
+title = "Escalate ambiguous high-impact tradeoffs"
+category = "delivery"
+tags = ["typescript", "bun", "cli", "security", "performance", "version-control"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Decisions that redefine requirements or accept material security, clarity, or performance risk remain accountable to the user."
+threat = "An implementer can silently resolve uncertainty in ways that violate stakeholder priorities or commit the architecture prematurely."
+expectation = "Engineering heuristics will sometimes conflict with stated requirements, security findings, coverage gaps, unclear docs, or performance needs."
+strategy = "Surface the concrete tension and seek user guidance before making a high-impact choice under those conditions."
+evidence = [{ type = "decision_record", description = "Changes involving an identified requirement conflict, architectural security response, requirement gap, documentation ambiguity, or clarity/performance compromise link to an explicit user decision.", required = true }]
+tradeoff = "Escalation interrupts flow and can delay decisions that an experienced implementer might have resolved safely."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#escalation-strategy", summary = "Lists the conflicts and uncertainties that require user guidance, reinforcing the earlier rule to consult when heuristics and requirements conflict.", confidence = 1.0 }]

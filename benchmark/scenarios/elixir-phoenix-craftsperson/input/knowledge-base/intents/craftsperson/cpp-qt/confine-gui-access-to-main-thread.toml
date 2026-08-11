@@ -1,0 +1,17 @@
+id = "guidelines.intent.confine-gui-access-to-main-thread"
+title = "Confine GUI access to the main thread"
+category = "reliability"
+tags = ["cpp", "qt", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "GUI state remains consistent."
+threat = "Workers touching widgets cause races or crashes."
+expectation = "More work will move off the UI thread."
+strategy = "Send results to main-thread receivers for GUI mutation."
+evidence = [{ type = "gate", description = "Affinity assertions show widget changes only on the GUI thread.", required = true }]
+tradeoff = "Marshalling adds asynchronous complexity."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#threading", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

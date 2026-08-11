@@ -1,0 +1,17 @@
+id = "guidelines.intent.current-architecture-diagrams"
+title = "Keep system structure visually traceable"
+category = "design"
+tags = ["kotlin", "android", "documentation", "dependencies", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to understand module and dependency relationships without reconstructing them from source."
+threat = "Stale diagrams misdirect design decisions and onboarding."
+expectation = "Architecture and module relationships will change with new features and integrations."
+strategy = "Maintain architecture diagrams under docs and update them with structural changes."
+evidence = [{ type = "gate", description = "Diagram nodes and edges match the current module graph and are changed in the same work as architectural modifications.", required = true }]
+tradeoff = "Diagrams duplicate information available from build files and require manual upkeep."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#documentation-standards", summary = "The source requires architecture diagrams in docs to remain updated.", confidence = 1.0 }]

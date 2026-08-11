@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-unclear-documented-behavior"
+title = "Clarify ambiguous documented behavior before implementation"
+category = "collaboration"
+tags = ["typescript", "documentation", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to keep implementation and documentation aligned to an intentional contract"
+threat = "Ambiguous documentation leads developers to choose incompatible plausible interpretations"
+expectation = "Existing documentation will sometimes be incomplete, stale, or internally inconsistent"
+strategy = "Seek user guidance when documentation does not establish the intended behavior"
+evidence = [{ type = "decision-record", description = "The ambiguous passage, clarified behavior, and corresponding implementation or test are linked in the change context", required = true }]
+tradeoff = "Clarification adds coordination delay and may expand a code task into documentation repair"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#escalation-strategy", summary = "Unclear documentation about intended behavior is explicitly listed as an escalation condition.", confidence = 1.0 }]

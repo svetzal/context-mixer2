@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-green-ci-before-integration"
+title = "Integrate only changes that pass CI"
+category = "quality"
+tags = ["typescript", "bun", "cli", "build-and-delivery", "test-gate", "completion"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The shared integration branch remains in a verified state."
+threat = "Merging changes with known failing automated checks makes the baseline unreliable for every subsequent contributor."
+expectation = "Parallel changes will be integrated frequently and local environments will not reproduce every supported check."
+strategy = "Require the complete CI pipeline to be green for the exact revision before it is integrated into main."
+evidence = [{ type = "ci_gate", description = "Branch protection or merge records show all required checks succeeded for the exact revision before it entered main.", required = true }]
+tradeoff = "Integration waits for CI capacity and transient or flaky checks can block otherwise valid changes."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#workflow--collaboration", summary = "Prescribes branching from main and requires green CI before merge.", confidence = 1.0 }]

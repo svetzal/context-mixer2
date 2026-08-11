@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-on-passing-unit-and-integration-tests"
+title = "Gate delivery on passing unit and integration tests"
+category = "quality"
+tags = ["java", "testing", "build-and-delivery", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A delivered change preserves both isolated behavior and assembled system wiring."
+threat = "Code that passes only a narrow test subset can break adapter integration or end-to-end flows."
+expectation = "Java services will combine business logic, frameworks, databases, and external adapters."
+strategy = "Run the complete Maven verify or Gradle build lifecycle, including unit and integration tests, before completion."
+evidence = [{ type = "quality_gate", description = "The repository's full unit and integration test lifecycle exits successfully for the delivered revision.", required = true }]
+tradeoff = "Full verification is slower and can depend on test infrastructure unavailable during quick local iterations."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#quality-gates-mandatory", summary = "Makes passing tests and the full integration-test verify lifecycle mandatory.", confidence = 1.0 }]

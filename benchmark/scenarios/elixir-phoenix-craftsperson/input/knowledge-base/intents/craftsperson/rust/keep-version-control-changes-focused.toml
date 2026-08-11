@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-version-control-changes-focused"
+title = "Keep version-control changes focused and green"
+category = "design"
+tags = ["rust", "error-handling", "build-and-delivery", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Each integrated change is understandable, reviewable, and supported by passing automation."
+threat = "Broad commits and unfocused review units mix reasons for change and make failures difficult to isolate."
+expectation = "Rust changes will move through collaborative version-control and CI workflows."
+strategy = "Use descriptive commit messages, focused review units, and require green CI before integration."
+evidence = [{ type = "vcs_review", description = "Commits state one clear purpose, review units remain focused, and required CI is green at integration.", required = true }]
+tradeoff = "Splitting work into focused units adds coordination and may require temporary sequencing between dependent changes."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#workflow--collaboration", summary = "Calls for descriptive commits, focused review units, and green CI before merging.", confidence = 1.0 }]

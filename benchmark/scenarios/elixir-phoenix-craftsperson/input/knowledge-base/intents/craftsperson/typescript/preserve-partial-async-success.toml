@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-partial-async-success"
+title = "Preserve successful results when peer operations fail"
+category = "reliability"
+tags = ["typescript", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Ability to use successful asynchronous results when all-or-nothing semantics are unnecessary"
+threat = "Fail-fast aggregation discards useful successes after any peer promise rejects"
+expectation = "Batch fetches will encounter intermittent and item-specific failures"
+strategy = "Use Promise.allSettled and explicitly narrow fulfilled results for partial-success workflows"
+evidence = [{ type = "test", description = "A mixed-outcome batch test proves fulfilled values are returned while rejected items remain identifiable", required = true }]
+tradeoff = "Partial-success handling requires an explicit policy for failures and can mask degraded service if rejections are ignored"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#nodejs-patterns", summary = "The source demonstrates Promise.allSettled with type-narrowed filtering of successful results.", confidence = 1.0 }]

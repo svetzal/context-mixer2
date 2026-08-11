@@ -1,0 +1,17 @@
+id = "guidelines.intent.complete-automated-test-gate"
+title = "Block completion on automated regression evidence"
+category = "reliability"
+tags = ["kotlin", "android", "concurrency", "testing", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 1
+capability = "Ability to preserve previously verified behavior after each change."
+threat = "Changes that compile can silently break existing unit and component behavior."
+expectation = "Feature interactions and regression surface will expand."
+strategy = "Require the full Gradle test task to pass before work is complete."
+evidence = [{ type = "gate", description = "The recorded completion run shows ./gradlew test passing for all configured modules.", required = true }]
+tradeoff = "A full test suite increases feedback time and can expose unrelated flakes."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#quality-gates-mandatory", summary = "The source makes all tests a mandatory completion gate.", confidence = 1.0 }]

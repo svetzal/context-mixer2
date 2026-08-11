@@ -1,0 +1,17 @@
+id = "guidelines.intent.consistent-kotlin-plugin-versions"
+title = "Apply a coherent plugin set across Kotlin builds"
+category = "documentation"
+tags = ["kotlin", "documentation", "dependencies", "build-and-delivery", "synchronization", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "Ability to build and document modules under a compatible, predictable toolchain."
+threat = "Divergent Kotlin, framework, and documentation plugin versions produce inconsistent behavior or incompatibilities."
+expectation = "More modules will apply overlapping Kotlin, Ktor, and Dokka plugins."
+strategy = "Declare plugin versions centrally and apply the relevant plugins consistently across modules."
+evidence = [{ type = "gate", description = "A build scan or settings review shows one resolved version for each shared plugin and all modules configure successfully.", required = true }]
+tradeoff = "Lockstep plugin upgrades can force coordinated changes in modules that otherwise could move independently."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#build-and-dependency-management", summary = "The source instructs consistent plugin application and gives a coherent Kotlin, Ktor, and Dokka plugin block.", confidence = 0.9 }]

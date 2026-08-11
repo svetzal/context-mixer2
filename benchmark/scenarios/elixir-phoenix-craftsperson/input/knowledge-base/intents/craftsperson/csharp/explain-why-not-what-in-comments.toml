@@ -1,0 +1,17 @@
+id = "guidelines.intent.explain-why-not-what-in-comments"
+title = "Use comments to preserve rationale"
+category = "documentation"
+tags = ["csharp", "documentation", "comments", "rationale", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-comments-to-preserve-rationale" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Future maintainers can recover the non-obvious reason a code choice or constraint exists."
+threat = "Comments that narrate syntax become stale while unstated rationale is lost."
+expectation = "Code will be changed by people who can read its mechanics but lack the original decision context."
+strategy = "Make mechanics self-explanatory through code and reserve comments for why a non-obvious choice is necessary."
+evidence = [{ type = "comment_review", description = "Comments explain constraints, rationale, or surprising tradeoffs and do not merely restate the adjacent control flow.", required = true }]
+tradeoff = "Sparse comments can underserve less experienced readers, while rationale itself still requires maintenance."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#documentation", summary = "Says code should be self-documenting and comments should explain why rather than what.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.review-with-psychological-safety"
+title = "Preserve psychological safety during code review"
+category = "collaboration"
+tags = ["typescript", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for collaborators to challenge designs, disclose uncertainty, and learn without personal threat"
+threat = "Personalized or adversarial critique suppresses questions and turns technical disagreement into defensive behavior"
+expectation = "Teams will repeatedly review imperfect ideas under delivery pressure"
+strategy = "Critique code and ideas with curiosity, assume positive intent, and avoid judgments about colleagues"
+evidence = [{ type = "review", description = "Review comments address observable code or design consequences, use inquiry for alternatives, and contain no personal attribution", required = true }]
+tradeoff = "Careful phrasing takes time and may feel less direct when urgent defects need decisive correction"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#workflow-collaboration", summary = "The review mindset says to review code rather than colleagues, critique with curiosity, assume positive intent, and prioritize psychological safety.", confidence = 1.0 }]

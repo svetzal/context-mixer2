@@ -1,0 +1,17 @@
+id = "guidelines.intent.document-public-api-contracts"
+title = "Document public API contracts"
+category = "documentation"
+tags = ["csharp", "documentation", "error-handling", "public-api", "contracts", "consumer-guidance"]
+relations = [
+  { type = "specializes", target = "craftsperson/document-public-contracts" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Consumers can use public APIs correctly without reading their implementation."
+threat = "Undocumented inputs, outputs, failures, and compatibility assumptions cause misuse and accidental breaking changes."
+expectation = "Public APIs will gain consumers who lack direct access to their original designers."
+strategy = "Maintain consumer-facing documentation for public APIs and their non-obvious behavioral contracts."
+evidence = [{ type = "api_documentation_review", description = "Each public API exposes current documentation for its purpose, important parameters and results, and non-obvious failure or compatibility behavior.", required = true }]
+tradeoff = "Public API documentation creates maintenance obligations and can repeat type information already available to tooling."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#documentation", summary = "Explicitly requires public APIs to be documented.", confidence = 1.0 }]

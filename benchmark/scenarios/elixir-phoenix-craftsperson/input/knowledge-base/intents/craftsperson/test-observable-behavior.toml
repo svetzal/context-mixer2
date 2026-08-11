@@ -1,0 +1,326 @@
+id = "guidelines.intent.test-observable-behavior"
+title = "Test observable behavior, not implementation"
+category = "testing"
+tags = ["behavior", "public-boundaries", "refactor-safety"]
+relations = [
+  { type = "related-to", target = "craftsperson/preserve-behavior-during-refactoring" },
+  { type = "related-to", target = "craftsperson/document-public-contracts" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Tests detect meaningful regressions while allowing implementation structure to improve."
+threat = "Tests mirror private calls, incidental structure, or framework mechanics and fail during harmless refactoring."
+expectation = "Implementation details will change more often than required behavior."
+strategy = "Drive the system through public or domain boundaries and assert outcomes visible to its consumers."
+evidence = [{ type = "test_review", description = "Tests fail when required behavior is absent and remain valid across behavior-preserving refactors.", required = true }]
+tradeoff = "Behavior-level tests can require broader fixtures and make a low-level defect harder to localize."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/python-ecosystem/agents/python-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#tests-are-the-executable-spec", summary = "Tests stable behavior rather than internal structure.", confidence = 1.0 }, { type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#testing-patterns", summary = "Specifies observable behavior rather than implementation structure.", confidence = 1.0 }, { type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#testing-philosophy", summary = "Tests observable behavior rather than implementation.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(deftest cancelling-order-releases-its-stock
+  (let [store (fresh-store)
+        order (place-order store {:sku "A1" :qty 2})]
+    (cancel-order store (:id order))
+    ; asserts the outcome a consumer can observe
+    (is (= 2 (available store "A1")))))
+; survives any internal restructuring of how holds work
+'''
+bad = '''
+(deftest cancelling-order-releases-its-stock
+  (let [calls (atom [])]
+    (with-redefs [inventory/release-hold!  ; private internal
+                  (fn [& args] (swap! calls conj args))]
+      (cancel-order (fresh-store) "ord-1")
+      ; asserts the implementation's private call sequence
+      (is (= [["A1" 2]] @calls)))))
+; renaming release-hold! breaks this test; actually losing
+; the stock does not
+'''
+
+[examples.cpp]
+good = '''
+TEST(Cart, RemovingLastItemYieldsEmptyCart) {
+  Cart cart;
+  cart.add(sku("A"), 1);
+
+  cart.remove(sku("A"));
+
+  EXPECT_TRUE(cart.isEmpty());        // consumer-visible
+  EXPECT_EQ(cart.total(), Money{0});  // outcomes only
+}
+// survived last month's storage rewrite without an edit
+'''
+bad = '''
+TEST(Cart, RemoveErasesFromInternalMap) {
+  Cart cart;
+  auto& internals = CartTestPeer::map(cart);  // private access
+  cart.add(sku("A"), 1);
+  cart.remove(sku("A"));
+  EXPECT_EQ(internals.bucket_count(), 8u);    // incidental
+  EXPECT_TRUE(CartTestPeer::dirtyFlag(cart)); // mechanism
+}
+// went red when storage moved from map to vector, though no
+// consumer-visible behavior changed — refactoring now "breaks"
+'''
+
+[examples.csharp]
+good = '''
+[Fact]
+public async Task Cancelled_order_releases_its_stock()
+{
+    var app = TestApp.WithStock("SKU-1", units: 5);
+    var order = await app.PlaceOrder("SKU-1", qty: 3);
+
+    await app.Cancel(order.Id);
+
+    (await app.AvailableStock("SKU-1"))
+        .Should().Be(5);
+}
+'''
+bad = '''
+[Fact]
+public async Task Cancel_calls_collaborators_in_order()
+{
+    await _service.Cancel(orderId);
+    // pins private wiring; fails on every harmless
+    // refactor, passes if stock math is wrong
+    Received.InOrder(() =>
+    {
+        _repo.Load(orderId);
+        _stock.Release(Arg.Any<Reservation>());
+        _repo.Save(Arg.Any<Order>());
+    });
+}
+'''
+
+[examples.elixir]
+good = '''
+test "checkout charges the discounted total exactly once" do
+  cart = build(:cart, total: 100, coupon: "SAVE10")
+
+  {:ok, receipt} = Checkout.run(cart)
+
+  # outcomes a consumer can observe; internals stay free
+  assert receipt.charged == 90
+  assert [%Charge{amount: 90}] = Payments.charges(cart)
+end
+'''
+bad = '''
+test "checkout runs its private steps in order" do
+  {:ok, _} = Checkout.run(build(:cart))
+
+  # welded to internals: any harmless refactor —
+  # renaming a step, merging two — fails this test
+  # while behavior is unchanged
+  state = :sys.get_state(Checkout.Server)
+  assert state.steps_run ==
+           [:validate, :apply_discounts_p, :persist]
+end
+'''
+
+[examples.go]
+good = '''
+func TestTotalIncludesSalesTax(t *testing.T) {
+	c := NewCheckout(catalog)
+	c.Add(item("book", 1000))
+
+	got := c.Total()
+
+	if got != 1130 {
+		t.Fatalf("want 1130 (13%% tax), got %d", got)
+	}
+	// internals may reshuffle freely; this fails only when
+	// the consumer-visible total is wrong
+}
+'''
+bad = '''
+func TestCheckoutRecalculation(t *testing.T) {
+	c := NewCheckout(catalog)
+	c.Add(item("book", 1000))
+	c.recalculate() // drives an unexported step directly
+
+	if len(c.pendingLineItems) != 1 { // asserts a private field
+		t.Fatal("expected 1 pending item")
+	}
+	// fails on any internal reshuffle, even when every total
+	// the customer can observe stays correct
+}
+'''
+
+[examples.java]
+good = '''
+@Test
+void bulkOrdersGetTenPercentOff() {
+    var cart = cartWith(items(12, dollars(10)));
+
+    var priced = pricing.price(cart);
+
+    assertEquals(dollars(108), priced.total());
+    // asserts the outcome customers see; everything
+    // inside PricingService is free to change shape
+}
+'''
+bad = '''
+@Test
+void appliesDiscountInternals() {
+    var calculator = mock(RuleCalculator.class);
+    var svc = new PricingService(calculator);
+
+    svc.price(cart);
+
+    // welded to private choreography, not outcomes
+    verify(calculator).preload(cart);
+    verify(calculator).applyRules(cart, RuleSet.DEFAULT);
+}
+// fails on any refactor — even ones that keep every
+// price correct
+'''
+
+[examples.kotlin]
+good = '''
+@Test fun `applying a coupon reduces the checkout total`() {
+    val cart = Cart().add(item(price = 100_00))
+
+    cart.apply(Coupon("SAVE10"))
+
+    // an outcome consumers can see; survives restructuring
+    assertThat(cart.total()).isEqualTo(Money(90_00))
+}
+'''
+bad = '''
+@Test fun `applying a coupon uses the calculator`() {
+    val calc = spyk(DiscountCalculator())
+    val cart = Cart(calc).add(item(price = 100_00))
+
+    cart.apply(Coupon("SAVE10"))
+
+    // pins private call order; fails on harmless refactors
+    verifyOrder { calc.validate(any()); calc.recompute(any()) }
+}
+'''
+
+[examples.python]
+good = '''
+def test_cancelling_order_releases_reserved_stock():
+    shop = Shop(stock={"book": 2})
+    order = shop.place_order("book", qty=2)
+
+    shop.cancel(order.id)
+
+    # outcome a consumer observes through the public API;
+    # survives any internal restructuring
+    assert shop.available("book") == 2
+'''
+bad = '''
+def test_cancel_order():
+    shop = Shop(stock={"book": 2})
+    shop._ledger = Mock()             # reach into privates
+    order = shop.place_order("book", qty=2)
+
+    shop.cancel(order.id)
+
+    # asserts internal call shape, not any outcome; fails
+    # on harmless refactors, passes if stock stays wrong
+    shop._ledger.release.assert_called_once_with("book", 2)
+'''
+
+[examples.ruby]
+good = '''
+it "grants the loyalty discount on the third order" do
+  customer = Customer.new
+  2.times { place_order(customer: customer, cents: 10_00) }
+
+  third = place_order(customer: customer, cents: 10_00)
+
+  expect(third.total_cents).to eq(9_00) # outcome a buyer sees
+end
+'''
+bad = '''
+it "grants the loyalty discount on the third order" do
+  customer = Customer.new
+  # asserts private choreography, not any visible outcome
+  expect(customer).to receive(:apply_discount!)
+    .with(percent: 10)
+  expect(DiscountLedger).to receive(:record)
+
+  place_order(customer: customer, cents: 10_00)
+  # renaming apply_discount! fails this; a wrong total passes
+end
+'''
+
+[examples.rust]
+good = '''
+#[test]
+fn deduplicates_case_insensitive_emails() {
+    let mut list = MailingList::new();
+    list.subscribe("A@example.com");
+    list.subscribe("a@example.com");
+    assert_eq!(list.recipient_count(), 1); // visible outcome
+}
+'''
+bad = '''
+#[test]
+fn subscribe_normalizes_then_inserts() {
+    let mut list = MailingList::new();
+    list.subscribe("A@example.com");
+    // asserts private structure; breaks when the map is
+    // swapped for a sorted vec though behavior is identical
+    assert!(list.index.contains_key("a@example.com"));
+    assert_eq!(list.normalize_calls, 1);
+}
+'''
+
+[examples.swift]
+good = '''
+@Test func findsDocumentsByAddedTerm() {
+    var index = SearchIndex()
+    index.add(document: "guide", terms: ["swift"])
+
+    #expect(index.search("swift") == ["guide"])
+    #expect(index.search("rust").isEmpty)
+    // outcomes a consumer sees; storage may change freely
+}
+'''
+bad = '''
+@Test func usesEightBucketsAndRebalances() {
+    let index = SearchIndex()
+    index.add(document: "guide", terms: ["swift"])
+
+    // asserts private structure and internal call counts;
+    // fails on any refactor that keeps search correct
+    #expect(index.internalBuckets.count == 8)
+    #expect(index.rebalanceCallCount == 1)
+}
+'''
+
+[examples.typescript]
+good = '''
+it("frees the seat when a booking is cancelled", async () => {
+  const app = testApp();
+  const { bookingId } = await app.book("flight-9", "12A");
+
+  await app.cancel(bookingId);
+
+  const seats = await app.availableSeats("flight-9");
+  expect(seats).toContain("12A"); // outcome consumers see
+});
+'''
+bad = '''
+it("cancel works", async () => {
+  const svc = new BookingService(repo, bus);
+  const release =
+    vi.spyOn(svc as never, "releaseSeatInternal");
+  const emit = vi.spyOn(bus, "emit");
+
+  await svc.cancel("b-1");
+
+  // Mirrors private structure: renaming releaseSeatInternal
+  // fails this test while behavior is fully intact.
+  expect(release).toHaveBeenCalledOnce();
+  expect(emit).toHaveBeenCalledWith("cancel:internal");
+});
+'''

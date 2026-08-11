@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-structured-tracing"
+title = "Use structured tracing for observability"
+category = "reliability"
+tags = ["rust", "formatting", "persistence", "data-integrity", "transactions", "database-constraints"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Operators can correlate nested service operations and query their context."
+threat = "Flat formatted log messages lose span relationships and encode data in strings that are difficult to search."
+expectation = "Production systems will need diagnosis across asynchronous and multi-step operations."
+strategy = "Prefer the tracing ecosystem over raw log and emit structured fields rather than interpolated data strings."
+evidence = [{ type = "observability_review", description = "Representative operations produce correlated tracing spans whose identifiers and outcomes are independently queryable fields.", required = true }]
+tradeoff = "Structured instrumentation adds dependencies, annotations, and decisions about field cardinality and sensitive data."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#observability", summary = "Prefers the tracing ecosystem over raw log and structured fields over formatted strings.", confidence = 1.0 }]

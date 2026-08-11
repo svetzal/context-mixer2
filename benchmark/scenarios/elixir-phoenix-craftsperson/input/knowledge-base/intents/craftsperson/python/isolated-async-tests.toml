@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolated-async-tests"
+title = "Make asynchronous tests explicit and leak-free"
+category = "reliability"
+tags = ["python", "concurrency", "testing", "dependencies", "error-handling", "structured-concurrency"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Async behavior can be tested deterministically without tasks leaking between test cases."
+threat = "Incorrect coroutine execution, synchronous mocks, and uncollected background tasks create false positives and order-dependent failures."
+expectation = "The codebase will add more asynchronous collaborators and scheduled work."
+strategy = "Run coroutine tests through pytest-asyncio, use AsyncMock for async collaborators, and explicitly clean up tasks created in tests."
+evidence = [{ type = "test", description = "The async test suite passes with warnings treated as errors and reports no unawaited coroutine or pending-task cleanup warnings.", required = true }]
+tradeoff = "Async-specific fixtures and cleanup add test boilerplate and can make failures harder to diagnose."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#testing-async-code", summary = "The source prescribes pytest-asyncio, AsyncMock, and careful cleanup around create_task in tests.", confidence = 1.0 }]

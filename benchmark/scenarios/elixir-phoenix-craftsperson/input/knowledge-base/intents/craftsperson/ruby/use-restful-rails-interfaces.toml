@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-restful-rails-interfaces"
+title = "Expose Rails resources through conventional REST interfaces"
+category = "design"
+tags = ["ruby", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability for Rails developers and tools to predict routing and controller behavior"
+threat = "Custom routes and nonstandard actions create local conventions that increase navigation and integration cost"
+expectation = "Applications will add resources and contributors familiar with standard Rails conventions"
+strategy = "Prefer RESTful routes and standard controller actions"
+evidence = [{ type = "review", description = "New HTTP operations map to resourceful routes and conventional actions unless a documented domain constraint requires otherwise", required = true }]
+tradeoff = "Some domain operations fit awkwardly into CRUD semantics and may require additional resources or indirection"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#rails-specific-guidance", summary = "Rails applications are directed to use RESTful routes and standard controller actions.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.constructor-injected-kotlin-boundaries"
+title = "Make service dependencies explicit at construction"
+category = "design"
+tags = ["kotlin", "testing", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to instantiate services with visible, substitutable dependencies in production and tests."
+threat = "Service locators, hidden globals, and field injection conceal requirements and bind behavior to runtime containers."
+expectation = "Services will gain more collaborators and run under both server and desktop composition roots."
+strategy = "Define dependencies as interfaces and provide them through constructor injection using manual DI or Koin at the composition boundary."
+evidence = [{ type = "static_check", description = "Core services declare required collaborators in constructors and can be instantiated in unit tests without starting a DI container.", required = true }]
+tradeoff = "Constructor signatures and composition roots grow as services gain dependencies, and interfaces can be needless for stable internal collaborators."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#dependency-injection", summary = "The source prefers constructor injection, interfaces for abstractions, and Koin or manual DI.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.synchronized-kotlin-behavior-docs"
+title = "Update Kotlin documentation with behavior changes"
+category = "documentation"
+tags = ["kotlin", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability for maintainers and users to rely on documentation as a description of current behavior."
+threat = "Code changes leave KDoc and user guides describing obsolete contracts."
+expectation = "Features and fixes will continue to alter observable behavior and public APIs."
+strategy = "Update KDoc and user-facing guides in the same change whenever behavior changes."
+evidence = [{ type = "review", description = "Behavior-changing diffs include corresponding KDoc or docs updates, or an explicit review finding demonstrates that no documented contract changed.", required = true }]
+tradeoff = "Keeping documentation synchronized increases the scope and completion time of behavior changes."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#workflow-pattern", summary = "The source requires KDoc and user guides to stay in sync and specifically updates documentation after behavior changes.", confidence = 1.0 }]

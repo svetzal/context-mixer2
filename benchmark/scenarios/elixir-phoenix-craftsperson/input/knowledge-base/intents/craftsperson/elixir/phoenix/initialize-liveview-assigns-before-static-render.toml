@@ -1,0 +1,17 @@
+id = "guidelines.intent.initialize-liveview-assigns-before-static-render"
+title = "Initialize assigns before static render"
+category = "design"
+tags = ["elixir", "phoenix", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Every LiveView can render successfully during both disconnected HTTP and connected WebSocket phases."
+threat = "A template reads an assign created only after connection and crashes the initial render with KeyError."
+expectation = "LiveViews will continue using two-phase rendering and add more asynchronous state."
+strategy = "Initialize every template-visible assign in mount/3 before checking connected state and use optional access only for genuinely optional assigns."
+evidence = [{ type = "liveview_test", description = "Disconnected and connected mount tests render each LiveView without missing-assign failures.", required = true }]
+tradeoff = "Mount code must define placeholder states and templates must represent loading or empty values."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#two-phase-rendering", summary = "Identifies two-phase rendering as a common crash source and requires all assigns before static render.", confidence = 1.0 }]

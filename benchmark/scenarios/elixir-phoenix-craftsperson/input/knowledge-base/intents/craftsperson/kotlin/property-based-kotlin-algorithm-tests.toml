@@ -1,0 +1,17 @@
+id = "guidelines.intent.property-based-kotlin-algorithm-tests"
+title = "Test algorithmic invariants across generated inputs"
+category = "testing"
+tags = ["kotlin", "testing", "error-handling", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to expose algorithm failures outside a small set of hand-picked examples."
+threat = "Example-only tests miss unexpected combinations and boundary values in large input spaces."
+expectation = "Algorithmic code will encounter wider and less predictable inputs over time."
+strategy = "Use Kotest property-based testing where behavior can be expressed as invariants."
+evidence = [{ type = "test", description = "Algorithm suites define domain-relevant generators and invariants, run enough cases to explore boundaries, and retain minimized regressions for found failures.", required = true }]
+tradeoff = "Generators and invariant design add complexity, and randomized failures can be harder to diagnose without reproducible seeds."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#kotest-when-appropriate", summary = "The source selects property-based testing for algorithmic code.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.review-code-with-psychological-safety"
+title = "Review code with psychological safety"
+category = "collaboration"
+tags = ["java", "security", "testing", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The team can surface defects and design disagreement without discouraging participation or learning."
+threat = "Personal or dictatorial critique causes defensiveness, silence, and hidden quality concerns."
+expectation = "Code review will repeatedly expose imperfect work and competing technical judgments."
+strategy = "Critique code and ideas rather than authors, and frame improvement proposals as respectful questions."
+evidence = [{ type = "review_observation", description = "Review comments identify observable code effects, explain their reasoning, and contain no personal attribution or coercive language.", required = true }]
+tradeoff = "Question-led feedback can be less direct and may take longer to resolve urgent issues."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#version-control-and-collaboration", summary = "Makes psychological safety paramount and directs reviewers to critique ideas, not authors, using suggestions rather than dictates.", confidence = 1.0 }]

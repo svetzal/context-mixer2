@@ -1,0 +1,17 @@
+id = "guidelines.intent.name-otp-processes-in-child-specs"
+title = "Name OTP processes in child specifications"
+category = "design"
+tags = ["elixir", "concurrency", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Supervised OTP services can be addressed reliably through stable application names."
+threat = "Unnamed primitives start successfully but callers cannot resolve the intended shared service."
+expectation = "Supervisors will manage multiple runtime primitives and application modules will call them indirectly."
+strategy = "Provide explicit names in child specifications for supervisors and other registered OTP primitives."
+evidence = [{ type = "integration_test", description = "The supervision tree starts and clients resolve each intended shared OTP service by its configured name.", required = true }]
+tradeoff = "Global names constrain multiplicity and can collide when tests or multiple instances share a VM."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#common-mistakes", summary = "States that OTP primitives require names in child specifications.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-first-red-green"
+title = "Clarify behavior through a failing test before implementation"
+category = "testing"
+tags = ["python", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "New behavior begins with an explicit, executable statement of the requirement."
+threat = "Implementation-first work can silently define the requirement around the code that happened to be written."
+expectation = "Requirements will contain ambiguity that is cheaper to expose before production code accumulates."
+strategy = "Work red-green: write a failing test first, then add the simplest implementation that makes it pass."
+evidence = [{ type = "trace", description = "Change history or an observed development trace shows the new specification failing before the production implementation and passing afterward.", required = true }]
+tradeoff = "Test-first sequencing can slow exploratory work and may lead to reworking tests as understanding changes."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#tests-are-the-executable-spec", summary = "The source explicitly requires red-green development to clarify what is being built.", confidence = 1.0 }]

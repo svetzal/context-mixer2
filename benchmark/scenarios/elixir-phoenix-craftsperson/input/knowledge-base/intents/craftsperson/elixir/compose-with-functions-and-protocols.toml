@@ -1,0 +1,17 @@
+id = "guidelines.intent.compose-with-functions-and-protocols"
+title = "Compose behavior with functions and protocols"
+category = "design"
+tags = ["elixir", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Behavior can be extended without inheriting implementation coupling."
+threat = "Code-reuse hierarchies entangle contracts with shared implementation and make local change ripple through descendants."
+expectation = "New data types and variants will need to participate in existing behavior."
+strategy = "Favor function composition and protocol polymorphism, using behaviours for contracts rather than code reuse."
+evidence = [{ type = "architecture_review", description = "Polymorphic extension points are protocols or behaviours, while shared execution is composed from functions rather than inherited implementations.", required = true }]
+tradeoff = "Composition can require explicit delegation and offers less bundled reuse than an inheritance-style abstraction."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Prefers composition and protocol polymorphism and limits behaviours to contracts.", confidence = 1.0 }]

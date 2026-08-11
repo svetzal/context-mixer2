@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-expressive-blocks-and-enumerables"
+title = "Express collection transformations with Ruby enumerables"
+category = "collaboration"
+tags = ["ruby", "concurrency", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to read collection processing as a sequence of domain-relevant transformations"
+threat = "Manual accumulator loops mix traversal mechanics with filtering, mapping, and ordering intent"
+expectation = "Ruby code will frequently transform collections as business behavior grows"
+strategy = "Prefer expressive blocks and enumerable chains when they clarify collection operations"
+evidence = [{ type = "review", description = "Collection code exposes filtering, mapping, and ordering through idiomatic enumerable operations without hidden mutation", required = true }]
+tradeoff = "Long enumerable chains can allocate intermediate collections and become difficult to debug or optimize"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#expressive-blocks-and-enumerables", summary = "The agent prefers an expressive select/map/sort chain over an imperative accumulator loop.", confidence = 1.0 }]

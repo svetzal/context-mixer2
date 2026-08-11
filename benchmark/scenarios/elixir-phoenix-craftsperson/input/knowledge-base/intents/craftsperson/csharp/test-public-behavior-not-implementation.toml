@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-public-behavior-not-implementation"
+title = "Test observable behavior rather than implementation"
+category = "testing"
+tags = ["csharp", "concurrency", "testing", "behavior", "public-boundaries", "refactor-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/test-observable-behavior" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Internal designs can be refactored freely while tests continue to protect externally meaningful behavior."
+threat = "Tests coupled to private methods, call sequences, or incidental structure fail during harmless refactoring."
+expectation = "The internal implementation will change more frequently than its behavioral contract."
+strategy = "Assert public outcomes and boundary effects rather than implementation details."
+evidence = [{ type = "mutation_review", description = "Behavior-preserving internal refactoring does not require test changes, while a contract-breaking mutation fails a relevant test.", required = true }]
+tradeoff = "Behavioral tests may localize defects less precisely and require more realistic setup than implementation-focused unit tests."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#testing-philosophy", summary = "Explicitly directs tests toward behavior rather than implementation details.", confidence = 1.0 }]

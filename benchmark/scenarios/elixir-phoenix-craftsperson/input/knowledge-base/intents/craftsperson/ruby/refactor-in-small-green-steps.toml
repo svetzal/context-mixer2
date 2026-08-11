@@ -1,0 +1,17 @@
+id = "guidelines.intent.refactor-in-small-green-steps"
+title = "Refactor through small verified transformations"
+category = "testing"
+tags = ["ruby", "concurrency", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to localize and reverse behavior changes introduced during refactoring"
+threat = "Large structural rewrites combine many transformations before a regression becomes visible"
+expectation = "Complex designs will require repeated restructuring while preserving behavior"
+strategy = "Apply one small transformation at a time and return tests to green between steps"
+evidence = [{ type = "trace", description = "Refactoring history consists of narrow transformations with a passing targeted or full test run after each step", required = true }]
+tradeoff = "Frequent test runs and intermediate states make refactoring slower than a single rewrite"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#when-refactoring", summary = "The agent requires one transformation at a time with tests green between each.", confidence = 1.0 }]

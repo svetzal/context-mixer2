@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralize-shared-knowledge"
+title = "Keep each shared decision in one place"
+category = "design"
+tags = ["typescript", "bun", "cli", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A single conceptual decision can change without coordinating edits across unrelated locations."
+threat = "Duplicated knowledge creates coupled change points that drift even when superficially similar code has independent reasons to exist."
+expectation = "Business rules and CLI policies will evolve, forcing maintainers to locate every representation of the same decision."
+strategy = "Extract knowledge that changes for the same reason while allowing identical code representing independent decisions to remain separate."
+evidence = [{ type = "review", description = "Change-impact review finds one authoritative location for each shared rule and records why any identical code is expected to diverge independently.", required = true }]
+tradeoff = "Centralizing a decision can introduce indirection, and misidentifying coincidental similarity as shared knowledge can couple unrelated behavior."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Distinguishes knowledge duplication from identical code and directs shared decisions to be extracted.", confidence = 1.0 }]

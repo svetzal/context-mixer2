@@ -1,0 +1,17 @@
+id = "guidelines.intent.organize-tests-as-readable-specs"
+title = "Organize tests as readable behavioral specifications"
+category = "testing"
+tags = ["python", "uv", "testing", "error-handling", "readability", "executable-specification"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-tests-readable-specifications" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A reader can understand expected behavior and failure context directly from the test suite."
+threat = "Generic test names and dense setup-action-assertion code obscure the contract a failure represents."
+expectation = "The suite will become a primary source of behavior knowledge for future maintainers."
+strategy = "Use Describe and should naming, nested behavior groups, descriptive test names, built-in pytest assertions, and blank-line-separated arrange, act, and assert phases."
+evidence = [{ type = "test_review", description = "Collected test names state behavior, related cases are grouped, and each test's setup, action, and assertion are visually and semantically distinct.", required = true }]
+tradeoff = "BDD naming and nested classes are more ceremonial than conventional test_ functions and may not fit all pytest tooling."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#bdd-style-specification-tests", summary = "Defines Describe and should naming, nested grouping, and blank-line Arrange/Act/Assert structure.", confidence = 1.0 }]

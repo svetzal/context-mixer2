@@ -1,0 +1,17 @@
+id = "guidelines.intent.explicit-design-tension-escalation"
+title = "Escalate decisions when engineering heuristics cannot resolve intent"
+category = "documentation"
+tags = ["python", "security", "testing", "documentation", "performance", "synchronization"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Consequential tradeoffs remain aligned with user intent rather than being silently decided by implementation convention."
+threat = "An engineer can apply a preferred heuristic while concealing conflicts with requirements, security, documentation, or performance needs."
+expectation = "Some changes will expose ambiguous requirements or force clarity, security, performance, and design principles into conflict."
+strategy = "State the concrete tension and seek user guidance when heuristics conflict with requirements, security needs architectural change, tests reveal requirement gaps, documentation is unclear, or performance threatens clarity."
+evidence = [{ type = "review", description = "The work record contains the competing concerns, their consequences, and an explicit user decision before implementation proceeds on a materially ambiguous tradeoff.", required = true }]
+tradeoff = "Escalation interrupts flow and transfers technical context and decision load to the user."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#escalation-strategy", summary = "The source lists specific conflicts and uncertainties that must be surfaced for user guidance.", confidence = 1.0 }]

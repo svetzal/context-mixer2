@@ -1,0 +1,17 @@
+id = "guidelines.intent.co-locate-specs-with-modules"
+title = "Co-locate specifications with their modules"
+category = "testing"
+tags = ["python", "uv", "testing", "dependencies", "readability", "executable-specification"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-tests-readable-specifications" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Maintainers can immediately find a module's behavioral specification and notice when it has none."
+threat = "A distant tests tree obscures code-to-test ownership and permits modules to evolve without nearby specifications."
+expectation = "The package will gain modules and contributors who navigate by source feature rather than test taxonomy."
+strategy = "Place one *_spec.py file beside each tested module and configure pytest to discover that convention."
+evidence = [{ type = "structure_gate", description = "Each behavior-bearing module has its colocated spec where applicable, and pytest collects *_spec.py files under the configured pattern.", required = true }]
+tradeoff = "Production package directories contain test files, which can complicate packaging and differs from common Python repository layouts."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#project-structure", summary = "Mandates colocated *_spec.py files and no separate tests directory so missing tests are visible.", confidence = 1.0 }]

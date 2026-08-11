@@ -1,0 +1,17 @@
+id = "guidelines.intent.do-not-test-logicless-gateways"
+title = "Do not unit-test logicless gateways"
+category = "testing"
+tags = ["java", "testing", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Test effort remains concentrated on business behavior and meaningful integration contracts."
+threat = "Unit tests for pure delegation duplicate library behavior and become brittle without increasing confidence."
+expectation = "The number of external adapters will grow and compete for finite test-maintenance effort."
+strategy = "Skip isolated tests for gateways that only translate and delegate; use integration tests for wiring and move any custom logic into the core."
+evidence = [{ type = "test_inventory", description = "Logicless gateways have no mock-heavy unit tests, while their wiring is covered at an integration boundary.", required = true }]
+tradeoff = "Adapter-specific regressions may be discovered later by slower integration tests."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#testing-philosophy", summary = "Says not to test I/O-isolating gateways unless they contain custom logic and prefers moving such logic into the core.", confidence = 1.0 }]

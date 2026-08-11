@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-worker-objects-for-qthread-work"
+title = "Use worker objects for QThread work"
+category = "reliability"
+tags = ["cpp", "qt", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Work and lifecycle follow Qt affinity rules."
+threat = "QThread subclassing conflates controller and work."
+expectation = "Background work will gain cleanup responsibilities."
+strategy = "Move a parentless QObject worker to QThread and wire lifecycle signals."
+evidence = [{ type = "gate", description = "Tests show worker-thread execution and deferred cleanup.", required = true }]
+tradeoff = "The pattern requires orchestration for simple tasks."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#threading", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

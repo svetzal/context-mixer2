@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-async-runtime"
+title = "Preserve the project's async runtime"
+category = "reliability"
+tags = ["rust", "concurrency", "security", "dependencies", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Async code remains interoperable with the runtime, scheduling, and operational model already chosen by the project."
+threat = "A change introduces a second runtime or replaces the existing runtime, fragmenting execution and dependency semantics."
+expectation = "New async features and dependencies will repeatedly tempt contributors to adopt their preferred runtime."
+strategy = "Detect and preserve the existing async runtime and require explicit authorization before changing runtime dependencies."
+evidence = [{ type = "dependency_review", description = "Dependency and source diffs introduce no additional async runtime without an explicit approved decision.", required = true }]
+tradeoff = "The project may retain a runtime that is not optimal for a particular new feature."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#async", summary = "Directs agents to preserve the project's runtime and not introduce a new one without authorization.", confidence = 1.0 }]

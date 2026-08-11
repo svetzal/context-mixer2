@@ -1,0 +1,17 @@
+id = "guidelines.intent.run-static-defect-analysis"
+title = "Run static defect analysis before delivery"
+category = "quality"
+tags = ["java", "testing", "dependencies", "static-analysis", "error-handling", "warnings"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Likely correctness and resource-management defects are detected without waiting for runtime failure."
+threat = "Compiler-legal bug patterns survive tests that do not exercise the triggering path."
+expectation = "The codebase and number of execution paths will grow faster than exhaustive dynamic testing."
+strategy = "Run SpotBugs and, where configured, PMD as mandatory static analysis gates."
+evidence = [{ type = "quality_gate", description = "Configured SpotBugs and PMD tasks complete without unresolved findings.", required = true }]
+tradeoff = "Static analyzers produce false positives and require configuration and triage effort."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#quality-gates-mandatory", summary = "Requires SpotBugs and optionally PMD as static analysis gates.", confidence = 1.0 }]

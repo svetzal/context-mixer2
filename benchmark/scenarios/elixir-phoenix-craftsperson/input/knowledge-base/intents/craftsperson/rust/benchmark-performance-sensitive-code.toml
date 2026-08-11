@@ -1,0 +1,17 @@
+id = "guidelines.intent.benchmark-performance-sensitive-code"
+title = "Benchmark performance-sensitive code"
+category = "performance"
+tags = ["rust", "performance", "profiling", "evidence", "optimization"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-from-measurement" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Performance-sensitive behavior can be changed with measured evidence of regressions or improvements."
+threat = "Optimization decisions rely on intuition and silently degrade throughput or latency."
+expectation = "Some code paths will have performance requirements that ordinary correctness tests cannot protect."
+strategy = "Use Criterion benchmarks under benches for stable-channel microbenchmarks and regression tracking."
+evidence = [{ type = "benchmark", description = "Relevant benchmark distributions are recorded and compared for performance-sensitive changes.", required = true }]
+tradeoff = "Microbenchmarks require stable environments and can encourage optimization of isolated metrics over system outcomes."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#optional-for-performance-sensitive-code", summary = "Recommends Criterion benchmarks for performance-sensitive code.", confidence = 1.0 }]

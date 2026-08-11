@@ -1,0 +1,17 @@
+id = "guidelines.intent.mock-only-boundary-contracts"
+title = "Mock only boundary protocols"
+category = "testing"
+tags = ["swift", "testing", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Tests isolate external effects without coupling to third-party or internal implementation details."
+threat = "Mocking library internals or core collaborators freezes incidental call sequences and leaks vendor APIs into tests."
+expectation = "Third-party libraries and internal implementations will change while domain expectations remain stable."
+strategy = "Create test doubles only for gateway protocols; wrap third-party libraries in a gateway before substituting them."
+evidence = [{ type = "test_source_gate", description = "Mock and spy types conform only to project-owned I/O boundary protocols, with no test double subclassing or mimicking a third-party library type.", required = true }]
+tradeoff = "Adding a gateway solely for isolation creates adapter code and can conceal vendor capabilities behind a narrower interface."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#testing-philosophy", summary = "Forbids mocking library internals and requires third-party libraries to be wrapped behind gateway protocols first.", confidence = 1.0 }]

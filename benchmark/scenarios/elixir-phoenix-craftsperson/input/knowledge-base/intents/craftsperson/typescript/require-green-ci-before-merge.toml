@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-green-ci-before-merge"
+title = "Require green CI before integration"
+category = "quality"
+tags = ["typescript", "build-and-delivery", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to prevent integration of changes that fail the shared automated environment"
+threat = "Locally successful work can break under repository-wide checks or clean-environment differences"
+expectation = "Changes will be merged by contributors with varying local environments"
+strategy = "Block merge until every required CI check passes"
+evidence = [{ type = "gate", description = "All required continuous-integration checks report success for the exact revision being merged", required = true }]
+tradeoff = "CI outages, queue delays, or flaky checks can block otherwise correct changes"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#workflow-collaboration", summary = "The version-control guidance explicitly requires CI to be green before merging.", confidence = 1.0 }]

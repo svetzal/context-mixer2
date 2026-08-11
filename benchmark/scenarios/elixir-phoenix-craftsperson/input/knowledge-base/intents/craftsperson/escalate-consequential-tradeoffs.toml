@@ -1,0 +1,300 @@
+id = "guidelines.intent.escalate-consequential-tradeoffs"
+title = "Escalate consequential tradeoffs"
+category = "collaboration"
+tags = ["decision-making", "escalation", "tradeoffs"]
+status = "hypothesized"
+confidence = 0.98
+capability = "High-impact choices are made by someone with the authority and context to accept their consequences."
+threat = "A heuristic or local preference decides a costly, irreversible, security-sensitive, or product-visible tradeoff."
+expectation = "Engineering principles will sometimes conflict and available evidence will not determine one uniquely correct answer."
+strategy = "Explain the competing options, consequences, evidence, and recommendation, then seek a decision from the appropriate authority."
+evidence = [{ type = "decision_review", description = "Consequential unresolved tradeoffs have an explicit decision and rationale from an appropriate owner.", required = true }]
+tradeoff = "Escalation adds coordination latency and can become avoidance if used for ordinary reversible decisions."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/elixir-ecosystem/agents/elixir-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md", "plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#escalation-strategy", summary = "Escalates uncertain high-impact decisions with options and tradeoffs.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#escalation-strategy", summary = "Escalates conflicts among requirements, security, performance, and design heuristics.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; Message to @maya (service owner), before merging:
+;;
+;; Retry policy for payment capture — two options:
+;;  A) retry 3x with backoff: fewer dropped orders, but can
+;;     double-charge when the PSP call succeeds ambiguously
+;;  B) no retry, park for manual review: safe, adds ~20
+;;     ops tickets/week
+;; Recommend B until PSP idempotency keys land. Your call.
+;;
+;; -> Decision (Maya): B; revisit after the PSP upgrade.
+;;    Recorded in ADR-019.
+'''
+bad = '''
+(defn capture-payment! [order]
+  ; quietly picked aggressive retries; ambiguous PSP timeouts
+  ; can double-charge — nobody with revenue authority was asked
+  (retrying {:attempts 3 :backoff-ms 200}
+    (psp/capture! (:payment order))))
+; no ADR, no thread, no reviewer flagged for the tradeoff
+'''
+
+[examples.cpp]
+good = '''
+To: @stacey (product owner)
+
+Payment retries — two viable options; this needs your call.
+  A) Retry 3x with backoff. Smoother UX, but risks a double
+     charge when PSP webhooks lag (seen twice in prod logs).
+  B) Fail fast and ask the user to retry. Safe, but worse
+     conversion at checkout.
+Evidence: PSP docs sec 4.2; incident 2026-05-11.
+Recommendation: B until the PSP confirms idempotency keys.
+Holding the merge until you decide.
+'''
+bad = '''
+// A double-charge-vs-conversion tradeoff, decided silently
+// by whoever happened to be editing this file:
+for (int attempt = 0; attempt < 3; ++attempt) {
+  if (psp.charge(order).ok()) break;   // no idempotency key
+}
+// Merged Friday 6pm. No reviewer, no note to the product
+// owner, no record that the alternative was ever considered.
+'''
+
+[examples.csharp]
+good = '''
+PR note (dev → owner):
+Retiring the v1 export API breaks 3 known integrators.
+Options:
+  a) remove now — clean code, angry integrators
+  b) 90-day deprecation shim — dual paths until Oct
+Evidence: access logs show 41 v1 calls/day.
+Recommend (b). Product-visible and irreversible —
+needs your call before I proceed.
+
+Decision (owner): (b). Announce Monday. Logged.
+'''
+bad = '''
+// dev settles an irreversible, product-visible
+// tradeoff alone, on a Friday deploy
+app.MapPost("/api/v1/export", () =>
+    Results.Problem("v1 removed, use v2"));
+// 41 calls/day, 3 integrators, zero options surfaced,
+// no owner ever saw the decision
+'''
+
+[examples.elixir]
+good = '''
+Note to @product-owner (blocking):
+
+Purging inactive accounts frees ~40% storage but is
+irreversible and touches EU users (export duty first?).
+  A) hard delete after export — cheap, irreversible
+  B) anonymize in place — reversible, keeps 60% of cost
+
+Recommend B until legal confirms A is safe. Your call —
+holding the migration until you decide.
+'''
+bad = '''
+commit 4f2a91c "cleanup: purge inactive accounts"
+
+# an irreversible, product-visible deletion decided
+# inline by whoever happened to write the migration
+def up do
+  execute("DELETE FROM accounts WHERE last_seen < ...")
+end
+
+(no options surfaced, no owner sign-off, no rationale)
+'''
+
+[examples.go]
+good = '''
+Message to product owner, before implementation:
+
+  Support wants to replay failed charges, which needs stored
+  card data. Options:
+    a) store gateway tokens — replay limited to 24h, no PCI
+       scope change, ~2 days of work
+    b) store PANs encrypted — full replay, Level 1 PCI audit
+       (~$40k/yr, ~3 months) plus breach liability
+  Recommendation: (a). This is your call, not mine to default.
+
+Decision recorded in docs/decisions/0014-charge-replay.md
+'''
+bad = '''
+commit 88ac2f1
+    Store card numbers so support can retry charges
+
+    Seemed handy for the support team. Base64-encoded them in
+    the users table for now.
+
+# an irreversible, security-sensitive tradeoff decided silently
+# by whoever happened to be editing the file that afternoon
+'''
+
+[examples.java]
+good = '''
+PR note, tagged @product-owner, before merging:
+
+Storing card fingerprints locally speeds repeat checkout
+but pulls us into PCI SAQ-D scope (annual audit, ~$40k).
+
+  (a) store fingerprint here — fastest UX, audit burden
+  (b) tokenize via processor — +80 ms, no scope change
+
+Recommendation: (b). This is your call, not mine —
+holding the merge until you decide.
+'''
+bad = '''
+commit 7d2f19c
+  Store raw card fingerprints for faster repeat checkout
+
+  Went with local storage since it was simplest to wire up.
+
+# a compliance-scope change rode into main inside a routine
+# "performance improvement" — nobody with the authority to
+# accept a $40k/yr audit obligation ever saw the choice
+'''
+
+[examples.kotlin]
+good = '''
+Message to the product owner before merging:
+
+  Search indexing choice is product-visible:
+    A) rebuild inline — always-fresh results, ~300ms extra
+       latency on every save
+    B) async rebuild — fast saves, results stale up to 10 min
+  Recommendation: B plus a staleness note in the UI.
+  This affects users directly, so it is your call — holding
+  the merge until you confirm.
+'''
+bad = '''
+// a product-visible tradeoff decided silently by whoever
+// happened to be editing this file that afternoon
+suspend fun save(doc: Doc) {
+    repo.save(doc)
+    scope.launch { searchIndex.rebuild() } // stale <= 10 min
+}
+// no options weighed, no owner asked, no decision recorded
+'''
+
+[examples.python]
+good = '''
+To: @product-owner — needs your call before I proceed.
+
+Account closure must either:
+  A) hard-delete rows now — simplest, but irreversible and
+     breaks the auditor's 7-year retention expectation
+  B) soft-delete + scheduled purge — keeps the audit trail,
+     adds a job we own (~2 days)
+Recommend B. A is a compliance risk beyond my authority to
+accept; I'll hold this branch until you decide.
+'''
+bad = '''
+commit 4be129c
+    Hard-delete users on account closure
+
+    Went with hard delete since it was simpler than adding
+    a purge job. Retention question TBD.
+
+# an irreversible, compliance-sensitive tradeoff decided
+# silently by implementation convenience
+'''
+
+[examples.ruby]
+good = '''
+PR comment (dev -> tech lead):
+
+Purging soft-deleted users frees 40% of the table, but it is
+irreversible and GDPR export requests sometimes arrive at
+day ~45. Options:
+  a) purge at 30d — cheapest, risks failing export requests
+  b) purge at 90d — safe, keeps most of the cost savings
+Recommend (b). This touches a compliance promise — your call.
+
+Lead: Agreed, (b). Recorded in DECISIONS.md#user-purge.
+'''
+bad = '''
+# dev decides an irreversible, compliance-visible tradeoff
+# alone, in code, without surfacing it
+class PurgeJob
+  def perform
+    # 30 feels reasonable
+    User.soft_deleted.where("deleted_at < ?", 30.days.ago)
+        .delete_all # nobody with authority ever saw this choice
+  end
+end
+'''
+
+[examples.rust]
+good = '''
+Posted before implementing:
+
+  Purging stale sessions can run as one transaction (locks
+  the table ~40s at our size) or in batches (no lock, but a
+  stale session may linger up to 5 minutes).
+  Recommendation: batched — the lock risks checkout
+  timeouts. Customer-visible either way; needs an owner.
+
+Decision (product owner, in thread): batched. Five minutes
+of staleness is acceptable; checkout latency is not.
+'''
+bad = '''
+// a one-way door decided silently by local preference:
+// sessions moved from Postgres to Redis "because faster" —
+// they now vanish on every Redis restart, which support
+// will discover as mass logouts
+
+Commit: "perf: move sessions to redis"
+
+// no options laid out, no consequences named, no owner
+// asked — a heuristic made a product-visible call
+'''
+
+[examples.swift]
+good = '''
+Note to @tech-lead before implementing session storage:
+
+  a) Keychain with biometric gate — 2 days, secure, adds a
+     login step users may resist
+  b) UserDefaults — 2 hours, ships tomorrow, tokens are
+     readable from any device backup
+
+Security- and product-visible, so not mine to decide alone.
+I recommend (a). Your call?
+
+Lead: (a) — the day's slip is approved; recording in ADR-19.
+'''
+bad = '''
+Commit: "Store session token"
+
++ UserDefaults.standard.set(token, forKey: "session")
+  // faster for the deadline; can harden later
+
+A security-sensitive, hard-to-reverse tradeoff shipped,
+decided by whoever happened to be typing that afternoon.
+'''
+
+[examples.typescript]
+good = '''
+PR comment, before merge:
+
+This migration drops the legacy `orders.status` column.
+After the first production write, rollback loses data.
+Options:
+  A. Dual-write one release, drop next cycle (safe, slower)
+  B. Drop now (fast, irreversible after deploy)
+Evidence: 3 downstream readers still query the column.
+I recommend A. @product-owner — this is your call, not mine.
+'''
+bad = '''
+commit 41c9e2f
+    drop legacy orders.status column
+
+    Went with the fast option since the sprint ends Friday.
+    Rollback won't be possible after deploy but it's
+    probably fine.
+
+# An irreversible, product-visible tradeoff decided by
+# deadline pressure and local preference alone.
+'''

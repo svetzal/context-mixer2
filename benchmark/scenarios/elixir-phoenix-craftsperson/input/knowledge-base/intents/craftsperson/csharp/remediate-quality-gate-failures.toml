@@ -1,0 +1,17 @@
+id = "guidelines.intent.remediate-quality-gate-failures"
+title = "Remediate quality-gate failures before proceeding"
+category = "quality"
+tags = ["csharp", "documentation", "error-handling", "quality-gates", "project-conventions", "completion"]
+relations = [
+  { type = "specializes", target = "craftsperson/honor-the-project-quality-gate" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A failed quality signal leads to a durable correction rather than normalized debt or accidental regression."
+threat = "Suppressions, partial reruns, and workarounds can hide root causes and make later failures harder to interpret."
+expectation = "Mandatory gates will occasionally reveal defects whose fixes affect other parts of the system."
+strategy = "Stop on failure, fix the root cause, rerun every gate, and document and consult on any necessary suppression."
+evidence = [{ type = "remediation_trace", description = "A failed gate is followed by a root-cause change and a complete green rerun; any suppression has a scoped rationale and user decision.", required = true }]
+tradeoff = "Root-cause remediation and full reruns increase cycle time and can delay unrelated delivery."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#when-quality-gates-fail", summary = "Requires stopping, fixing root causes, rerunning all checks, and documenting and consulting on exceptions.", confidence = 1.0 }]

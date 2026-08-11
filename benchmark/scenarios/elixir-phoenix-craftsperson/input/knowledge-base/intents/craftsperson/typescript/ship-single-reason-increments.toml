@@ -1,0 +1,17 @@
+id = "guidelines.intent.ship-single-reason-increments"
+title = "Ship independently safe single-reason increments"
+category = "delivery"
+tags = ["typescript", "error-handling", "build-and-delivery", "incremental-delivery", "change-scope", "reversibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/deliver-small-independent-increments" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to review, release, and reverse changes in small coherent units"
+threat = "Bundled changes entangle unrelated risk and make failures difficult to isolate"
+expectation = "Work will need incremental review and deployment under changing priorities"
+strategy = "Structure commits around one reason to change and keep each increment independently shippable"
+evidence = [{ type = "review", description = "Each commit has one coherent purpose, passes its required gates, and does not depend on an unshipped companion commit for safety", required = true }]
+tradeoff = "Small increments require more sequencing and may temporarily leave deliberately limited implementations"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Small, safe increments are defined as single-reason commits that could ship independently.", confidence = 1.0 }]

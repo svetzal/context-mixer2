@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralized-kotlin-user-guides"
+title = "Keep end-user Kotlin guidance in one discoverable home"
+category = "documentation"
+tags = ["kotlin", "concurrency", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.91
+capability = "Ability for users to find task-oriented documentation independently of source API pages."
+threat = "Guides scattered among code, generated output, and ad hoc notes become difficult to discover and update."
+expectation = "The application will accumulate more user-visible workflows beyond symbol-level API contracts."
+strategy = "Maintain end-user documentation under docs and integrate it with the Dokka documentation workflow."
+evidence = [{ type = "review", description = "User-facing guides live under docs, are linked from the generated documentation entry point, and cover current supported workflows.", required = true }]
+tradeoff = "A prescribed documentation location and toolchain may not fit every distribution channel and requires cross-link maintenance."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#documentation-with-dokka", summary = "The source says to maintain end-user documentation in docs using Dokka.", confidence = 1.0 }]

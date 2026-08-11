@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-version-control-changes-focused"
+title = "Keep version-control changes focused and reviewable"
+category = "delivery"
+tags = ["python", "uv", "error-handling", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Reviewers can understand, validate, and safely integrate each change from its history and description."
+threat = "Broad pull requests and vague commits hide unrelated behavior changes and increase review error."
+expectation = "Work will be integrated collaboratively from branches and later investigated through version history."
+strategy = "Branch from main, use descriptive commit messages, and keep pull requests narrowly scoped with clear descriptions."
+evidence = [{ type = "version_control_review", description = "The change has focused commits with intention-revealing subjects and a review description that identifies its coherent scope.", required = true }]
+tradeoff = "Splitting and documenting changes adds workflow overhead and may require sequencing dependent work across several commits."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#workflow--collaboration", summary = "Requires branching from main, descriptive commits, and focused clearly described pull requests.", confidence = 1.0 }]

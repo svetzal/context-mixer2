@@ -1,0 +1,17 @@
+id = "guidelines.intent.prevent-polymorphic-object-slicing"
+title = "Prevent object slicing"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Dynamic type behavior survives base contracts."
+threat = "Passing polymorphic bases by value discards derived state."
+expectation = "More implementations will use base interfaces."
+strategy = "Pass polymorphic bases by reference or pointer."
+evidence = [{ type = "gate", description = "Polymorphic base parameters are never by value.", required = true }]
+tradeoff = "References introduce lifetime concerns."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#common-mistakes-to-avoid", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

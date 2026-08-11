@@ -1,0 +1,17 @@
+id = "guidelines.intent.stream-large-data"
+title = "Process large data with bounded memory"
+category = "reliability"
+tags = ["typescript", "concurrency", "backpressure", "resource-bounds"]
+relations = [
+  { type = "specializes", target = "craftsperson/bound-concurrent-work" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to transform inputs larger than available memory"
+threat = "Buffering whole files makes memory consumption scale with input size and can terminate the process"
+expectation = "File and payload sizes may grow beyond development-scale examples"
+strategy = "Compose readable, transform, and writable streams through a promise-based pipeline"
+evidence = [{ type = "test", description = "A representative large-input test completes with bounded peak memory and propagates pipeline errors", required = true }]
+tradeoff = "Streaming introduces chunk boundaries, backpressure concerns, and more complex error handling than whole-value processing"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#nodejs-patterns", summary = "The stream-processing example prescribes pipeline-based processing for large files.", confidence = 1.0 }]

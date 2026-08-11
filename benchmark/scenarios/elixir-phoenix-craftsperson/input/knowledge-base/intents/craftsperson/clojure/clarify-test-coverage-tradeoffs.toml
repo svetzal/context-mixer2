@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-test-coverage-tradeoffs"
+title = "Escalate coverage tradeoffs that require business judgment"
+category = "testing"
+tags = ["clojure", "testing", "dependencies", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to align testing investment and accepted regression risk with business priorities"
+threat = "A developer-only coverage decision can overspend on low-value tests or leave high-impact behavior underprotected"
+expectation = "Coverage targets will sometimes conflict with deadlines, testability, or the value of the affected path"
+strategy = "Seek a user decision when test-coverage tradeoffs depend on business risk or delivery priorities"
+evidence = [{ type = "decision-record", description = "Any accepted coverage exception records the uncovered behavior, business rationale, risk owner, and review condition", required = true }]
+tradeoff = "Requiring business input for exceptions can delay delivery and asks nontechnical stakeholders to evaluate technical uncertainty"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#when-to-escalate", summary = "Coverage tradeoffs needing a business decision are an explicit escalation trigger.", confidence = 1.0 }]

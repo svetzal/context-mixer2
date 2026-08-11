@@ -1,0 +1,17 @@
+id = "guidelines.intent.freeze-immutable-models"
+title = "Freeze models whose values are immutable"
+category = "design"
+tags = ["python", "uv", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Values intended as immutable cannot be changed after validation and safely retain value semantics."
+threat = "Incidental mutation makes shared domain values change at a distance and invalidates reasoning based on construction-time checks."
+expectation = "Validated models will be passed between layers and potentially shared across concurrent or long-lived operations."
+strategy = "Set Pydantic model_config to ConfigDict(frozen=True) for immutable data models."
+evidence = [{ type = "test", description = "Immutable domain models reject attribute reassignment after construction.", required = true }]
+tradeoff = "Updates require creating replacement instances and frozen models are awkward for legitimately stateful entities."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#data-structures", summary = "Prescribes frozen Pydantic configuration for immutable models.", confidence = 1.0 }]

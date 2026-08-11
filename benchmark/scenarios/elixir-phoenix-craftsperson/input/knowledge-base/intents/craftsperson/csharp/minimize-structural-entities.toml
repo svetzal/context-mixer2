@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimize-structural-entities"
+title = "Minimize structural entities"
+category = "design"
+tags = ["csharp", "testing", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The design remains easy to navigate because every class, interface, and indirection has a concrete purpose."
+threat = "Ceremonial layers and speculative abstractions multiply concepts without adding behavioral value."
+expectation = "Incremental changes will otherwise accumulate structure faster than obsolete structure is removed."
+strategy = "Use small focused types, remove unnecessary classes and interfaces, and require every entity to justify its existence."
+evidence = [{ type = "design_review", description = "Each introduced type owns a distinct responsibility or contract, and removing a layer would measurably lose clarity, substitution, or behavior.", required = true }]
+tradeoff = "Aggressive minimization can collapse useful seams and make a later extension require a larger refactor."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#engineering-principles-simple-design-heuristics", summary = "Ranks minimal entities fourth and requires every type to justify its existence.", confidence = 1.0 }]

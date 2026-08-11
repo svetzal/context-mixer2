@@ -1,0 +1,280 @@
+id = "guidelines.intent.require-passing-tests-before-completion"
+title = "Require passing tests before completion"
+category = "quality"
+tags = ["test-gate", "completion", "regression-safety"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Completed work preserves all behavior already protected by the project's executable specification."
+threat = "Known regressions are normalized, hidden, or deferred while a change is declared complete."
+expectation = "Every change can interact with behavior outside its immediate implementation area."
+strategy = "Run the complete relevant test suite and resolve every failure before declaring the work complete."
+evidence = [{ type = "test_gate", description = "The project's complete relevant test suite passes in the completion environment.", required = true }]
+tradeoff = "Full suites consume time and unrelated flaky tests can block otherwise sound changes."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/ruby-ecosystem/agents/ruby-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#quality-assurance-process", summary = "Requires a passing test suite before completion.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#quality-assurance", summary = "Never delivers with a failing test suite.", confidence = 1.0 }, { type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#quality-gates-mandatory", summary = "Requires all tests to pass before completion.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+$ clojure -M:test
+147 tests, 512 assertions, 0 failures, 0 errors.
+
+Done — full suite green in the completion environment.
+; the two failures found mid-work were resolved, not
+; deferred: one real tax-rounding regression, one stale
+; fixture updated with the reason noted in the commit
+'''
+bad = '''
+$ clojure -M:test
+147 tests, 512 assertions, 2 failures.
+
+FAIL in pricing-test/vat-applies-to-eu-orders
+FAIL in checkout-test/rejects-empty-cart
+
+"Done! (those 2 failures look pre-existing/unrelated,
+someone should look at them at some point)"
+'''
+
+[examples.cpp]
+good = '''
+$ ctest --output-on-failure
+  ...
+  100% tests passed, 0 tests failed out of 214
+
+Closing note: two pricing tests went red mid-change and
+caught a real regression in coupon stacking. Fixed the
+regression — not the tests — before declaring this done.
+Full suite green in the completion environment, log attached.
+'''
+bad = '''
+$ ctest
+  2 FAILED: Pricing.AppliesVolumeDiscount, Checkout.Total
+$ git diff tests/
+  -TEST(Pricing, AppliesVolumeDiscount) {
+  +TEST(Pricing, DISABLED_AppliesVolumeDiscount) {  // silenced
+$ ctest -E Checkout          # excluded the other failure
+  100% tests passed (187/214 run)
+
+Status: Complete.   # two known regressions ship, normalized
+'''
+
+[examples.csharp]
+good = '''
+$ dotnet test
+  Passed! 214, Failed: 0, Skipped: 0
+
+Completion note: full suite green on a clean
+checkout; no skips added, no filters applied.
+The one pre-existing flake (Nightly_export_retry)
+was fixed rather than muted — root cause was a
+shared temp path.
+'''
+bad = '''
+$ dotnet test
+  Failed! 3
+    Refund_restores_gift_card_balance
+    Refund_emits_ledger_event
+    Nightly_export_includes_refunds
+
+"Done — those refund tests were already sort of
+flaky, someone should look at them sometime."
+$ git push origin main
+'''
+
+[examples.elixir]
+good = '''
+$ mix test
+  1 failure: "refund restores the full balance"
+
+# traced to my change (rounding order) and fixed:
+$ mix test
+  312 tests, 0 failures
+
+Completion declared only after the full relevant suite
+is green in the completion environment.
+'''
+bad = '''
+@tag :skip   # went red after my change; "unrelated,
+             # probably" — never investigated
+test "refund restores the full balance" do
+  {:ok, account} = Refunds.process(refund)
+  assert account.balance == original_balance
+end
+
+# reported upstream: "done, all tests passing" — with
+# the known regression hidden behind the skip tag
+'''
+
+[examples.go]
+good = '''
+$ go test ./...
+ok      example.com/orders            0.41s
+ok      example.com/orders/pricing    1.20s
+ok      example.com/orders/refund     0.83s
+
+# every relevant package green in the completion environment —
+# only now is the change described as done
+'''
+bad = '''
+$ go test ./...
+--- FAIL: TestRefundRounding (0.01s)
+    rounding_test.go:31: want 13.45, got 13.44
+FAIL    example.com/orders/pricing
+
+$ git commit -m "Add refund support"   # declared complete
+# "probably unrelated to my change" — unproven, unreported
+'''
+
+[examples.java]
+good = '''
+$ mvn verify
+Tests run: 450, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+
+Completion note: full suite green in the completion
+environment. The intermittent CartTest failure seen
+earlier was reproduced and root-caused (shared fixture
+mutation) and fixed — not re-run until it happened to
+pass.
+'''
+bad = '''
+$ mvn verify
+Tests run: 450, Failures: 3
+  InvoiceTest.roundsMixedVatCorrectly
+  CartTest.mergesDuplicateLines
+  RefundTest.restoresGiftCardBalance
+
+Status update: "Done! Those 3 failures look pre-existing
+or flaky, will circle back later."
+# three known regressions, normalized and shipped
+'''
+
+[examples.kotlin]
+good = '''
+$ ./gradlew test
+> InvoiceTest.rounds half-up FAILED
+# regression fixed, then the full suite re-run:
+$ ./gradlew test
+BUILD SUCCESSFUL — 214 tests, 0 failures
+# only now is the work declared complete
+'''
+bad = '''
+$ ./gradlew test
+> InvoiceTest.rounds half-up FAILED
+> 213 passed, 1 failed
+# marked done anyway: "unrelated failure, pre-existing,
+# someone should look later" — no issue filed, the change
+# declared complete on a known-red suite
+'''
+
+[examples.python]
+good = '''
+$ pytest -q
+1 failed: test_reorders_use_saved_address
+
+# fix before any completion claim
+$ $EDITOR src/orders/reorder.py
+
+$ pytest -q
+217 passed in 41.2s
+# the complete relevant suite is green in the completion
+# environment; now the work can be called done
+'''
+bad = '''
+$ pytest -q
+3 failed, 214 passed
+# "those 3 were probably already broken" — never checked
+
+$ git commit -m "Add reorder flow (done)"
+$ git push origin main
+# the regressions ride to main inside a "complete" change
+# and tomorrow's failures look normal
+'''
+
+[examples.ruby]
+good = '''
+$ bundle exec rspec
+  842 examples, 0 failures
+
+Two failures during the work were real regressions in refund
+rounding — fixed before completion, not skipped:
+
+  commit: "Fix rounding regression caught by refund_spec"
+
+Declared done only with the complete suite green.
+'''
+bad = '''
+# spec/refund_spec.rb
+xit "rounds half-cents toward the customer" do # broke it,
+  expect(refund(cents: 101)).to eq(51)         # so silenced it
+end
+
+# Slack: "Refunds change is done. (2 unrelated test failures,
+# will look later)" — they were not unrelated
+'''
+
+[examples.rust]
+good = '''
+$ cargo test --workspace
+test result: ok. 212 passed; 0 failed
+
+# a failure surfaced mid-work and was fixed before done:
+#   orders::rounds_half_up — regressed by the rate change
+
+Report: full workspace suite green in the completion
+environment; no tests skipped or newly ignored.
+'''
+bad = '''
+$ cargo test --workspace
+test result: FAILED. 209 passed; 3 failed
+
+// "probably already broken" — silenced to reach green
+#[ignore] // TODO: flaky? revisit someday
+#[test]
+fn rounds_half_up() { /* was protecting real behavior */ }
+
+Report: "Done, tests passing."
+'''
+
+[examples.swift]
+good = '''
+$ swift test
+Suite 'All tests' passed — 412 tests, 0 failures
+
+The ticket is declared done only now: the complete relevant
+suite is green in the same environment CI uses, so every
+behavior it protects still holds.
+'''
+bad = '''
+$ swift test
+  FAIL InvoiceTests.appliesCreditOnce
+  FAIL InvoiceTests.roundsTotalHalfUp
+
+"Marking done — those two were probably failing before."
+
+# no baseline checked; two real regressions ship, and the
+# next contributor inherits a red suite as normal
+'''
+
+[examples.typescript]
+good = '''
+$ npx vitest run
+ Test Files  38 passed (38)
+      Tests  214 passed (214)
+
+Declared complete only after the full relevant suite ran
+green in the completion environment — including the two
+failures introduced and fixed along the way.
+'''
+bad = '''
+$ npx vitest run
+ Tests  211 passed, 3 failed
+
+// vitest.config.ts — added to "get to green":
+export default defineConfig({
+  test: { exclude: ["**/pricing/**"] }, // failing area hidden
+});
+
+"Done! Tests pass."   # three known regressions ride along
+'''

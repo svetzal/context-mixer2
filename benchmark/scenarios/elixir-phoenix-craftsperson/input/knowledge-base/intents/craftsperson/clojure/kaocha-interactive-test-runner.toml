@@ -1,0 +1,17 @@
+id = "guidelines.intent.kaocha-interactive-test-runner"
+title = "Use Kaocha when richer test feedback is available"
+category = "testing"
+tags = ["clojure", "kaocha", "testing", "error-handling", "readability", "executable-specification"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-tests-readable-specifications" },
+]
+status = "hypothesized"
+confidence = 0.87
+capability = "Ability to organize tests and receive rapid, actionable failure feedback during interactive development"
+threat = "Basic runner output and manual reruns slow the diagnose-change-test loop as suites grow"
+expectation = "The test suite will become large enough that watch mode and richer reporting improve development flow"
+strategy = "Adopt Kaocha as the enhanced runner when the project can support it, including watch mode for REPL-driven work"
+evidence = [{ type = "gate", description = "The Kaocha alias runs the organized suite and watch mode reruns an affected test after a source change", required = true }]
+tradeoff = "An additional runner adds configuration and dependency maintenance and can diverge from plain clojure.test behavior"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-tools-you-wield", summary = "Kaocha is recommended when available for better reporting, organization, and watch-mode feedback.", confidence = 1.0 }]

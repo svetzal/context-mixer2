@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolated-viewmodel-tests"
+title = "Verify presentation logic without Android infrastructure"
+category = "quality"
+tags = ["kotlin", "android", "testing", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to exercise ViewModel behavior quickly and deterministically."
+threat = "Tests coupled to real repositories or Android runtime obscure presentation defects and become slow."
+expectation = "ViewModels will coordinate more asynchronous repositories and UI decisions."
+strategy = "Instantiate ViewModels in unit tests with mocked repository or gateway interfaces using coroutine-aware MockK APIs."
+evidence = [{ type = "gate", description = "ViewModel tests use controlled interface substitutes and run without real network, database, or device dependencies.", required = true }]
+tradeoff = "Mocks can encode implementation interactions too tightly and require maintenance during refactors."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#unit-tests-junit-5--mockk", summary = "The source requires isolated ViewModel tests with mocked repositories and coroutine-aware MockK.", confidence = 1.0 }]

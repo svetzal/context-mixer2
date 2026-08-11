@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-async-behavior-with-async-tools"
+title = "Test async behavior in its native execution model"
+category = "reliability"
+tags = ["python", "uv", "concurrency", "testing", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Tests exercise coroutine scheduling and await contracts rather than approximating them synchronously."
+threat = "Synchronous tests or ordinary mocks can miss missing awaits and return values that do not behave like coroutines."
+expectation = "Async interfaces will grow and be substituted at gateway boundaries."
+strategy = "Run coroutine tests with pytest-asyncio and represent substituted async functions with AsyncMock."
+evidence = [{ type = "test_review", description = "Async tests execute under the asyncio pytest marker and assert awaited calls on AsyncMock-based collaborators.", required = true }]
+tradeoff = "Async test plugins and doubles add event-loop configuration and can still hide real scheduling races."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#testing-async-code", summary = "Requires pytest-asyncio markers and AsyncMock for async function tests.", confidence = 1.0 }]

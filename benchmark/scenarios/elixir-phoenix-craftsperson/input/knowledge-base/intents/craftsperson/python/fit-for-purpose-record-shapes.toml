@@ -1,0 +1,17 @@
+id = "guidelines.intent.fit-for-purpose-record-shapes"
+title = "Use specialized record shapes only where their access semantics fit"
+category = "design"
+tags = ["python", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.88
+capability = "Boundary and lightweight record data retain the access semantics expected by their consumers."
+threat = "Forcing every non-model shape into one representation obscures positional records or dictionary-shaped external payloads."
+expectation = "The system will consume external mappings and occasionally need minimal immutable positional records."
+strategy = "Use TypedDict for typed external dictionary access and reserve NamedTuple for simple immutable records that need positional access."
+evidence = [{ type = "review", description = "Each TypedDict corresponds to mapping-shaped external data, and each NamedTuple has a documented positional-access use that a Pydantic model would not serve as directly.", required = true }]
+tradeoff = "Supporting multiple record forms weakens the otherwise uniform Pydantic model approach and increases conversion decisions."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#data-structures", summary = "The source makes narrow exceptions for NamedTuple positional records and TypedDict external mappings.", confidence = 0.92 }]

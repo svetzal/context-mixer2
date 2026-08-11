@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-psychological-safety-in-review"
+title = "Preserve psychological safety in review"
+category = "collaboration"
+tags = ["typescript", "bun", "cli", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Contributors can expose uncertainty, receive critique, and improve code without personal threat."
+threat = "Adversarial or personal review language suppresses questions, hides risks, and damages collaboration."
+expectation = "Design disagreements and defects will recur as multiple people review high-stakes changes."
+strategy = "Critique code and ideas with curiosity, assume positive intent, and avoid judgments about colleagues."
+evidence = [{ type = "review", description = "Review comments identify observable code effects, ask constructive questions or propose alternatives, and contain no personal attribution or hostile framing.", required = true }]
+tradeoff = "Careful framing takes additional time and can make urgent or severe feedback feel less direct if poorly expressed."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#workflow--collaboration", summary = "Makes psychological safety paramount and directs reviewers to critique code with curiosity while assuming positive intent.", confidence = 1.0 }]

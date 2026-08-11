@@ -1,0 +1,17 @@
+id = "guidelines.intent.classify-dependencies-by-role"
+title = "Classify dependencies by runtime and development role"
+category = "design"
+tags = ["python", "uv", "dependencies", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Published artifacts and local workflows include only the dependencies appropriate to their role."
+threat = "Undifferentiated dependencies leak development tooling into consumers or leave required tooling implicit."
+expectation = "Projects will have runtime requirements, publishable library extras, and local test, lint, and documentation tools with different distribution semantics."
+strategy = "Keep runtime dependencies under project metadata, published extras under optional dependencies, and local tooling in explicit dev or named dependency groups."
+evidence = [{ type = "manifest_review", description = "Every declared dependency is in the group matching whether it is required at runtime, exposed as a published extra, or used only for local development.", required = true }]
+tradeoff = "Multiple dependency groups add manifest structure and require contributors to understand which groups are synchronized."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#pyprojecttoml-structure", summary = "Separates project dependencies, published optional extras, and local development groups.", confidence = 1.0 }]

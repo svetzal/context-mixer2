@@ -1,0 +1,17 @@
+id = "guidelines.intent.extract-complex-controller-operations"
+title = "Move complex operations out of Rails controllers"
+category = "design"
+tags = ["ruby", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to understand and test multi-step business operations independently of HTTP delivery"
+threat = "Business workflows embedded in controllers couple decisions to request handling and produce oversized actions"
+expectation = "User requests will trigger increasingly complex multi-step operations"
+strategy = "Extract complex business operations into service objects and leave controllers to coordinate HTTP concerns"
+evidence = [{ type = "architecture", description = "Controllers parse requests and render responses while multi-step domain decisions live in independently testable service objects", required = true }]
+tradeoff = "Service objects add classes and can become an anemic catch-all layer if responsibilities are poorly named"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#rails-specific-guidance", summary = "Complex multi-step business logic should be extracted from controllers into service objects.", confidence = 1.0 }]

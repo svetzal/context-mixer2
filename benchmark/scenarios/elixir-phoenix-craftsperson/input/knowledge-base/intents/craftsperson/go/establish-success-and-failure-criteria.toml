@@ -1,0 +1,17 @@
+id = "guidelines.intent.establish-success-and-failure-criteria"
+title = "Define success and failure before design"
+category = "testing"
+tags = ["go", "testing", "error-handling", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The team can determine objectively whether the delivered behavior solves the requested problem."
+threat = "Coding without explicit success, edge, and failure criteria leaves completion subjective and important behavior unspecified."
+expectation = "Features will interact with invalid inputs and failing dependencies beyond their happy path."
+strategy = "Identify success criteria, edge cases, error conditions, and failure modes while understanding requirements."
+evidence = [{ type = "acceptance_review", description = "The change has observable success criteria and enumerated edge and failure outcomes that map to tests or explicit exclusions.", required = true }]
+tradeoff = "Up-front criteria work adds analysis time and cannot anticipate every emergent condition."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#understand-requirements", summary = "Instructs implementers to identify success criteria, edge cases, error conditions, and failure modes.", confidence = 1.0 }]

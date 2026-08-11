@@ -1,0 +1,17 @@
+id = "guidelines.intent.organize-module-apis-for-discovery"
+title = "Organize module APIs for discovery"
+category = "design"
+tags = ["elixir", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Readers can find a module's public contract and supporting implementation quickly."
+threat = "Interleaved public and private functions obscure the supported API as modules grow."
+expectation = "Modules will acquire more entry points and helpers over time."
+strategy = "Place the public API at the top, group related functions, and keep private helpers at the bottom."
+evidence = [{ type = "structure_review", description = "A reader can identify all public entry points before encountering private helpers, with related functions adjacent.", required = true }]
+tradeoff = "API-first ordering can separate a private helper from the public function that uses it and creates reordering churn."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#code-structure--patterns", summary = "Prescribes public functions first, private functions last, and related functions grouped together.", confidence = 1.0 }]

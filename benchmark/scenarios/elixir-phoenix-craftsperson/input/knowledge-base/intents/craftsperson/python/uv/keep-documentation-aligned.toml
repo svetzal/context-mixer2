@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-documentation-aligned"
+title = "Keep documentation aligned with implementation"
+category = "documentation"
+tags = ["python", "uv", "documentation", "build-and-delivery", "synchronization", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Users and maintainers can rely on guides, examples, and docstrings as current operating instructions."
+threat = "Behavior changes leave separately maintained documentation describing obsolete APIs or workflows."
+expectation = "Implementation and public contracts will evolve while documentation remains a separate artifact."
+strategy = "Review docs with code changes, update examples and docstrings, and require a successful MkDocs build."
+evidence = [{ type = "documentation_gate", description = "uv run mkdocs build succeeds and changed behavior has current examples and docstrings.", required = true }]
+tradeoff = "Every behavior change carries documentation work and another build gate."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Requires review of docs, synchronized examples and docstrings, and a successful MkDocs build.", confidence = 1.0 }]

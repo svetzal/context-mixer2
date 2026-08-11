@@ -1,0 +1,17 @@
+id = "guidelines.intent.pin-required-cpp-standard"
+title = "Require the intended C++ standard"
+category = "delivery"
+tags = ["cpp", "qt", "compatibility", "runtime-versions", "platform-support"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-supported-platform-baselines" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Targets support the semantics and features used."
+threat = "Toolchain defaults silently select older dialects."
+expectation = "Builds will span machines and compiler upgrades."
+strategy = "Require C++20 through target compile features."
+evidence = [{ type = "gate", description = "Configuration fails when cxx_std_20 is unavailable.", required = true }]
+tradeoff = "Older compilers and platforms are excluded."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#build-system-cmake", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

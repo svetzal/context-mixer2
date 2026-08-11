@@ -1,0 +1,18 @@
+id = "guidelines.intent.standardize-project-tooling"
+title = "Standardize project operations on canonical tooling"
+category = "delivery"
+tags = ["tooling", "project-management", "repeatability"]
+relations = [
+  { type = "related-to", target = "craftsperson/inspect-project-context-before-changing-it" },
+  { type = "related-to", target = "craftsperson/make-dependency-resolution-reproducible" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Contributors perform common project operations through one predictable, reproducible interface."
+threat = "Ad hoc commands and parallel toolchains create environments that drift from project policy and from one another."
+expectation = "Language ecosystems will offer overlapping ways to create projects, run tools, manage environments, and publish artifacts."
+strategy = "Use the repository's canonical project tool for initialization, dependency changes, task execution, and environment synchronization."
+evidence = [{ type = "workflow_review", description = "Documented and automated project operations use the selected canonical tool rather than bypassing it with parallel workflows.", required = true }]
+tradeoff = "Standardization can limit access to niche capabilities and couples workflows to the selected tool."
+scope = { project = "guidelines", paths = ["plugins"] }
+sources = [{ type = "synthesis", ref = "intents", summary = "Generalizes recurring uv, Cargo, Mix, Gradle, Bun, and comparable project-tool guidance.", confidence = 0.98 }]

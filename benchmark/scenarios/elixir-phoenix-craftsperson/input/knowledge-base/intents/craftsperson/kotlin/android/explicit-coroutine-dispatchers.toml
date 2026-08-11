@@ -1,0 +1,17 @@
+id = "guidelines.intent.explicit-coroutine-dispatchers"
+title = "Preserve deliberate execution-context control"
+category = "reliability"
+tags = ["kotlin", "android", "concurrency", "testing", "performance", "structured-concurrency"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to keep blocking and CPU-heavy work off the UI thread and test scheduling deterministically."
+threat = "Implicit dispatchers run work on inappropriate threads and hide performance behavior."
+expectation = "Features will combine I/O, CPU work, and UI updates under varying device constraints."
+strategy = "Select IO, Default, or Main dispatchers explicitly and inject dispatchers where deterministic tests need control."
+evidence = [{ type = "gate", description = "Coroutine call sites and tests show deliberate dispatcher selection, with no blocking work reachable on Main.", required = true }]
+tradeoff = "Explicit or injected dispatchers increase parameters and scheduling boilerplate."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#coroutines--flow", summary = "The source explicitly requires dispatchers to be specified.", confidence = 1.0 }]

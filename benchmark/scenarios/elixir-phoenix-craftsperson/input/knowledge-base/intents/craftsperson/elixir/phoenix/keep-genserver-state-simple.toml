@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-genserver-state-simple"
+title = "Keep GenServer state simple"
+category = "reliability"
+tags = ["elixir", "phoenix", "concurrency", "testing", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "A running service can be inspected, restarted, and reasoned about from a clear state representation."
+threat = "Opaque resources and tangled derived values make process recovery and debugging unpredictable."
+expectation = "Long-lived processes will be inspected during incidents and restarted by supervisors."
+strategy = "Keep GenServer state small, explicit, and serializable."
+evidence = [{ type = "state_review", description = "A GenServer state snapshot consists of inspectable data with documented invariants and no hidden ownership of irreplaceable resources.", required = true }]
+tradeoff = "Derived values may need recomputation and external resources may require separate lifecycle management."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#otp-best-practices", summary = "Directs GenServers to keep state simple and serializable.", confidence = 1.0 }]

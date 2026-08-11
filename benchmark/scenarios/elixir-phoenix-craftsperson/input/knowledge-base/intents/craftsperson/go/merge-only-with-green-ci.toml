@@ -1,0 +1,17 @@
+id = "guidelines.intent.merge-only-with-green-ci"
+title = "Merge only an independently verified green change"
+category = "quality"
+tags = ["go", "dependencies", "build-and-delivery", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The shared main line retains an automated signal that integrated changes satisfy repository gates."
+threat = "Locally passing or unverified changes can break the shared baseline when environment-dependent checks fail."
+expectation = "Contributors and build environments will differ, and many changes will converge on main."
+strategy = "Require the branch's CI checks to be green before merging."
+evidence = [{ type = "ci_gate", description = "Every required CI check reports success for the exact revision merged to main.", required = true }]
+tradeoff = "CI outages, queue latency, or flaky checks can delay an otherwise correct change."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#small-safe-increments", summary = "Requires green CI before merging a branch from main.", confidence = 1.0 }]

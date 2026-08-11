@@ -1,0 +1,1 @@
+benchmark/scenarios/**/input/** whitespace=-trailing-space,-space-before-tab

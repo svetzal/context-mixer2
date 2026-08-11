@@ -1,0 +1,17 @@
+id = "guidelines.intent.catch-only-intended-exceptions"
+title = "Catch only intended exceptions"
+category = "reliability"
+tags = ["python", "uv", "concurrency", "error-handling", "error-modeling", "recoverability"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Unexpected failures and process-control signals remain visible instead of being silently swallowed."
+threat = "Bare or overly broad except clauses intercept programming errors, KeyboardInterrupt, or SystemExit."
+expectation = "Protected operations will fail in new ways as implementations and dependencies change."
+strategy = "Catch the narrow exception types the code can meaningfully handle and never use a bare except."
+evidence = [{ type = "static_gate", description = "Static checks find no bare except clauses, and review confirms each handler names only exceptions it can recover from.", required = true }]
+tradeoff = "New exception types may propagate farther and require explicit updates when upstream failure behavior changes."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#common-mistakes-to-avoid", summary = "Contrasts a bare except that catches process-control signals with a specific ValueError handler.", confidence = 1.0 }]

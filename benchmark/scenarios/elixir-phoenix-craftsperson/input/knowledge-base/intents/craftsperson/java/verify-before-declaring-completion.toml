@@ -1,0 +1,17 @@
+id = "guidelines.intent.verify-before-declaring-completion"
+title = "Verify before declaring work complete"
+category = "quality"
+tags = ["java", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A completion claim reliably means the Java change has passed all applicable repository quality policy."
+threat = "Contributors omit checks they were not explicitly asked to run and hand off defects as finished work."
+expectation = "Delivery pressure and varied local habits will otherwise make verification inconsistent between code sessions."
+strategy = "Run the complete configured quality gate proactively after implementation and before commit, push, or completion handoff."
+evidence = [{ type = "workflow_gate", description = "The completion trace records successful results for every applicable configured test, analysis, coverage, security, integration, and documentation check.", required = true }]
+tradeoff = "Proactive full verification adds latency and tool setup even for small or low-risk changes."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#quality-gates-mandatory", summary = "Defines quality checks as mandatory for every code session and requires them to run proactively before work is considered done.", confidence = 1.0 }]

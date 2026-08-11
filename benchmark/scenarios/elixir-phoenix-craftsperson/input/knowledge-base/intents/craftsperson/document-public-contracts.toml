@@ -1,0 +1,311 @@
+id = "guidelines.intent.document-public-contracts"
+title = "Document public contracts"
+category = "documentation"
+tags = ["public-api", "contracts", "consumer-guidance"]
+relations = [
+  { type = "related-to", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Consumers can use a public interface correctly without reading its implementation."
+threat = "Inputs, outputs, failure modes, invariants, and compatibility expectations remain implicit or drift from behavior."
+expectation = "Public interfaces will be used and changed by people who do not share the implementer's local context."
+strategy = "Document the purpose, accepted inputs, returned outcomes, failures, invariants, and non-obvious rationale at the public boundary."
+evidence = [{ type = "api_review", description = "Each changed public contract documents the information a consumer needs and agrees with executable behavior.", required = true }]
+tradeoff = "Rich contract documentation increases maintenance cost and can repeat information already made obvious by a precise interface."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#documentation", summary = "Documents public API contracts for consumers.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#engineering-principles-you-follow", summary = "Documents every exported contract.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#documentation", summary = "Documents public contracts together with non-obvious rationale.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defn reserve-stock
+  "Reserves `qty` units of `sku` for 15 minutes.
+
+  Returns {:reservation-id uuid} on success.
+  Returns {:error :insufficient-stock :available n} when short.
+  Throws ex-info {:type :unknown-sku} for SKUs not in catalog.
+  `qty` must be a positive int. Idempotent per
+  [order-id sku] pair — safe to retry."
+  [order-id sku qty]
+  (reserve! inventory order-id sku qty))
+'''
+bad = '''
+(defn reserve-stock
+  "Reserves stock."
+  [order-id sku qty]
+  (reserve! inventory order-id sku qty))
+; the failure modes exist (:insufficient-stock map, an
+; :unknown-sku throw, an idempotency rule) but a consumer can
+; learn them only by reading the implementation — or in prod
+'''
+
+[examples.cpp]
+good = '''
+/// Reserves stock for an order.
+///
+/// \param qty  Units requested; must be > 0.
+/// \returns    A Reservation valid for 15 minutes.
+/// \throws OutOfStock  if fewer than qty units remain.
+/// \throws InvalidQty  if qty <= 0.
+///
+/// Thread-safe; may be called from any worker thread.
+/// (15-minute hold matches the checkout SLA, see ADR-012.)
+Reservation reserve(Sku sku, int qty);
+'''
+bad = '''
+// does the thing
+Reservation* reserve(Sku sku, int qty);
+// What does qty <= 0 do? What comes back when stock is out?
+// (Header comment elsewhere still says "returns nullptr when
+// out of stock" — it has thrown OutOfStock since v2.3.)
+// Every consumer reads the implementation to find out.
+'''
+
+[examples.csharp]
+good = '''
+/// <summary>Reserves stock for a pending order.</summary>
+/// <param name="sku">An existing catalog SKU.</param>
+/// <param name="qty">Units; 1–100 per reservation.</param>
+/// <returns>The reservation id.</returns>
+/// <exception cref="UnknownSkuException">
+/// No catalog entry exists for <paramref name="sku"/>.
+/// </exception>
+/// <exception cref="OutOfStockException">
+/// Fewer than <paramref name="qty"/> units remain.
+/// </exception>
+public Guid Reserve(string sku, int qty) { ... }
+'''
+bad = '''
+// callers must read the body to learn the cap is 100
+// and that unknown skus surface as a null Guid?
+public Guid? Reserve(string sku, int qty)
+{
+    if (qty is < 1 or > 100)
+        throw new ArgumentException("qty");
+    if (!_catalog.Contains(sku)) return null;
+    return _stock.Hold(sku, qty);
+}
+'''
+
+[examples.elixir]
+good = '''
+@doc """
+Reserves `qty` units of `sku` for the current order.
+
+Returns `{:ok, reservation}`, or `{:error, :insufficient}`
+when available stock is below `qty`. Raises only on repo
+outage. `qty` must be positive; zero is rejected upstream.
+"""
+@spec reserve(String.t(), pos_integer()) ::
+        {:ok, Reservation.t()} | {:error, :insufficient}
+def reserve(sku, qty), do: do_reserve(sku, qty)
+'''
+bad = '''
+# public API of the inventory context — no contract:
+# inputs, failure modes, and invariants are discoverable
+# only by reading (and re-reading) the implementation
+def reserve(sku, qty) do
+  with %Item{} = item <- Repo.get_by(Item, sku: sku),
+       true <- item.stock >= qty do
+    create_reservation(item, qty)
+  end
+end
+'''
+
+[examples.go]
+good = '''
+// Reserve holds qty units of sku for the current checkout.
+//
+// It returns ErrUnknownSKU for skus absent from the catalog
+// and ErrInsufficientStock when fewer than qty units remain;
+// the hold expires after 15 minutes unless Confirm is called.
+// qty must be positive.
+func (s *Stock) Reserve(ctx context.Context, sku string, qty int) error
+'''
+bad = '''
+// Reserve reserves stock.
+func (s *Stock) Reserve(ctx context.Context, sku string, qty int) error {
+	if qty <= 0 {
+		return errors.New("bad qty") // undocumented failure mode
+	}
+	if !s.catalog.Has(sku) {
+		return errUnknown // unexported: callers can't test for it
+	}
+	s.holds[sku] += qty // 15-min expiry lives only in a cron job
+	return nil
+}
+'''
+
+[examples.java]
+good = '''
+public interface StockService {
+    /**
+     * Reserves stock for every line of the order.
+     *
+     * @param order at least one line; all quantities > 0
+     * @return reservation id, held for 15 minutes
+     * @throws OutOfStockException if any line cannot be
+     *         filled; no partial reservation is retained
+     */
+    ReservationId reserve(Order order)
+        throws OutOfStockException;
+}
+'''
+bad = '''
+public interface StockService {
+    /** Reserves stock. */
+    Object reserve(Order order) throws Exception;
+}
+// a consumer cannot learn without reading the impl:
+//   - is a partial fill kept when one line is short?
+//   - how long does the hold last?
+//   - which failures are expected vs. bugs?
+'''
+
+[examples.kotlin]
+good = '''
+/**
+ * Reserves [quantity] units of [sku] for the caller.
+ *
+ * Returns a [Reservation] valid for 15 minutes; unclaimed
+ * stock is released automatically after that.
+ *
+ * @throws InsufficientStockException when fewer than
+ *   [quantity] units are free; nothing is reserved.
+ */
+fun reserve(sku: Sku, quantity: Int): Reservation
+'''
+bad = '''
+// the inventory module's public entry point
+fun reserve(sku: String, quantity: Int): Reservation
+// consumers must read the implementation to discover the
+// 15-minute expiry, that quantity <= 0 throws, and that a
+// failed reservation holds no stock — none of which the
+// signature or any documentation admits
+'''
+
+[examples.python]
+good = '''
+def reserve(self, sku: str, qty: int) -> Reservation:
+    """Hold stock for a sku ahead of checkout.
+
+    Args:
+        sku: existing catalog sku (case-sensitive).
+        qty: units to hold, 1..MAX_LINE_QTY.
+    Returns:
+        Reservation valid for 15 minutes.
+    Raises:
+        UnknownSku: sku is not in the catalog.
+        InsufficientStock: fewer than qty units on hand.
+    """
+'''
+bad = '''
+def reserve(self, sku, qty):
+    """Reserves."""
+    # the 15-minute hold, the qty ceiling, and both failure
+    # modes are discoverable only by reading the body
+    self._check(sku)
+    self._hold(sku, qty, ttl=900)
+    return self._pending[sku]
+'''
+
+[examples.ruby]
+good = '''
+# Reserves stock for an order line.
+#
+# @param sku [String] an active catalog SKU
+# @param qty [Integer] must be positive
+# @return [Reservation] holds stock for 15 minutes
+# @raise [OutOfStockError] when available < qty
+# @raise [UnknownSkuError] for inactive or missing SKUs
+def reserve(sku:, qty:)
+  inventory.hold(sku: sku, qty: qty, ttl: 900)
+end
+'''
+bad = '''
+# reserves stock
+def reserve(sku, qty, opts = {})
+  # silently returns nil when out of stock — undocumented;
+  # callers discover the failure mode in production
+  inventory.hold(sku, qty, opts)
+rescue OutOfStockError
+  nil
+end
+'''
+
+[examples.rust]
+good = '''
+/// Reserves `qty` units of `sku` for the current order.
+///
+/// Returns the reservation id on success.
+///
+/// # Errors
+/// - [`ReserveError::UnknownSku`] if `sku` is not in catalog
+/// - [`ReserveError::Insufficient`] with the available count
+///
+/// Reservations expire after [`RESERVE_TTL`] (15 minutes).
+pub fn reserve(&mut self, sku: &Sku, qty: u32)
+    -> Result<ReservationId, ReserveError> {
+    self.inventory.take(sku, qty).map(|_| self.next_id())
+}
+'''
+bad = '''
+/// Reserves stock.
+pub fn reserve(&mut self, sku: &Sku, qty: u32)
+    -> Result<ReservationId, ReserveError> {
+    // failure modes, the 15-minute expiry, and what qty = 0
+    // means are discoverable only by reading this body
+    self.inventory.take(sku, qty).map(|_| self.next_id())
+}
+'''
+
+[examples.swift]
+good = '''
+/// Reserves `quantity` units of `sku` for the open order.
+///
+/// - Parameter quantity: Must be at least 1.
+/// - Returns: A reservation that expires after 15 minutes
+///   unless confirmed.
+/// - Throws: `InventoryError.insufficientStock` when fewer
+///   than `quantity` units remain; the order is unchanged.
+public func reserve(sku: SKU, quantity: Int) throws
+    -> Reservation
+'''
+bad = '''
+/// Reserves stock.
+public func reserve(sku: String, quantity: Int) throws
+    -> Reservation
+// consumers must read the implementation to learn that
+// quantity 0 traps, that the throw still burns the token,
+// and that the reservation silently expires
+'''
+
+[examples.typescript]
+good = '''
+/**
+ * Reserve stock for an order line.
+ *
+ * @param sku - existing catalog SKU; unknown SKUs throw
+ * @param qty - positive integer, capped at 100 per call
+ * @returns remaining stock after the reservation
+ * @throws {OutOfStockError} when qty exceeds available stock
+ * Invariant: stock never goes below zero.
+ */
+export function reserve(sku: string, qty: number): number {
+  return inventory.reserve(sku, qty);
+}
+'''
+bad = '''
+// Consumers must read the body to discover any of this:
+// unknown SKU throws, qty over 100 is silently clamped,
+// and a negative return secretly means "backordered".
+export function reserve(sku: string, qty: number): number {
+  const item = catalog.get(sku);
+  if (!item) throw new Error("bad sku");
+  const q = Math.min(qty, 100);
+  item.stock -= q;
+  return item.stock;
+}
+'''

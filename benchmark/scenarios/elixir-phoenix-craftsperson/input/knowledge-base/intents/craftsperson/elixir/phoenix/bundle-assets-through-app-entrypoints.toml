@@ -1,0 +1,17 @@
+id = "guidelines.intent.bundle-assets-through-app-entrypoints"
+title = "Bundle assets through application entrypoints"
+category = "reliability"
+tags = ["elixir", "phoenix", "dependencies", "performance", "build-and-delivery", "concurrency"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Browser dependencies are versioned, built, and deployed with the Phoenix application."
+threat = "External layout URLs and inline scripts bypass the supported bundler, CSP, cache, and LiveView lifecycle."
+expectation = "The frontend will add vendor JavaScript and CSS while the default build exposes only app.js and app.css bundles."
+strategy = "Import vendor dependencies into app.js and app.css and avoid external vendor src or href references and inline custom scripts."
+evidence = [{ type = "asset_gate", description = "A production build contains all frontend dependencies in supported bundles and layouts contain no external vendor asset or inline custom script references.", required = true }]
+tradeoff = "Vendor updates require bundle integration and large dependencies increase application asset size."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#asset-bundling", summary = "Limits default bundles to app.js and app.css and requires vendor imports instead of external or inline assets.", confidence = 1.0 }]

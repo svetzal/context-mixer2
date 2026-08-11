@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-tests-passing"
+title = "Keep the verified behavior passing"
+category = "quality"
+tags = ["typescript", "testing", "error-handling", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to preserve behavior already established by the executable specification"
+threat = "Changes silently regress existing behavior when failures are tolerated or deferred"
+expectation = "The system will be modified repeatedly while existing contracts remain in force"
+strategy = "Treat a fully passing test suite as the highest-priority completion condition"
+evidence = [{ type = "gate", description = "The project test command exits successfully with no failing tests for the candidate change", required = true }]
+tradeoff = "Strictly blocking on all failures can delay unrelated work when tests are flaky or obsolete"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "All tests passing is the first simple-design heuristic and correctness is non-negotiable.", confidence = 1.0 }]

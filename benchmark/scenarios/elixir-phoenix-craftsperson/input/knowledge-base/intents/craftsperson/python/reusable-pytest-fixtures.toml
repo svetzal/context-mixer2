@@ -1,0 +1,17 @@
+id = "guidelines.intent.reusable-pytest-fixtures"
+title = "Centralize shared test setup at the narrowest useful package scope"
+category = "design"
+tags = ["python", "pytest", "concurrency", "testing", "dependencies", "idioms"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Related specifications reuse consistent setup without copying construction knowledge."
+threat = "Duplicated fixtures drift and broad global fixtures create invisible coupling between unrelated tests."
+expectation = "More modules will need related factories and boundary doubles as the suite grows."
+strategy = "Place shared pytest fixtures in conftest.py at the package level appropriate to their actual consumers and use factory fixtures for varied model data."
+evidence = [{ type = "review", description = "Shared fixture definitions have multiple consumers within their directory scope, and unrelated packages do not inherit fixtures they never use.", required = true }]
+tradeoff = "Implicit fixture discovery can make setup origins harder to find and over-shared fixtures can couple tests."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#test-organization", summary = "The source prescribes appropriately scoped conftest files and demonstrates factory and mock gateway fixtures.", confidence = 0.96 }]

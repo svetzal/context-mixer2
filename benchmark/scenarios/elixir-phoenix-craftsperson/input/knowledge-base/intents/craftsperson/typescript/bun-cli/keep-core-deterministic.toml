@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-core-deterministic"
+title = "Keep core behavior deterministic"
+category = "architecture"
+tags = ["typescript", "bun", "cli", "testing", "dependencies", "functional-core"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Core computations produce repeatable results that can be reasoned about and tested in isolation."
+threat = "Hidden state and side effects make the same input produce environment-dependent results."
+expectation = "Concurrency, filesystem state, environment variables, and subprocess behavior will vary between local, CI, and user machines."
+strategy = "Implement business logic as pure functions with immutable data and push state changes to the imperative shell."
+evidence = [{ type = "test", description = "Core functions return equal results for equal inputs and core-module tests run without clocks, processes, files, network, or environment mutation.", required = true }]
+tradeoff = "Pure boundaries require explicit data passing and may create intermediate values that an in-place imperative implementation would avoid."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Requires a pure functional core where the same inputs always produce the same outputs and side effects remain at boundaries.", confidence = 1.0 }]

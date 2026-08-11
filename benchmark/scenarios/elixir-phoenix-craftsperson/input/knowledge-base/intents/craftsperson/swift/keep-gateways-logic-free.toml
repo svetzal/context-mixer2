@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-gateways-logic-free"
+title = "Keep gateway adapters free of business logic"
+category = "architecture"
+tags = ["swift", "testing", "gateways", "business-logic", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-gateways-logic-free" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Domain decisions receive direct, deterministic tests instead of being trapped in I/O adapters."
+threat = "Custom logic inside gateways becomes expensive to exercise and blurs the boundary between policy and integration."
+expectation = "Adapters will accumulate transformations and decisions as integrations evolve unless logic is deliberately moved inward."
+strategy = "Keep gateway structs as thin library wrappers and move any custom decision logic into the functional core."
+evidence = [{ type = "architecture_review", description = "Gateway methods translate and delegate only; any branch encoding a business rule exists in a core type with direct behavior tests.", required = true }]
+tradeoff = "Moving transformations into the core can expose integration-shaped values or require additional mapping types and calls."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#testing-philosophy", summary = "Says gateway structs should not be tested unless they have custom logic and favors moving such logic into the core.", confidence = 1.0 }]

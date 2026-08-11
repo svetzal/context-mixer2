@@ -1,0 +1,14 @@
+id = "guidelines.intent.load-task-specific-guidance-on-demand"
+title = "Load task-specific guidance on demand"
+category = "delivery"
+tags = ["skills", "progressive-disclosure", "context-budget"]
+status = "hypothesized"
+confidence = 0.97
+capability = "Agents receive detailed procedures and domain knowledge when a task needs them without imposing that context on unrelated work."
+threat = "Specialized workflows accumulate in always-loaded repository guidance, consuming context and exerting influence even when they do not apply."
+expectation = "Most detailed procedures, tool instructions, and supporting references are relevant to only a subset of repository tasks."
+strategy = "Put reusable task-triggered procedures in skills, keep tool contracts with their tool descriptions, place supporting detail in skill references, and let AGENTS.md contain only durable repository-wide rules plus concise routing cues."
+evidence = [{ type = "guidance_review", description = "Specialized guidance has an explicit activation path and is absent from automatically loaded context when its triggering task is not in scope.", required = true }]
+tradeoff = "Activation can fail when skills, tools, and routing cues are poorly named or their triggers are ambiguous."
+scope = { project = "*", paths = ["AGENTS.md", "**/AGENTS.md", "skills/**/SKILL.md", "skills/**/references/**"] }
+sources = [{ type = "field_observation", ref = "Stacey Vetzal, 2026-07-24", summary = "Skills and tool details can provide strongly loaded task context without making specialized guidance universal.", confidence = 1.0 }, { type = "commit", ref = "https://github.com/svetzal/foundry/commit/c69f333e18081a1107d7092f9c35eb588e8cac28", summary = "A Foundry capability was documented for distinct audiences across the user book, an activation-gated skill, and concise repository guidance.", confidence = 0.9 }]

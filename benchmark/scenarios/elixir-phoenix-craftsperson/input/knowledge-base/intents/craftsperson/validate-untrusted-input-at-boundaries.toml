@@ -1,0 +1,363 @@
+id = "guidelines.intent.validate-untrusted-input-at-boundaries"
+title = "Validate untrusted input at boundaries"
+category = "architecture"
+tags = ["validation", "trust-boundaries", "security"]
+status = "hypothesized"
+confidence = 0.97
+capability = "Core code operates on values whose shape and invariants are already known."
+threat = "External, decoded, persisted, or user-supplied data is trusted and propagates malformed or hostile state inward."
+expectation = "Every external producer can change independently and may send incomplete, invalid, or adversarial values."
+strategy = "Parse and validate untrusted data once at the boundary, reject invalid input explicitly, and pass narrowed domain values inward."
+evidence = [{ type = "boundary_test", description = "Malformed and adversarial inputs are rejected before they reach core operations, while valid inputs become constrained domain values.", required = true }]
+tradeoff = "Boundary schemas and validation mappings duplicate some type information and must evolve with external contracts."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md", "plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#type-system-patterns", summary = "Narrows unknown values and validates untrusted boundaries.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#cli-argument-parsing", summary = "Parses CLI input into validated internal values.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#architectural-principles", summary = "Separates external data contracts from validated domain behavior.", confidence = 0.9 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(def transfer-params
+  [:map
+   [:to-account [:re #"\d{8}"]]
+   [:amount [:and pos-int? [:< 1000000]]]])
+
+(defn handler [req]
+  (let [params (decode-body req)]
+    (if (mc/validate transfer-params params)
+      ; only narrowed, known-shape values travel inward
+      {:status 200 :body (transfer! params)}
+      {:status 400
+       :body (mc/explain transfer-params params)})))
+'''
+bad = '''
+(defn handler [req]
+  ; raw decoded JSON flows straight into the core
+  (let [params (json/read-str (slurp (:body req))
+                              :key-fn keyword)]
+    {:status 200 :body (transfer! params)}))
+
+;; now reachable:
+;; (transfer! {:amount "-9999" :to-account "'; drop table--"})
+; core code must defend against shapes it was never meant
+; to see — or, worse, doesn't
+'''
+
+[examples.cpp]
+good = '''
+// Boundary: parse once, reject explicitly, narrow the type.
+std::expected<TransferOrder, ValidationError>
+parseTransfer(const QJsonObject& body) {
+  auto amount = Money::parse(body["amount"].toString());
+  auto to = AccountId::parse(body["to"].toString());
+  if (!amount || amount->isNegative())
+    return std::unexpected(ValidationError::BadAmount);
+  if (!to)
+    return std::unexpected(ValidationError::BadAccount);
+  return TransferOrder{*to, *amount};
+}
+// the core only ever receives TransferOrder — known-valid
+'''
+bad = '''
+void handleTransfer(const QJsonObject& body) {
+  // raw request strings flow straight into the core:
+  ledger.transfer(body["to"].toString(),
+                  body["amount"].toString().toDouble());
+}
+// Deep inside Ledger::transfer, months later: negative
+// amounts, "", and "1e308" have all arrived here. Each
+// callee now re-checks (differently) or trusts blindly.
+'''
+
+[examples.csharp]
+good = '''
+app.MapPost("/transfers", (TransferDto dto) =>
+{
+    // parse once at the edge; the core only ever
+    // sees constrained domain values
+    if (!Iban.TryParse(dto.To, out var iban))
+        return Results.ValidationProblem(Err("to"));
+    if (dto.Amount is <= 0 or > 50_000)
+        return Results.ValidationProblem(Err("amount"));
+    var transfer = new Transfer(iban,
+        Money.Cad(dto.Amount));
+    return Results.Ok(bank.Execute(transfer));
+});
+'''
+bad = '''
+app.MapPost("/transfers", (TransferDto dto) =>
+    Results.Ok(bank.Execute(dto))); // raw dto inward
+
+public Receipt Execute(TransferDto dto)
+{
+    // hostile client strings reach SQL untouched
+    var sql = "insert into txns values ('" +
+        dto.To + "', " + dto.Amount + ")";
+    _db.Run(sql);
+    return new Receipt(dto.To, dto.Amount);
+}
+'''
+
+[examples.elixir]
+good = '''
+def create(conn, params) do
+  # parsed and narrowed ONCE at the boundary; the core
+  # receives domain values, never raw external maps
+  case OrderInput.parse(params["order"]) do
+    {:ok, %OrderInput{sku: sku, qty: qty}} ->
+      json(conn, Orders.place(sku, qty))
+
+    {:error, changeset} ->
+      conn
+      |> put_status(422)
+      |> json(errors_on(changeset))
+  end
+end
+'''
+bad = '''
+def create(conn, params) do
+  # the raw external map flows straight inward
+  order = Orders.place(params["order"])
+  json(conn, order)
+end
+
+# deep in the core, on hostile data:
+def place(attrs) do
+  %Order{qty: String.to_integer(attrs["qty"])}
+  # crashes on "abc"; negative qty sails through
+end
+'''
+
+[examples.go]
+good = '''
+// parse once at the edge; the core only ever sees Transfer
+func parseTransfer(r *http.Request) (Transfer, error) {
+	var raw struct{ Amount, To string }
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		return Transfer{}, fmt.Errorf("decode transfer: %w", err)
+	}
+	amt, err := ParseMoney(raw.Amount) // rejects negatives, junk
+	if err != nil {
+		return Transfer{}, fmt.Errorf("amount: %w", err)
+	}
+	to, err := ParseAccountID(raw.To)
+	if err != nil {
+		return Transfer{}, fmt.Errorf("to: %w", err)
+	}
+	return Transfer{Amount: amt, To: to}, nil
+}
+'''
+bad = '''
+func handleTransfer(w http.ResponseWriter, r *http.Request) {
+	var body map[string]any
+	json.NewDecoder(r.Body).Decode(&body) // error ignored
+
+	// raw wire values trusted straight into the core:
+	// negative amounts, "", and missing keys all flow inward
+	amt := body["amount"].(float64)
+	svc.Transfer(r.Context(), body["to"].(string),
+		int64(amt*100))
+}
+'''
+
+[examples.java]
+good = '''
+// parsed once at the edge into a constrained domain value
+record TransferRequest(AccountId from, AccountId to,
+                       Money amount) {
+    static TransferRequest parse(JsonNode body) {
+        var amount = Money.parse(
+            body.path("amount").asText());
+        if (amount.isNegativeOrZero()) {
+            throw new BadRequest("amount must be positive");
+        }
+        return new TransferRequest(
+            AccountId.parse(body.path("from").asText()),
+            AccountId.parse(body.path("to").asText()),
+            amount);
+    }
+}
+// core methods accept TransferRequest, never raw JSON
+'''
+bad = '''
+void handleTransfer(HttpServletRequest req) {
+    // raw request values flow straight into the core
+    var from = req.getParameter("from");
+    var amount = req.getParameter("amount");
+
+    ledger.move(from, req.getParameter("to"),
+        new BigDecimal(amount)); // "-500", "1e999", null...
+
+    audit.log("transfer " + from);  // log injection, too
+}
+'''
+
+[examples.kotlin]
+good = '''
+fun parseTransfer(raw: JsonObject): TransferRequest {
+    val cents = raw["amount"]?.jsonPrimitive?.longOrNull
+        ?: throw BadRequest("amount must be an integer")
+    if (cents <= 0) throw BadRequest("amount must be positive")
+    val to = AccountId.parse(raw["to"]?.jsonPrimitive?.content)
+        ?: throw BadRequest("invalid destination account")
+    // inward from here, only narrowed domain values travel
+    return TransferRequest(Money(cents), to)
+}
+'''
+bad = '''
+suspend fun transfer(call: ApplicationCall) {
+    val body = call.receive<Map<String, String>>()
+    // raw external strings flow straight into the core
+    ledger.transfer(
+        amountCents = body["amount"]!!.toLong(), // "-500" ok
+        toAccount = body["to"]!!, // any string whatsoever
+    )
+}
+'''
+
+[examples.python]
+good = '''
+class TransferRequest(BaseModel):
+    account: Annotated[
+        str, StringConstraints(pattern=r"^\d{7}$")]
+    amount: Annotated[Decimal, Field(gt=0, le=25_000)]
+
+@app.post("/transfers")
+def transfer(req: TransferRequest) -> Receipt:
+    # parsed once at the edge; the core receives narrowed,
+    # already-valid domain values
+    return execute_transfer(Account(req.account), req.amount)
+'''
+bad = '''
+@app.post("/transfers")
+def transfer(request: Request) -> dict:
+    data = request.json()      # external payload trusted
+    # negative amounts, missing keys, and "1e309" all flow
+    # inward for the core to trip over later
+    return execute_transfer(
+        data["account"], Decimal(data["amount"]))
+'''
+
+[examples.ruby]
+good = '''
+Quantity = Data.define(:value) do
+  def self.parse(raw:)
+    n = Integer(raw, exception: false)
+    unless n&.between?(1, 99)
+      raise InvalidInput, "qty must be 1-99"
+    end
+    new(value: n)
+  end
+end
+
+# boundary: parse once, pass the narrowed value inward
+def create
+  qty = Quantity.parse(raw: params[:qty])
+  Cart.add(sku: params[:sku], qty: qty)
+end
+'''
+bad = '''
+def create
+  # raw request params flow straight into core operations
+  Cart.add(sku: params[:sku], qty: params[:qty])
+end
+
+class Cart
+  def self.add(sku:, qty:)
+    line(sku).qty += qty # "3" + "3" => "33"; "-1" mints stock
+  end
+end
+'''
+
+[examples.rust]
+good = '''
+pub fn handle(raw: &str) -> Result<Response, ApiError> {
+    let req: TransferRequest = serde_json::from_str(raw)
+        .map_err(|_| ApiError::Malformed)?;
+    let amt = Cents::parse(&req.amount)
+        .map_err(|_| ApiError::InvalidAmount)?;
+    let acct = AccountId::parse(&req.account_id)
+        .map_err(|_| ApiError::UnknownAccount)?;
+    // the core receives only narrowed domain values
+    core::transfer(acct, amt)
+}
+'''
+bad = '''
+pub fn handle(raw: &str) -> Result<Response, ApiError> {
+    let v: serde_json::Value = serde_json::from_str(raw)?;
+    // raw, unvalidated strings flow inward
+    core::transfer(
+        v["account_id"].as_str().unwrap_or(""),
+        v["amount"].as_str().unwrap_or("0"),
+    )
+}
+// deep in the core, hostile input finally explodes
+pub fn transfer(acct: &str, amt: &str) -> Result<Response, E> {
+    let amt: u64 = amt.parse().unwrap(); // panics on "1e9;--"
+    debit(acct, Cents(amt))
+}
+'''
+
+[examples.swift]
+good = '''
+struct Email {
+    let value: String
+    init?(_ raw: String) {
+        guard raw.contains("@"), raw.count <= 254 else {
+            return nil
+        }
+        value = raw.lowercased()
+    }
+}
+
+func handleSignup(_ body: Data) throws {
+    let raw = try JSONDecoder().decode(RawSignup.self,
+                                       from: body)
+    guard let email = Email(raw.email) else {
+        throw HTTPError.badRequest("invalid email")
+    }
+    userService.create(email: email)  // narrowed value inward
+}
+'''
+bad = '''
+func handleSignup(_ json: [String: Any]) {
+    // decoded payload trusted as-is
+    let email = json["email"] as? String ?? ""
+    let plan = json["plan"] as? String ?? "free"
+    userService.create(email: email, plan: plan)
+    // "" and hostile strings flow into the core and the
+    // database; every downstream caller re-checks — or not
+}
+'''
+
+[examples.typescript]
+good = '''
+const OrderRequest = z.object({
+  sku: z.string().regex(/^[A-Z]{3}-\d{4}$/),
+  qty: z.number().int().positive().max(100),
+});
+type OrderRequest = z.infer<typeof OrderRequest>;
+
+app.post("/orders", (req, res) => {
+  const parsed = OrderRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ issues: parsed.error.issues });
+  }
+  placeOrder(parsed.data); // core sees only narrowed values
+  return res.sendStatus(201);
+});
+'''
+bad = '''
+app.post("/orders", (req, res) => {
+  // req.body is any; hostile shapes flow straight inward.
+  const { sku, qty } = req.body;
+  placeOrder(sku, qty);
+  res.sendStatus(201);
+});
+
+// Deep in the core, far from the boundary:
+function placeOrder(sku: string, qty: number): void {
+  db.run(`UPDATE stock SET n = n - ${qty}
+          WHERE sku = '${sku}'`); // injection included
+}
+'''

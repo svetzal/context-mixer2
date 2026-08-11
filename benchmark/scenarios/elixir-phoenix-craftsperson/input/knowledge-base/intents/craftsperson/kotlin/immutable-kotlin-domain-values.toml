@@ -1,0 +1,17 @@
+id = "guidelines.intent.immutable-kotlin-domain-values"
+title = "Make mutation exceptional in Kotlin domain code"
+category = "design"
+tags = ["kotlin", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to reason about domain state without tracing hidden in-place changes."
+threat = "Mutable references and entities allow distant code to alter shared state unexpectedly."
+expectation = "Domain models will be passed across more features, threads, and architectural boundaries."
+strategy = "Prefer val properties, data-class value objects, and transformations that return new instances."
+evidence = [{ type = "review", description = "Domain-model review finds val-based immutable state and explicit copy or transformation operations wherever state changes.", required = true }]
+tradeoff = "Copying values can allocate more objects and requires explicit modeling of every state transition."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#kotlin-idioms", summary = "The source prefers val, data classes for value objects, and new instances over mutation.", confidence = 1.0 }]

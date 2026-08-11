@@ -1,0 +1,17 @@
+id = "guidelines.intent.track-dependency-staleness"
+title = "Track dependency staleness"
+category = "dependencies"
+tags = ["python", "uv", "security", "testing", "dependencies", "build-and-delivery"]
+relations = [
+  { type = "specializes", target = "craftsperson/minimize-dependency-surface" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Maintainers retain visibility into packages that are falling behind supported releases."
+threat = "Long-unnoticed dependency drift makes later security or compatibility upgrades larger and riskier."
+expectation = "Upstream packages will continue releasing fixes and dropping support for older versions."
+strategy = "Inspect outdated packages as part of security maintenance and distinguish awareness from automatic upgrading."
+evidence = [{ type = "maintenance_gate", description = "uv pip list --outdated has been reviewed and materially stale direct dependencies have an explicit disposition.", required = true }]
+tradeoff = "Staleness reports create recurring review work and can encourage unnecessary upgrades without user value."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Requires checking outdated dependencies during the security audit.", confidence = 1.0 }]

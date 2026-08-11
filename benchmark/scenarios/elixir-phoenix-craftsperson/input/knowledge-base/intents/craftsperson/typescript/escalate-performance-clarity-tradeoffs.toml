@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-performance-clarity-tradeoffs"
+title = "Escalate performance changes that compromise clarity"
+category = "performance"
+tags = ["typescript", "performance", "profiling", "evidence", "optimization"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-from-measurement" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to make an accountable choice between maintainability and measured performance needs"
+threat = "Unilateral optimization obscures intent or, conversely, a readability rule ignores a critical performance constraint"
+expectation = "Some workloads will create performance pressure that conflicts with the preferred simple design"
+strategy = "Present measured need and clarity cost to the user before adopting the compromise"
+evidence = [{ type = "decision-record", description = "A benchmark or profile, the proposed complexity, alternatives, and the user-approved tradeoff are recorded", required = true }]
+tradeoff = "Measurement and consultation delay optimization and may leave a temporary performance limitation"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#escalation-strategy", summary = "Performance needs that might compromise clarity explicitly require user guidance.", confidence = 1.0 }]

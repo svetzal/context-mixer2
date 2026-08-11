@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-records-for-immutable-data"
+title = "Use records for immutable data carriers"
+category = "design"
+tags = ["java", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Data-only domain values remain immutable, concise, and explicit about their contents."
+threat = "Mutable JavaBean conventions add hidden state transitions and boilerplate that obscure value semantics."
+expectation = "More data carriers will be added and maintained by readers who must quickly distinguish values from stateful objects."
+strategy = "Prefer Java records when a type exists to carry immutable data and does not require object identity or mutable lifecycle."
+evidence = [{ type = "static_check", description = "Data-carrier types that do not require mutability are records, and exceptions document the lifecycle or compatibility need.", required = true }]
+tradeoff = "Records constrain inheritance, mutability, and some framework integration patterns."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#modern-java-mastery", summary = "Prefers records for immutable data carriers and rejects JavaBeans where records suffice.", confidence = 1.0 }]

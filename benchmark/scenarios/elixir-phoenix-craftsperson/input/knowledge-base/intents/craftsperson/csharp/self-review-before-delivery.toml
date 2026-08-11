@@ -1,0 +1,17 @@
+id = "guidelines.intent.self-review-before-delivery"
+title = "Self-review changes before delivery"
+category = "quality"
+tags = ["csharp", "security", "testing", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Obvious defects, confusing design, and incomplete supporting changes are caught before another person spends review effort."
+threat = "Authors normalize their own assumptions and overlook problems that become visible only from a review perspective."
+expectation = "Fast incremental delivery will otherwise shift avoidable discovery work onto reviewers and users."
+strategy = "After automated checks, inspect the completed change as an independent code reviewer would before presenting it."
+evidence = [{ type = "self_review_checklist", description = "The author records a final review of the diff for correctness, readability, tests, documentation, and unintended changes before handoff.", required = true }]
+tradeoff = "A second pass adds latency and still lacks the independence of review by another person."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#self-verification-steps", summary = "Requires reviewing one's own code as if reviewing someone else's before presenting work.", confidence = 1.0 }]

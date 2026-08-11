@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-hook-dom-ownership-explicit"
+title = "Make hook DOM ownership explicit"
+category = "reliability"
+tags = ["elixir", "phoenix", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "JavaScript-managed DOM remains stable when LiveView patches surrounding content."
+threat = "Server patches overwrite hook mutations or remount the wrong node."
+expectation = "Hooks will integrate third-party widgets and locally managed DOM state."
+strategy = "Give every hook a unique ID and mark self-managed DOM with phx-update=ignore."
+evidence = [{ type = "browser_test", description = "A server patch leaves hook-owned DOM intact and the hook remains attached to the uniquely identified element.", required = true }]
+tradeoff = "Ignored subtrees do not receive normal server-rendered updates and require explicit synchronization."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#hook-requirements", summary = "Requires unique IDs for hooks and phx-update ignore where JavaScript manages the DOM.", confidence = 1.0 }]

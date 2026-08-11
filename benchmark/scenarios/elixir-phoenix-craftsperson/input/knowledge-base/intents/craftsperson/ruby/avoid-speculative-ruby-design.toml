@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-speculative-ruby-design"
+title = "Build only for demonstrated Ruby requirements"
+category = "design"
+tags = ["ruby", "testing", "build-and-delivery", "yagni", "scope-control", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to keep the design proportional to behavior the product actually needs"
+threat = "Speculative flexibility adds unused abstractions, branches, and maintenance obligations"
+expectation = "Possible future requirements will be easier to imagine than to predict accurately"
+strategy = "Apply YAGNI and defer speculative work until a concrete requirement appears"
+evidence = [{ type = "review", description = "Every new abstraction, option, and extension point maps to a current tested requirement", required = true }]
+tradeoff = "A later requirement may require reworking a deliberately simpler design"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "Small safe increments explicitly include avoiding speculative work through YAGNI.", confidence = 1.0 }]

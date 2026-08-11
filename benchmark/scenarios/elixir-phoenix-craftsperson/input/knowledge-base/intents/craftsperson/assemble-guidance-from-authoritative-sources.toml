@@ -1,0 +1,14 @@
+id = "guidelines.intent.assemble-guidance-from-authoritative-sources"
+title = "Assemble guidance from authoritative sources"
+category = "delivery"
+tags = ["context-assembly", "single-source-of-truth", "references"]
+status = "hypothesized"
+confidence = 0.98
+capability = "Agents can assemble the context a task needs while every decision remains owned by one maintainable source."
+threat = "Copying the same rule or product description into AGENTS.md, skills, tool help, and product documentation creates competing authorities that drift independently."
+expectation = "One task may require context from repository policy, a reusable procedure, tool contracts, and current product documentation at the same time."
+strategy = "Give each kind of knowledge one authoritative home, assemble task context through explicit pointers and selective loading, and generate repeated views when duplication is unavoidable. A stronger context source should route to another authority rather than restate it."
+evidence = [{ type = "guidance_trace", description = "For each material decision in assembled context, reviewers can identify one authoritative source and all other appearances are pointers or generated projections.", required = true }]
+tradeoff = "Reference-based assembly introduces navigation and requires source links to remain accurate and discoverable."
+scope = { project = "*", paths = ["AGENTS.md", "**/AGENTS.md", "skills/**/SKILL.md", "skills/**/references/**", "docs/**", "book/**"] }
+sources = [{ type = "field_observation", ref = "Stacey Vetzal, 2026-07-24", summary = "Agent context is assembled from force-loaded guidance, activated skills, tool descriptions, and loosely referenced supporting material.", confidence = 1.0 }, { type = "commit", ref = "https://github.com/svetzal/parite-cli/commit/48ab1cbddbd6a576352623a75a5ecc9300e8f30d", summary = "Replaced duplicated product description in AGENTS.md with concise routing pointers to authoritative mdBook material.", confidence = 1.0 }]

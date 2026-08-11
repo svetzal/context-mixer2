@@ -1,0 +1,17 @@
+id = "guidelines.intent.declare-gradle-dependency-visibility"
+title = "Declare Gradle dependency visibility precisely"
+category = "delivery"
+tags = ["java", "gradle", "testing", "dependencies", "builds", "configuration"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Each Gradle module exposes only the dependencies that form part of its consumer-facing contract."
+threat = "Overuse of api leaks implementation libraries while incorrect implementation scope breaks downstream compilation."
+expectation = "Modules will be reused and their internal dependency choices will change independently."
+strategy = "Choose api, implementation, and testImplementation according to actual consumer visibility and test-only use."
+evidence = [{ type = "compile_gate", description = "Consumer fixture builds compile with declared API dependencies and cannot access implementation-only or test-only libraries.", required = true }]
+tradeoff = "Precise scoping requires understanding module boundaries and can expose previously hidden coupling during migration."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#build-and-dependency-management", summary = "Requires precise use of implementation, api, and testImplementation.", confidence = 1.0 }]

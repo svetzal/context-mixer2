@@ -1,0 +1,17 @@
+id = "guidelines.intent.explain-why-in-comments"
+title = "Use comments to preserve rationale"
+category = "design"
+tags = ["go", "documentation", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Future maintainers can recover non-obvious reasons and constraints that are absent from the code itself."
+threat = "Comments that narrate syntax duplicate code while the actual decision context is lost."
+expectation = "Original authors and surrounding historical context will not always be available."
+strategy = "Make code explain what it does and reserve comments for why a non-obvious choice exists."
+evidence = [{ type = "review", description = "Comments state constraints, rationale, or rejected alternatives and do not merely paraphrase adjacent statements.", required = true }]
+tradeoff = "Rationale comments require upkeep and can become incorrect when the decision changes."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#code-is-communication", summary = "Says comments should explain why rather than what because code should explain what.", confidence = 1.0 }]

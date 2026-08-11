@@ -1,0 +1,17 @@
+id = "guidelines.intent.access-struct-fields-explicitly"
+title = "Access struct fields explicitly"
+category = "design"
+tags = ["elixir", "testing", "persistence", "error-handling", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Field access respects the declared semantics of structs and changesets."
+threat = "Map-style Access syntax is applied to structs that do not implement Access, causing runtime failures or bypassing changeset semantics."
+expectation = "Structured domain values and Ecto changesets will cross generic data-processing code."
+strategy = "Use direct dot access for structs and Ecto.Changeset.get_field/2 for changesets instead of struct[:field]."
+evidence = [{ type = "static_check", description = "Application code contains no Access-style field reads on structs and changeset reads use the changeset API.", required = true }]
+tradeoff = "Generic access helpers require type-specific branches instead of one uniform bracket syntax."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#core-language-patterns", summary = "Forbids map access syntax on structs and directs changeset reads through Ecto.Changeset.get_field/2.", confidence = 1.0 }]

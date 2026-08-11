@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-embedded-text-readable"
+title = "Keep embedded multi-line text readable"
+category = "quality"
+tags = ["java", "formatting", "error-handling", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "Embedded SQL, JSON, and other multi-line payloads remain legible and structurally comparable to their native form."
+threat = "Escaped string concatenation obscures formatting and makes structured text error-prone to edit."
+expectation = "Java code will continue to embed templates and structured payloads that change with external contracts."
+strategy = "Use Java text blocks for multi-line strings when they preserve the source format more clearly."
+evidence = [{ type = "review", description = "Multi-line embedded content is represented without concatenation noise and has a parsing or snapshot test where correctness matters.", required = true }]
+tradeoff = "Text-block indentation and incidental whitespace semantics can produce subtle output changes."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#modern-java-mastery", summary = "Recommends text blocks for readable multi-line SQL and JSON templates.", confidence = 1.0 }]

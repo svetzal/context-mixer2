@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-multi-step-writes-atomic"
+title = "Make multi-step writes atomic"
+category = "reliability"
+tags = ["elixir", "phoenix", "persistence", "error-handling", "data-integrity", "transactions"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A business operation either commits all required persistence changes or leaves none behind."
+threat = "A failure between writes creates partial orders, payments, or related records that violate business invariants."
+expectation = "Multi-step operations will encounter validation failures, database errors, and concurrent activity."
+strategy = "Wrap inseparable persistence steps in Repo.transaction/1 and roll back on any tagged failure."
+evidence = [{ type = "integration_test", description = "Injecting failure at each transaction step leaves the database in its pre-operation state.", required = true }]
+tradeoff = "Transactions hold database resources longer and cannot atomically include irreversible external side effects."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#transactions", summary = "Requires Repo.transaction for operations whose steps must succeed or fail together.", confidence = 1.0 }]

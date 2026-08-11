@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-documentation-examples-current"
+title = "Keep documentation examples executable against current behavior"
+category = "documentation"
+tags = ["typescript", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for users to learn and integrate through examples that actually work"
+threat = "Implementation changes leave copied examples invoking obsolete APIs or semantics"
+expectation = "Public interfaces and recommended usage will evolve"
+strategy = "Review and update documentation examples with every relevant implementation change"
+evidence = [{ type = "test", description = "Documentation example snippets compile or execute successfully against the current implementation", required = true }]
+tradeoff = "Executable examples require test harnesses and add compatibility obligations to documentation"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "Documentation sync requires reviewing docs and ensuring examples match the current implementation.", confidence = 1.0 }]

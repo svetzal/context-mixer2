@@ -1,0 +1,17 @@
+id = "guidelines.intent.return-owned-values-not-local-references"
+title = "Return owned values, not local references"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Returned data outlives the callee stack."
+threat = "References to locals dangle immediately."
+expectation = "More temporaries will cross layers."
+strategy = "Return local results by value."
+evidence = [{ type = "gate", description = "Analyzers find no returned addresses or references to locals.", required = true }]
+tradeoff = "Legacy types may copy without optimization."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#common-mistakes-to-avoid", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

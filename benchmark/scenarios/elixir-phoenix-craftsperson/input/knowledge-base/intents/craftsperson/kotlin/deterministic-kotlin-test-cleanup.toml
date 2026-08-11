@@ -1,0 +1,17 @@
+id = "guidelines.intent.deterministic-kotlin-test-cleanup"
+title = "Release test resources on every path"
+category = "reliability"
+tags = ["kotlin", "testing", "build-and-delivery", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to run tests repeatedly and independently without leaked state or resources."
+threat = "Failed tests can bypass cleanup and contaminate later cases or exhaust constrained resources."
+expectation = "Suites will use more files, servers, coroutines, and mutable fixtures as integration coverage grows."
+strategy = "Use lifecycle hooks or try-finally to clean up resources even when execution fails."
+evidence = [{ type = "test", description = "Repeated and randomized-order suite runs leave no open resources or shared-state residue, including when the test body throws.", required = true }]
+tradeoff = "Cleanup scaffolding adds boilerplate and can obscure the primary behavior under test."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#test-structure", summary = "The source requires @AfterEach or try-finally cleanup when needed.", confidence = 1.0 }]

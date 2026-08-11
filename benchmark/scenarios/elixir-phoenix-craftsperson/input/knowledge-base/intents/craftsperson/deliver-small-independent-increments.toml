@@ -1,0 +1,280 @@
+id = "guidelines.intent.deliver-small-independent-increments"
+title = "Deliver small independent increments"
+category = "delivery"
+tags = ["incremental-delivery", "change-scope", "reversibility"]
+relations = [
+  { type = "related-to", target = "craftsperson/avoid-speculative-capability" },
+  { type = "related-to", target = "craftsperson/preserve-behavior-during-refactoring" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Each change can be understood, validated, integrated, and reversed without carrying unrelated risk."
+threat = "Large multi-purpose changes entangle failures, hide intent, and make review or rollback ambiguous."
+expectation = "Projects will evolve through repeated uncertain requests rather than one perfectly known final design."
+strategy = "Deliver one coherent reason to change at a time, keep the smallest working increment green, and separate unrelated cleanup."
+evidence = [{ type = "change_review", description = "Each change set has one clear purpose, passes its gates independently, and contains no unrelated edits.", required = true }]
+tradeoff = "Incremental delivery creates more integration points and may defer efficiencies available from a broader redesign."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/elixir-ecosystem/agents/elixir-craftsperson.md", "plugins/ruby-ecosystem/agents/ruby-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "Delivers small independently valid increments.", confidence = 1.0 }, { type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Requires small single-reason increments that can ship independently.", confidence = 1.0 }, { type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#development-workflow", summary = "Delivers single-reason increments and keeps them green.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+commit 1/3: Extract shipping-rate lookup into rates ns
+  (pure move, all tests green, deployable alone)
+
+commit 2/3: Add :express shipping option to checkout
+  (one new behavior + its tests, gates pass independently)
+
+commit 3/3: Remove dead :courier code path
+  (unrelated cleanup kept separate so it reverts alone)
+'''
+bad = '''
+commit: "checkout updates"
+  - adds :express shipping
+  - reformats 41 files with new cljfmt config
+  - renames db columns (migration included, untested)
+  - half-finished loyalty-points feature, no flag
+
+; reverting the migration also reverts the feature and the
+; formatting; review cannot isolate any single intent
+'''
+
+[examples.cpp]
+good = '''
+commit 4f2a91c
+  fix: reject expired coupons at checkout
+
+  One behavior change, shipped with its test; gates green
+  on this commit alone. The CouponScanner rename is split
+  into the next commit.
+
+commit 88d03be
+  refactor: rename CouponScanner to CouponReader
+
+  Mechanical rename only; no behavior change.
+'''
+bad = '''
+commit b91c2ea
+  checkout fixes + cleanup
+
+  - reject expired coupons
+  - upgrade Qt 6.5 -> 6.7
+  - reformat entire src/ tree
+  - half of the new loyalty feature (rest coming later)
+
+  38 files changed, 4112 insertions(+), 3977 deletions(-)
+  # revert the Qt upgrade and you revert the coupon fix too
+'''
+
+[examples.csharp]
+good = '''
+$ git log --oneline main..HEAD
+9f3c2aa feat: reject expired coupons at checkout
+7b81d04 test: characterize coupon expiry edge cases
+
+$ git show --stat 9f3c2aa | tail -1
+ 3 files changed, 41 insertions(+), 2 deletions(-)
+# each commit has one purpose and passes the gate alone
+'''
+bad = '''
+$ git log --oneline main..HEAD
+4e77a19 checkout fixes + rename services + swap the
+        logging lib + WIP loyalty points (don't deploy)
+
+$ git show --stat 4e77a19 | tail -1
+ 87 files changed, 4312 insertions(+), 977 deletions(-)
+# revert the coupon bug and you revert the logger too
+'''
+
+[examples.elixir]
+good = '''
+git log --oneline (one purpose per change, each green):
+
+  c3d9a1e Round cart totals to two decimal places
+  b72f480 Reject checkout when the cart is empty
+  a19c5db Extract Money helper (no behavior change)
+
+Any one of these can be reviewed, shipped, or reverted
+without dragging the others along.
+'''
+bad = '''
+commit 8f03b2c "checkout fixes + refactor + deps"
+
+  - rounds totals AND rewrites Cart internals
+  - bumps ecto 3.10 -> 3.12 in the same diff
+  - drive-by renames across 14 unrelated files
+
+Reverting the bad rounding now also reverts the dep
+bump; review cannot tell which hunks serve which goal.
+'''
+
+[examples.go]
+good = '''
+$ git log --oneline
+8c1d4e2 Limit login attempts to 5 per minute per account
+b7a90f1 Extract Clock interface so lockout tests control time
+3f6e8d0 Fix off-by-one in session-list pagination cursor
+
+# each commit has one purpose, passed the full gate on its
+# own, and reverts cleanly without dragging neighbors along
+'''
+bad = '''
+$ git log --oneline
+9d2f7aa Login throttling + pagination fix + gofmt sweep of
+        internal/ + rename UserSvc→UserService + WIP retries
+
+$ git revert 9d2f7aa   # need to back out just the throttling
+# ...but that also reverts the pagination fix customers rely
+# on, and restores the pre-rename compile breakage
+'''
+
+[examples.java]
+good = '''
+$ git log --oneline main..HEAD
+a1f3c2d Add VAT field to invoice totals
+
+# one purpose; full suite green at this commit; nothing
+# unrelated rides along
+
+Queued separately, each independently revertible:
+  - rename InvoiceCalc -> InvoiceTotals   (pure cleanup)
+  - bump jackson 2.17 -> 2.18             (dependency)
+'''
+bad = '''
+$ git log --oneline main..HEAD
+9be411f Add VAT, redesign invoice module, rename 47 files,
+        upgrade jackson, fix unrelated date bug, add logging
+
+$ git show --stat 9be411f | tail -1
+ 312 files changed, 9840 insertions(+), 7210 deletions(-)
+
+# the date fix regressed — but reverting it now drags the
+# VAT feature and the jackson upgrade out with it
+'''
+
+[examples.kotlin]
+good = '''
+$ git log --oneline
+9f31c2a add unit price column to invoice line items
+4b8e7d1 fix rounding on multi-currency totals
+2c91a44 rename BillingPeriod fields for clarity (no behavior)
+
+# each commit has one purpose, passes the gate on its own,
+# and reverts cleanly without dragging anything else along
+'''
+bad = '''
+$ git log --oneline
+8d02f1e invoice rework + rounding fix + renames + dep bumps
+
+# one commit touching 47 files for three unrelated reasons;
+# reverting the bad rounding change also reverts the feature,
+# and review could not tell which hunks served which purpose
+'''
+
+[examples.python]
+good = '''
+$ git log --oneline
+a1f9d02 Add rate-limit header parsing to the API client
+c37be21 Retry idempotent requests on 429 using Retry-After
+e90c4d5 Document retry behavior in the client README
+
+# each commit has one purpose, passed the gate on its own,
+# and reverts cleanly without dragging anything else out
+'''
+bad = '''
+$ git show --stat 7d2c9aa
+    Retry on 429, upgrade httpx, reformat client module,
+    rename config keys, fix unrelated date bug
+
+ src/client.py     | 512 ++++++++++++------------
+ src/config.py     |  88 +++--
+ src/dates.py      |  12 +-
+# reverting the bad rename now takes the bugfix with it
+'''
+
+[examples.ruby]
+good = '''
+commit 1: Add Money#allocate for splitting invoice totals
+  (unit tested, no callers yet — ships dark)
+commit 2: Use Money#allocate in invoice line rounding
+commit 3: Remove now-dead InvoiceRounder float math
+
+Each commit passes the full suite on its own and reverts
+cleanly without disturbing the others.
+'''
+bad = '''
+commit: "Invoice rework + misc"
+  47 files changed, 2310 insertions(+), 1875 deletions(-)
+  - new rounding engine
+  - unrelated RuboCop autofixes across app/
+  - drive-by rename of User#name
+  - half of a feature flag for taxes
+
+Reverting the rounding bug takes the rename and flag with it.
+'''
+
+[examples.rust]
+good = '''
+$ git log --oneline -3
+9f2c1aa refactor: extract RateTable lookup (behavior kept)
+b81d044 feat: charge per-kg rate for US destinations
+c3a97e0 fix: reject zero-weight parcels at intake
+
+# each commit builds green on its own and reverts cleanly;
+# the rate change can roll back without losing the fix
+'''
+bad = '''
+$ git log --oneline -1
+4e19b02 US rates + intake fix + reformat + WIP retry logic
+
+$ git show --stat 4e19b02 | tail -1
+ 87 files changed, 4211 insertions(+), 1980 deletions(-)
+
+# rolling back the rate bug also reverts the intake fix,
+# and review cannot tell intent from accident
+'''
+
+[examples.swift]
+good = '''
+$ git log --oneline
+  a1f3c2d Add VAT rate lookup for DE invoices
+  9c04b7e Extract InvoiceTotals from checkout (no behavior
+          change)
+  4e77a10 Fix rounding of zero-line invoices
+
+Each commit has one purpose, builds green on its own, and
+can be reverted without dragging unrelated work with it.
+'''
+bad = '''
+$ git log --oneline
+  f00dcaf WIP: VAT lookup + checkout refactor + rounding
+          fix + rename files + drive-by lint cleanup
+
+1 commit, 63 files changed. Reverting the bad rounding fix
+also reverts the VAT feature, the refactor, and the rename.
+Review cannot tell which hunk serves which purpose.
+'''
+
+[examples.typescript]
+good = '''
+$ git log --oneline -3
+a1f2c3d fix: reject expired coupons at checkout
+9e8d7c6 test: characterize coupon expiry edge cases
+5b4a3f2 refactor: extract CouponClock seam (no behavior)
+
+Each commit has one purpose, builds green on its own,
+and reverts cleanly without dragging anything else out.
+'''
+bad = '''
+$ git log --oneline -1
+f00dcaf fix coupons + upgrade eslint + rename services +
+        new onboarding flow (WIP)
+
+$ git show --stat f00dcaf | tail -1
+ 87 files changed, 4102 insertions(+), 1987 deletions(-)
+
+# Reverting the coupon fix takes the onboarding flow with
+# it; review cannot tell which edits serve which purpose.
+'''

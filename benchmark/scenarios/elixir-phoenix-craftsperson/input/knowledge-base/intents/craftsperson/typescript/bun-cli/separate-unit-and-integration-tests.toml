@@ -1,0 +1,17 @@
+id = "guidelines.intent.separate-unit-and-integration-tests"
+title = "Keep unit and integration feedback separable"
+category = "quality"
+tags = ["typescript", "bun", "cli", "testing", "dependencies", "error-handling"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Developers can run fast deterministic checks independently from slower environment-dependent verification."
+threat = "An undifferentiated suite makes routine feedback slow and hides which failures arise from integration conditions."
+expectation = "External gateways and platform checks will expand as the CLI gains integrations."
+strategy = "Classify unit and integration tests through tags or naming conventions while retaining a complete combined gate."
+evidence = [{ type = "gate", description = "Documented commands select only unit tests, only integration tests, or the full suite, and CI reports the categories separately before enforcing the combined result.", required = true }]
+tradeoff = "Classification conventions require maintenance and can create false confidence if developers run only the fast subset."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#testing-patterns", summary = "Directs unit and integration tests to be separated using tags or file naming conventions.", confidence = 1.0 }]

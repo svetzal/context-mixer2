@@ -1,0 +1,17 @@
+id = "guidelines.intent.explain-technical-rationale-and-tradeoffs"
+title = "Explain technical rationale and tradeoffs"
+category = "delivery"
+tags = ["csharp", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Users and future maintainers can evaluate a technical choice and adapt it when its assumptions change."
+threat = "Unexplained prescriptions become cargo cults, while hidden downsides prevent informed decisions."
+expectation = "Constraints and priorities will evolve after a recommendation is made."
+strategy = "Explain why a choice was made, what alternatives were viable, and which costs or risks it accepts."
+evidence = [{ type = "decision_review", description = "A consequential technical choice records its protected outcome, rejected viable alternative, and material downside.", required = true }]
+tradeoff = "Rationale adds communication overhead and can overwhelm straightforward changes when applied indiscriminately."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#communication-style", summary = "Requires showing reasoning and highlighting tradeoffs when multiple valid approaches exist.", confidence = 1.0 }]

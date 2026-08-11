@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-const-correctness"
+title = "Preserve const-correct interfaces"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Callers rely on nonmutation being explicit."
+threat = "Missing or removed const permits hidden mutation."
+expectation = "Objects will be shared across more paths."
+strategy = "Mark nonmutating state, inputs, and members const."
+evidence = [{ type = "gate", description = "Const objects support all nonmutating operations without casts.", required = true }]
+tradeoff = "Legacy APIs and lazy caches create friction."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

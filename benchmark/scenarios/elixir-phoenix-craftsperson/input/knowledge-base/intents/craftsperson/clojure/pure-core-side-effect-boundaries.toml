@@ -1,0 +1,17 @@
+id = "guidelines.intent.pure-core-side-effect-boundaries"
+title = "Keep business logic pure behind explicit effect boundaries"
+category = "architecture"
+tags = ["clojure", "testing", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to understand and test business transformations independently of external state"
+threat = "Interleaved I/O, time, randomness, and computation make logic nondeterministic and difficult to compose"
+expectation = "Business rules and external integrations will evolve at different rates"
+strategy = "Implement a functional core of pure functions and push all side effects to clearly marked boundaries"
+evidence = [{ type = "test", description = "Core business functions are exercised with ordinary values and require no I/O, clock, random source, or external service", required = true }, { type = "review", description = "I/O, time, and randomness occur only in identifiable boundary namespaces or injected collaborators", required = true }]
+tradeoff = "Boundary orchestration and explicit effect inputs add parameters and structural ceremony"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#core-philosophy", summary = "Pure logic is to be separated from side effects and I/O pushed to boundaries.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#extract-pure-logic", summary = "The improvement example injects time so the transformation becomes independently pure.", confidence = 1.0 }]

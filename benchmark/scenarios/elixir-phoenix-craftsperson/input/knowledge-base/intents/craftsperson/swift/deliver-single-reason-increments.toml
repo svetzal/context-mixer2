@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliver-single-reason-increments"
+title = "Deliver single-reason increments"
+category = "delivery"
+tags = ["swift", "concurrency", "testing", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Each change can be understood, tested, reverted, and integrated independently."
+threat = "Mixing features with refactoring or unrelated edits hides causality and makes rollback risky."
+expectation = "Several concerns will compete within feature work and defects may require selective reversal."
+strategy = "Make one change at a time and commit one coherent reason with a descriptive message."
+evidence = [{ type = "history_review", description = "Each commit contains one coherent feature, fix, or refactor and can be reverted without removing unrelated behavior.", required = true }]
+tradeoff = "Splitting work requires sequencing discipline and can create temporary intermediate states or more commits."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#development-workflow", summary = "Requires one change at a time during refactoring and single-reason commits for feature work.", confidence = 1.0 }]

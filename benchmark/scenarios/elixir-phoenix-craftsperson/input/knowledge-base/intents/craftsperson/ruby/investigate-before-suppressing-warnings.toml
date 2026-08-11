@@ -1,0 +1,17 @@
+id = "guidelines.intent.investigate-before-suppressing-warnings"
+title = "Understand warnings before suppressing them"
+category = "quality"
+tags = ["ruby", "security", "documentation", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to distinguish acceptable tool noise from evidence of a real defect"
+threat = "Convenient suppressions can hide vulnerabilities, quality regressions, or misunderstood behavior"
+expectation = "Automated quality and security tools will occasionally report inconvenient or false-positive findings"
+strategy = "Investigate every warning and document the rationale before adding a suppression"
+evidence = [{ type = "review", description = "Each new suppression is narrowly scoped and accompanied by a recorded explanation of the warning, investigation, and residual risk", required = true }]
+tradeoff = "Investigating false positives delays delivery and maintaining justifications adds overhead"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#quality-gates-non-negotiable", summary = "The source forbids suppressing warnings without understanding and documenting why.", confidence = 1.0 }]

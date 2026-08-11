@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-high-impact-conflicts"
+title = "Escalate high-impact engineering conflicts"
+category = "design"
+tags = ["csharp", "security", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Consequential departures from architecture, requirements, security posture, or project conventions receive accountable human judgment."
+threat = "An engineer can locally resolve a conflict in a way that silently changes product behavior, compatibility, or long-term design."
+expectation = "Quality failures, heuristic conflicts, project exceptions, vulnerable dependencies, and misunderstood requirements will sometimes lack a safe mechanical answer."
+strategy = "Pause and consult the user when a fix requires architectural change, principles conflict, project context contradicts general advice, a security upgrade risks compatibility, or tests expose a fundamental requirement mismatch."
+evidence = [{ type = "decision_trace", description = "A high-impact conflict records the alternatives, consequences, and explicit user decision before the consequential change proceeds.", required = true }]
+tradeoff = "Escalation delays resolution and transfers additional decision load to the user."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#escalation-strategy", summary = "Enumerates architectural, heuristic, project-context, security-compatibility, and requirement conflicts that require user escalation.", confidence = 1.0 }]

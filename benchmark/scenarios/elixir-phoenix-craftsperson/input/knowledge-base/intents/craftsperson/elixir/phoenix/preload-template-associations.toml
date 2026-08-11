@@ -1,0 +1,17 @@
+id = "guidelines.intent.preload-template-associations"
+title = "Preload associations used by templates"
+category = "design"
+tags = ["elixir", "phoenix", "persistence", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Rendering query cost remains bounded and independent of collection length."
+threat = "Template access lazily fetches associations per row and creates N+1 database traffic."
+expectation = "Rendered collections and association depth will grow with product usage."
+strategy = "Explicitly preload every association a template will access, in the query or through Repo.preload."
+evidence = [{ type = "query_trace", description = "Rendering a representative collection performs a constant number of database queries as item count increases.", required = true }]
+tradeoff = "Preloading can fetch unused data and increase memory or initial query complexity."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#ecto-database-guidelines", summary = "Requires explicit preloads for associations accessed in templates to prevent N+1 queries.", confidence = 1.0 }]

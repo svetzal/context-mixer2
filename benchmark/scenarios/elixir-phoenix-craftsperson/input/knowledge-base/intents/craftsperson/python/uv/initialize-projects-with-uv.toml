@@ -1,0 +1,17 @@
+id = "guidelines.intent.initialize-projects-with-uv"
+title = "Initialize projects with a standard uv scaffold"
+category = "delivery"
+tags = ["python", "uv", "dependencies", "persistence", "tooling", "project-management"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "New Python projects begin with the minimum metadata and runtime files required for a consistent uv workflow."
+threat = "Ad hoc project setup omits interpreter pins, package metadata, ignore rules, or an executable entry point."
+expectation = "Additional Python projects will be created by people with different setup habits."
+strategy = "Use uv init for new or existing directories and choose the intended Python version at initialization."
+evidence = [{ type = "structure_review", description = "A newly initialized project contains pyproject.toml, .python-version, .gitignore, README.md, and a working starter module appropriate to its chosen layout.", required = true }]
+tradeoff = "Generated scaffolding reflects uv defaults and may require cleanup or restructuring for specialized packages."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#creating-a-new-project", summary = "Directs new and existing directories through uv init and lists the standard files it creates.", confidence = 1.0 }]

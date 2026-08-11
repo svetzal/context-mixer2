@@ -1,0 +1,17 @@
+id = "guidelines.intent.edge-and-error-tests"
+title = "Test edge cases and failure behavior explicitly"
+category = "testing"
+tags = ["clojure", "testing", "error-handling", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to preserve defined behavior at input boundaries and under failure conditions"
+threat = "Happy-path-only tests leave boundary semantics and error contracts accidental"
+expectation = "Production inputs and dependencies will produce malformed, empty, extreme, and failing cases"
+strategy = "Add named tests for relevant edge cases and error conditions alongside normal examples"
+evidence = [{ type = "test", description = "Tests for each changed contract include its identified empty, boundary, invalid, and dependency-failure cases", required = true }]
+tradeoff = "Enumerating failure cases expands maintenance and can duplicate property tests if boundaries are not chosen carefully"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#5-testing", summary = "The testing review explicitly requires edge cases and error conditions to be tested.", confidence = 1.0 }]

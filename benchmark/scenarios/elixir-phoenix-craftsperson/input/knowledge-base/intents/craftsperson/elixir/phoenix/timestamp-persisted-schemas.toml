@@ -1,0 +1,17 @@
+id = "guidelines.intent.timestamp-persisted-schemas"
+title = "Timestamp persisted schemas"
+category = "reliability"
+tags = ["elixir", "phoenix", "persistence", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.86
+capability = "Persisted records retain basic creation and update chronology for operations and diagnosis."
+threat = "Schemas without timestamps lose evidence needed to order changes, investigate incidents, or support later lifecycle rules."
+expectation = "Future operations, audits, and features will need record age and last-change information not anticipated at schema creation."
+strategy = "Include Ecto timestamps in every persisted schema."
+evidence = [{ type = "schema_check", description = "Every persisted Ecto schema and backing table exposes populated inserted_at and updated_at fields.", required = true }]
+tradeoff = "Timestamps add columns and write churn even for records whose chronology is not currently used."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#schema-and-changesets", summary = "Explicitly requires timestamps in every schema; the future operational rationale is inferred.", confidence = 0.86 }]

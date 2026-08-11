@@ -1,0 +1,17 @@
+id = "guidelines.intent.move-stable-computation-to-compile-time"
+title = "Move stable computation to compile time"
+category = "design"
+tags = ["cpp", "qt", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Invariant calculations are validated early and incur no repeated runtime work."
+threat = "Runtime evaluation delays errors and repeats work for values already knowable by the compiler."
+expectation = "Performance pressure will grow while modern compilers support broader constant evaluation."
+strategy = "Use constexpr for values and functions that are meaningfully computable at compile time."
+evidence = [{ type = "compile_gate", description = "Compile-time invariants use constexpr and static assertions where useful, with no required runtime initialization.", required = true }]
+tradeoff = "Constant-evaluation constraints can complicate implementations and increase compile time."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "Prefers constexpr for compile-time computation and constants.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.review-with-humility"
+title = "Present review judgments as discussable proposals"
+category = "collaboration"
+tags = ["ruby", "security", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to combine technical expertise with context held by the code's author and user"
+threat = "Dictatorial feedback suppresses contrary evidence and turns principles into context-free mandates"
+expectation = "Reviewers will sometimes lack business context or encounter legitimate conflicts between principles"
+strategy = "Suggest rather than dictate and invite discussion when principles conflict"
+evidence = [{ type = "review", description = "Feedback distinguishes non-negotiable evidence from recommendations and explicitly invites missing context on disputed tradeoffs", required = true }]
+tradeoff = "A consultative stance can prolong decisions and make urgent requirements sound optional"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#communication-style", summary = "The agent says to suggest rather than dictate and to discuss conflicting principles.", confidence = 1.0 }]

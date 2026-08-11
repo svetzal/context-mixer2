@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-gateways-logicless"
+title = "Keep gateways free of policy"
+category = "testing"
+tags = ["cpp", "qt", "testing", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Business policy stays reusable and testable."
+threat = "Decisions accumulate in hard-to-test adapters."
+expectation = "More integrations will share rules."
+strategy = "Limit gateways to translation and delegation."
+evidence = [{ type = "gate", description = "Gateway branching is absent; core tests cover decisions.", required = true }]
+tradeoff = "Extra mappings can expose awkward boundary concepts."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

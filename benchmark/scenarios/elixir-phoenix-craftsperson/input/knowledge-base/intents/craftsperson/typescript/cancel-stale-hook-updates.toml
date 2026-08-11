@@ -1,0 +1,17 @@
+id = "guidelines.intent.cancel-stale-hook-updates"
+title = "Prevent stale asynchronous hook updates"
+category = "reliability"
+tags = ["typescript", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability for a React hook to avoid updating state after its effect is superseded or unmounted"
+threat = "Late promise completion writes obsolete data or updates an unmounted consumer"
+expectation = "Async operations will outlive renders and dependencies will change before responses arrive"
+strategy = "Use effect cleanup to mark the operation cancelled and guard every asynchronous state update"
+evidence = [{ type = "test", description = "A hook test resolves an old request after cleanup and verifies it does not update current state", required = true }]
+tradeoff = "Cancellation flags add lifecycle complexity and do not abort the underlying I/O"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#react-patterns", summary = "The custom hook example guards promise callbacks with a cancelled flag set during effect cleanup.", confidence = 1.0 }]

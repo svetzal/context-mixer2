@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-gateways-logicless"
+title = "Keep gateways free of business logic"
+category = "testing"
+tags = ["elixir", "testing", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Business decisions remain testable in the core while gateways stay replaceable plumbing."
+threat = "Custom logic accumulates inside I/O adapters where tests require expensive or misleading infrastructure setup."
+expectation = "Integrations will attract validation and transformation logic as they evolve."
+strategy = "Keep gateways as thin library wrappers, do not test logicless gateways, and move any custom decision logic into the core."
+evidence = [{ type = "review_observation", description = "Gateway modules contain only translation and delegation; custom decisions have direct core tests.", required = true }]
+tradeoff = "Moving logic inward can require additional data structures and translation across the boundary."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Calls for thin gateways with no logic to test and says custom logic should move into the core.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.write-descriptive-commit-messages"
+title = "Make commit intent discoverable from history"
+category = "delivery"
+tags = ["ruby", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to understand why a Ruby change entered the codebase from version history"
+threat = "Vague commit messages erase decision context needed for diagnosis and reversal"
+expectation = "Future maintainers will investigate regressions and design history without the original author"
+strategy = "Use descriptive commit messages that state the change's purpose"
+evidence = [{ type = "review", description = "Each commit subject identifies the behavior or design outcome changed rather than only naming files or generic activity", required = true }]
+tradeoff = "Writing useful commit messages adds time and may require revising history before integration"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "Version-control etiquette explicitly calls for descriptive commits.", confidence = 1.0 }]

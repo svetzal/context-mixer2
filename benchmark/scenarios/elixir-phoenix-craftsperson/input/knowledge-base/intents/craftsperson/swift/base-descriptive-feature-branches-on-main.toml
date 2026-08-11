@@ -1,0 +1,17 @@
+id = "guidelines.intent.base-descriptive-feature-branches-on-main"
+title = "Base descriptively named feature branches on main"
+category = "delivery"
+tags = ["swift", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Feature work begins from the shared integration baseline and remains identifiable while isolated."
+threat = "Branches created from stale or ambiguous bases accumulate unrelated divergence and become difficult to attribute."
+expectation = "Multiple changes may proceed concurrently before being integrated."
+strategy = "Create every feature or fix branch from main and name it for the behavior or defect it contains."
+evidence = [{ type = "history_gate", description = "The branch merge-base is the intended main revision at work start and its name follows a descriptive feature/<slug> or fix/<slug> form.", required = true }]
+tradeoff = "Mandatory branches add workflow overhead for tiny changes and a main-only baseline may not fit release-train or stacked-change models."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#branching", summary = "Requires all feature work to branch from main with descriptive feature or fix names.", confidence = 1.0 }]

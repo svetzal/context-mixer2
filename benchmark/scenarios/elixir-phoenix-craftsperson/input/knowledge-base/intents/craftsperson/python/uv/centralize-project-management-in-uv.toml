@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralize-project-management-in-uv"
+title = "Centralize Python project management in uv"
+category = "delivery"
+tags = ["python", "uv", "dependencies", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Contributors use one coherent source of truth for Python versions, environments, dependencies, and project commands."
+threat = "Mixing package and environment managers creates divergent state and irreproducible local workflows."
+expectation = "Projects will be cloned and maintained across machines by contributors with different global Python setups."
+strategy = "Use uv as the single interface for project initialization, Python installation, virtual environments, dependencies, locking, and tool execution."
+evidence = [{ type = "workflow_review", description = "Documented project operations and automation use uv rather than a mixture of pip, venv, pyenv, and direct tool invocation.", required = true }]
+tradeoff = "The project depends on uv availability and contributors must learn its command model."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#project-management-with-uv", summary = "Declares uv the single tool for Python versions, environments, dependencies, and project tools.", confidence = 1.0 }]

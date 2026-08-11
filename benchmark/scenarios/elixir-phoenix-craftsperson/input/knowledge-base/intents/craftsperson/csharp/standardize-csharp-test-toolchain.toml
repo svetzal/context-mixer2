@@ -1,0 +1,17 @@
+id = "guidelines.intent.standardize-csharp-test-toolchain"
+title = "Standardize the C# test toolchain"
+category = "delivery"
+tags = ["csharp", "testing", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Tests share a familiar structure and vocabulary that contributors can read and extend consistently."
+threat = "A fragmented mix of frameworks, assertion styles, and mocking libraries raises cognitive and maintenance costs."
+expectation = "The suite and contributor population will grow, making local tool preferences increasingly expensive."
+strategy = "Default to xUnit, use FluentAssertions for readable assertions, and use Moq only for gateway or boundary isolation."
+evidence = [{ type = "manifest_and_test_review", description = "Test projects use the standard framework and assertion library, and any Moq usage is confined to owned boundary interfaces.", required = true }]
+tradeoff = "Standardization adds third-party dependencies and can discourage a better-fit tool for an unusual testing problem."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#testing-philosophy", summary = "Names xUnit, FluentAssertions, and Moq as the default C# testing stack with a boundary-only constraint on mocking.", confidence = 1.0 }]

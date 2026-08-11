@@ -1,0 +1,17 @@
+id = "guidelines.intent.write-explanatory-commit-messages"
+title = "Write specific commit messages that explain intent"
+category = "delivery"
+tags = ["swift", "testing", "dependencies", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Future maintainers can recover what changed and why from version history."
+threat = "Vague commit messages erase decision context and make archaeology depend on reconstructing diffs."
+expectation = "Changes will later be debugged, reverted, audited, or extended after the immediate context is gone."
+strategy = "Use descriptive, specific commit messages and explain the reason when it is not obvious from the diff."
+evidence = [{ type = "history_review", description = "A commit subject names the concrete behavior changed, and its body records non-obvious motivation or constraints.", required = true }]
+tradeoff = "Writing useful messages takes time and can duplicate context already clear in a small diff."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#commit-messages", summary = "Requires descriptive specific messages and an explanation of why when code alone does not reveal it.", confidence = 1.0 }]

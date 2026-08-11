@@ -1,0 +1,14 @@
+id = "guidelines.intent.match-context-binding-to-change-rate"
+title = "Match context binding to change rate"
+category = "delivery"
+tags = ["context-assembly", "change-rate", "binding-strength"]
+status = "hypothesized"
+confidence = 0.98
+capability = "Agent context stays authoritative and current without making every task carry volatile or irrelevant knowledge."
+threat = "Frequently changing material is bound into high-priority or automatically loaded context, where stale guidance persists strongly and competes with current task intent."
+expectation = "Repository operating constraints, reusable procedures, product models, and task-specific facts change at different rates and apply across different scopes."
+strategy = "Bind stable, broadly applicable constraints most strongly; activate reusable task-specific procedures only when relevant; keep evolving product material in authoritative referenced artifacts; and supply ephemeral intent in the current task. The faster material changes, the more loosely and selectively it should be bound to agent context."
+evidence = [{ type = "context_architecture_review", description = "Each guidance source has a loading mechanism whose priority and activation scope are justified by the material's stability, applicability, and authority.", required = true }]
+tradeoff = "Looser binding reduces automatic recall and makes reliable routing, descriptive links, and context discovery more important."
+scope = { project = "*", paths = ["AGENTS.md", "**/AGENTS.md", "skills/**/SKILL.md", "skills/**/references/**", "docs/**", "book/**"] }
+sources = [{ type = "field_observation", ref = "Stacey Vetzal, 2026-07-24", summary = "Agent context is assembled from sources with different priority and loading behavior; material that changes more often should be bound more loosely.", confidence = 1.0 }, { type = "commit", ref = "https://github.com/svetzal/parite-cli/commit/48ab1cbddbd6a576352623a75a5ecc9300e8f30d", summary = "Moved volatile descriptive product material out of force-loaded guidance and into referenced, gate-checked product documentation.", confidence = 1.0 }]

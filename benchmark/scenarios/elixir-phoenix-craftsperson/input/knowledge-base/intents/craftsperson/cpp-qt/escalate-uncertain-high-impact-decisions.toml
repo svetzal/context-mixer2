@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-uncertain-high-impact-decisions"
+title = "Escalate uncertain high-impact decisions"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Architecture reflects stakeholder intent."
+threat = "Implementers silently resolve safety or requirement conflicts."
+expectation = "Future work exposes choices with no universal answer."
+strategy = "Seek user guidance for principle conflicts and consequential uncertainty."
+evidence = [{ type = "gate", description = "Conversation records guidance for safety, performance, container, or threading tradeoffs.", required = true }]
+tradeoff = "Escalation can delay sound decisions."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#escalation-strategy", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

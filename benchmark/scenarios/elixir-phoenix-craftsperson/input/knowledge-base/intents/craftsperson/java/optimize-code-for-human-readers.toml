@@ -1,0 +1,17 @@
+id = "guidelines.intent.optimize-code-for-human-readers"
+title = "Optimize code for the next human reader"
+category = "design"
+tags = ["java", "security", "readability", "clarity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A maintainer can infer business intent and change the code safely without relying on its original author."
+threat = "Clever, compressed, or poorly named code makes correct behavior expensive to discover and review."
+expectation = "Most code will be read and modified repeatedly after its initial delivery by people with less context."
+strategy = "Prefer expressive types, meaningful names, and straightforward structure that reads like an explanation."
+evidence = [{ type = "review", description = "A reviewer unfamiliar with the change can state its domain behavior from public types, names, and control flow without decoding incidental mechanics.", required = true }]
+tradeoff = "Reader-oriented structure can be more verbose and may sacrifice compactness or micro-optimizations."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#core-identity", summary = "Optimizes for the next human reader and later ranks revealed intent immediately after correctness.", confidence = 1.0 }]

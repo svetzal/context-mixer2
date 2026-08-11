@@ -1,0 +1,17 @@
+id = "guidelines.intent.cover-edge-and-error-behavior"
+title = "Exercise edge and error behavior"
+category = "testing"
+tags = ["cpp", "qt", "testing", "error-handling", "edge-cases", "failure-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The system responds predictably outside happy paths."
+threat = "Boundary and failure behavior remains undefined."
+expectation = "Production will produce rare and failing conditions."
+strategy = "Test relevant boundaries, edge cases, and error paths."
+evidence = [{ type = "gate", description = "Tests demonstrate affected input limits and dependency failures.", required = true }]
+tradeoff = "Rare-case coverage grows the suite without proving completeness."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#quality-assurance-process", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

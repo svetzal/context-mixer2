@@ -1,0 +1,17 @@
+id = "guidelines.intent.dokka-generation-gate"
+title = "Treat generated Kotlin documentation as a build artifact"
+category = "documentation"
+tags = ["kotlin", "documentation", "build-and-delivery", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to publish navigable API documentation from the current source."
+threat = "Malformed or stale KDoc silently breaks documentation output while compilation still succeeds."
+expectation = "Public APIs, modules, and documentation links will change with each feature."
+strategy = "Run Dokka generation for every code-change session and review the generated site."
+evidence = [{ type = "gate", description = "./gradlew dokkaHtml exits successfully and the generated index opens with current public APIs and no broken navigation observed.", required = true }]
+tradeoff = "Documentation generation increases feedback time and visual review remains partly manual."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#documentation-with-dokka", summary = "The source requires Dokka to build without errors and instructs review of its generated HTML.", confidence = 1.0 }]

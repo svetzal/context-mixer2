@@ -1,0 +1,17 @@
+id = "guidelines.intent.base-work-on-main"
+title = "Base change branches on the current main line"
+category = "delivery"
+tags = ["typescript", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to develop changes against the integration baseline they will eventually join"
+threat = "Branches based on stale or divergent lines accumulate avoidable integration conflicts"
+expectation = "Main will advance while work occurs in parallel"
+strategy = "Branch from main for each body of work"
+evidence = [{ type = "gate", description = "Version-control ancestry shows the change branch descends from the intended main baseline", required = true }]
+tradeoff = "Main-based branching requires synchronization and may expose work to unrelated upstream churn"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#workflow-collaboration", summary = "The version-control section says to branch from main for all work.", confidence = 1.0 }]

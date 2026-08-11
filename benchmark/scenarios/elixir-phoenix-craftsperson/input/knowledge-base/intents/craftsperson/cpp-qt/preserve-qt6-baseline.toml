@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-qt6-baseline"
+title = "Preserve the Qt 6 baseline"
+category = "delivery"
+tags = ["cpp", "qt", "dependencies", "build-and-delivery", "compatibility", "runtime-versions"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-supported-platform-baselines" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "The application consistently builds against the intended Qt API generation and imported targets."
+threat = "Implicit or legacy Qt selection introduces incompatible Qt 5 APIs, modules, or build behavior."
+expectation = "Developer machines and CI environments may provide multiple Qt generations."
+strategy = "Require Qt6 components explicitly in CMake and link through Qt6 imported targets."
+evidence = [{ type = "manifest_review", description = "CMake uses find_package(Qt6 REQUIRED ...) and target links reference Qt6 imported targets.", required = true }]
+tradeoff = "The Qt 6 baseline excludes systems and dependencies that remain tied to Qt 5."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#build-system-cmake", summary = "The prescribed build discovers required Qt6 components and links Qt6 imported targets.", confidence = 1.0 }]

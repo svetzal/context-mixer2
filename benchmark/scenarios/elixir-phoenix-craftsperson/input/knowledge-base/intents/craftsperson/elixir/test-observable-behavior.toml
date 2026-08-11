@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-observable-behavior"
+title = "Test observable behavior instead of implementation"
+category = "testing"
+tags = ["elixir", "concurrency", "testing", "behavior", "public-boundaries", "refactor-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/test-observable-behavior" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Tests preserve externally meaningful contracts while allowing internal refactoring."
+threat = "Assertions coupled to private calls or internal structure fail when behavior is unchanged and discourage design improvement."
+expectation = "Implementation details will change more often than supported behavior."
+strategy = "Assert public outcomes with descriptive ExUnit names and built-in assertions rather than testing internals."
+evidence = [{ type = "refactor_test", description = "An implementation-only refactor leaves the suite unchanged and passing, while each test name describes an observable result.", required = true }]
+tradeoff = "Behavior-level failures can provide less direct localization than tests aimed at private steps."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Requires tests to verify behavior rather than implementation details and prefers descriptive ExUnit tests.", confidence = 1.0 }]

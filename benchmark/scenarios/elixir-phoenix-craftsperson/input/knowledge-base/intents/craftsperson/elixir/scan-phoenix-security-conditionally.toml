@@ -1,0 +1,17 @@
+id = "guidelines.intent.scan-phoenix-security-conditionally"
+title = "Scan Phoenix services with Sobelow conditionally"
+category = "design"
+tags = ["elixir", "phoenix", "security", "testing", "dependencies", "idioms"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Phoenix-specific security weaknesses are detected when a pure-Elixir engagement includes a Phoenix API service."
+threat = "Generic dependency auditing misses framework-level configuration and code vulnerabilities."
+expectation = "Some backend-only services will use Phoenix without LiveView or web UI, while libraries and OTP applications will not."
+strategy = "Run mix sobelow --config for Phoenix projects and omit that gate for non-Phoenix projects."
+evidence = [{ type = "conditional_security_gate", description = "Phoenix services have a successful configured Sobelow scan; non-Phoenix projects document the gate as not applicable.", required = true }]
+tradeoff = "Conditional tooling complicates shared pipelines and Sobelow findings can require framework-specific investigation."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#quality-assurance-process", summary = "Lists Sobelow as a security gate only for Phoenix projects, while the agent scope includes Phoenix API-only services.", confidence = 1.0 }]

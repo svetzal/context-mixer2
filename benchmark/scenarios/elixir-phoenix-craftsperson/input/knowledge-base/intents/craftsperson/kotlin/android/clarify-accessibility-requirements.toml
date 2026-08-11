@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-accessibility-requirements"
+title = "Make accessibility expectations explicit"
+category = "collaboration"
+tags = ["kotlin", "android", "testing", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to deliver interactions that work for users with diverse access needs."
+threat = "Unspecified accessibility behavior is easily omitted from design and acceptance tests."
+expectation = "New screens and interaction patterns will introduce accessibility decisions not inferable from visuals alone."
+strategy = "Ask for accessibility requirements when they are unspecified and turn them into semantic and behavioral acceptance criteria."
+evidence = [{ type = "gate", description = "Feature criteria include applicable screen-reader, focus, contrast, touch-target, and alternative-interaction expectations.", required = true }]
+tradeoff = "Clarification and additional criteria expand design and test effort."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#when-to-seek-clarification", summary = "The source explicitly says to seek clarification when accessibility requirements are unspecified.", confidence = 1.0 }]

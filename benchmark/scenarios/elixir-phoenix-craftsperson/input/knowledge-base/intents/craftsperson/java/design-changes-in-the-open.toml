@@ -1,0 +1,17 @@
+id = "guidelines.intent.design-changes-in-the-open"
+title = "Design changes in the open"
+category = "architecture"
+tags = ["java", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Stakeholders and collaborators can correct architecture assumptions before they harden into code."
+threat = "Private design decisions create late surprises about core boundaries, adapters, and key types."
+expectation = "Feature work will involve choices whose costs become expensive after implementation."
+strategy = "Sketch the functional core, adapters, and key types before coding and expose the approach for feedback."
+evidence = [{ type = "design_review", description = "A non-trivial change has a concise pre-implementation design sketch covering behavior, boundaries, and key types.", required = true }]
+tradeoff = "Up-front discussion adds latency and can overformalize straightforward changes."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#when-implementing-features", summary = "Requires feature approaches, including functional-core boundaries, adapters, and key types, to be sketched openly before coding.", confidence = 1.0 }]

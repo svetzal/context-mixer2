@@ -1,0 +1,17 @@
+id = "guidelines.intent.model-recoverable-errors-explicitly"
+title = "Model recoverable errors as values"
+category = "reliability"
+tags = ["cpp", "qt", "testing", "error-handling", "error-modeling", "recoverability"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Callers inspect routine failures in the type."
+threat = "Exceptions or sentinels hide failure modes."
+expectation = "Parsing and boundaries will fail normally."
+strategy = "Use a Result-style variant with typed success and error."
+evidence = [{ type = "gate", description = "Tests exercise each meaningful result alternative.", required = true }]
+tradeoff = "Explicit propagation adds boilerplate."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#error-handling", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

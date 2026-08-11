@@ -1,0 +1,17 @@
+id = "guidelines.intent.logic-free-gateway-adapters"
+title = "Keep gateway adapters thin and logic-free"
+category = "architecture"
+tags = ["clojure", "testing", "gateways", "business-logic", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-gateways-logic-free" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to test business decisions without exercising external I/O adapters"
+threat = "Domain logic inside gateways becomes difficult to test without infrastructure and blurs architectural ownership"
+expectation = "Integration adapters will otherwise accumulate mapping, validation, and decision logic as services evolve"
+strategy = "Limit gateways to thin library wrappers and move custom logic into the functional core"
+evidence = [{ type = "review", description = "Gateway functions contain only argument translation and external calls; branching or domain transformations are located in directly tested core namespaces", required = true }, { type = "test", description = "Gateway namespaces have no isolated tests unless retained custom logic is explicitly identified", required = true }]
+tradeoff = "Moving transformations out of adapters can expose transport-shaped values to additional mapping functions and namespaces"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#1-functional-purity", summary = "Gateway functions should be thin wrappers without testable logic, and custom logic should be moved into the core.", confidence = 1.0 }]

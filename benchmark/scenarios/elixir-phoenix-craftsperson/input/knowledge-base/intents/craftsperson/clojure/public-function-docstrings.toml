@@ -1,0 +1,17 @@
+id = "guidelines.intent.public-function-docstrings"
+title = "Document every public function at its definition"
+category = "documentation"
+tags = ["clojure", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for callers to understand a public function's contract without reading its implementation"
+threat = "Undocumented parameters, return values, effects, and relationships become tribal knowledge and drift from behavior"
+expectation = "Public functions will be used by maintainers who lack the original implementation context"
+strategy = "Maintain comprehensive docstrings describing inputs, return values, purity or side effects, examples, and relevant related functions"
+evidence = [{ type = "static-check", description = "Every public function has a non-empty docstring containing its input and result contract", required = true }, { type = "documentation", description = "Representative public functions include executable or manually verified usage examples and identify side effects when present", required = true }]
+tradeoff = "Detailed docstrings take time to maintain and can mislead callers when implementation changes are not reflected in them"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-tools-you-wield", summary = "Codox guidance requires comprehensive docstrings with usage examples.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#documentation-standards", summary = "Every public function is shown with contract, purity, example, and related-function documentation.", confidence = 1.0 }]

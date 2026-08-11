@@ -1,0 +1,17 @@
+id = "guidelines.intent.detect-memory-and-race-faults-with-sanitizers"
+title = "Detect memory and race faults with sanitizers"
+category = "quality"
+tags = ["rust", "concurrency", "testing", "build-and-delivery", "static-analysis", "warnings"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Native high-risk execution can expose memory corruption, leaks, and concurrency races before release."
+threat = "Use-after-free, out-of-bounds access, leaks, or data races occur only under runtime conditions ordinary tests do not diagnose."
+expectation = "Unsafe, FFI, and concurrent code will interact with native layouts, allocators, and scheduling."
+strategy = "Run the applicable nightly address, memory, or thread sanitizer for high-risk native test targets."
+evidence = [{ type = "sanitizer_gate", description = "Selected sanitizer runs complete without findings for representative supported targets, with platform limitations documented.", required = true }]
+tradeoff = "Sanitizer builds are slow, platform-constrained, resource-intensive, and can alter timing or memory behavior."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#optional-but-recommended-for-unsafeffi-or-security-critical-code", summary = "Recommends nightly address, thread, and memory sanitizers to detect native memory and race failures.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliberate-coroutine-failure-isolation"
+title = "Choose sibling cancellation semantics deliberately"
+category = "reliability"
+tags = ["kotlin", "concurrency", "error-handling", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to preserve independent concurrent results when one child operation fails."
+threat = "Default sibling cancellation can discard valid work when child operations are intentionally independent."
+expectation = "Parallel workflows will combine tasks with different failure dependencies."
+strategy = "Use supervisorScope only when child failures should not cancel siblings; otherwise retain normal structured failure propagation."
+evidence = [{ type = "test", description = "Concurrency tests inject one child failure and assert whether siblings cancel or complete according to the documented operation semantics.", required = true }]
+tradeoff = "Failure isolation requires explicit collection and reporting of child failures and can allow partial outcomes."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#coroutines-best-practices", summary = "The source selects supervisorScope when child failures should not cancel siblings.", confidence = 1.0 }]

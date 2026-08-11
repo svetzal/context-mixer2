@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-version-control-changes-focused"
+title = "Keep version-control changes focused"
+category = "design"
+tags = ["elixir", "phoenix", "error-handling", "build-and-delivery", "cohesion", "single-responsibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Changes can be reviewed and merged with one clear purpose and known gate status."
+threat = "Broad branches and ambiguous commits mix risks, obscure intent, and make failures hard to isolate."
+expectation = "Multiple contributors will deliver changes concurrently through review and CI."
+strategy = "Branch from main, use descriptive commits, keep pull requests narrowly scoped with clear descriptions, and merge only after CI is green."
+evidence = [{ type = "history_review", description = "Each reviewed change has one coherent purpose, a descriptive history and summary, and successful required CI checks before merge.", required = true }]
+tradeoff = "Focused delivery creates more branches and review cycles and can postpone adjacent cleanup."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#workflow--collaboration", summary = "Requires descriptive commits, main-based branches, green CI, and focused reviewable pull requests.", confidence = 1.0 }]

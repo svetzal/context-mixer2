@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-unconstrained-any"
+title = "Avoid unconstrained Any in typed code"
+category = "design"
+tags = ["python", "uv", "dependencies", "static-analysis", "composition", "inheritance"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Static analysis continues to check how values flow through generic and polymorphic code."
+threat = "Any disables type checking transitively and lets interface mismatches cross module boundaries unnoticed."
+expectation = "Reusable code will handle values whose concrete types vary while still needing enforceable contracts."
+strategy = "Use object, TypeVar, Generic, or Protocol to express uncertainty or polymorphism instead of Any."
+evidence = [{ type = "static_gate", description = "Type checking and review find no unjustified Any in project-owned interfaces or generic code.", required = true }]
+tradeoff = "Precise generic and protocol types take more design work and can produce more complex annotations."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#type-hints", summary = "Directs use of object or proper generics instead of Any and recommends TypeVar, Generic, and Protocol.", confidence = 1.0 }]

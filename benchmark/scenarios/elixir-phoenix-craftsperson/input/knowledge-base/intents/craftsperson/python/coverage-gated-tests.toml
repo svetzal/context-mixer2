@@ -1,0 +1,17 @@
+id = "guidelines.intent.coverage-gated-tests"
+title = "Gate completion on passing tests with sufficient coverage"
+category = "testing"
+tags = ["python", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Behavioral regressions and unexercised paths are detected before code is declared complete."
+threat = "A green but shallow test suite can leave important behavior unverified."
+expectation = "New branches and edge cases will accumulate as the product evolves."
+strategy = "Run the full pytest suite with pytest-cov, enforce the configured coverage threshold, and cover relevant edge cases."
+evidence = [{ type = "gate", description = "`pytest --cov` exits successfully with every test passing and reported coverage above the project's configured threshold.", required = true }]
+tradeoff = "Coverage gates add execution time and can incentivize low-value tests written only to increase a metric."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#quality-assurance-process", summary = "The source makes pytest with coverage above threshold mandatory and calls for edge-case coverage.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.explicit-hilt-bindings"
+title = "Keep dependency construction declarative and replaceable"
+category = "design"
+tags = ["kotlin", "android", "concurrency", "testing", "dependencies", "idioms"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to inspect and swap interface implementations while centralizing complex object creation."
+threat = "Ad hoc factories and concealed construction rules make the object graph inconsistent."
+expectation = "Implementations and environment-specific construction will vary across app configurations and tests."
+strategy = "Expose interfaces from modules, use @Binds for direct mappings, and reserve @Provides for complex construction."
+evidence = [{ type = "gate", description = "Hilt modules use @Binds for simple interface mappings, @Provides only where construction logic is required, and expose no redundant factories.", required = true }]
+tradeoff = "Binding modules add annotation boilerplate and compile-time graph complexity."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#dependency-injection-hilt", summary = "The source prescribes interfaces with @Binds for simple mappings and @Provides for complex creation.", confidence = 1.0 }]

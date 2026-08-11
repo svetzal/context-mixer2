@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-review-findings-actionable"
+title = "Make review findings actionable"
+category = "collaboration"
+tags = ["csharp", "security", "testing", "code-review", "feedback", "remediation"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-review-feedback-actionable" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A code author can understand and resolve a review concern without guessing the desired outcome."
+threat = "Vague criticism creates rework, defensive debate, or superficial changes that miss the actual risk."
+expectation = "Reviewers will often have context or expertise that the change author does not share."
+strategy = "Describe the concrete problem, its consequence, a specific improvement, and the rationale for that improvement."
+evidence = [{ type = "review_observation", description = "Each blocking or corrective finding identifies a location, observable risk, proposed outcome, and technical rationale.", required = true }]
+tradeoff = "Actionable review takes more reviewer time and a proposed solution can over-constrain the author."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#code-review-protocol", summary = "Requires concrete improvements with specific changes and rationale.", confidence = 1.0 }]

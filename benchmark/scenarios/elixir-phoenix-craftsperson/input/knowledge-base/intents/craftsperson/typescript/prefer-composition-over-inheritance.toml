@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-composition-over-inheritance"
+title = "Prefer composition over class inheritance"
+category = "design"
+tags = ["typescript", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to combine and replace behavior without inheriting unwanted state or coupling"
+threat = "Inheritance binds behavior to rigid hierarchies and exposes subclasses to base-class evolution"
+expectation = "Implementations and combinations of behavior will vary independently"
+strategy = "Assemble behavior through composition and interface-based polymorphism"
+evidence = [{ type = "review", description = "New polymorphic behavior is supplied through composed collaborators or interfaces unless an inheritance relationship has an explicit invariant", required = true }]
+tradeoff = "Composition can require more delegation code and a larger number of small collaborators"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly favours composition and interface-based polymorphism over class inheritance.", confidence = 1.0 }]

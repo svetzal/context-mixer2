@@ -1,0 +1,17 @@
+id = "guidelines.intent.single-responsibility-functions"
+title = "Keep functions focused on one reason to change"
+category = "design"
+tags = ["go", "testing", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A maintainer can understand, test, and change one behavior without navigating unrelated control flow."
+threat = "Large multi-purpose functions entangle decisions and make local changes risky."
+expectation = "Functions will accumulate branches and responsibilities as features evolve."
+strategy = "Keep functions small and focused on a single responsibility."
+evidence = [{ type = "review", description = "Each changed function has one articulable responsibility and unrelated decisions are extracted behind intention-revealing names.", required = true }]
+tradeoff = "Decomposition increases the number of functions and can scatter a simple linear workflow."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#code-is-communication", summary = "Directs functions to remain small and focused on a single responsibility.", confidence = 1.0 }]

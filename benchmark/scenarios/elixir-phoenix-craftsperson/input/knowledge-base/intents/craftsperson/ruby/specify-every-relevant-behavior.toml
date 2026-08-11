@@ -1,0 +1,17 @@
+id = "guidelines.intent.specify-every-relevant-behavior"
+title = "Back relevant Ruby behavior with executable specs"
+category = "testing"
+tags = ["ruby", "testing", "behavior", "public-boundaries", "refactor-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/test-observable-behavior" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to detect when supported behavior changes intentionally or accidentally"
+threat = "Unspecified edge cases and flows can regress without making the test suite fail"
+expectation = "Behavior will expand across happy paths, errors, and boundary conditions"
+strategy = "Cover relevant behavior comprehensively with intent-revealing RSpec examples"
+evidence = [{ type = "test", description = "A behavior inventory maps happy paths, errors, and material edge cases to named RSpec examples with outcome assertions", required = true }]
+tradeoff = "Comprehensive specifications increase suite size, execution time, and maintenance cost"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#your-core-mission", summary = "The mission says every behavior is backed by intent-revealing RSpec specs, and review asks for comprehensive behavior coverage.", confidence = 1.0 }]

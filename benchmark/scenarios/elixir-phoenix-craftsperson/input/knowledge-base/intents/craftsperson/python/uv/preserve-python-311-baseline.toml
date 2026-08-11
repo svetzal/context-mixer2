@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-python-311-baseline"
+title = "Preserve a Python 3.11-or-newer baseline"
+category = "delivery"
+tags = ["python", "uv", "concurrency", "dependencies", "compatibility", "runtime-versions"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-supported-platform-baselines" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The codebase can depend on modern annotation and concurrency semantics without compatibility shims."
+threat = "Supporting older interpreters reintroduces future imports, legacy typing forms, and missing structured-concurrency features."
+expectation = "Contributors may otherwise broaden interpreter support implicitly for environments outside the stated target."
+strategy = "Target Python 3.11 or newer and reject compatibility constructs whose only purpose is older runtimes."
+evidence = [{ type = "manifest_gate", description = "requires-python and CI interpreter versions exclude Python below 3.11, and source does not use older-runtime annotation shims.", required = true }]
+tradeoff = "Users constrained to Python 3.10 or older cannot run the project."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#type-hints", summary = "Explicitly targets Python 3.11+ and forbids postponed-annotation compatibility imports.", confidence = 1.0 }]

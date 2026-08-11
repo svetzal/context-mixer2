@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-behavior-red-green"
+title = "Specify behavior through red-green tests"
+category = "testing"
+tags = ["python", "uv", "concurrency", "testing", "tdd", "red-green-refactor"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Tests describe required behavior, detect its absence, and survive internal refactoring."
+threat = "Implementation-coupled tests can pass for the wrong reason and obstruct harmless structural change."
+expectation = "Implementation details will change more often than the behavior users depend on."
+strategy = "Write a failing behavioral test first, pass it with the simplest implementation, then refactor without changing the specified outcome."
+evidence = [{ type = "test_review", description = "A new test fails when the intended behavior is absent and continues to pass after behavior-preserving refactors.", required = true }]
+tradeoff = "Strict test-first development adds friction during exploratory work when the desired behavior is still uncertain."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#tests-are-the-executable-spec", summary = "Requires red-green development and tests of behavior rather than implementation details.", confidence = 1.0 }]

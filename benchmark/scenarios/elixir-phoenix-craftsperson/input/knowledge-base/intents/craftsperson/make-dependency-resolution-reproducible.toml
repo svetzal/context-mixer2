@@ -1,0 +1,302 @@
+id = "guidelines.intent.make-dependency-resolution-reproducible"
+title = "Make dependency resolution reproducible"
+category = "dependencies"
+tags = ["reproducibility", "lockfiles", "build-stability"]
+status = "hypothesized"
+confidence = 0.97
+capability = "Developers, CI, and deployed artifacts resolve a deliberately equivalent dependency set."
+threat = "Floating or independently duplicated version decisions produce environment-specific builds and surprise upgrades."
+expectation = "Dependency registries and compatible version ranges will change between installations even when project source does not."
+strategy = "Use the ecosystem's appropriate lock or resolution mechanism, centralize version decisions, and verify environments from that source."
+evidence = [{ type = "reproducibility_gate", description = "A clean supported environment resolves the committed dependency decision without unexplained drift.", required = true }]
+tradeoff = "Locked resolution requires deliberate update work and can delay receiving compatible fixes until the lock is refreshed."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md", "plugins/python-ecosystem/agents/python-craftsperson.md", "plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#build-and-dependency-management", summary = "Centralizes and pins production dependency decisions.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#build-and-dependency-management", summary = "Centralizes dependency coordinates for consistent module resolution.", confidence = 1.0 }, { type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#lockfile", summary = "Commits a cross-platform lockfile and synchronizes environments to it.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; deps.edn — every version pinned, one source of truth
+{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        metosin/malli {:mvn/version "0.16.4"}
+        com.github.seancorfield/next.jdbc
+        {:mvn/version "1.3.955"}}}
+
+;; CI resolves from a clean cache (`clojure -Srepro -P`) and
+;; antq gates unexplained drift — dev, CI, and prod artifacts
+;; all build from this one committed decision
+'''
+bad = '''
+;; deps.edn
+{:deps {metosin/malli {:mvn/version "RELEASE"}       ; floats
+        cheshire/cheshire {:mvn/version "LATEST"}}}  ; floats
+
+;; ci.edn separately pins malli 0.14.0 "for the build server"
+; dev machines, CI, and prod artifacts each resolve their own
+; idea of the dependency set on any given day
+'''
+
+[examples.cpp]
+good = '''
+# conanfile.txt — versions decided once, centrally
+[requires]
+fmt/10.2.1
+spdlog/1.14.1
+qt/6.7.2
+
+# conan.lock is committed; CI resolves strictly from it:
+- run: conan install . --lockfile=conan.lock \
+       --lockfile-strict
+# a clean machine builds byte-equivalent dependency trees
+'''
+bad = '''
+# CMakeLists.txt — resolves differently on every clean build
+FetchContent_Declare(fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+  GIT_TAG master)                        # floating branch
+FetchContent_Declare(json
+  URL https://example.com/json/latest.tar.gz)   # "latest"
+
+# no lockfile; laptops and CI already disagree, and Tuesday's
+# green build fails Wednesday with zero local changes
+'''
+
+[examples.csharp]
+good = '''
+Directory.Packages.props:
+  <ItemGroup>
+    <PackageVersion Include="Polly" Version="8.4.1" />
+    <PackageVersion Include="Dapper" Version="2.1.35" />
+  </ItemGroup>
+
+# CI restores strictly from the committed lock file
+$ dotnet restore --locked-mode
+  Restored from packages.lock.json (0 changes)
+'''
+bad = '''
+App.csproj:
+  <PackageReference Include="Polly" Version="8.*" />
+  <PackageReference Include="Dapper" Version="*" />
+Worker.csproj:
+  <PackageReference Include="Polly" Version="7.2.0" />
+<!-- floating wildcards, two Polly decisions, no lock
+     file: CI, laptops, and prod each resolve their
+     own surprise dependency set -->
+'''
+
+[examples.elixir]
+good = '''
+# mix.exs — deliberate, centralized constraints
+defp deps do
+  [
+    {:phoenix, "~> 1.7.14"},
+    {:oban, "~> 2.18"}
+  ]
+end
+
+# mix.lock is committed; CI proves it is authoritative:
+#   mix deps.get --check-locked
+# dev, CI, and the release all resolve the same tree
+'''
+bad = '''
+# mix.exs — resolves to whatever exists today
+defp deps do
+  [
+    {:phoenix, ">= 0.0.0"},
+    {:oban, github: "oban-bg/oban", branch: "main"}
+  ]
+end
+
+# .gitignore
+#   mix.lock          "it kept causing conflicts"
+# every machine builds a different application
+'''
+
+[examples.go]
+good = '''
+$ head -4 go.mod
+module example.com/orders
+go 1.24
+
+require github.com/jackc/pgx/v5 v5.7.2
+
+$ go mod verify        # go.sum is committed; CI runs this too
+all modules verified
+'''
+bad = '''
+$ cat .gitignore
+go.sum                 # "kept out to reduce diff noise"
+
+$ grep -A1 '^deps:' Makefile
+deps:
+	go get -u ./...    # every machine floats to whatever is
+	                   # newest at build time; CI and laptops
+	                   # routinely resolve different trees
+'''
+
+[examples.java]
+good = '''
+# gradle/libs.versions.toml — each version decided once
+[versions]
+jackson = "2.18.2"
+
+# lockfile committed; CI fails on drift
+$ git ls-files | grep lockfile
+gradle.lockfile
+
+$ ./gradlew build     # lockAllConfigurations enabled
+BUILD SUCCESSFUL — resolution matches the committed lock
+'''
+bad = '''
+// build.gradle — floating range plus duplicated decisions
+implementation 'com.fasterxml.jackson.core:jackson-core:2.+'
+implementation
+    'com.fasterxml.jackson:jackson-databind:2.17.1'
+// ci.yml pins a third opinion:
+//   JACKSON_VERSION: 2.16.0
+
+# Tuesday's CI resolved 2.18.2, the laptop resolves 2.19.0,
+# prod was built weeks ago with 2.17.x — no lockfile, so
+# "works on my machine" is now a version race
+'''
+
+[examples.kotlin]
+good = '''
+// gradle/libs.versions.toml decides every version once:
+//   [versions] ktor = "2.3.11"
+dependencies {
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
+}
+// gradle.lockfile is committed; upgrades happen as
+// deliberate lockfile-refresh commits, not by accident
+'''
+bad = '''
+dependencies {
+    implementation("io.ktor:ktor-client-core:2.+") // floats
+    implementation("io.ktor:ktor-client-cio:2.3.9")
+    // a sibling module pins core at 2.3.11 independently —
+    // laptops and CI resolve different graphs on different
+    // days, and Friday's build differs from Monday's
+}
+'''
+
+[examples.python]
+good = '''
+# pyproject.toml
+[project]
+dependencies = ["httpx>=0.27,<0.28", "pydantic>=2.7,<3"]
+
+# uv.lock is committed; CI and prod resolve the same set
+$ uv sync --frozen
+Resolved 43 packages from lockfile
+
+$ uv lock --check          # gate fails on unexplained drift
+Lockfile is up to date
+'''
+bad = '''
+# requirements.txt — floats to whatever today resolves
+httpx
+pydantic>=2
+
+# Dockerfile
+RUN pip install httpx pydantic
+# a third, independent version decision; dev, CI, and the
+# image can all ship different resolutions of "the same" app
+'''
+
+[examples.ruby]
+good = '''
+Gemfile:       gem "sidekiq", "~> 7.2"
+Gemfile.lock:  sidekiq (7.2.4)   # committed
+
+CI and deploy both run:
+  bundle install --frozen   # fails loudly on any drift
+
+Every environment resolves the identical tree from the lock;
+upgrades happen as deliberate lock-refresh commits.
+'''
+bad = '''
+Gemfile:     gem "sidekiq"       # floats to whatever is newest
+.gitignore:  Gemfile.lock        # lock deliberately untracked
+
+Dockerfile:
+  RUN gem install sidekiq rails  # second, independent version
+                                 # decision, drifting on its own
+
+Dev has 7.2, CI pulled 8.0 this morning, prod still ships 6.5.
+'''
+
+[examples.rust]
+good = '''
+# Cargo.toml — one authoritative decision per dependency
+[workspace.dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+tokio = { version = "1.45", features = ["rt-multi-thread"] }
+
+# Cargo.lock is committed; CI refuses drift
+$ cargo build --locked
+'''
+bad = '''
+# member crates each float their own decision
+# crates/api/Cargo.toml
+serde = "*"
+# crates/worker/Cargo.toml
+serde = "1"
+
+# and the lockfile is ignored — every machine resolves its
+# own surprise upgrade on its own schedule
+$ grep Cargo.lock .gitignore
+Cargo.lock
+'''
+
+[examples.swift]
+good = '''
+// Package.swift
+dependencies: [
+    .package(url: "https://github.com/apple/swift-nio.git",
+             from: "2.65.0"),
+]
+
+# Package.resolved is committed; CI verifies from it:
+$ swift package resolve --force-resolved-versions
+# every machine builds the same dependency graph
+'''
+bad = '''
+// Package.swift
+dependencies: [
+    // floats with upstream — resolves differently each day
+    .package(url: "https://github.com/apple/swift-nio.git",
+             branch: "main"),
+]
+
+# .gitignore
+Package.resolved   # every machine resolves alone
+'''
+
+[examples.typescript]
+good = '''
+package.json:
+  "dependencies": { "zod": "3.23.8" }
+
+$ git ls-files package-lock.json
+package-lock.json
+
+ci.yml:
+  - run: npm ci      # installs exactly the committed lock
+
+Laptop, CI, and the deployed image resolve one decision.
+'''
+bad = '''
+package.json:
+  "dependencies": { "zod": "*", "express": "latest" }
+
+.gitignore:
+  package-lock.json      # lockfile deliberately untracked
+
+ci.yml:
+  - run: npm install     # fresh resolution on every build
+
+# Tuesday's CI and Friday's laptop ship different trees.
+'''

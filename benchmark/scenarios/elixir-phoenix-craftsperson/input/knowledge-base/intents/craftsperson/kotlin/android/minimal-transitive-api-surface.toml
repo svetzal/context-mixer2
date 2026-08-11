@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimal-transitive-api-surface"
+title = "Prevent accidental dependency exposure"
+category = "delivery"
+tags = ["kotlin", "android", "dependencies", "builds", "configuration", "reproducibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to change an internal dependency without forcing consumers to compile against it."
+threat = "Using api by default leaks transitive types and couples downstream modules to implementation choices."
+expectation = "Module internals and library choices will evolve independently."
+strategy = "Use Gradle implementation dependencies unless a dependency is intentionally part of the module's public API."
+evidence = [{ type = "gate", description = "Dependency declarations use api only where exported signatures require or intentionally promise transitive access.", required = true }]
+tradeoff = "Consumers may need explicit duplicate dependency declarations for types they use directly."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#build-configuration", summary = "The source explicitly prefers implementation over api except for intentional transitive exposure.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.exhaustive-state-transition-tests"
+title = "Preserve every intended presentation-state transition"
+category = "testing"
+tags = ["kotlin", "android", "testing", "error-handling", "edge-cases", "failure-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to prove how ViewModels respond across success, failure, empty, cancellation, and boundary cases."
+threat = "Happy-path-only tests leave invalid or missing transitions undiscovered."
+expectation = "Feature state machines will gain more events and edge conditions."
+strategy = "Test all defined state transitions and material edge cases."
+evidence = [{ type = "gate", description = "A transition matrix maps each event and starting state to assertions, including error and boundary scenarios.", required = true }]
+tradeoff = "Exhaustive transition tests grow combinatorially and require deliberate pruning of impossible states."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#unit-tests-junit-5--mockk", summary = "The source explicitly requires all state transitions and edge cases to be tested.", confidence = 1.0 }]

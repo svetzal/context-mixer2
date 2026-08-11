@@ -1,0 +1,17 @@
+id = "guidelines.intent.model-recoverable-errors-explicitly"
+title = "Model recoverable errors explicitly"
+category = "reliability"
+tags = ["elixir", "concurrency", "error-handling", "error-modeling", "recoverability", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Callers can compose and handle expected failure without exception control flow."
+threat = "Recoverable conditions crash processes or become ambiguous sentinel values."
+expectation = "Sequential operations will encounter validation, lookup, and external-service failures in normal operation."
+strategy = "Return tagged ok/error tuples for failures callers are expected to handle."
+evidence = [{ type = "test", description = "Public fallible operations return documented tagged tuples and tests assert each expected error branch.", required = true }]
+tradeoff = "Tagged results require explicit branching and can make success-path pipelines more verbose."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#error-handling", summary = "Prescribes tagged ok/error tuples for recoverable failures.", confidence = 1.0 }]

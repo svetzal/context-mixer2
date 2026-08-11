@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-liveview-javascript-in-hooks"
+title = "Isolate LiveView JavaScript in hooks"
+category = "design"
+tags = ["elixir", "phoenix", "build-and-delivery", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Client behavior survives LiveView patching and participates in the application asset build."
+threat = "Raw template scripts execute unpredictably, are lost during patches, or bypass bundling."
+expectation = "Interactive components will need browser APIs and bidirectional server events."
+strategy = "Implement JavaScript as correctly named colocated hooks or registered external hooks, never raw script tags."
+evidence = [{ type = "browser_test", description = "Hook behavior mounts after LiveView patches and template review finds no raw custom script tags.", required = true }]
+tradeoff = "Even small scripts must follow hook lifecycle and bundling conventions."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#javascript-interop", summary = "Defines colocated and external hooks and forbids raw script tags in LiveView templates.", confidence = 1.0 }]

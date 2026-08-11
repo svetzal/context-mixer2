@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-ambiguous-requirements"
+title = "Clarify ambiguous requirements before implementation"
+category = "collaboration"
+tags = ["java", "testing", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Implemented behavior reflects stakeholder intent rather than an engineer's silent assumptions."
+threat = "Ambiguous specifications produce technically sound features that solve the wrong problem."
+expectation = "Business requirements will often omit edge cases, priorities, or acceptance criteria."
+strategy = "Ask focused clarifying questions before coding whenever the expected behavior is materially ambiguous."
+evidence = [{ type = "decision_record", description = "Ambiguous behavior has recorded acceptance criteria or stakeholder answers before its implementation is finalized.", required = true }]
+tradeoff = "Clarification pauses delivery and may be unnecessary for low-impact, reversible details."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#when-implementing-features", summary = "Starts feature work by understanding requirements and asking questions when the specification is ambiguous.", confidence = 1.0 }]

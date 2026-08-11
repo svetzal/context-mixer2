@@ -1,0 +1,17 @@
+id = "guidelines.intent.instrument-logical-boundaries-only"
+title = "Instrument meaningful operation boundaries"
+category = "design"
+tags = ["rust", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Telemetry remains legible and economical enough to reveal significant operations."
+threat = "Instrumenting every function floods traces with low-value spans and obscures the operations that matter."
+expectation = "Adding instrumentation mechanically will be easy as the tracing ecosystem becomes standard."
+strategy = "Create spans at logical service and operation boundaries rather than on every function."
+evidence = [{ type = "trace_review", description = "Representative traces emphasize domain operations without deep noise from trivial helper functions.", required = true }]
+tradeoff = "Sparse instrumentation may omit detail needed for diagnosing an unexpected lower-level failure."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#observability", summary = "Instructs agents to instrument logical boundaries rather than every function.", confidence = 1.0 }]

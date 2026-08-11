@@ -1,0 +1,17 @@
+id = "guidelines.intent.audit-dependency-security"
+title = "Audit dependencies for known vulnerabilities"
+category = "quality"
+tags = ["swift", "security", "testing", "dependencies", "build-and-delivery", "quality-gates"]
+relations = [
+  { type = "specializes", target = "craftsperson/honor-the-project-quality-gate" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The released dependency graph avoids known exploitable package versions."
+threat = "Transitive dependencies can introduce publicly known vulnerabilities invisible to normal compilation and tests."
+expectation = "Advisories and dependency versions will continue to change after packages are selected."
+strategy = "Run OWASP Dependency-Check or an equivalent vulnerability scanner in CI as a mandatory quality gate."
+evidence = [{ type = "security_gate", description = "The CI dependency scan completes against the resolved graph and reports no unaccepted vulnerability above the project's severity threshold.", required = true }]
+tradeoff = "Advisory scanners produce false positives, depend on database freshness, and can block builds before an upstream fix exists."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#quality-gates-mandatory", summary = "Requires OWASP Dependency-Check or an equivalent dependency-security check in CI.", confidence = 1.0 }]

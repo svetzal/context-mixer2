@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-typed-signal-slot-connections"
+title = "Use typed signal-slot connections"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Signature mismatches fail at compile time."
+threat = "String macros defer mismatch to runtime."
+expectation = "Signals and slots will evolve."
+strategy = "Use pointer-to-member connect syntax."
+evidence = [{ type = "gate", description = "Connect calls are typed and signature changes fail compilation.", required = true }]
+tradeoff = "Overloads require verbose disambiguation."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#signals-and-slots", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

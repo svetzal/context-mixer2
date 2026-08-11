@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-macros-on-explicit-need"
+title = "Gate macros on explicit need"
+category = "design"
+tags = ["elixir", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.84
+capability = "Program behavior remains traceable through ordinary functions unless compile-time generation is deliberately required."
+threat = "Convenient metaprogramming hides control flow, expands compile-time coupling, and makes tooling or debugging harder."
+expectation = "Repeated syntax and DSL opportunities will create pressure to introduce macros before their costs are justified."
+strategy = "Use functions and data by default and introduce a macro only for an explicitly approved requirement."
+evidence = [{ type = "diff_review", description = "Every new defmacro is linked to an explicit requirement and explains why a function or data representation cannot satisfy it.", required = true }]
+tradeoff = "Rejecting macros can leave repetitive call-site syntax or prevent a concise domain-specific language."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#common-mistakes", summary = "Allows macros only when explicitly requested; the maintainability rationale is inferred.", confidence = 0.84 }]

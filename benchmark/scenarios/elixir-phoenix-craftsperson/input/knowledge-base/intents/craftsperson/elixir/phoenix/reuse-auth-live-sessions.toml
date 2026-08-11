@@ -1,0 +1,17 @@
+id = "guidelines.intent.reuse-auth-live-sessions"
+title = "Reuse authentication live sessions"
+category = "architecture"
+tags = ["elixir", "phoenix", "security", "error-handling", "trust-boundaries", "authorization"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "All routes sharing an authentication mode receive one consistent mount policy and scope assignment."
+threat = "Duplicate live_session names or parallel blocks drift in hooks and produce router errors or inconsistent auth state."
+expectation = "The router will gain many authenticated and optionally authenticated LiveViews."
+strategy = "Add routes to the existing current_user or require_authenticated_user live_session and define each session name only once."
+evidence = [{ type = "router_review", description = "Each authentication live_session name appears once and all matching routes are grouped beneath its shared on_mount policy.", required = true }]
+tradeoff = "Related feature routes may be separated from their feature's other routing declarations."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#authentication-with-phxgenauth", summary = "Forbids duplicate live_session names and requires grouping routes in existing auth sessions.", confidence = 1.0 }]

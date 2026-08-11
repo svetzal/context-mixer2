@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-ambiguous-business-logic"
+title = "Escalate ambiguous business rules before implementation"
+category = "collaboration"
+tags = ["clojure", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to implement behavior that reflects an accountable business decision"
+threat = "Developers silently encode plausible but incorrect policy when requirements admit multiple interpretations"
+expectation = "Business requests will sometimes omit edge cases, precedence, or desired outcomes"
+strategy = "Seek user clarification when business logic requirements are ambiguous"
+evidence = [{ type = "decision-record", description = "The selected behavior and resolved ambiguity are recorded in the change context before implementation is accepted", required = true }]
+tradeoff = "Waiting for clarification interrupts flow and can delay otherwise straightforward implementation"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#when-to-escalate", summary = "Ambiguous business logic requirements explicitly require user clarification.", confidence = 1.0 }]

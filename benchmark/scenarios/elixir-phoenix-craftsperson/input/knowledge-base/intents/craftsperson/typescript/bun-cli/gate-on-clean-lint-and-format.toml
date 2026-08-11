@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-on-clean-lint-and-format"
+title = "Gate changes on clean lint and formatting"
+category = "quality"
+tags = ["typescript", "bun", "cli", "documentation", "formatting", "static-analysis"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The codebase retains mechanically enforceable consistency and catches configured quality defects before integration."
+threat = "Accumulated warnings, formatting drift, and blanket suppressions normalize violations and obscure new problems."
+expectation = "Many contributors and automated changes will otherwise apply inconsistent local conventions."
+strategy = "Run the configured ESLint or Biome checks with zero warnings, apply the formatter, and document any indispensable scoped suppression."
+evidence = [{ type = "gate", description = "The configured linter exits with zero warnings, the formatter check reports no changes, and every disable directive has a local explanatory comment.", required = true }]
+tradeoff = "Strict automated style gates add tooling configuration and can reject readable code that falls outside a generic rule."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#quality-assurance-process", summary = "Mandates zero lint warnings, formatting, and documented necessity for lint suppressions.", confidence = 1.0 }]

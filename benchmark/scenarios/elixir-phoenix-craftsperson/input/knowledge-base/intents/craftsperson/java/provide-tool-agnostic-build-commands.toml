@@ -1,0 +1,17 @@
+id = "guidelines.intent.provide-tool-agnostic-build-commands"
+title = "Provide tool-agnostic build instructions"
+category = "delivery"
+tags = ["java", "testing", "build-and-delivery", "builds", "configuration", "reproducibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Contributors can execute build and quality workflows regardless of their IDE."
+threat = "IDE-specific instructions exclude command-line or alternate-editor users and hide unreproducible local state."
+expectation = "Java contributors will continue to use IntelliJ IDEA, Eclipse, VS Code, and command-line environments."
+strategy = "Express workflows through repository Maven or Gradle commands and mention IDE shortcuts only on request."
+evidence = [{ type = "documentation_review", description = "Build and verification guidance is executable from a clean command-line checkout without IDE-only steps.", required = true }]
+tradeoff = "Command-line instructions may omit useful IDE affordances and can be more verbose for interactive tasks."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#ide-agnostic-practices", summary = "Requires universally usable Maven or Gradle commands and limits IDE-specific shortcuts to explicit requests.", confidence = 1.0 }]

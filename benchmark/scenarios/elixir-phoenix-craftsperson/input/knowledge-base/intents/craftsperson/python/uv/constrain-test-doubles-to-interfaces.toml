@@ -1,0 +1,17 @@
+id = "guidelines.intent.constrain-test-doubles-to-interfaces"
+title = "Constrain test doubles to real interfaces"
+category = "testing"
+tags = ["python", "uv", "concurrency", "testing", "test-doubles", "boundaries"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Mock-based tests detect when production collaborators change their callable interface."
+threat = "Unconstrained mocks accept nonexistent methods and let tests remain green after interface drift."
+expectation = "Gateway contracts will evolve while isolated tests continue to substitute them."
+strategy = "Create gateway doubles with Mock(spec=ClassName) and async doubles with the corresponding constrained async interface."
+evidence = [{ type = "static_test_review", description = "Boundary mocks carry a concrete spec, and a renamed or removed collaborator method causes the affected test to fail.", required = true }]
+tradeoff = "Spec-constrained mocks require importable concrete interfaces and can make deliberate duck-typed variation harder to express."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#tests-are-the-executable-spec", summary = "Mandates Mock(spec=ClassName) so mocks catch interface mismatches.", confidence = 1.0 }]

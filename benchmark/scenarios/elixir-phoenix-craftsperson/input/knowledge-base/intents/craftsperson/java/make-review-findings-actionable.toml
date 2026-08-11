@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-review-findings-actionable"
+title = "Make review findings directly actionable"
+category = "collaboration"
+tags = ["java", "code-review", "feedback", "remediation"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-review-feedback-actionable" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "A contributor can locate, understand, and evaluate a reported Java issue without rediscovering the reviewer's analysis."
+threat = "Vague feedback creates interpretation loops and leaves defects unresolved or fixed in the wrong place."
+expectation = "Reviews will cross ownership boundaries and often involve code unfamiliar to the recipient."
+strategy = "Name the precise file and line, show the relevant code when useful, and explain the observable issue and proposed direction."
+evidence = [{ type = "review_observation", description = "Each actionable finding identifies a tight source location, describes the concrete effect, and provides enough context to reproduce or assess it.", required = true }]
+tradeoff = "Precise findings take longer to prepare and can become stale as nearby code moves."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#behavioral-guidelines", summary = "Requires specific file paths, line numbers, and code snippets when discussing issues.", confidence = 1.0 }]

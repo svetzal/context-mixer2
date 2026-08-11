@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-test-names-describe-behavior"
+title = "Make test names describe behavior"
+category = "testing"
+tags = ["typescript", "bun", "cli", "testing", "error-handling", "readability"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-tests-readable-specifications" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "The test suite serves as a readable catalog of supported behavior and failures identify the broken expectation."
+threat = "Generic or implementation-oriented test names obscure the requirement under test and slow regression diagnosis."
+expectation = "The suite will grow until maintainers often encounter failures in code they did not author."
+strategy = "Name tests as specific externally observable behaviors under meaningful conditions."
+evidence = [{ type = "test_review", description = "The collected Bun test names state a condition and observable outcome without requiring the test body to identify the protected behavior.", required = true }]
+tradeoff = "Precise behavioral names are longer and must be updated when the specification changes."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#quality-assurance-process", summary = "Requires test names to clearly describe behavior, reinforcing the executable-spec principle.", confidence = 1.0 }]

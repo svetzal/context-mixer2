@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-clean-formatting"
+title = "Require deterministic formatting"
+category = "quality"
+tags = ["cpp", "qt", "formatting", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Diffs emphasize semantic changes."
+threat = "Style variation creates review noise."
+expectation = "Many contributors will touch shared files."
+strategy = "Apply clang-format and gate on no diff."
+evidence = [{ type = "gate", description = "The format check makes no changes.", required = true }]
+tradeoff = "Style changes can create broad churn."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#quality-assurance-process", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

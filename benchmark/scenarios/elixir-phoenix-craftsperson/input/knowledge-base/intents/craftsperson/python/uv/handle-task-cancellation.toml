@@ -1,0 +1,17 @@
+id = "guidelines.intent.handle-task-cancellation"
+title = "Handle async task cancellation gracefully"
+category = "reliability"
+tags = ["python", "uv", "concurrency", "build-and-delivery", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Async operations release resources and preserve cancellation semantics when their caller no longer needs them."
+threat = "Cancelled tasks swallow cancellation, leave partial state, or leak resources."
+expectation = "Timeouts, client disconnects, shutdowns, and sibling failures will cancel in-flight work."
+strategy = "Treat cancellation as a normal lifecycle path: clean up in finally or contexts and re-propagate cancellation after only necessary local handling."
+evidence = [{ type = "test", description = "Cancellation tests show resources are released, partial writes obey the documented atomicity policy, and cancellation reaches the awaiting caller.", required = true }]
+tradeoff = "Cancellation-safe cleanup and rollback paths add code that can be difficult to exercise deterministically."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#asyncawait-best-practices", summary = "Explicitly requires graceful handling of task cancellation.", confidence = 1.0 }]

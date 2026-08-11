@@ -1,0 +1,17 @@
+id = "guidelines.intent.gateway-protocol-boundaries"
+title = "Put every external interaction behind a gateway boundary"
+category = "architecture"
+tags = ["clojure", "persistence", "gateways", "external-systems", "dependency-inversion"]
+relations = [
+  { type = "specializes", target = "craftsperson/put-gateways-at-external-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to substitute external systems while exercising application behavior deterministically"
+threat = "Direct database, API, filesystem, or HTTP calls couple business logic to infrastructure and availability"
+expectation = "External services and their client libraries will change, fail, and require test substitutes"
+strategy = "Expose external interactions through dedicated gateway protocols and namespaces"
+evidence = [{ type = "architecture", description = "Imports and call sites show that production namespaces reach external systems only through declared gateway protocols or namespaces", required = true }, { type = "test", description = "Core workflow tests replace gateways with deterministic protocol implementations without starting external infrastructure", required = true }]
+tradeoff = "Gateway protocols add interfaces, adapters, and navigation for integrations that may initially be simple"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#1-functional-purity", summary = "All databases, APIs, filesystems, and HTTP interactions are directed through mockable gateway protocols or namespaces.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.scoped-non-swallowing-kotlin-catches"
+title = "Catch only failures that can be handled"
+category = "reliability"
+tags = ["kotlin", "error-handling", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to observe unexpected failures while recovering from explicitly understood ones."
+threat = "Broad or empty catch blocks swallow defects, cancellation, and operational signals."
+expectation = "More framework and infrastructure calls will introduce diverse exception types."
+strategy = "Keep catch scopes narrow, handle only known failures, and propagate or report anything not actually recovered."
+evidence = [{ type = "static_check", description = "No empty or catch-all handler silently returns; each catch either produces a documented recovery outcome or preserves the failure through propagation or reporting.", required = true }]
+tradeoff = "Narrow handlers add branches and may expose more failures to callers or operators."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#error-prevention", summary = "The source requires appropriate catch scopes and forbids swallowed exceptions.", confidence = 1.0 }]

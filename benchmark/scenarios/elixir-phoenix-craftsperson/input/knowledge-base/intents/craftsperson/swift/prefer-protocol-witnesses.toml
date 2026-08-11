@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-protocol-witnesses"
+title = "Prefer protocol witnesses to delegate protocols"
+category = "design"
+tags = ["swift", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.79
+capability = "Collaborator behavior can be supplied explicitly and composed from small, focused operations."
+threat = "Broad delegate protocols couple a consumer to callback-oriented objects and accumulate unrelated responsibilities."
+expectation = "Collaborators will need lightweight substitution and recombination as behaviors diversify."
+strategy = "Represent required operations as protocol-witness values rather than delegate protocol objects."
+evidence = [{ type = "review", description = "A new callback collaboration uses a focused witness value, or records why object identity and multi-method delegate lifecycle are required.", required = true }]
+tradeoff = "Witness values are less familiar to many Swift developers and may lose identity, lifecycle, or optional-callback conventions provided by delegates."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#common-patterns-and-anti-patterns", summary = "Explicitly prefers protocol witnesses over delegate protocols without further qualification.", confidence = 0.8 }]

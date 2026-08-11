@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-purpose-specific-test-layers"
+title = "Use purpose-specific test layers"
+category = "testing"
+tags = ["elixir", "testing", "error-handling", "test-strategy", "test-pyramid", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-purpose-specific-test-layers" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Defects are caught at the cheapest layer that faithfully exercises the relevant boundary."
+threat = "A single test style either misses integration failures or makes all feedback slow and brittle."
+expectation = "The application will contain both pure rules and framework or context boundaries."
+strategy = "Use fast isolated unit tests for pure functions and integration tests at context boundaries."
+evidence = [{ type = "suite_review", description = "Pure rules have infrastructure-free unit tests and context contracts have targeted integration coverage without duplicating the same assertions at every layer.", required = true }]
+tradeoff = "Maintainers must decide which layer owns each behavior and support more than one test harness."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#testing-strategy", summary = "Separates fast pure-function unit tests from integration tests at context boundaries.", confidence = 1.0 }]

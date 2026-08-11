@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-lint-suppressions"
+title = "Gate lint suppressions on documented necessity"
+category = "quality"
+tags = ["python", "uv", "documentation", "static-analysis", "error-handling", "warnings"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Exceptional lint bypasses remain visible, justified, and narrowly scoped."
+threat = "Convenient noqa comments silently disable checks and erode the zero-warning policy."
+expectation = "Some code will encounter false positives or unavoidable patterns that tempt local suppression."
+strategy = "Permit noqa only when necessary and accompany each use with an explanation of why the rule cannot reasonably be satisfied."
+evidence = [{ type = "static_review", description = "Every noqa is narrowly targeted and has adjacent documentation establishing its necessity.", required = true }]
+tradeoff = "Rejecting easy suppressions can require awkward rewrites or lengthy justification for legitimate exceptions."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Forbids warning suppression unless it is absolutely necessary and documented.", confidence = 1.0 }]

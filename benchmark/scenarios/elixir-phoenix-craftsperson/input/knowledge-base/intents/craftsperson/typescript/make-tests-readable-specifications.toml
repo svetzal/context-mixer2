@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-tests-readable-specifications"
+title = "Make tests readable behavioral specifications"
+category = "testing"
+tags = ["typescript", "testing", "error-handling", "readability", "executable-specification", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-tests-readable-specifications" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability for maintainers to infer promised behavior from the test suite"
+threat = "Vague names and custom assertion machinery obscure what a failure means"
+expectation = "Tests will serve as long-lived documentation and debugging evidence"
+strategy = "Use descriptive test names and the test runner's built-in assertions where they express the behavior"
+evidence = [{ type = "review", description = "Each changed test name states the behavior and its failure message identifies the violated expectation without decoding a custom assertion layer", required = true }]
+tradeoff = "Descriptive names can be long and built-in assertions may be less domain-specific than custom matchers"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "The testing guidance prefers Jest or Vitest built-in assertions and descriptive test names.", confidence = 1.0 }]

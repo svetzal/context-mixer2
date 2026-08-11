@@ -1,0 +1,17 @@
+id = "guidelines.intent.optimize-code-for-clarity"
+title = "Optimize code for clarity and change safety"
+category = "design"
+tags = ["rust", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Future maintainers can understand code intent and change it safely without reconstructing clever hidden reasoning."
+threat = "Concise, magical, or overly clever code obscures decisions and increases the cost of modification."
+expectation = "The codebase will be maintained by humans and agents with incomplete historical context."
+strategy = "Favor clarity over cleverness and explicitness over magic; judge success by ease of reasoning rather than code volume."
+evidence = [{ type = "review", description = "Reviewers can explain the purpose and flow of changed code from its names and structure without external narration.", required = true }]
+tradeoff = "Explicit code may be longer and can repeat low-level mechanics that a compact abstraction would hide."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#core-philosophy", summary = "States that code is communication and favors clarity and explicitness.", confidence = 1.0 }]

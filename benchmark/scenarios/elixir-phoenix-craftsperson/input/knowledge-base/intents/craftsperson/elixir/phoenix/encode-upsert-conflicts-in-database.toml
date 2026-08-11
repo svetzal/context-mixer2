@@ -1,0 +1,17 @@
+id = "guidelines.intent.encode-upsert-conflicts-in-database"
+title = "Encode upsert conflicts in the database"
+category = "reliability"
+tags = ["elixir", "phoenix", "concurrency", "persistence", "data-integrity", "transactions"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Retryable or concurrent creates converge on one deterministic persisted row."
+threat = "Read-before-write upserts race and create duplicates or apply inconsistent replacement behavior."
+expectation = "Imports, retries, and concurrent requests will submit the same logical identity more than once."
+strategy = "Use Repo insert on_conflict with an explicit conflict_target and replacement policy."
+evidence = [{ type = "concurrency_test", description = "Concurrent inserts for the same conflict target produce one row with the documented winning field values.", required = true }]
+tradeoff = "Database-specific conflict semantics can overwrite fields unexpectedly and reduce portability."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#upserts", summary = "Prescribes on_conflict and conflict_target for upsert operations.", confidence = 1.0 }]

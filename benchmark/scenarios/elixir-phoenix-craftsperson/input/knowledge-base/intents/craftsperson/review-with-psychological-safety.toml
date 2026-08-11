@@ -1,0 +1,294 @@
+id = "guidelines.intent.review-with-psychological-safety"
+title = "Review with psychological safety"
+category = "collaboration"
+tags = ["code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "related-to", target = "craftsperson/make-review-feedback-actionable" },
+  { type = "related-to", target = "craftsperson/escalate-consequential-tradeoffs" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Review participants can examine correctness and design risks candidly without personal attack or defensiveness."
+threat = "Judgmental feedback targets the author, asserts preference as fact, or withholds the reasoning needed for collaboration."
+expectation = "Technical review will surface disagreement among people with different information, experience, and constraints."
+strategy = "Critique observable code and ideas with curiosity, distinguish defects from preferences, and acknowledge sound decisions."
+evidence = [{ type = "review_audit", description = "Review comments address code and consequences rather than personal attributes and clearly distinguish required changes from suggestions.", required = true }]
+tradeoff = "Careful framing takes time and can soften urgency if severe risks are not still stated plainly."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/python-ecosystem/agents/python-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#when-reviewing-code", summary = "Makes psychological safety and classification of feedback part of code review.", confidence = 1.0 }, { type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#workflow--collaboration", summary = "Preserves psychological safety during technical review.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#code-review-philosophy", summary = "Critiques code rather than people and acknowledges sound choices.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+Nice catch moving validation before the write — that closes
+the race we discussed last sprint.
+
+Question on line 58: `pmap` shares `conn` across threads,
+and next.jdbc connections aren't thread-safe — I believe
+this can corrupt results under load. Worth a test? [required]
+
+Style thought, take it or leave it: `->>` might read more
+naturally than the nested maps here. [suggestion]
+'''
+bad = '''
+Did you even run this? pmap over a shared connection — this
+is exactly the kind of sloppy work I keep flagging from you.
+
+Rewrite it properly this time.
+
+; targets the author, asserts blame as fact, splits nothing
+; into required vs. preference — and the one real defect is
+; never actually explained
+'''
+
+[examples.cpp]
+good = '''
+Nice catch using a scoped connection here — that plugs the
+leak pattern from last sprint.
+
+Question on parseRetry(): when the header is missing we
+default to 0 and hammer the server. Was that deliberate?
+If not, suggest the RFC's 1s minimum. [required — risk of
+production incident]
+
+Lambda vs named slot is a preference, not a defect — take
+it or leave it. [suggestion]
+'''
+bad = '''
+Did you even test this?? A first-year student would know
+better than to parse headers this way.
+
+Wrong. Rewrite it.
+
+I don't have time to explain — just do it the way I would.
+
+(targets the author, asserts preference as fact, withholds
+reasoning; next time the author won't ask for review early)
+'''
+
+[examples.csharp]
+good = '''
+review: CartService.cs:58 [question → maybe blocking]
+What led to caching the cart here? I may be missing
+context, but with two web nodes I think a stale cart
+can survive checkout — if so that's a defect we should
+fix before merge. The extraction below is a suggestion
+only, take it or leave it. Nice catch on the decimal
+rounding in Totals(), by the way — that was subtle.
+'''
+bad = '''
+review: CartService.cs:58
+Did you even read the codebase before touching it?
+Caching here is obviously wrong — anyone who has
+worked on carts knows better. This is sloppy work,
+and honestly typical of your last few PRs. Rewrite
+it properly this time.
+'''
+
+[examples.elixir]
+good = '''
+"This retry loop could hammer the API while it's down —
+what would you think about exponential backoff here?
+(blocking; happy to pair on it)"
+
+"Style note, take or leave: `with` might read better
+than the nested case here. Preference, not a defect."
+
+"The changeset validation split is really clean — I'm
+stealing that pattern."
+'''
+bad = '''
+"Did you even read the docs before writing this?"
+
+"This is amateur hour. My way is obviously correct."
+
+"Rewrite it. I shouldn't have to explain why."
+
+(targets the author, asserts preference as fact,
+withholds all reasoning, acknowledges nothing sound —
+and buries the one genuine defect in the noise)
+'''
+
+[examples.go]
+good = '''
+Review comment:
+
+  This retry loop can re-send a charge when the ack times out —
+  am I reading that right? If so, an idempotency key would
+  close the gap, and your gateway split makes that a small
+  change. That split also made this easy to review — thanks.
+
+  (blocking: the double-charge; everything else is suggestion)
+'''
+bad = '''
+Review comments:
+
+  "Did you even test this?"
+  "Anyone who has written Go for more than a week wouldn't
+   do it this way."
+  "Rewrite it properly."
+
+# targets the author, asserts taste as fact, offers no
+# reasoning to engage with — next time nobody asks for review
+'''
+
+[examples.java]
+good = '''
+"The cache key at line 88 omits the tenant id, so two
+tenants can read each other's totals — I'd class that as
+a blocking defect; adding tenantId to the key should fix
+it. Want me to share the failing case I sketched?
+
+The streaming rewrite in InvoiceTotals is a genuine
+simplification — nice. One optional thought: a short
+comment on the rounding choice would help the next
+reader. Not blocking."
+'''
+bad = '''
+"Did you even read the codebase before touching this?
+Obviously the cache key is wrong. Sloppy work — this is
+a junior mistake. Rewrite it properly this time.
+
+Also I would never use streams here. Change it back."
+
+# targets the author, asserts preference as fact, and
+# gives no reasoning anyone could learn from — next time
+# this developer hides their work until the last minute
+'''
+
+[examples.kotlin]
+good = '''
+"The retry loop re-reads the config file on each attempt —
+was that intentional? If it is for hot-reload, a comment
+would help future readers; if not, hoisting it saves a file
+read per retry. Non-blocking either way."
+
+"Nice catch making the timeout configurable — that fixes
+the CI flake we chased last week."
+'''
+bad = '''
+"Did you even test this? Re-reading config inside a retry
+loop is amateur hour."
+
+"I don't know why you keep writing code like this. Rewrite
+it properly this time, the way I showed you."
+
+"Obviously wrong. Anyone senior would see why."
+'''
+
+[examples.python]
+good = '''
+The cache key omits the tenant id, so two tenants can read
+each other's reports — must-fix before merge, I think.
+`key = f"{tenant.id}:{report.id}"` would close it.
+
+Nice call making the export streaming — that removes the
+OOM risk the old version carried.
+
+Curious why the retry count moved to config? Not opposed,
+just want to understand the scenario it serves.
+'''
+bad = '''
+Did you even test this? A cache without the tenant id is
+amateur hour. Anyone who's actually worked on multi-tenant
+systems would know better.
+
+Rewrite it properly this time.
+
+# targets the author, asserts preference as fact, and
+# gives no reasoning to collaborate with
+'''
+
+[examples.ruby]
+good = '''
+"I'm curious about the retry loop at refund.rb:42 — if the
+request times out mid-charge, could this double-charge? If
+so that's a blocker; an idempotency key would close it.
+
+The Result-object refactor here is a real improvement — the
+error paths are much easier to follow now.
+
+Naming nit (take or leave): `amt` -> `amount_cents`."
+'''
+bad = '''
+"Did you even test this? Anyone who's worked with payments
+would know better than to write a retry loop like that.
+
+This whole file is wrong. Rewrite it properly this time.
+
+I don't have time to explain — my way is just correct."
+'''
+
+[examples.rust]
+good = '''
+Review comments:
+
+  src/sync.rs:88 — I think this can deadlock if two workers
+  take the locks in opposite order (a,b vs b,a). Am I
+  reading the acquisition order right? If so, ordering by
+  resource id would fix it. [blocking]
+
+  Nice use of `entry().or_insert_with` in the cache — that
+  removed the double-lookup cleanly.
+'''
+bad = '''
+Review comments:
+
+  Did you even test this? Sloppy work.
+
+  Nobody who understands concurrency would write sync.rs
+  this way. Rewrite it properly.
+
+  (targets the author, asserts preference as fact, and
+  gives no location, reasoning, or path forward)
+'''
+
+[examples.swift]
+good = '''
+"The cache read on line 42 runs off the main actor, but
+CacheStore isn't Sendable — I think it can race with the
+write on line 58. Did I read that right? If so, isolating
+the store behind an actor seems cleanest; open to other
+routes.
+
+Nice call making the eviction policy a value type — it made
+this file much easier to follow."
+
+[required vs. suggestion clearly separated, code critiqued]
+'''
+bad = '''
+"Did you even test this? A senior dev wouldn't write a
+race like this."
+
+"This is just wrong. Rewrite it."
+
+"Obviously an actor. Everyone knows that."
+
+[targets the author, asserts preference as fact, withholds
+the reasoning the fix actually needs]
+'''
+
+[examples.typescript]
+good = '''
+Review comments:
+
+"This retry loop can double-charge when the timeout fires
+after the charge lands — see Stripe's idempotency docs.
+[blocking] Passing `idempotencyKey` would close it."
+
+"Nice catch consolidating the two date parsers — that has
+bitten us twice. Curious whether the branchless check on
+line 88 is worth a short comment for future readers?" 
+'''
+bad = '''
+Review comments:
+
+"Did you even read the codebase before touching it?"
+"Obviously wrong. Anyone senior would know this."
+"I would never write it this way, so change it."
+"Rejecting. Figure out why yourself."
+
+# Targets the author, asserts preference as fact, and
+# withholds the reasoning collaboration would need.
+'''

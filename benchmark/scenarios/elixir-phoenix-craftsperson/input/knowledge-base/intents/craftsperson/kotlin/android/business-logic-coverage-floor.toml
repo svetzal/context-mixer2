@@ -1,0 +1,17 @@
+id = "guidelines.intent.business-logic-coverage-floor"
+title = "Retain broad executable evidence for business logic"
+category = "testing"
+tags = ["kotlin", "android", "concurrency", "testing", "coverage", "risk"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to refactor core decisions with confidence that important paths remain exercised."
+threat = "Untested branches allow regressions despite a superficially green test suite."
+expectation = "Business rules will accumulate edge cases and be changed repeatedly."
+strategy = "Maintain more than 80 percent code coverage for business logic and generate JaCoCo reports."
+evidence = [{ type = "gate", description = "jacocoTestReport succeeds and enforces business-logic coverage above 80 percent.", required = true }]
+tradeoff = "A numeric threshold can reward shallow tests and adds maintenance for exclusions and generated code."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#unit-tests-junit-5--mockk", summary = "The source requires greater than 80 percent coverage for business logic and a JaCoCo report gate.", confidence = 1.0 }]

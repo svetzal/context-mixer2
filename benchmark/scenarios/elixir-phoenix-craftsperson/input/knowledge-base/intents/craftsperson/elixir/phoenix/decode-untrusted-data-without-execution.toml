@@ -1,0 +1,17 @@
+id = "guidelines.intent.decode-untrusted-data-without-execution"
+title = "Decode untrusted data without execution"
+category = "architecture"
+tags = ["elixir", "phoenix", "testing", "formatting", "security", "trust-boundaries"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Serialized data from untrusted sources can be inspected without instantiating executable terms."
+threat = "Unsafe term deserialization executes payload-controlled behavior or exhausts runtime resources."
+expectation = "Integrations and uploads may supply binary formats not produced by the application."
+strategy = "Avoid executable term formats for untrusted data and use non-executable safe decoding helpers when decoding is unavoidable."
+evidence = [{ type = "security_test", description = "Malicious serialized payloads are rejected or decoded as inert data, and no untrusted path calls unsafe binary_to_term.", required = true }]
+tradeoff = "Safe formats and decoders may lose Erlang term fidelity or require explicit schema translation."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#phoenix-security-non-negotiable", summary = "Forbids executable deserialization of untrusted terms and directs safe decoding when unavoidable.", confidence = 1.0 }]

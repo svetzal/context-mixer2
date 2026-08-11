@@ -1,0 +1,17 @@
+id = "guidelines.intent.constrain-structured-strings-with-types"
+title = "Constrain structured strings with template literal types"
+category = "design"
+tags = ["typescript", "formatting", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.86
+capability = "Ability to reject malformed structured string values at compile time"
+threat = "Plain string types admit values that violate a known prefix, delimiter, or composition format"
+expectation = "String-encoded routes, event names, and identifiers will be composed across more call sites"
+strategy = "Use template literal types when a string contract has a stable, finite structure"
+evidence = [{ type = "static-check", description = "Type-checking accepts representative valid string forms and rejects values outside the declared template", required = true }]
+tradeoff = "Template literal types can become complex, slow inference, and overconstrain formats that need runtime extensibility"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#core-identity-expertise", summary = "The agent explicitly calls for fully leveraging template literal types but does not provide a specific example.", confidence = 0.9 }]

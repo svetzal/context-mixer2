@@ -1,0 +1,17 @@
+id = "guidelines.intent.scan-phoenix-security-statically"
+title = "Scan Phoenix security statically"
+category = "design"
+tags = ["elixir", "phoenix", "security", "testing", "dependencies", "build-and-delivery"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Framework-specific security mistakes are detected before deployment."
+threat = "Unsafe Phoenix configuration and coding patterns evade functional tests and general dependency audits."
+expectation = "Web-facing changes will continually add routes, parameters, templates, and security-sensitive configuration."
+strategy = "Run Sobelow with the project configuration as a mandatory security check."
+evidence = [{ type = "security_gate", description = "mix sobelow --config completes with no unaddressed high- or medium-severity findings.", required = true }]
+tradeoff = "Static scanning introduces false positives and requires maintaining tool configuration and documented exceptions."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#quality-assurance-process", summary = "Includes configured Sobelow scanning in the mandatory security audit.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-first-new-behavior"
+title = "Specify new behavior before implementing it"
+category = "testing"
+tags = ["go", "concurrency", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "New behavior begins with an executable statement of its expected contract."
+threat = "Implementation-first work lets accidental structure dictate tests and leaves requirements ambiguous until late."
+expectation = "New behavior will be added incrementally under changing requirements."
+strategy = "Write a failing behavioral test before implementation and proceed through a red-green-refactor cycle."
+evidence = [{ type = "workflow", description = "Change history or development trace shows a contract-level test failing before the implementation that makes it pass.", required = true }]
+tradeoff = "Strict test-first sequencing can slow exploratory work and may cause early tests to encode a still-evolving design."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#tests-are-the-executable-spec", summary = "Requires tests first for new behavior and treats red as a temporary development state.", confidence = 1.0 }]

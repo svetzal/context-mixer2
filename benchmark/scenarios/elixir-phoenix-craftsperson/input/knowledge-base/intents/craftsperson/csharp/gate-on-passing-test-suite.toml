@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-on-passing-test-suite"
+title = "Gate completion on a fully passing test suite"
+category = "quality"
+tags = ["csharp", "testing", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Known behavioral contracts remain intact at every accepted change."
+threat = "Proceeding with failing or silently skipped tests permits known regressions and erodes confidence in the suite."
+expectation = "Changes in one area will continue to have effects that are difficult to predict locally."
+strategy = "Run dotnet test before completion, require every test to pass, and allow skips only with explicit justification."
+evidence = [{ type = "test_gate", description = "dotnet test reports no failures and every skipped test has a visible, current justification.", required = true }]
+tradeoff = "Unrelated flaky or environment-dependent tests can block otherwise valid work."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#quality-gates-mandatory", summary = "Requires all tests to pass and prohibits unjustified skipped tests before work is complete.", confidence = 1.0 }]

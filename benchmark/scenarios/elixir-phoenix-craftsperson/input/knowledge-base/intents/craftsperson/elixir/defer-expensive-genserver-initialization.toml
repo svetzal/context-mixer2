@@ -1,0 +1,17 @@
+id = "guidelines.intent.defer-expensive-genserver-initialization"
+title = "Defer expensive GenServer initialization"
+category = "reliability"
+tags = ["elixir", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A process joins its supervision tree promptly before performing expensive warm-up work."
+threat = "Blocking work in init/1 delays supervisor startup and leaves initialization outside the running process lifecycle."
+expectation = "Service startup will increasingly require caches, databases, or APIs whose latency can vary."
+strategy = "Return promptly from init/1 and perform post-start warm-up in handle_continue/2."
+evidence = [{ type = "lifecycle_test", description = "A test demonstrates prompt supervised startup while delayed warm-up completes through handle_continue/2 and produces the ready state.", required = true }]
+tradeoff = "The process can be alive before it is ready, requiring an explicit readiness state and behavior for early messages."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#genserver-initialization", summary = "Prescribes handle_continue/2 for expensive initialization after supervised process startup.", confidence = 1.0 }]

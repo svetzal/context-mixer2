@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-functional-core-from-effects"
+title = "Isolate the functional core from effects"
+category = "architecture"
+tags = ["java", "testing", "persistence", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business logic can be understood and tested without frameworks, networks, databases, or filesystems."
+threat = "I/O and mutation spread through domain code and make behavior slow, nondeterministic, and difficult to reuse."
+expectation = "Infrastructure integrations will change independently from the business rules they serve."
+strategy = "Keep business logic pure or side-effect-free and push I/O and orchestration into an imperative adapter shell."
+evidence = [{ type = "test", description = "Functional-core tests run without Spring, databases, network services, filesystems, or other external infrastructure.", required = true }]
+tradeoff = "Separating core and shell introduces orchestration and mapping code that may be excessive for simple CRUD."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Requires pure or side-effect-free business logic with I/O and frameworks pushed to adapter layers.", confidence = 1.0 }]

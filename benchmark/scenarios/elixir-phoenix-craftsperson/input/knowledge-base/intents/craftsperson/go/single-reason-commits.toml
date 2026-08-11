@@ -1,0 +1,17 @@
+id = "guidelines.intent.single-reason-commits"
+title = "Make each commit explain one coherent change"
+category = "delivery"
+tags = ["go", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "History can be reviewed, reverted, and understood as a sequence of independent decisions."
+threat = "Mixed-purpose commits obscure causality and force unrelated changes to be accepted or reverted together."
+expectation = "Future debugging and maintenance will rely on version history to identify why behavior changed."
+strategy = "Create single-reason commits with descriptive messages."
+evidence = [{ type = "history_review", description = "Each commit has one articulable purpose, contains no unrelated file changes, and its message states that purpose.", required = true }]
+tradeoff = "Maintaining atomic history requires extra staging discipline and can produce more commits."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#small-safe-increments", summary = "Calls for single-reason commits with descriptive messages.", confidence = 1.0 }]

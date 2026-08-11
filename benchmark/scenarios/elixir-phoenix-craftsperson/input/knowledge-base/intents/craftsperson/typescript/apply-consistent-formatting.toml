@@ -1,0 +1,17 @@
+id = "guidelines.intent.apply-consistent-formatting"
+title = "Apply the project's automated formatting"
+category = "quality"
+tags = ["typescript", "formatting", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to maintain a consistent visual code style without recurring manual debate"
+threat = "Hand-formatted variations create noisy diffs and distract review from behavior"
+expectation = "Many edits and contributors will otherwise introduce stylistic drift"
+strategy = "Run the configured Prettier formatting command before completion"
+evidence = [{ type = "gate", description = "npm run format completes successfully and a subsequent formatting check reports no changes needed", required = true }]
+tradeoff = "Automated formatting can produce broad diffs and may choose layouts individual authors dislike"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "The linting quality step explicitly requires running Prettier through npm run format.", confidence = 1.0 }]

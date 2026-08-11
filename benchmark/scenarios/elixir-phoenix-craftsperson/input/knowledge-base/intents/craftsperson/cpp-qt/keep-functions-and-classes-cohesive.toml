@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-functions-and-classes-cohesive"
+title = "Keep code behaviorally cohesive"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "One responsibility changes without tangled control flow."
+threat = "Long functions, nesting, modes, and god classes combine decisions."
+expectation = "Features tend to add branches and responsibilities."
+strategy = "Split distinct behaviors, flatten flow, and replace boolean modes with named operations."
+evidence = [{ type = "gate", description = "Review finds focused functions, classes, and behavior-specific APIs.", required = true }]
+tradeoff = "Aggressive splitting can scatter a linear workflow."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#red-flags-to-catch", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-api-contracts"
+title = "Resolve external API contracts before binding implementations"
+category = "collaboration"
+tags = ["kotlin", "android", "error-handling", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to integrate against stable, correctly understood request, response, error, and lifecycle semantics."
+threat = "Ambiguous contracts cause adapters and domain models to encode guesses that fail in integration."
+expectation = "Remote APIs and their versions will evolve independently from the Android client."
+strategy = "Clarify unclear API contracts before finalizing gateway and repository implementations."
+evidence = [{ type = "gate", description = "Contract tests or documented examples cover required fields, errors, pagination, versioning, and other material semantics.", required = true }]
+tradeoff = "Contract clarification depends on external parties and can block client progress."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#when-to-seek-clarification", summary = "The source explicitly calls for clarification when API contracts are unclear.", confidence = 1.0 }]

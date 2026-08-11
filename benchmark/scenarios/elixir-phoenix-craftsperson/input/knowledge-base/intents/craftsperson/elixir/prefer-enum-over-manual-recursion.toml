@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-enum-over-manual-recursion"
+title = "Prefer Enum over manual recursion"
+category = "design"
+tags = ["elixir", "testing", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Common collection transformations remain recognizable and rely on well-tested library semantics."
+threat = "Custom recursion reimplements traversal, termination, or accumulation details and introduces subtle defects."
+expectation = "Collection-processing requirements will evolve and be maintained by readers with varying recursion expertise."
+strategy = "Use Enum functions for standard traversals; when recursion is necessary, expose base cases through pattern-matched function heads."
+evidence = [{ type = "review_observation", description = "Manual recursive traversals document why Enum is insufficient and make all termination cases explicit in function heads.", required = true }]
+tradeoff = "Enum pipelines can allocate intermediate values or offer less control than specialized tail recursion."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#common-mistakes", summary = "Prefers Enum over manual recursion and requires pattern-matched function-head base cases when recursion is needed.", confidence = 1.0 }]

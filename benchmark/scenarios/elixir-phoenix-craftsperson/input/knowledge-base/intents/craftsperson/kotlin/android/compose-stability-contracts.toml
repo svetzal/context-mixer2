@@ -1,0 +1,17 @@
+id = "guidelines.intent.compose-stability-contracts"
+title = "Preserve predictable Compose recomposition"
+category = "design"
+tags = ["kotlin", "android", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Ability for Compose to skip unnecessary recomposition without treating mutable data as stable."
+threat = "Missing or incorrect stability metadata causes excess recomposition or stale rendering assumptions."
+expectation = "UI models and composable trees will grow, making recomposition costs and correctness more consequential."
+strategy = "Apply @Immutable and @Stable only where their contracts are actually satisfied."
+evidence = [{ type = "gate", description = "Compose compiler metrics or stability reports match annotations, and annotated types expose no contract-breaking mutable state.", required = true }]
+tradeoff = "Stability annotations require discipline and can mask bugs when applied incorrectly."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#code-quality", summary = "The source instructs appropriate use of @Immutable and @Stable in Compose.", confidence = 1.0 }]

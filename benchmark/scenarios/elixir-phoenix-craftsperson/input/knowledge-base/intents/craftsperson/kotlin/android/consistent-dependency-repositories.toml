@@ -1,0 +1,17 @@
+id = "guidelines.intent.consistent-dependency-repositories"
+title = "Preserve deterministic repository resolution"
+category = "design"
+tags = ["kotlin", "android", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for every module and environment to resolve dependencies from an approved, consistent source set."
+threat = "Per-module repositories permit shadowed artifacts, inconsistent resolution, and supply-chain drift."
+expectation = "More modules, plugins, and build environments will participate in dependency resolution."
+strategy = "Centralize repository declarations with dependencyResolutionManagement."
+evidence = [{ type = "gate", description = "Settings configuration enforces the repository set and module build files add no unauthorized repositories.", required = true }]
+tradeoff = "Central policy makes exceptional repositories harder to introduce for a single module."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#build-configuration", summary = "The source requires dependencyResolutionManagement for consistent repositories.", confidence = 1.0 }]

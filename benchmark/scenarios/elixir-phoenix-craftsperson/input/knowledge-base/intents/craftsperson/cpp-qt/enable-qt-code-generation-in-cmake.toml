@@ -1,0 +1,17 @@
+id = "guidelines.intent.enable-qt-code-generation-in-cmake"
+title = "Enable Qt code generation in CMake"
+category = "delivery"
+tags = ["cpp", "qt", "cmake", "build-and-delivery", "builds", "configuration"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Meta-object, resource, and UI code stays current."
+threat = "Manual or missing generation yields stale builds."
+expectation = "More Qt source types will be added."
+strategy = "Enable AUTOMOC, AUTORCC, and AUTOUIC."
+evidence = [{ type = "gate", description = "Clean builds generate all Qt artifacts.", required = true }]
+tradeoff = "Automatic scanning can hide participating files."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#build-system-cmake", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

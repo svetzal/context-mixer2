@@ -1,0 +1,17 @@
+id = "guidelines.intent.table-driven-business-tests"
+title = "Express business scenarios as table-driven tests"
+category = "testing"
+tags = ["go", "testing", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Many related business scenarios can be expanded and compared consistently without duplicating test control flow."
+threat = "One-off tests repeat setup and assertions, making edge cases expensive to add and behavior matrices hard to review."
+expectation = "Business rules will accumulate normal, boundary, and failure scenarios."
+strategy = "Use named table-driven test cases for business logic and related scenario families."
+evidence = [{ type = "test_review", description = "Business-rule tests enumerate named normal and edge cases in tables with shared execution and assertions.", required = true }]
+tradeoff = "Large test tables can hide scenario-specific setup and produce less direct failure context than separate tests."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#maintain-comprehensive-tests", summary = "Requires table-driven tests for all business logic and repeats them as the preferred scenario structure.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliberate-shrinker-rules"
+title = "Protect required runtime behavior during shrinking"
+category = "performance"
+tags = ["kotlin", "android", "build-and-delivery", "profiling", "evidence", "optimization"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-from-measurement" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to optimize release artifacts without removing or renaming code reached indirectly."
+threat = "Overbroad or missing ProGuard/R8 rules either disable optimization or break reflection, serialization, JNI, and framework discovery."
+expectation = "New libraries and generated code will introduce changing reachability requirements."
+strategy = "Keep narrowly justified ProGuard/R8 rules and validate optimized release behavior."
+evidence = [{ type = "gate", description = "Release tests cover reflective and serialized paths, shrinker diagnostics contain no unexplained missing references, and keep rules carry rationale.", required = true }]
+tradeoff = "Rule tuning is specialized work and release-only failures can be difficult to diagnose."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#build-configuration", summary = "The source requires careful ProGuard/R8 rule configuration.", confidence = 1.0 }]

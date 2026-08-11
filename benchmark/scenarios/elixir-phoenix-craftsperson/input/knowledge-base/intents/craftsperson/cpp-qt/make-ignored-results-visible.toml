@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-ignored-results-visible"
+title = "Make consequential results non-discardable"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The compiler catches ignored outcomes requiring action."
+threat = "Important results can be silently discarded."
+expectation = "APIs will gain less-familiar callers."
+strategy = "Mark likely-bug ignored results nodiscard."
+evidence = [{ type = "gate", description = "Compiler checks flag discarded consequential results.", required = true }]
+tradeoff = "nodiscard can create intentional-ignore noise."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

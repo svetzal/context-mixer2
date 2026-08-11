@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-xctest-compatibility"
+title = "Preserve XCTest and XCUITest coverage"
+category = "testing"
+tags = ["swift", "testing", "persistence", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Existing test suites and UI automation continue to protect behavior during testing-framework evolution."
+threat = "An all-at-once framework migration can discard mature coverage or strand UI automation with no equivalent."
+expectation = "Legacy XCTest suites and XCUITest workflows will coexist with Swift Testing for a substantial period."
+strategy = "Support existing XCTest suites and retain XCUITest for UI automation while adopting Swift Testing incrementally."
+evidence = [{ type = "test_gate", description = "The package or workspace continues to discover and pass retained XCTest and XCUITest suites alongside newer Swift Testing tests.", required = true }]
+tradeoff = "Maintaining multiple test frameworks creates duplicate conventions and slows complete migration to newer tooling."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#testing-philosophy", summary = "Explicitly calls for compatibility with existing XCTest suites and XCUITest UI automation.", confidence = 1.0 }]

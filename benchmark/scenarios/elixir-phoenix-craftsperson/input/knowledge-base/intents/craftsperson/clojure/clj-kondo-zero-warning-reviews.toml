@@ -1,0 +1,17 @@
+id = "guidelines.intent.clj-kondo-zero-warning-reviews"
+title = "Make clj-kondo a zero-warning review gate"
+category = "quality"
+tags = ["clojure", "clj-kondo", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to catch idiom, correctness, and structural problems during every code review"
+threat = "Fast-moving changes accumulate detectable defects when lint feedback is optional or noisy"
+expectation = "Production code and project-specific conventions will evolve continuously"
+strategy = "Run clj-kondo on every review, configure project rules in .clj-kondo/config.edn, and admit no unexplained warnings"
+evidence = [{ type = "gate", description = "clojure -M:lint exits successfully with zero warnings under the checked-in project configuration", required = true }]
+tradeoff = "Strict linting adds review latency and project-specific configuration maintenance, and can initially surface a large cleanup burden"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-tools-you-wield", summary = "clj-kondo is the primary linter, required for every review with project configuration and zero-warning tolerance.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-gates-mandatory", summary = "The lint command is mandatory before a review is complete.", confidence = 1.0 }]

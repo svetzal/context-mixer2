@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-inferred-specificity-with-satisfies"
+title = "Check structural conformance without widening inferred values"
+category = "quality"
+tags = ["typescript", "testing", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.85
+capability = "Ability to verify a value satisfies a contract while retaining its useful inferred specificity"
+threat = "Type annotations widen literals while type assertions can bypass genuine incompatibilities"
+expectation = "Configuration and lookup objects will need both contract checks and precise downstream inference"
+strategy = "Use the satisfies operator when a value should be checked against a shape without replacing its inferred type"
+evidence = [{ type = "static-check", description = "The compiler rejects structurally invalid configuration while downstream code retains the value's literal or property-specific inference", required = true }]
+tradeoff = "The distinction between annotation and satisfies is subtle and can confuse maintainers unfamiliar with the operator"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#core-identity-expertise", summary = "The source explicitly calls for use of the modern satisfies operator but does not elaborate its boundary.", confidence = 0.9 }]

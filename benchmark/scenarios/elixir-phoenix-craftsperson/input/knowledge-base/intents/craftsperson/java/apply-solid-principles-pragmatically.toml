@@ -1,0 +1,17 @@
+id = "guidelines.intent.apply-solid-principles-pragmatically"
+title = "Apply SOLID principles pragmatically"
+category = "design"
+tags = ["java", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "Java components remain cohesive, substitutable, and dependent on stable abstractions as the system changes."
+threat = "Concentrated responsibilities and concrete coupling create change hotspots and unsafe extension points."
+expectation = "The design will accumulate new implementations and requirements that stress current boundaries."
+strategy = "Use the SOLID principles as context-sensitive design diagnostics rather than automatic abstraction rules."
+evidence = [{ type = "architecture_review", description = "Changed components have a clear responsibility, narrow interfaces, substitutable implementations, and dependencies directed toward owned abstractions where useful.", required = true }]
+tradeoff = "SOLID interpretations are subjective and overapplication can produce excessive interfaces and indirection."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Calls for pragmatic application of Single Responsibility, Open/Closed, Liskov, Interface Segregation, and Dependency Inversion.", confidence = 1.0 }]

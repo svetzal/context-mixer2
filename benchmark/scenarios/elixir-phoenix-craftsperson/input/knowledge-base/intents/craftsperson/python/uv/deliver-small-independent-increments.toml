@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliver-small-independent-increments"
+title = "Deliver small independently shippable increments"
+category = "delivery"
+tags = ["python", "uv", "error-handling", "incremental-delivery", "change-scope", "reversibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/deliver-small-independent-increments" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Changes can be reviewed, validated, shipped, or reverted independently."
+threat = "Multi-reason batches couple unrelated risk and make failures difficult to isolate or reverse."
+expectation = "The system will evolve continuously under incomplete information and occasional regressions."
+strategy = "Make single-reason commits that are safe and complete enough to ship on their own."
+evidence = [{ type = "version_control_review", description = "Each commit has one coherent reason, passes its applicable checks, and does not depend on unrelated later commits to be safe.", required = true }]
+tradeoff = "Maintaining independently valid intermediate states can require extra sequencing, scaffolding, or more commits."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#small-safe-increments", summary = "Calls for single-reason commits that could ship independently.", confidence = 1.0 }]

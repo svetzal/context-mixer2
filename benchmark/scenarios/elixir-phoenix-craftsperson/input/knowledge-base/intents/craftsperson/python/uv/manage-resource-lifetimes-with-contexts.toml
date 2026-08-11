@@ -1,0 +1,17 @@
+id = "guidelines.intent.manage-resource-lifetimes-with-contexts"
+title = "Manage resource lifetimes with context managers"
+category = "reliability"
+tags = ["python", "uv", "error-handling", "build-and-delivery", "concurrency", "structured-concurrency"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Files, connections, locks, and dynamically acquired resources are released on every exit path."
+threat = "Manual cleanup is skipped by exceptions, returns, cancellation, or future control-flow changes."
+expectation = "Resource-using functions will gain more exit paths and may acquire a dynamic set of resources."
+strategy = "Use with blocks, custom context managers, and ExitStack to make acquisition and cleanup one lexical lifetime."
+evidence = [{ type = "test", description = "Resource tests show cleanup occurs on success and exceptional exit, and review finds no manual lifetime that a context manager should own.", required = true }]
+tradeoff = "Custom context managers and ExitStack introduce protocol ceremony and can hide cleanup ordering from casual readers."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#context-managers", summary = "Requires with for resource management and recommends custom context managers and ExitStack.", confidence = 1.0 }]

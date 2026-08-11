@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-guards-simple-and-reusable"
+title = "Keep guards simple and reusable"
+category = "design"
+tags = ["elixir", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Function-head eligibility checks remain readable, legal in guards, and consistent across clauses."
+threat = "Complex or duplicated guard expressions obscure dispatch and exceed the guard-safe expression subset."
+expectation = "Input invariants will recur across more function clauses as APIs grow."
+strategy = "Limit guards to simple type and value checks, move complex logic into bodies, and extract repeated guard-safe predicates with defguard."
+evidence = [{ type = "static_review", description = "Guards use only supported simple expressions and repeated invariant checks share a named defguard.", required = true }]
+tradeoff = "Moving logic into bodies can add clauses or delay rejection until after dispatch, while defguard adds named API surface."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#guards", summary = "Limits guards to simple allowed checks, moves complex logic into bodies, and recommends defguard for reuse.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-business-core-pure"
+title = "Keep business logic deterministic and pure"
+category = "design"
+tags = ["typescript", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to reason about and test business behavior from explicit inputs and outputs"
+threat = "Hidden state, timing, and I/O make core outcomes nondeterministic and difficult to reproduce"
+expectation = "Business rules will grow while needing fast, reliable verification"
+strategy = "Implement core functions so the same inputs produce the same outputs without side effects"
+evidence = [{ type = "test", description = "Core tests run without I/O or global-state fixtures and repeated equal inputs produce equal outputs", required = true }]
+tradeoff = "Pure designs require explicit data plumbing and may feel less direct than stateful orchestration"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Functional core guidance requires pure business logic whose outputs depend only on inputs.", confidence = 1.0 }]

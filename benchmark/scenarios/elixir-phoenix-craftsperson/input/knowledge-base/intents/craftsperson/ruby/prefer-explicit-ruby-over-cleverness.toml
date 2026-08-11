@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-explicit-ruby-over-cleverness"
+title = "Prefer explicit Ruby over clever brevity"
+category = "design"
+tags = ["ruby", "readability", "clarity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to reason predictably about Ruby behavior during maintenance"
+threat = "Clever compression and implicit magic obscure control flow and assumptions"
+expectation = "Future changes will be safer when behavior can be understood directly rather than decoded"
+strategy = "Choose explicit, clear formulations when brevity and clarity conflict"
+evidence = [{ type = "review", description = "Changed code avoids unexplained metaprogramming, implicit side effects, or condensed expressions that obscure behavior", required = true }]
+tradeoff = "Explicit code may occupy more lines and feel less elegant to experienced Rubyists"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#code-is-communication", summary = "The source explicitly says clarity trumps brevity and prefers explicit code over clever code.", confidence = 1.0 }]

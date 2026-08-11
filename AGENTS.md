@@ -392,6 +392,13 @@ Read-only materializer for an externally maintained TOML intent knowledge base.
 - `cmf/src/profile.rs` — materialization-profile schema, loading, and scope guards
 - `cmf/src/assembly.rs` — deterministic selection, graph expansion, surface shaping, and budget enforcement
 
+### cmf Assembly Benchmarks
+
+- `benchmark/run.sh` — scenario runner; assembles fixed inputs and writes ignored results
+- `benchmark/score.py` — deterministic corpus, selection, retention, size, and vocabulary metrics
+- `benchmark/scenarios/<name>/input/` — copied original artifact, complete intent catalogue, and profile
+- `benchmark/scenarios/<name>/{expected,baseline,provenance}.json` — integrity targets, comparison baseline, and source revision
+
 ## Spec
 
 See `SPEC.md` for the full design spec.

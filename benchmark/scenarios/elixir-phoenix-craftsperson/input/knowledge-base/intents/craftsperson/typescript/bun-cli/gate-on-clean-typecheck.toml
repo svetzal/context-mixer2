@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-on-clean-typecheck"
+title = "Gate changes on a clean typecheck"
+category = "quality"
+tags = ["typescript", "bun", "cli", "documentation", "error-handling", "static-analysis"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Static contracts remain trustworthy across the entire TypeScript program."
+threat = "Type errors and unexplained suppressions hide incompatible assumptions that become runtime defects."
+expectation = "Interfaces and data shapes will change across modules as the CLI evolves."
+strategy = "Require `bunx tsc --noEmit` to report zero errors and permit suppressions only when necessary and documented."
+evidence = [{ type = "static_check", description = "`bunx tsc --noEmit` exits successfully with zero diagnostics, and every `@ts-ignore` or `@ts-expect-error` has a scoped documented justification.", required = true }]
+tradeoff = "Strict type correctness can slow integration with incomplete or incorrectly typed libraries and may require local adapters or declarations."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#quality-assurance-process", summary = "Mandates a zero-error TypeScript check and rejects undocumented type-error suppressions.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.strict-aggregate-lint-gate"
+title = "Require a warning-free aggregate lint gate"
+category = "quality"
+tags = ["go", "static-analysis", "build-and-delivery", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The whole Go tree conforms to a consistent, centrally configured defect and style policy."
+threat = "Warnings tolerated in one area become precedent and let actionable findings accumulate."
+expectation = "Production code, tests, and examples will grow under multiple contributors and changing lint rules."
+strategy = "Run golangci-lint with strict project configuration and require zero warnings before completion."
+evidence = [{ type = "gate", description = "golangci-lint run exits successfully with zero warnings over all configured packages and files.", required = true }]
+tradeoff = "A zero-warning policy can block delivery on low-value findings and makes configuration upgrades more expensive."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#ensure-code-quality", summary = "Requires strict golangci-lint execution, zero warnings, and coverage of examples and tests.", confidence = 1.0 }]

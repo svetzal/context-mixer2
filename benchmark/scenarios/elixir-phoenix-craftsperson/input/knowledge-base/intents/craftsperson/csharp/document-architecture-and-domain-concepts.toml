@@ -1,0 +1,17 @@
+id = "guidelines.intent.document-architecture-and-domain-concepts"
+title = "Document architecture and domain concepts"
+category = "documentation"
+tags = ["csharp", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Future contributors can understand system boundaries, important decisions, and shared business language."
+threat = "Architectural rationale and domain meaning remain tacit and disappear when original contributors leave."
+expectation = "New maintainers will make changes without having participated in the decisions that shaped the system."
+strategy = "Record architectural decisions and define important domain concepts in maintained project documentation."
+evidence = [{ type = "documentation_review", description = "Non-obvious architectural constraints have rationale and consequences recorded, and important domain terms are defined consistently with the code.", required = true }]
+tradeoff = "Decision and concept documentation takes time and can become stale or overly ceremonial."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#documentation", summary = "Requires architectural decisions and domain concepts to be documented.", confidence = 1.0 }]

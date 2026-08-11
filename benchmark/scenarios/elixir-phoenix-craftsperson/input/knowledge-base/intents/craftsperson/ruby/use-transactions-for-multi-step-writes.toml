@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-transactions-for-multi-step-writes"
+title = "Make multi-step database operations atomic"
+category = "reliability"
+tags = ["ruby", "concurrency", "persistence", "error-handling", "data-integrity", "transactions"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to preserve database invariants when part of a multi-step operation fails"
+threat = "Independent writes can leave partially applied business operations after errors or concurrency conflicts"
+expectation = "Rails business workflows will update multiple related records under failure and contention"
+strategy = "Wrap multi-step database operations in appropriate transactions"
+evidence = [{ type = "test", description = "A failure injected after an intermediate write leaves all participating records in their pre-operation state", required = true }]
+tradeoff = "Transactions hold locks, can reduce concurrency, and cannot atomically cover arbitrary external side effects"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#rails-specific-guidance", summary = "Transactions are required for multi-step Rails database operations.", confidence = 1.0 }]

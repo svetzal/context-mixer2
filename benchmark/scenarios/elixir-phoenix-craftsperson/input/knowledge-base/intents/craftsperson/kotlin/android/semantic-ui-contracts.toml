@@ -1,0 +1,17 @@
+id = "guidelines.intent.semantic-ui-contracts"
+title = "Preserve accessible and testable UI meaning"
+category = "design"
+tags = ["kotlin", "android", "testing", "persistence", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for assistive technologies and UI tests to identify controls and content by meaning."
+threat = "Visual-only or structural selectors exclude users and make tests brittle."
+expectation = "The interface will evolve visually while accessibility and automation must remain stable."
+strategy = "Expose appropriate Compose semantic properties for interactive and informational UI."
+evidence = [{ type = "gate", description = "Accessibility checks and Compose tests locate elements by roles, labels, content descriptions, or stable semantic properties.", required = true }]
+tradeoff = "Semantic metadata adds authoring effort and can become misleading if not updated with behavior."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#ui-tests-compose-ui-test", summary = "The source explicitly requires semantic properties for accessibility and testability.", confidence = 1.0 }]

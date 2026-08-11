@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Repeatable cmf assembly benchmarks.** Self-contained scenarios snapshot an
+  original guidance artifact, the full intent catalogue, and an assembly
+  profile. The runner records selection precision and recall, exact strategy
+  retention, vocabulary overlap, context size, corpus integrity, and deltas
+  from a checked-in algorithm baseline. The first scenario targets
+  `elixir-phoenix-craftsperson` across 989 intents.
 - **cmf is now a focused intent materializer.** `cmf assemble <profile>` scans
   TOML intent records, applies deterministic selection and graph traversal,
   shapes an agent or skill, and enforces a context budget. `--explain` writes

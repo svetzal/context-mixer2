@@ -1,0 +1,14 @@
+id = "guidelines.intent.keep-product-intent-out-of-agent-instructions"
+title = "Keep product intent out of agent instructions"
+category = "delivery"
+tags = ["agent-guidance", "product-intent", "context-boundaries"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Product behavior and direction can evolve without force-loaded agent instructions contradicting the current product source of truth."
+threat = "Product requirements, desired architecture, or behavioral descriptions embedded in AGENTS.md retain priority after the product changes and cause agents to resist or misread the new intent."
+expectation = "Product understanding will change more frequently than the repository-wide rules for working safely and effectively."
+strategy = "Use AGENTS.md for instructions about how to work in the repository—workflow, quality gates, safety constraints, conventions, and navigation—not for what the product does or should become. Keep product behavior, contracts, roadmap, and architecture in product-owned documents and executable specifications, with pointers from agent guidance when discovery help is needed."
+evidence = [{ type = "guidance_review", description = "AGENTS.md contains no authoritative product specification, and a product change never requires a prompt that asks the agent to ignore AGENTS.md.", required = true }]
+tradeoff = "Agents must sometimes follow a pointer and load a product artifact before acting instead of receiving the product model automatically."
+scope = { project = "*", paths = ["AGENTS.md", "**/AGENTS.md", "docs/**", "book/**", "specs/**"] }
+sources = [{ type = "field_observation", ref = "Stacey Vetzal, 2026-07-24", summary = "Repeated product changes conflicted with higher-priority product guidance in AGENTS.md and required prompts to override it.", confidence = 1.0 }, { type = "commit", ref = "https://github.com/svetzal/parite-cli/commit/48ab1cbddbd6a576352623a75a5ecc9300e8f30d", summary = "Removed product specification from AGENTS.md, moved descriptive material into the mdBook, and corrected a stale behavioral claim uncovered during the move.", confidence = 1.0 }]

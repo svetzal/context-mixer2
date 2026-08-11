@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-functional-core-from-effects"
+title = "Isolate the functional core from effects"
+category = "architecture"
+tags = ["rust", "testing", "persistence", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Business logic can be understood and tested without databases, networks, filesystems, or runtime orchestration."
+threat = "I/O and mutation spread through domain logic and make behavior expensive or nondeterministic to test."
+expectation = "Infrastructure integrations and delivery mechanisms will change independently from core policy."
+strategy = "Keep business logic pure and push mutation and side effects to a thin imperative shell."
+evidence = [{ type = "test", description = "Core business tests run without real I/O, runtime services, or external infrastructure.", required = true }]
+tradeoff = "Separating core and shell introduces mapping and orchestration code that can be excessive for simple CRUD."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#engineering-practices", summary = "Requires a functional core and imperative shell with effects at system boundaries.", confidence = 1.0 }]

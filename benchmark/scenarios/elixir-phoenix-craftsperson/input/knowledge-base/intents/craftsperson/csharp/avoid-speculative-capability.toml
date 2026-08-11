@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-speculative-capability"
+title = "Avoid speculative capability"
+category = "design"
+tags = ["csharp", "testing", "yagni", "scope-control", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The system remains focused on currently understood needs and carries only behavior that has evidence of value."
+threat = "Predicted future requirements create unused code, configuration, and extension points that still require maintenance."
+expectation = "Many anticipated use cases will change or never arrive while today's code continues accumulating cost."
+strategy = "Apply YAGNI and defer features and extensibility until a concrete requirement demands them."
+evidence = [{ type = "scope_review", description = "Every introduced behavior or extension point maps to a current acceptance criterion, user need, or measured constraint.", required = true }]
+tradeoff = "Deferral can require later refactoring and may miss a cheap opportunity to preserve a genuinely imminent extension."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#incremental-development", summary = "Explicitly applies YAGNI and rejects speculative work.", confidence = 1.0 }]

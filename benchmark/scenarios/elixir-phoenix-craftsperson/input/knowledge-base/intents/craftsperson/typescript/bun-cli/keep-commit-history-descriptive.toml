@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-commit-history-descriptive"
+title = "Keep commit history descriptive"
+category = "delivery"
+tags = ["typescript", "bun", "cli", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.91
+capability = "Future maintainers can understand why behavior changed from version-control history."
+threat = "Vague commit messages erase the intent needed for archaeology, regression diagnosis, and selective reversion."
+expectation = "The codebase will outlive the context and memory of individual changes."
+strategy = "Write commit subjects that name the concrete behavior or engineering decision introduced."
+evidence = [{ type = "history_check", description = "Each change commit subject states a specific action and affected behavior rather than a generic label such as update, fix, or changes.", required = true }]
+tradeoff = "Crafting precise messages takes time and a concise subject cannot capture every nuance without a body."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#workflow--collaboration", summary = "Requires descriptive commit messages and provides a behavior-specific example.", confidence = 1.0 }]

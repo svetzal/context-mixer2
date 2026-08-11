@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-value-semantics"
+title = "Prefer value semantics"
+category = "design"
+tags = ["cpp", "qt", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Data has local lifetime without aliasing surprises."
+threat = "Unnecessary identity couples callers to shared state."
+expectation = "Data will cross more component boundaries."
+strategy = "Use values unless identity, polymorphism, or measured cost requires indirection."
+evidence = [{ type = "gate", description = "Ordinary data types pass and return as values.", required = true }]
+tradeoff = "Large values may copy and identity models resist conversion."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-async-for-io"
+title = "Use async concurrency for I/O-bound work"
+category = "reliability"
+tags = ["python", "uv", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The process can make progress on other work while an operation waits on external I/O."
+threat = "Synchronous waiting serializes independent I/O operations and consumes execution capacity."
+expectation = "Services will perform multiple independent network, file, or database operations under concurrent load."
+strategy = "Model I/O-bound operations as async functions and run independent awaitables concurrently where ordering is not required."
+evidence = [{ type = "concurrency_test", description = "A trace or timing test shows independent I/O waits overlap without changing required result ordering or error semantics.", required = true }]
+tradeoff = "Async code introduces event-loop constraints, cancellation states, and more complex debugging."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#asyncawait-best-practices", summary = "Directs I/O-bound operations to async def and recommends concurrent execution for independent operations.", confidence = 1.0 }]

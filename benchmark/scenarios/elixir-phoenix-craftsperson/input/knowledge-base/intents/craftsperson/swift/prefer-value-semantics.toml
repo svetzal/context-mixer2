@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-value-semantics"
+title = "Prefer value semantics unless identity is essential"
+category = "design"
+tags = ["swift", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "State can be reasoned about locally without hidden aliasing or lifecycle coupling."
+threat = "Unnecessary reference semantics let distant code mutate shared instances and make ownership unclear."
+expectation = "Features will add more consumers and concurrency, increasing the cost of implicit shared identity."
+strategy = "Model data with structs and enums, using classes only when identity or inheritance is essential."
+evidence = [{ type = "review_gate", description = "Each newly introduced class has a documented identity or inheritance requirement that a value type could not satisfy.", required = true }]
+tradeoff = "Copying values can cost memory or time, and reference identity is more direct for inherently shared mutable objects."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#swift-language-mastery", summary = "Directly prefers structs and enums and reserves classes for essential identity or inheritance.", confidence = 1.0 }]

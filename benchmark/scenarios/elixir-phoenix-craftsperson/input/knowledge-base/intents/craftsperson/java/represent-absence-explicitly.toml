@@ -1,0 +1,17 @@
+id = "guidelines.intent.represent-absence-explicitly"
+title = "Represent optional results explicitly"
+category = "design"
+tags = ["java", "error-handling", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Callers can distinguish an absent result from a programming error without risking a null dereference."
+threat = "Null-returning APIs hide absence in an unchecked value and propagate latent NullPointerExceptions."
+expectation = "APIs will gain more callers and composition paths where undocumented nullability is easily missed."
+strategy = "Return Optional where absence is a legitimate outcome and use null-safe transformations."
+evidence = [{ type = "static_check", description = "Public and domain APIs with legitimate no-result outcomes return Optional, and tests cover present and absent paths.", required = true }]
+tradeoff = "Optional adds wrapping and can be misused in fields, parameters, or performance-sensitive paths."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#modern-java-mastery", summary = "Prefers Streams and Optional for null-safe transformations and rejects null returns where Optional clarifies intent.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralize-shared-decisions"
+title = "Centralize knowledge that changes for one reason"
+category = "design"
+tags = ["rust", "security", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "A single engineering decision can be changed consistently without finding every duplicated expression of it."
+threat = "The same knowledge is encoded in multiple places that silently diverge when one copy changes."
+expectation = "Business rules, policies, and conventions will evolve after their first implementation."
+strategy = "Identify duplicated decisions rather than merely identical code and extract each shared decision into one authoritative representation."
+evidence = [{ type = "change_review", description = "A representative policy change requires editing one authoritative definition, with consumers deriving behavior from it.", required = true }]
+tradeoff = "Centralizing knowledge can introduce indirection and couple consumers that only appear to share a decision today."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#simple-design-heuristics-priority-order", summary = "Distinguishes duplicated knowledge from merely identical code and directs shared decisions to be extracted.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#self-correction-mechanisms", summary = "Requires extracting the shared decision when knowledge duplication is detected.", confidence = 1.0 }]

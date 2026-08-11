@@ -1,0 +1,17 @@
+id = "guidelines.intent.run-static-type-analysis"
+title = "Run static type analysis"
+category = "quality"
+tags = ["elixir", "testing", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Cross-function type inconsistencies and impossible success assumptions are detected before runtime."
+threat = "Dynamic execution leaves latent type mismatches outside the paths exercised by tests."
+expectation = "Function contracts and data shapes will evolve across module boundaries."
+strategy = "Use Dialyxir in development and test and gate completion on mix dialyzer."
+evidence = [{ type = "gate", description = "mix dialyzer completes without unexplained findings against the current project PLT.", required = true }]
+tradeoff = "Dialyzer adds configuration, analysis time, and false-positive investigation to the workflow."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#quality-assurance-process", summary = "Requires Dialyxir and mix dialyzer as the type-analysis gate.", confidence = 1.0 }]

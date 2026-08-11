@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-passing-tests"
+title = "Require all tests to pass before completion"
+category = "quality"
+tags = ["swift", "testing", "error-handling", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Completed work preserves every behavior currently protected by the test suite."
+threat = "Shipping with known test failures normalizes regressions and makes later failures ambiguous."
+expectation = "Frequent changes across targets will create regressions outside the immediately edited code."
+strategy = "Run the full Swift test suite and block completion or commit until every target is green."
+evidence = [{ type = "gate", description = "swift test exits successfully across all package targets at the candidate commit.", required = true }]
+tradeoff = "Full-suite gating slows delivery and can block unrelated work when the suite contains pre-existing flaky or platform-specific failures."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#quality-gates-mandatory", summary = "Makes a green swift test run across all targets mandatory before commit or completion.", confidence = 1.0 }]

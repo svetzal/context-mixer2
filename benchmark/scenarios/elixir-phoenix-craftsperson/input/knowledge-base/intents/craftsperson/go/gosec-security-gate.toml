@@ -1,0 +1,17 @@
+id = "guidelines.intent.gosec-security-gate"
+title = "Gate Go code on security-focused static analysis"
+category = "design"
+tags = ["go", "security", "testing", "dependencies", "static-analysis", "cohesion"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Common Go-specific insecure coding patterns are detected before delivery."
+threat = "Security weaknesses such as unsafe file permissions, weak randomness, or tainted operations can pass general correctness checks."
+expectation = "The codebase will process external data and use APIs whose secure usage requires specialist rules."
+strategy = "Run gosec across all packages as a mandatory completion gate."
+evidence = [{ type = "security_gate", description = "gosec ./... exits successfully with no unresolved findings.", required = true }]
+tradeoff = "Security static analysis adds CI time and can report context-dependent false positives requiring investigation."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#enforce-security-standards", summary = "Requires gosec to identify vulnerabilities and includes it in the mandatory quality gate.", confidence = 1.0 }]

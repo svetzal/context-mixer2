@@ -1,0 +1,17 @@
+id = "guidelines.intent.fuzz-adversarial-input-surfaces"
+title = "Fuzz adversarial input surfaces"
+category = "delivery"
+tags = ["rust", "security", "tooling", "project-management", "repeatability"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Parsers, decoders, and protocol handlers remain robust across inputs humans did not anticipate."
+threat = "Malformed or adversarial inputs trigger panics, hangs, memory faults, or violated invariants outside hand-written examples."
+expectation = "Externally controlled inputs will explore a much larger state space than curated tests cover."
+strategy = "Maintain cargo-fuzz targets for parser, decoder, protocol, and comparable security-sensitive input surfaces."
+evidence = [{ type = "fuzz_gate", description = "Relevant cargo fuzz targets run for a defined budget without reproducible crashes, hangs, sanitizer findings, or invariant violations.", required = true }]
+tradeoff = "Fuzzing consumes substantial compute, depends on platform and LLVM sanitizer support, and cannot prove the absence of defects."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#optional-but-recommended-for-unsafeffi-or-security-critical-code", summary = "Recommends cargo-fuzz for parsers, decoders, and protocol surfaces, subject to platform constraints.", confidence = 1.0 }]

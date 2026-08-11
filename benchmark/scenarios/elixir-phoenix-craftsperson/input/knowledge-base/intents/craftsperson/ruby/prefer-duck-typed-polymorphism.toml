@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-duck-typed-polymorphism"
+title = "Polymorph on behavior instead of concrete type"
+category = "design"
+tags = ["ruby", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to add interchangeable Ruby collaborators without modifying consumers"
+threat = "Concrete type checks centralize knowledge of every implementation and grow conditional branches"
+expectation = "New payment methods and other collaborators will satisfy existing behavioral contracts"
+strategy = "Rely on duck-typed messages rather than `is_a?` branching"
+evidence = [{ type = "test", description = "A new object responding to the required message works through the existing consumer without adding a type-specific branch", required = true }]
+tradeoff = "Duck typing moves compatibility failures to runtime unless contracts are well tested"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#duck-typing-and-polymorphism", summary = "The source prefers behavior-based dispatch over concrete CreditCard and PayPal type checks.", confidence = 1.0 }]

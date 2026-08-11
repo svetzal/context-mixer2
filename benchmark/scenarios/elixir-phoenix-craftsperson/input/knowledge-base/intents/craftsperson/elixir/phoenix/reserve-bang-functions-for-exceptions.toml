@@ -1,0 +1,17 @@
+id = "guidelines.intent.reserve-bang-functions-for-exceptions"
+title = "Reserve bang functions for exceptional failure"
+category = "reliability"
+tags = ["elixir", "phoenix", "concurrency", "error-handling", "error-modeling", "recoverability"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Call sites communicate whether failure is expected or should terminate the current process."
+threat = "Routine failure hidden behind raising APIs causes avoidable crashes and obscures recovery obligations."
+expectation = "The same operation may need both recoverable and fail-fast variants in different contexts."
+strategy = "Use bang variants only where failure is truly exceptional and a crash is the intended response."
+evidence = [{ type = "callsite_review", description = "Each bang call is in a context where its failure is documented as exceptional and supervised or startup-fatal.", required = true }]
+tradeoff = "Callers must choose and propagate non-bang results in more places instead of relying on concise raising APIs."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#error-handling", summary = "Limits bang variants to truly exceptional failure.", confidence = 1.0 }]

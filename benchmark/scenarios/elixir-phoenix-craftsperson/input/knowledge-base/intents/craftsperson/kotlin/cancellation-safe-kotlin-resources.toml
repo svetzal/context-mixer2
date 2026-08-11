@@ -1,0 +1,17 @@
+id = "guidelines.intent.cancellation-safe-kotlin-resources"
+title = "Release coroutine resources during cancellation"
+category = "reliability"
+tags = ["kotlin", "concurrency", "build-and-delivery", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to cancel asynchronous operations without leaking their resources or leaving partial ownership behind."
+threat = "Cancellation interrupts normal control flow and can bypass ordinary resource release."
+expectation = "Long-running and I/O-bound coroutine work will be cancelled by timeouts, shutdown, or user actions."
+strategy = "Place cancellation-sensitive cleanup in finally blocks and verify cancellation paths explicitly."
+evidence = [{ type = "test", description = "Tests cancel active coroutine operations and assert that files, clients, jobs, and other owned resources are closed or released.", required = true }]
+tradeoff = "Cancellation-safe cleanup complicates coroutine code and cleanup itself may need special non-cancellable handling."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#coroutines-best-practices", summary = "The source requires proper coroutine cancellation and cleanup in finally blocks.", confidence = 1.0 }]

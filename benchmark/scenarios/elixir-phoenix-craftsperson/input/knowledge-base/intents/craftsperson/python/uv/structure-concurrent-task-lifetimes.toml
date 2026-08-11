@@ -1,0 +1,17 @@
+id = "guidelines.intent.structure-concurrent-task-lifetimes"
+title = "Structure concurrent task lifetimes"
+category = "reliability"
+tags = ["python", "uv", "concurrency", "error-handling", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Spawned concurrent work finishes, fails, or is cancelled within an explicit parent lifetime."
+threat = "Unstructured tasks outlive their caller, leak failures, or remain orphaned during partial failure."
+expectation = "Async operations will fan out into several tasks that can succeed or fail independently."
+strategy = "Prefer asyncio.TaskGroup for structured concurrency and use gather only when its lifecycle and failure semantics are deliberately appropriate."
+evidence = [{ type = "async_trace", description = "On normal and exceptional parent exit, every child task has completed or been awaited through cancellation, with no orphan tasks or unobserved exceptions.", required = true }]
+tradeoff = "Structured groups couple sibling task lifetimes and may cancel useful partial work after one failure."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#asyncawait-best-practices", summary = "Recommends gather for concurrent operations and TaskGroup for structured concurrency, with a TaskGroup example.", confidence = 1.0 }]

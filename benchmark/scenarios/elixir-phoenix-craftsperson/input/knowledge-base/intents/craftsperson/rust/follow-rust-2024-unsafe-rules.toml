@@ -1,0 +1,17 @@
+id = "guidelines.intent.follow-rust-2024-unsafe-rules"
+title = "Follow Rust 2024 unsafe syntax rules"
+category = "design"
+tags = ["rust", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Unsafe and FFI code remains valid and explicit under the Rust 2024 language model."
+threat = "Legacy syntax hides unsafe obligations or fails when a project adopts Rust 2024."
+expectation = "More projects will migrate to Rust 2024 while retaining low-level integrations."
+strategy = "Use unsafe extern blocks and unsafe-marked attributes as required by Rust 2024."
+evidence = [{ type = "ci_gate", description = "Rust 2024 crates compile without unsafe-operation edition diagnostics.", required = true }]
+tradeoff = "Edition-specific syntax creates conditional guidance for multi-edition workspaces."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#unsafe-and-ffi-non-negotiable-rules", summary = "Calls out unsafe extern blocks and unsafe attributes required by Rust 2024.", confidence = 1.0 }]

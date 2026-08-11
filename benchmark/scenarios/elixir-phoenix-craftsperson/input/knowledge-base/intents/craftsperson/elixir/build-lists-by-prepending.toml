@@ -1,0 +1,17 @@
+id = "guidelines.intent.build-lists-by-prepending"
+title = "Build lists by prepending"
+category = "design"
+tags = ["elixir", "build-and-delivery", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Incremental list construction remains linear as collection size grows."
+threat = "Repeated tail concatenation traverses the accumulated list and turns construction into quadratic work."
+expectation = "Production collections will outgrow the small examples where append cost is invisible."
+strategy = "Prepend each new item and reverse once when final order must match insertion order."
+evidence = [{ type = "performance_check", description = "Growing-list loops contain no list ++ [item] accumulation and a scaling test remains approximately linear.", required = true }]
+tradeoff = "Prepending reverses order and may require a final traversal to restore it."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#core-language-patterns", summary = "Prefers prepending to lists over appending a singleton to the tail.", confidence = 1.0 }]

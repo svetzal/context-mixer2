@@ -1,0 +1,303 @@
+id = "guidelines.intent.apply-simple-design-priorities"
+title = "Apply simple design priorities in order"
+category = "design"
+tags = ["simplicity", "design-priorities", "maintainability"]
+status = "hypothesized"
+confidence = 0.98
+capability = "Design decisions resolve toward the smallest structure that completely and clearly supports required behavior."
+threat = "Simplicity becomes a vague aesthetic and trades correctness or clarity for fewer lines or fewer types."
+expectation = "Design pressures will conflict and contributors need a stable order for resolving them."
+strategy = "Prioritize passing behavioral tests, revealing intent, eliminating duplicated knowledge, and only then minimizing structural entities."
+evidence = [{ type = "design_review", description = "Simplifications preserve behavior and clarity before reducing duplication or structure.", required = true }]
+tradeoff = "The ordered heuristic may retain more structure than a code-size-first definition of simplicity would permit."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/ruby-ecosystem/agents/ruby-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md", "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#simple-design-heuristics-in-priority-order", summary = "Orders simple design around tests, intent, duplication, and minimal elements.", confidence = 1.0 }, { type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#simple-design-heuristics-in-priority-order", summary = "Uses the same ordered simple-design heuristic for Ruby work.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#simple-design-heuristics-priority-order", summary = "Applies the ordered heuristic to Rust design decisions.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(def hst-rate 0.13)
+
+(defn with-tax [amount]
+  (* amount (+ 1 hst-rate)))
+
+(defn order-total [items]
+  (with-tax (transduce (map :price) + items)))
+
+(deftest order-total-applies-hst
+  (is (== 113 (order-total [{:price 100}]))))
+; green tests, intent-revealing names, then dedupe, then shrink
+'''
+bad = '''
+; "simplified" to fewer tokens: inlined names, dropped the test
+(defn ot [xs] (reduce #(+ %1 (* (:price %2) 1.13)) 0 xs))
+
+(defn cart-total [c] (reduce #(+ %1 (* (:price %2) 1.13)) 0 c))
+; fewer defs and fewer lines won, but 1.13 is now duplicated,
+; unnamed, and the behavior is unverified
+'''
+
+[examples.cpp]
+good = '''
+// Duplicated tax knowledge unified; names still reveal intent;
+// the behavioral test stays green and stays in the tree.
+Money netPrice(const Order& o) {
+  return o.subtotal() - discount(o);
+}
+Money discount(const Order& o) {
+  return o.subtotal() * loyaltyRate(o.customer());
+}
+TEST(Pricing, LoyalCustomerGetsTenPercentOff) {
+  Order o = orderFor(loyalCustomer(), Money{100});
+  EXPECT_EQ(netPrice(o), Money{90});
+}
+'''
+bad = '''
+// "Simpler": fewer lines and fewer names, but rounding now
+// differs from the spec, intent is gone, and the failing
+// pricing test was deleted to make the build green.
+Money netPrice(const Order& o) {
+  return Money{
+      static_cast<int>(o.sub() * (o.c().loyal() ? .9 : 1))};
+}
+// TEST(Pricing, LoyalCustomerGetsTenPercentOff)  // removed
+'''
+
+[examples.csharp]
+good = '''
+// tests green; duplication removed, intent kept visible
+private const decimal OntarioHst = 0.13m;
+
+public static decimal InvoiceTotal(decimal net) =>
+    WithTax(net);
+
+public static decimal RefundTotal(decimal net) =>
+    -WithTax(net);
+
+private static decimal WithTax(decimal net) =>
+    net + net * OntarioHst;
+'''
+bad = '''
+// "simpler": fewest lines and types win over clarity
+public static decimal Calc(decimal n, int kind) =>
+    kind == 0 ? n * 1.13m
+    : kind == 1 ? n * -1.13m
+    : throw new ArgumentException(nameof(kind));
+// magic int modes, 1.13 duplicated, and refund rounding
+// now drifts from invoice rounding — tests were "too
+// slow to run" for this cleanup
+'''
+
+[examples.elixir]
+good = '''
+def discount(%Order{tier: tier, total: total}) do
+  total * rate(tier)
+end
+
+# duplication removed last, after behavior and intent:
+# both tier tests stay green, names still reveal pricing
+defp rate(:standard), do: 0.05
+defp rate(:premium), do: 0.08
+'''
+bad = '''
+# priority 4 (fewest entities) applied first: one fn and
+# fewer lines won, so the premium rule vanished and the
+# name says nothing. Line count beat correctness.
+def d(o) do
+  o.total * 0.05
+end
+'''
+
+[examples.go]
+good = '''
+// duplication removed only after tests and intent stayed intact
+func regularFee(order Order) Money { return fee(order, regularRate) }
+func expressFee(order Order) Money { return fee(order, expressRate) }
+
+func fee(order Order, rate Rate) Money {
+	base := rate.Apply(order.Weight)
+	// rounding rule kept explicit — invoices depend on half-up
+	return base.RoundHalfUp(2)
+}
+'''
+bad = '''
+// "simpler": fewer lines, one less type — but the invoice
+// rounding rule is gone and the bool argument hides intent
+func fee(o Order, x bool) float64 {
+	return map[bool]float64{true: 1.5, false: 1.1}[x] * o.W
+}
+
+total := fee(order, true) // express? regular? reader must guess
+'''
+
+[examples.java]
+good = '''
+// duplicated tax knowledge removed; names still reveal intent
+BigDecimal taxFor(Order order) {
+    return order.subtotal().multiply(TAX_RATE);
+}
+
+BigDecimal totalFor(Order order) {
+    return order.subtotal().add(taxFor(order));
+}
+
+@Test
+void totalIncludesTax() {
+    var order = new Order(new BigDecimal("100.00"));
+    assertEquals(new BigDecimal("113.00"), totalFor(order));
+}
+'''
+bad = '''
+// "simpler": fewer methods, but intent and the tax rule vanish
+BigDecimal calc(Order o, int m) {
+    // m=0 subtotal, m=1 tax, m=2 total
+    return switch (m) {
+        case 0 -> o.subtotal();
+        case 1 -> o.subtotal().multiply(new BigDecimal("0.13"));
+        default -> o.subtotal().multiply(new BigDecimal("1.13"));
+    };
+}
+// element count went down; clarity and the named tax
+// decision went with it
+'''
+
+[examples.kotlin]
+good = '''
+// simplification kept behavior and intent before size
+data class Discount(val percent: Int) {
+    init { require(percent in 0..100) }
+}
+
+fun priceAfter(price: Money, d: Discount): Money =
+    price * (100 - d.percent) / 100
+// duplicate range checks removed from callers by
+// centralizing the rule here; all tests still green
+'''
+bad = '''
+// "simpler" = fewer lines and fewer types, at any cost
+fun p(a: Int, b: Int) = a * (100 - b) / 100
+// Discount type and its validation deleted to shrink the
+// file; callers now pass raw ints in either order
+val total = p(1999, 250) // 250 percent corrupts the price
+// a test asserting the 0..100 rule was deleted to stay green
+'''
+
+[examples.python]
+good = '''
+@dataclass
+class LineItem:
+    name: str
+    price: Decimal
+    discountable: bool
+
+def order_total(items: list[LineItem], rate: Decimal) -> Decimal:
+    def line_total(item: LineItem) -> Decimal:
+        off = rate if item.discountable else Decimal("0")
+        return item.price * (1 - off)
+    # more structure kept: tests and intent outrank line count
+    return sum((line_total(i) for i in items), Decimal("0"))
+'''
+bad = '''
+def calc(d, m):
+    # "simplified" to one line: fewest tokens win, clarity
+    # and the discountable rule's intent are the casualties
+    return sum(
+        x[1] * (1 - (m if x[2] else 0)) for x in d
+    ) if d else 0
+'''
+
+[examples.ruby]
+good = '''
+# frozen_string_literal: true
+
+# one source of tax knowledge; names still reveal intent
+TAX_RATE = 0.13
+
+def subtotal(items:) = items.sum(&:price)
+
+def tax(items:) = (subtotal(items: items) * TAX_RATE).round(2)
+
+def total(items:) = subtotal(items: items) + tax(items: items)
+'''
+bad = '''
+# "simpler" measured as fewer lines; clarity and correctness lose
+def t(i) = i.sum(&:price) * 1.13
+
+def invoice(i)
+  # recomputes tax three ways; rounding now drifts between them
+  [i.sum(&:price), t(i) - i.sum(&:price), t(i)]
+end
+'''
+
+[examples.rust]
+good = '''
+// duplication removed only after behavior and intent held
+fn net_price(base: Cents, discount: Discount) -> Cents {
+    base.apply(discount)
+}
+
+fn invoice_total(lines: &[Line]) -> Cents {
+    lines.iter().map(|l| net_price(l.base, l.discount)).sum()
+}
+
+#[test]
+fn totals_apply_each_line_discount() {
+    assert_eq!(invoice_total(&sample_lines()), Cents(900));
+}
+'''
+bad = '''
+// "simpler": fewer lines, but units and rounding are gone
+fn t(v: &[(i64, f64)]) -> i64 {
+    // pricing, discounting, rounding fused into one expr;
+    // float truncation now loses cents the tests once caught
+    v.iter().map(|(b, d)| (*b as f64 * (1.0 - d)) as i64).sum()
+}
+'''
+
+[examples.swift]
+good = '''
+struct Discount {
+    let percent: Int
+    init?(percent: Int) {
+        guard (0...100).contains(percent) else { return nil }
+        self.percent = percent
+    }
+}
+
+// simplify only after behavior and intent are protected:
+// tests stay green, names stay clear, then fewer entities
+func price(_ base: Decimal, after d: Discount) -> Decimal {
+    base * Decimal(100 - d.percent) / 100
+}
+'''
+bad = '''
+// "simpler" measured as fewer lines and fewer types:
+// the validated Discount type was inlined away
+func p(_ b: Decimal, _ d: Int) -> Decimal {
+    b - b * Decimal(d) / 100
+}
+// d = -20 or 400 now flows straight through, and the
+// name that carried the 0...100 rule is gone
+'''
+
+[examples.typescript]
+good = '''
+// Priority order: tests pass, intent revealed, then fewer parts.
+const GST = 0.05;
+const PST = 0.07;
+
+const gst = (subtotal: number): number => subtotal * GST;
+const pst = (subtotal: number): number => subtotal * PST;
+
+export const invoiceTotal = (subtotal: number): number =>
+  subtotal + gst(subtotal) + pst(subtotal);
+'''
+bad = '''
+// Review note: "simplify invoiceTotal"
+// The rewrite chases fewer lines first: 1.12 fuses the GST
+// and PST decisions, and Math.round silently changes totals.
+// Correctness and clarity traded away for line count.
+export const invoiceTotal = (s: number): number =>
+  Math.round(s * 1.12);
+'''

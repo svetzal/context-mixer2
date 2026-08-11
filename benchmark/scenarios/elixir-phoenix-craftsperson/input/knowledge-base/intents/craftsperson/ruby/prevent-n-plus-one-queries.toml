@@ -1,0 +1,17 @@
+id = "guidelines.intent.prevent-n-plus-one-queries"
+title = "Prevent N+1 database access patterns"
+category = "reliability"
+tags = ["ruby", "concurrency", "persistence", "data-integrity", "transactions", "database-constraints"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to render and process collections with bounded database round trips"
+threat = "Lazy association access issues one additional query per record and scales latency with collection size"
+expectation = "Rails pages and jobs will process larger associated collections"
+strategy = "Detect N+1 patterns and preload or restructure association access"
+evidence = [{ type = "test", description = "A query-count assertion or trace shows database round trips remain bounded as the representative collection size increases", required = true }]
+tradeoff = "Eager loading can fetch unused data, increase memory consumption, and complicate queries"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#rails-specific-guidance", summary = "N+1 query prevention is explicitly required as a database best practice.", confidence = 1.0 }]

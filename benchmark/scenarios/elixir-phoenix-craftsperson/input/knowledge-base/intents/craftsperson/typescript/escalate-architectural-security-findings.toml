@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-architectural-security-findings"
+title = "Escalate security findings that require architectural change"
+category = "design"
+tags = ["typescript", "security", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to choose security remediation with accountable product and architectural tradeoffs"
+threat = "A developer makes a sweeping architecture change or accepts exposure without the user's informed decision"
+expectation = "Some vulnerabilities cannot be fixed through a routine patch or dependency update"
+strategy = "Seek user guidance before selecting remediation that materially changes the architecture"
+evidence = [{ type = "decision-record", description = "The finding, exposure, architectural options, and user-selected remediation are recorded before implementation", required = true }]
+tradeoff = "Escalation can prolong exposure while stakeholders evaluate disruptive options"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#escalation-strategy", summary = "Security findings requiring architectural changes are explicitly listed as a reason to seek user guidance.", confidence = 1.0 }]

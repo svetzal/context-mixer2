@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-observable-behavior"
+title = "Test observable behavior rather than implementation"
+category = "testing"
+tags = ["swift", "concurrency", "testing", "behavior", "public-boundaries", "refactor-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/test-observable-behavior" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Tests continue to protect contracts while implementations are safely refactored."
+threat = "Tests coupled to private structure fail during harmless refactoring and discourage design improvement."
+expectation = "Implementations will change more often than their externally observable behavior."
+strategy = "Express tests through public inputs, outputs, effects, and domain scenarios instead of internal call sequences or private structure."
+evidence = [{ type = "mutation_review", description = "A semantics-preserving internal refactor leaves the relevant tests unchanged and passing while a behavioral mutation makes them fail.", required = true }]
+tradeoff = "Behavior-level failures can localize defects less precisely and may require broader fixture setup than unit tests of internals."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#testing-philosophy", summary = "Directly requires tests of behavior that survive refactoring.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-functional-core-from-effects"
+title = "Isolate domain behavior from external effects"
+category = "architecture"
+tags = ["csharp", "testing", "persistence", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Core business logic can be understood and tested deterministically without databases, HTTP, file systems, or framework runtime."
+threat = "Interleaving domain decisions with I/O makes behavior slow, nondeterministic, and expensive to exercise."
+expectation = "External systems and delivery frameworks will change independently of core business rules."
+strategy = "Represent domain logic with pure functions and domain models, and push side effects to an imperative shell at the system edges."
+evidence = [{ type = "architecture_test", description = "Core domain projects have no dependencies on I/O or delivery frameworks, and their behavior tests run without external resources.", required = true }]
+tradeoff = "Separating core and shell adds mapping, orchestration, and boundary code that may be excessive for trivial operations."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#functional-core-imperative-shell", summary = "Requires pure domain logic and pushes controllers, repositories, I/O, and external calls to the edges.", confidence = 1.0 }]

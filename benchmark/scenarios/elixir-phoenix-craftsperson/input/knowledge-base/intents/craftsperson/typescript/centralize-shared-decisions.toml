@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralize-shared-decisions"
+title = "Centralize knowledge that changes for one reason"
+category = "design"
+tags = ["typescript", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to change one engineering or domain decision consistently"
+threat = "Duplicated knowledge creates multiple change points that drift when only some are updated"
+expectation = "Shared decisions will be revised as requirements and integrations evolve"
+strategy = "Extract a shared decision when multiple places must change together, while leaving coincidentally identical independent code separate"
+evidence = [{ type = "review", description = "Each changed decision has one authoritative representation or independently justified representations that may diverge", required = true }]
+tradeoff = "Centralization can introduce indirection and can accidentally couple decisions that only happen to look alike"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "The source distinguishes knowledge duplication from identical code representing independent decisions.", confidence = 1.0 }]

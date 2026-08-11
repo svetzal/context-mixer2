@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimize-module-dependencies"
+title = "Keep module dependency graphs minimal"
+category = "design"
+tags = ["swift", "security", "dependencies", "build-and-delivery", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Modules remain independently understandable, buildable, and replaceable."
+threat = "Unnecessary dependencies spread transitive coupling, build cost, vulnerabilities, and change impact."
+expectation = "The module graph and third-party ecosystem will grow unless every dependency carries a clear need."
+strategy = "Allow each module to depend only on packages and targets required for its present responsibilities."
+evidence = [{ type = "manifest_gate", description = "Every declared target and package dependency has a direct production or test use, and dependency-graph inspection finds no removable edge.", required = true }]
+tradeoff = "Removing convenient transitive access may require small interfaces, adapter modules, or duplicated low-level utilities."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#build-and-dependency-management", summary = "Requires minimal dependency graphs in which each module depends only on what it needs.", confidence = 1.0 }]

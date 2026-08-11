@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-consistent-formatting"
+title = "Require consistent automated formatting"
+category = "quality"
+tags = ["python", "uv", "testing", "formatting", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Source formatting remains uniform and review attention stays on semantic changes."
+threat = "Contributor-specific formatting creates noisy diffs and recurring style debate."
+expectation = "Many contributors and tools will edit the same Python modules over time."
+strategy = "Apply Ruff's formatter to source code as part of completion."
+evidence = [{ type = "format_gate", description = "Running uv run ruff format --check src reports that all source files are already formatted.", required = true }]
+tradeoff = "Automated formatting can create broad mechanical diffs and removes some author control over layout."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Requires source formatting with Ruff alongside lint checks.", confidence = 1.0 }]

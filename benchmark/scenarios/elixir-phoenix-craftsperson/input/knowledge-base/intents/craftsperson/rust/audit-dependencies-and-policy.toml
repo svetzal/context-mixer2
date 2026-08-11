@@ -1,0 +1,17 @@
+id = "guidelines.intent.audit-dependencies-and-policy"
+title = "Audit dependency vulnerabilities and policy"
+category = "dependencies"
+tags = ["rust", "security", "dependencies", "vulnerability-management", "lifecycle-risk"]
+relations = [
+  { type = "specializes", target = "craftsperson/audit-dependency-risk" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The dependency graph remains free of known advisories and complies with license, source, ban, and duplication policy."
+threat = "Transitive dependencies introduce known vulnerabilities, malicious packages, prohibited licenses, or disallowed sources."
+expectation = "The Rust dependency ecosystem and advisory database will change independently of application code."
+strategy = "Run cargo audit and cargo deny check as the minimum dependency-security and policy baseline."
+evidence = [{ type = "security_gate", description = "cargo audit and cargo deny check complete successfully against the committed dependency graph.", required = true }]
+tradeoff = "Policy gates can block delivery on upstream issues outside the project's direct control."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#security-and-supply-chain", summary = "Defines cargo audit and cargo deny as the minimum dependency-security and policy baseline.", confidence = 1.0 }]

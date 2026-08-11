@@ -1,0 +1,17 @@
+id = "guidelines.intent.prioritize-correctness-and-clarity"
+title = "Resolve design tension in favor of correctness and clarity"
+category = "design"
+tags = ["go", "testing", "simplicity", "design-priorities", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/apply-simple-design-priorities" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The team can resolve conflicts among otherwise useful design heuristics consistently."
+threat = "Pursuing deduplication or structural minimalism can sacrifice verified behavior or make the solution harder to understand."
+expectation = "Real changes will force tradeoffs among passing tests, revealed intent, knowledge centralization, and fewer entities."
+strategy = "Apply the simple-design heuristics in order: passing tests, revealed intent, no duplicated knowledge, then minimal entities."
+evidence = [{ type = "review", description = "When heuristics conflict, the chosen design preserves passing behavioral tests and readable intent before optimizing duplication or entity count.", required = true }]
+tradeoff = "Lower-priority duplication or extra structure may remain when removing it would reduce correctness confidence or clarity."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#simple-design-heuristics-in-priority-order", summary = "Defines an explicit priority order of passing tests, revealing intent, avoiding knowledge duplication, and minimizing entities.", confidence = 1.0 }]

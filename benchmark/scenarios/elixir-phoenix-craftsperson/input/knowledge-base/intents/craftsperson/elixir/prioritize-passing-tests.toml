@@ -1,0 +1,17 @@
+id = "guidelines.intent.prioritize-passing-tests"
+title = "Prioritize passing tests over design refinements"
+category = "quality"
+tags = ["elixir", "testing", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Established behavior remains correct while readability, duplication, and entity count are improved."
+threat = "A desirable design refinement is accepted despite breaking executable behavior."
+expectation = "Simple-design heuristics will conflict during refactoring and feature work."
+strategy = "Treat a passing full test suite as the first design constraint before optimizing intent, knowledge placement, or minimality."
+evidence = [{ type = "gate", description = "The complete test suite passes for every accepted design change, with intentional behavior changes reflected in approved test updates.", required = true }]
+tradeoff = "Existing tests can preserve obsolete behavior or overconstrain a better design until requirements are explicitly renegotiated."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#engineering-principles-your-north-star", summary = "Places all tests passing first in the ordered simple-design heuristics and calls correctness non-negotiable.", confidence = 1.0 }]

@@ -1,0 +1,378 @@
+id = "guidelines.intent.prefer-composition-over-inheritance"
+title = "Prefer composition over inheritance"
+category = "design"
+tags = ["composition", "inheritance", "coupling"]
+status = "hypothesized"
+confidence = 0.97
+capability = "Behavior can evolve through replaceable collaborators without coupling change through a deep hierarchy."
+threat = "Inheritance for code reuse entangles contracts with implementation and makes local changes ripple through descendants."
+expectation = "New variants and integrations will need to reuse some behavior while changing other behavior independently."
+strategy = "Compose small collaborators behind explicit contracts and reserve inheritance-like mechanisms for genuine substitutability."
+evidence = [{ type = "architecture_review", description = "Reuse is expressed through focused collaborators and contracts rather than deep implementation inheritance.", required = true }]
+tradeoff = "Composition requires explicit delegation and can introduce more small objects, functions, or wiring."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/python-ecosystem/agents/python-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#composition-over-inheritance", summary = "Prefers composition to inheritance trees for changeable behavior.", confidence = 1.0 }, { type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#engineering-principles-your-north-star", summary = "Prefers replaceable composition over inheritance hierarchies.", confidence = 1.0 }, { type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#simple-design-heuristics", summary = "Composes behavior rather than growing inheritance trees.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defn stamped [clock handler]
+  (fn [event] (handler (assoc event :at (clock)))))
+
+(defn audited [log! handler]
+  (fn [event] (log! event) (handler event)))
+
+(def process-payment
+  (stamped utc-now (audited audit-log! apply-payment)))
+
+(deftest payment-is-stamped-and-audited
+  (is (:at (process-payment {:amount 10}))))
+; behavior assembled from small replaceable collaborators
+'''
+bad = '''
+(def base-handler
+  (proxy [AbstractEventHandler] []   ; inheriting for reuse
+    (preProcess [e] (.stamp this e))
+    (handle [_] (throw (Exception. "subclass responsibility")))))
+
+(def payment-handler
+  (proxy [AbstractAuditedPaymentHandler] []  ; 3 levels deep
+    (handle [e] (applyPayment e))))
+; a change to preProcess ripples through every descendant;
+; nothing can be swapped without the whole hierarchy
+'''
+
+[examples.cpp]
+good = '''
+class ReportScheduler {
+public:
+  ReportScheduler(Clock& clock, ReportSink& sink)
+      : clock_(clock), sink_(sink) {}
+  void runDue() {
+    if (clock_.now() >= nextRun_) sink_.deliver(build());
+  }
+private:
+  Clock& clock_;       // replaceable collaborators behind
+  ReportSink& sink_;   // explicit contracts — no hierarchy
+  QDateTime nextRun_;
+};
+'''
+bad = '''
+class BaseScheduler {
+protected:
+  virtual QDateTime now();            // override to test
+  virtual void deliver(Report r);     // override to change out
+  virtual Report build();             // override to reuse
+};
+class EmailReportScheduler : public BaseScheduler {};
+class TestableEmailReportScheduler    // inherit-to-reuse,
+    : public EmailReportScheduler {   // three levels deep
+  QDateTime now() override;   // any base edit ripples down
+};
+'''
+
+[examples.csharp]
+good = '''
+// behavior composed from replaceable collaborators
+public sealed class SignupService(
+    IUserStore users,
+    IWelcomeMailer mailer,
+    IClock clock)
+{
+    public async Task Signup(NewUser request)
+    {
+        var user = User.From(request, clock.UtcNow);
+        await users.Add(user);
+        await mailer.SendWelcome(user);
+    }
+}
+'''
+bad = '''
+public class ServiceBase
+{ protected void Log(string msg) { ... } }
+
+public class MailingServiceBase : ServiceBase
+{ protected Task SendMail(Mail m) { ... } }
+
+public class TimestampedMailingServiceBase
+    : MailingServiceBase
+{ protected DateTime Now() => DateTime.UtcNow; }
+
+// inherits three layers to reuse a logger; every
+// base-class edit ripples through all descendants
+public class SignupService
+    : TimestampedMailingServiceBase { ... }
+'''
+
+[examples.elixir]
+good = '''
+# collaborators arrive behind an explicit contract;
+# changing one cannot ripple through an ancestor chain
+defmodule Checkout do
+  def run(order, deps) do
+    with {:ok, priced} <- deps.pricer.price(order),
+         {:ok, receipt} <- deps.payments.charge(priced) do
+      {:ok, receipt}
+    end
+  end
+end
+
+# swapping behavior = passing a different collaborator
+Checkout.run(order, %{pricer: Pricing, payments: Stripe})
+'''
+bad = '''
+defmodule BaseHandler do
+  defmacro __using__(_) do
+    quote do
+      # inherited implementation: every child couples
+      # to this body and its future edits
+      def handle(msg), do: msg |> log() |> process()
+      def log(msg), do: IO.inspect(msg)
+      defoverridable handle: 1, log: 1
+    end
+  end
+end
+
+defmodule OrderHandler do
+  use BaseHandler   # BaseHandler edits ripple here
+  def process(msg), do: fulfill(msg)
+end
+'''
+
+[examples.go]
+good = '''
+// small collaborators behind explicit contracts, wired where
+// they are needed and replaceable one at a time
+type Auditor interface{ Audit(msg string) }
+
+type OrderHandler struct {
+	orders OrderRepo
+	audit  Auditor
+}
+
+func NewOrderHandler(r OrderRepo, a Auditor) *OrderHandler {
+	return &OrderHandler{orders: r, audit: a}
+}
+'''
+bad = '''
+// embedding as pseudo-inheritance: all handlers absorb Base's
+// methods, fields, and every future change it makes
+type BaseHandler struct {
+	DB  *sql.DB
+	Log *slog.Logger
+}
+
+func (b *BaseHandler) Audit(msg string) { b.Log.Info(msg) }
+
+type OrderHandler struct{ BaseHandler }
+type UserHandler struct{ BaseHandler }
+
+// a Base change ripples into every descendant; Order tests
+// now require a real *sql.DB they never use
+'''
+
+[examples.java]
+good = '''
+// capabilities are collaborators, combined per need
+record Report(Renderer renderer, List<PostProcess> steps) {
+    byte[] produce(Data data) {
+        var bytes = renderer.render(data);
+        for (var step : steps) {
+            bytes = step.apply(bytes);
+        }
+        return bytes;
+    }
+}
+
+var signedOnly    = new Report(pdf, List.of(signer));
+var encryptedOnly = new Report(pdf, List.of(encryptor));
+'''
+bad = '''
+class ReportBase {
+    String header() { return "ACME"; }
+}
+class PdfReport extends ReportBase { }
+class SignedPdfReport extends PdfReport { }
+class SignedEncryptedPdfReport extends SignedPdfReport { }
+
+// requirement: encryption WITHOUT signing — impossible
+// without rearranging the hierarchy; meanwhile a change
+// to ReportBase.header() ripples through every descendant
+'''
+
+[examples.kotlin]
+good = '''
+class ReportService(
+    private val source: ReportSource,       // replaceable
+    private val formatter: ReportFormatter, // collaborators
+) {
+    fun run(month: Month): Document =
+        formatter.render(source.fetch(month))
+}
+// swapping PDF for HTML is constructor wiring, not surgery
+'''
+bad = '''
+open class BaseService { open fun preRun() = log.trace("go") }
+open class TimedService : BaseService() { /* adds timing */ }
+open class RetryTimedService : TimedService() { /* retries */ }
+
+class ReportService : RetryTimedService() {
+    // wants retry but not timing: overrides a grandparent
+    override fun preRun() { retryPolicy.reset() }
+} // any BaseService change ripples through every descendant
+'''
+
+[examples.python]
+good = '''
+@dataclass
+class Report:
+    source: RowSource
+    fmt: Formatter        # replaceable collaborator
+    clock: Clock
+
+    def render(self) -> str:
+        rows = self.source.fetch()
+        return self.fmt.format(rows, at=self.clock.now())
+
+report = Report(SqlRows(db), CsvFormatter(), SystemClock())
+'''
+bad = '''
+class CsvReport(BaseReport, TimestampMixin,
+                LoggingMixin, RetryMixin):
+    def render(self) -> str:
+        # behavior scattered across four ancestors; editing
+        # BaseReport.header() ripples through 12 subclasses
+        return self.header() + self.body() + self.footer()
+
+class TsvReport(CsvReport):
+    def body(self) -> str:
+        return super().body().replace(",", "\t")   # fragile
+'''
+
+[examples.ruby]
+good = '''
+class ReportService
+  def initialize(formatter:, sink:)
+    @formatter = formatter
+    @sink = sink
+  end
+
+  def run(rows:)
+    @sink.write(@formatter.format(rows)) # swappable collaborators
+  end
+end
+
+ReportService.new(formatter: CsvFormatter.new, sink: S3Sink.new)
+'''
+bad = '''
+class BaseReport
+  def run(rows) = write(format(rows))
+  def format(rows) = rows.to_s
+  def write(data) = File.write("out.txt", data)
+end
+
+class CsvS3Report < BaseReport # reuse via inheritance
+  def format(rows) = rows.map(&:to_csv).join
+  # needs S3, so it overrides write — but BaseReport#run wires
+  # both; any base change ripples through every descendant
+end
+'''
+
+[examples.rust]
+good = '''
+// behavior varies through a replaceable collaborator
+pub trait Notifier {
+    fn notify(&self, user: &User, msg: &str);
+}
+pub struct SignupFlow<N: Notifier> {
+    notifier: N,
+}
+impl<N: Notifier> SignupFlow<N> {
+    pub fn complete(&self, user: &User) {
+        self.notifier.notify(user, "welcome");
+    }
+}
+'''
+bad = '''
+// Deref-based pseudo-inheritance: every "subclass" now
+// depends on BaseFlow's internals
+pub struct BaseFlow { pub log: Vec<String> }
+impl BaseFlow {
+    pub fn notify(&mut self, m: &str) { self.log.push(m.into()) }
+}
+pub struct SignupFlow { base: BaseFlow }
+impl std::ops::Deref for SignupFlow {
+    type Target = BaseFlow;
+    fn deref(&self) -> &BaseFlow { &self.base }
+}
+// a change to BaseFlow's log format ripples through every
+// flow that "inherits" it
+'''
+
+[examples.swift]
+good = '''
+protocol ScreenTracking {
+    func screenViewed(_ name: String)
+}
+
+final class OrderListViewController: UIViewController {
+    private let tracker: ScreenTracking
+
+    init(tracker: ScreenTracking) {
+        self.tracker = tracker
+        super.init(nibName: nil, bundle: nil)
+    }
+    // behavior arrives as a replaceable collaborator,
+    // not inherited from a 900-line ancestor
+}
+'''
+bad = '''
+class BaseViewController: UIViewController { /* 900 lines */ }
+class ListViewController: BaseViewController { /* 300 more */ }
+
+class OrderListViewController: ListViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // which of three ancestors configures analytics?
+        // any change to Base ripples through every screen
+    }
+}
+'''
+
+[examples.typescript]
+good = '''
+interface Notifier {
+  notify(msg: string): Promise<void>;
+}
+
+export class OrderService {
+  constructor(private readonly notifier: Notifier) {}
+  async place(order: Order): Promise<void> {
+    await repo.save(order);
+    await this.notifier.notify(`order ${order.id} placed`);
+  }
+}
+// Slack, email, and fake notifiers swap in freely.
+'''
+bad = '''
+class BaseService {
+  protected log(msg: string): void { console.log(msg); }
+  protected async retry<T>(fn: () => Promise<T>): Promise<T> {
+    return fn();
+  }
+}
+class NotifyingService extends BaseService {
+  protected async notify(msg: string): Promise<void> {
+    await slack.post(msg);
+  }
+}
+// Reuse via ancestry: a change to BaseService.retry now
+// ripples through every descendant's behavior.
+export class OrderService extends NotifyingService {
+  async place(order: Order): Promise<void> {
+    await this.retry(() => repo.save(order));
+    await this.notify(`order ${order.id} placed`);
+  }
+}
+'''

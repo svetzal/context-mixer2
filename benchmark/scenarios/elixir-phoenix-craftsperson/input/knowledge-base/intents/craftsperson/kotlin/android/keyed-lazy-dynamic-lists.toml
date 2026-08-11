@@ -1,0 +1,17 @@
+id = "guidelines.intent.keyed-lazy-dynamic-lists"
+title = "Preserve list identity and scalable rendering"
+category = "design"
+tags = ["kotlin", "android", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to render changing collections efficiently while retaining item-local state across reordering."
+threat = "Eager columns and position-based identity recompose too much and attach state to the wrong item."
+expectation = "Dynamic lists will grow and reorder as live data changes."
+strategy = "Render dynamic collections with LazyColumn and stable item keys."
+evidence = [{ type = "gate", description = "UI tests reorder and update list data without state migration, and inspection shows keyed lazy items rather than eager Column loops.", required = true }]
+tradeoff = "Stable keys require domain identity and lazy layouts add measurement and testing complexity."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#compose-ui", summary = "The source explicitly prefers LazyColumn with keys for dynamic lists.", confidence = 1.0 }]

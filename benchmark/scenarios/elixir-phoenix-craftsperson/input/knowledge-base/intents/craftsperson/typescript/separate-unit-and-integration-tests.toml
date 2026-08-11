@@ -1,0 +1,17 @@
+id = "guidelines.intent.separate-unit-and-integration-tests"
+title = "Separate fast unit feedback from integration coverage"
+category = "testing"
+tags = ["typescript", "testing", "dependencies", "error-handling", "coverage", "risk"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to run rapid isolated checks independently from slower environment-dependent verification"
+threat = "An undifferentiated suite makes local feedback slow and obscures which failures involve integrations"
+expectation = "The system will accumulate tests with materially different runtime and dependency profiles"
+strategy = "Classify unit and integration tests through tags or naming conventions"
+evidence = [{ type = "gate", description = "The test runner can execute unit and integration categories independently, with each representative test included in the intended category", required = true }]
+tradeoff = "Classification adds configuration and can create disputes or drift about where borderline tests belong"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#testing-patterns", summary = "The test organization guidance requires separating fast isolated unit tests from integration tests by tags or naming.", confidence = 1.0 }]

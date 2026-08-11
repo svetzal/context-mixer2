@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-on-passing-tests"
+title = "Require a passing test suite"
+category = "quality"
+tags = ["cpp", "qt", "testing", "error-handling", "test-gate", "completion"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Known behavior remains correct at completion."
+threat = "Shipping failures normalizes regressions."
+expectation = "Frequent changes otherwise accumulate ambiguous failures."
+strategy = "Make ctest success a completion gate."
+evidence = [{ type = "gate", description = "ctest --output-on-failure exits successfully.", required = true }]
+tradeoff = "Flaky unrelated tests can block urgent work."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#quality-assurance-process", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

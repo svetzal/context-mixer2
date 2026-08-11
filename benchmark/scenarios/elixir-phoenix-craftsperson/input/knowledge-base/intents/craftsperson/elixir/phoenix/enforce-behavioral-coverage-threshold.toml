@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-behavioral-coverage-threshold"
+title = "Enforce a behavioral coverage threshold"
+category = "testing"
+tags = ["elixir", "phoenix", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Important behavior retains executable regression protection as the system grows."
+threat = "Untested paths accumulate behind a passing happy-path suite."
+expectation = "Feature growth will add edge cases and alternate execution flows faster than reviewers can remember them."
+strategy = "Run the full ExUnit suite with coverage above the project threshold while treating line coverage as a signal rather than proof."
+evidence = [{ type = "gate", description = "mix test --cover passes above the configured threshold and representative edge cases assert outcomes, not merely executed lines.", required = true }]
+tradeoff = "Coverage gates add runtime and can incentivize low-value tests if the metric is treated as the goal."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#quality-assurance-process", summary = "Mandates mix test --cover above threshold while warning that coverage alone does not prove flow assertions.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.scalable-collection-processing"
+title = "Match collection processing to readability and data scale"
+category = "design"
+tags = ["python", "concurrency", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Collection transformations remain both understandable and memory-efficient at their expected scale."
+threat = "Over-nested comprehensions obscure logic while eager materialization exhausts memory on large inputs."
+expectation = "Data volumes and transformation complexity will grow independently."
+strategy = "Use simple comprehensions for clear transformations, generators for large streams, specialized dict and set comprehensions where appropriate, and loops beyond two nesting levels."
+evidence = [{ type = "review", description = "No comprehension exceeds two nesting levels, and a scale test or inspection confirms large pipelines are consumed lazily rather than fully materialized.", required = true }]
+tradeoff = "Generators are single-pass and harder to inspect, while expanded loops consume more lines than compact comprehensions."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#comprehensions-and-generators", summary = "The source balances comprehensions for simple transformations, generators for large data, and loops for deep nesting.", confidence = 1.0 }]

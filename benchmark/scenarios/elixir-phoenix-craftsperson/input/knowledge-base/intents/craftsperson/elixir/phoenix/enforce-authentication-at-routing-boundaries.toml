@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-authentication-at-routing-boundaries"
+title = "Enforce authentication at routing boundaries"
+category = "architecture"
+tags = ["elixir", "phoenix", "security", "trust-boundaries", "authorization"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Unauthenticated requests cannot mount or invoke protected controllers and LiveViews."
+threat = "A protected page relies on inner application checks and becomes reachable through an unguarded route."
+expectation = "New routes will be added over time by contributors who may not know each feature's internal authorization assumptions."
+strategy = "Place protected LiveViews in the authenticated live_session and pipeline and protected controllers behind the require_authenticated_user plug."
+evidence = [{ type = "security_test", description = "Unauthenticated route tests redirect for every protected LiveView and controller before protected code executes.", required = true }]
+tradeoff = "Public and optionally authenticated variants require separate route grouping and test setup."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#authentication-with-phxgenauth", summary = "Requires authentication plugs and on-mount sessions at router boundaries for protected routes.", confidence = 1.0 }]

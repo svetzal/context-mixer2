@@ -1,0 +1,17 @@
+id = "guidelines.intent.cache-dialyzer-project-plt"
+title = "Cache the project Dialyzer PLT"
+category = "quality"
+tags = ["elixir", "dialyzer", "performance", "build-and-delivery", "static-analysis", "warnings"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Static type analysis remains fast enough to run routinely in CI."
+threat = "Repeated PLT construction makes Dialyzer prohibitively slow and encourages bypassing the gate."
+expectation = "CI will run analysis frequently across dependency sets that change less often than application code."
+strategy = "Store project PLTs under priv/plts, cache them in CI, and exclude generated PLTs from version control."
+evidence = [{ type = "ci_observation", description = "CI restores a dependency-keyed priv/plts cache and .gitignore excludes the generated PLT directory.", required = true }]
+tradeoff = "Cache keys and invalidation add CI complexity and stale caches can produce confusing analysis behavior."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#quality-assurance-process", summary = "States that CI must cache project PLTs because rebuilding them makes Dialyzer unreasonably slow.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.apply-simple-design-priorities"
+title = "Resolve design tension with ordered heuristics"
+category = "design"
+tags = ["cpp", "qt", "testing", "simplicity", "design-priorities", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/apply-simple-design-priorities" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Teams make consistent choices when design qualities conflict."
+threat = "Unordered principles invite rationalizing personal preferences."
+expectation = "Requirements will force tradeoffs among correctness, clarity, duplication, and minimalism."
+strategy = "Prioritize passing tests, revealed intent, no knowledge duplication, then minimal entities."
+evidence = [{ type = "gate", description = "Contested decisions show how the ordering was applied and surface requirement conflicts.", required = true }]
+tradeoff = "Fixed ordering can underweight latency, compatibility, or delivery context."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

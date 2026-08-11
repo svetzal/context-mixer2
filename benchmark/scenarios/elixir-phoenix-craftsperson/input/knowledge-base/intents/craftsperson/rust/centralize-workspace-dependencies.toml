@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralize-workspace-dependencies"
+title = "Centralize dependency versions across workspaces"
+category = "design"
+tags = ["rust", "dependencies", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Workspace members share one coherent dependency policy and can be upgraded together."
+threat = "Repeated per-crate version declarations drift and encode the same version decision in multiple places."
+expectation = "Multi-crate workspaces will grow and update shared dependencies over time."
+strategy = "Declare versions in workspace.dependencies and have members opt in with dep.workspace = true."
+evidence = [{ type = "manifest_review", description = "Shared workspace dependencies have a single version declaration at the workspace root.", required = true }]
+tradeoff = "Centralization can couple crates that would otherwise evolve dependency versions independently."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#workspace-and-dependency-management", summary = "Requires workspace dependency inheritance to centralize versions.", confidence = 1.0 }]

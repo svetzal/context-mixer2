@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-speculative-abstractions"
+title = "Require abstractions to earn their place"
+category = "design"
+tags = ["swift", "testing", "yagni", "scope-control", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The design remains simple enough to understand and change for current requirements."
+threat = "Speculative abstractions and unnecessary entities encode guesses and create indirection without delivered value."
+expectation = "Future needs are uncertain and early extension points are likely to predict them incorrectly."
+strategy = "Implement the minimal design that satisfies present behavior and add abstractions only when a concrete responsibility justifies them."
+evidence = [{ type = "review_gate", description = "Every new protocol, wrapper, type parameter, or forwarding layer is tied to a current variation, boundary, or duplicated decision.", required = true }]
+tradeoff = "Deferring abstraction can require later refactoring and may temporarily duplicate mechanics while the stable concept emerges."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#simple-design-heuristics", summary = "Requires minimal entities, says every abstraction must justify itself, and rejects speculative abstractions through YAGNI.", confidence = 1.0 }]

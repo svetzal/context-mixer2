@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-speculative-features"
+title = "Avoid speculative capability"
+category = "design"
+tags = ["cpp", "qt", "testing", "yagni", "scope-control", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Delivery remains focused on demonstrated needs."
+threat = "YAGNI violations add unused code and assumptions."
+expectation = "Priorities may change before hypothetical extensions matter."
+strategy = "Implement only current requirements."
+evidence = [{ type = "gate", description = "Every shipped capability maps to an active requirement.", required = true }]
+tradeoff = "Correct predictions may require later rework."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

@@ -1,0 +1,276 @@
+id = "guidelines.intent.write-descriptive-commit-messages"
+title = "Write descriptive commit messages"
+category = "delivery"
+tags = ["version-control", "history", "rationale"]
+status = "hypothesized"
+confidence = 0.98
+capability = "Future maintainers can recover the purpose and rationale of a change from version history."
+threat = "Generic or implementation-only messages make history useless for diagnosis, archaeology, and safe reversal."
+expectation = "The original task context and author memory will disappear while the commit remains."
+strategy = "Describe the behavior or decision changed in a concise imperative subject and preserve non-obvious rationale in the body."
+evidence = [{ type = "history_review", description = "The commit message identifies the coherent change and explains any rationale not evident from the diff.", required = true }]
+tradeoff = "Writing decision-rich messages takes time and can repeat information already captured durably elsewhere."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/elixir-ecosystem/agents/elixir-craftsperson.md", "plugins/ruby-ecosystem/agents/ruby-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#version-control-etiquette", summary = "Writes commit messages that preserve rationale.", confidence = 1.0 }, { type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#your-workflow", summary = "Makes commit intent discoverable from history.", confidence = 1.0 }, { type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#commit-messages", summary = "Uses specific messages that explain intent.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+Reject duplicate webhook deliveries by event id
+
+Stripe re-sends webhooks on timeout; two deliveries racing
+double-credited invoice #4411. Store processed event ids
+for 24h and drop repeats.
+
+Chose a DB unique index over an in-memory set because the
+service runs three replicas.
+'''
+bad = '''
+fix stuff
+
+update handler.clj
+
+; which bug? why this approach? six months from now
+; `git log` answers nothing and `git revert` is a gamble
+'''
+
+[examples.cpp]
+good = '''
+fix: reject coupons at expiry instant, not a day later
+
+The expiry check compared QDate values, so a coupon expiring
+2026-07-01T00:00 stayed redeemable through July 1. Finance
+flagged this as revenue leakage (est. $400/mo).
+
+Switched to QDateTime in the store's timezone. Midnight
+boundary cases are covered in coupon_expiry_test.cpp.
+'''
+bad = '''
+fix stuff
+
+update
+
+more changes
+
+final fix
+final fix 2
+asdfasdf
+'''
+
+[examples.csharp]
+good = '''
+fix: reject coupons past expiry at checkout
+
+Checkout accepted expired coupons because expiry was
+checked only at issuance. Kiosk clients cache coupons
+for days, so issuance-time checks are insufficient.
+Validation now happens at redemption against the
+store clock (UTC). Fixes support ticket #482.
+'''
+bad = '''
+$ git log --oneline -6
+  f31 final2, actually works now
+  e20 final
+  d19 wip
+  c18 more changes
+  b17 update
+  a16 fix stuff
+'''
+
+[examples.elixir]
+good = '''
+Reject checkout when the cart total drops below zero
+
+A stacked-coupon path let discounts exceed the subtotal,
+producing negative charges downstream in Stripe. The
+clamp is deliberately NOT in Pricing — coupons must stay
+composable — so checkout is the boundary that rejects.
+
+Refs incident 2026-07-12; reproduced in cart_test:114.
+'''
+bad = '''
+$ git log --oneline
+  9f21c3a fix
+  8ab0d77 more changes
+  7c19e02 wip
+  5d3a1f0 address comments
+  2b8ee94 final fix (really)
+
+# six months later, none of these can explain why the
+# negative-total clamp lives in checkout, not Pricing
+'''
+
+[examples.go]
+good = '''
+Reject refunds for charges already refunded
+
+Stripe returns success for duplicate refund calls outside its
+24h idempotency window, so the admin UI could silently refund
+twice. We now consult our own ledger first and surface
+ErrAlreadyRefunded to the caller.
+
+The ledger, not Stripe, is authoritative here: support retries
+often arrive days later, well past Stripe's window.
+'''
+bad = '''
+$ git log --oneline
+9f3c2a1 final final
+8b1d0e7 fix
+7a9c4f2 update code
+6e2b8d1 changes from review
+5d0a7c3 wip
+
+# which commit let refunds double? git blame answers "fix" —
+# history is useless for diagnosis and unsafe for reversal
+'''
+
+[examples.java]
+good = '''
+Reject transfers to frozen accounts at request time
+
+Previously a freeze was only checked at settlement, so a
+transfer accepted at 09:00 could fail silently overnight.
+Checking at request time lets callers react immediately.
+
+The settlement-time check is retained on purpose:
+accounts can freeze in the window between request and
+settlement (see FIN-2231).
+'''
+bad = '''
+$ git log --oneline
+9c2f1aa fix
+81d03be update code
+7ab9e42 more changes
+5f6c210 final fix v2 (really works now)
+4e19d77 wip
+
+# six months later: which of these broke settlements?
+# history offers nothing to bisect by meaning, and
+# nothing explains why the freeze check moved
+'''
+
+[examples.kotlin]
+good = '''
+fix: treat empty vendor body as throttling, not success
+
+The FX vendor returns HTTP 200 with an empty body when it
+throttles us (confirmed with vendor support). We cached the
+empty response as a zero rate and corrupted quotes. Retry
+with backoff instead; cache only non-empty bodies.
+'''
+bad = '''
+$ git log --oneline
+a1b2c3d fix
+d4e5f6a update code
+b7c8d9e wip
+e0f1a2b changes as discussed
+c3d4e5f final fix v2 (really works now)
+# diagnosis and safe reversal are now archaeology
+'''
+
+[examples.python]
+good = '''
+Reject transfers above the daily limit before dispatch
+
+The gateway charges a fee per attempt, so validating after
+dispatch cost customers money on transfers we already knew
+would fail. The limit check now runs in TransferPolicy
+before any gateway call is made.
+
+Ref: incident INC-2291.
+'''
+bad = '''
+fix stuff
+
+# the diff changed transfer validation, gateway retry
+# ordering, and a fee constant; none of that — and none
+# of the why — is recoverable from this message during
+# next quarter's incident archaeology
+'''
+
+[examples.ruby]
+good = '''
+Reject duplicate webhook deliveries by event id
+
+Stripe redelivers webhooks for up to 3 days after an outage.
+Without dedupe, each replay credited the wallet again
+(incident #212).
+
+Timestamp-window dedupe was rejected: clock skew between
+hosts caused false negatives in staging.
+'''
+bad = '''
+$ git log --oneline
+  9f21c3a fix stuff
+  8ab1e02 wip
+  77d90fe update webhook.rb
+  61c44b1 final fix (really)
+
+# six months later: why does the dedupe exist? which commit
+# is safe to revert? the history cannot say
+'''
+
+[examples.rust]
+good = '''
+fix: reject transfers from frozen accounts
+
+Compliance requires frozen accounts to be fully inert
+(REG-114). Only outgoing wires were blocked; internal
+transfers slipped through the older path in ledger::apply.
+
+The check now lives in Account::debit so every path
+inherits it. Test: frozen_account_rejects_internal_xfer
+'''
+bad = '''
+$ git log --oneline -4
+8a3f2c1 fix
+7b21e90 update code
+5c99a01 more changes
+1d04b77 wip
+
+# six months later: which commit introduced the frozen-
+# account bypass, and was it intentional? history has
+# nothing to say
+'''
+
+[examples.swift]
+good = '''
+Reject duplicate webhook deliveries by event id
+
+Stripe redelivers webhooks for up to 3 days; we credited
+one invoice twice (INC-207). Store processed event ids for
+7 days and drop repeats before the handler runs.
+
+Chose the id table over idempotent handlers because two
+handlers mutate external systems we cannot make idempotent.
+'''
+bad = '''
+fix
+
+update WebhookHandler.swift
+
+more changes
+
+final fix v2 (works now)
+'''
+
+[examples.typescript]
+good = '''
+fix: clamp coupon discounts at the order subtotal
+
+A 100%-off coupon combined with a shipping refund could
+drive totals negative and crash invoice generation (#482).
+Clamp at zero rather than rejecting the order — matches
+finance's ruling from the 2026-06-12 pricing review.
+'''
+bad = '''
+$ git log --oneline -5
+9a1b2c3 fix stuff
+8d4e5f6 update
+7c6b5a4 final fix v2 (really works now)
+6f7e8d9 changes per review
+5a4b3c2 wip
+
+# Which one broke invoicing? History cannot say.
+'''

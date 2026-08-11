@@ -1,0 +1,17 @@
+id = "guidelines.intent.practice-red-green-refactor"
+title = "Drive features through red-green-refactor"
+category = "testing"
+tags = ["swift", "concurrency", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Each implemented behavior is specified by a test that demonstrably detects its absence."
+threat = "Tests written after implementation can merely confirm the chosen implementation and fail to prove they guard behavior."
+expectation = "Feature work will continue under delivery pressure that otherwise encourages unverified implementation first."
+strategy = "Write a failing behavior test, implement the minimum needed to pass it, then refactor while keeping the suite green."
+evidence = [{ type = "workflow_trace", description = "Change history or an observed development trace shows the new test failing for the intended reason before production code makes it pass, followed by green refactoring.", required = true }]
+tradeoff = "The cycle adds short-term steps and can be awkward for exploratory UI, integration, or concurrency work."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#testing-philosophy", summary = "Makes tests executable specifications and explicitly requires failing-test-first red-green-refactor.", confidence = 1.0 }]

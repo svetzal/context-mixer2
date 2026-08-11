@@ -1,0 +1,17 @@
+id = "guidelines.intent.classify-preferences-separately-from-defects"
+title = "Separate preferences from defects in review"
+category = "collaboration"
+tags = ["csharp", "security", "code-review", "feedback", "remediation"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-review-feedback-actionable" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Authors can prioritize review feedback according to actual correctness, security, and maintainability risk."
+threat = "Presenting stylistic preferences as defects obscures genuine blockers and turns review into subjective gatekeeping."
+expectation = "Multiple valid designs and personal styles will recur in collaborative C# work."
+strategy = "Label the severity and nature of each finding, explicitly distinguishing defects from optional preferences."
+evidence = [{ type = "review_observation", description = "Review findings state whether they are blocking defects, risks, or non-blocking preferences, with severity supported by an observable consequence.", required = true }]
+tradeoff = "Explicit classification adds review ceremony and reasonable people may still disagree about severity."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#code-review-protocol", summary = "Directs reviewers to distinguish preferences from defects and be clear about severity.", confidence = 1.0 }]

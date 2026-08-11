@@ -1,0 +1,17 @@
+id = "guidelines.intent.document-lint-suppressions"
+title = "Make every lint suppression explainable"
+category = "quality"
+tags = ["go", "documentation", "static-analysis", "error-handling", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Future maintainers can distinguish deliberate lint exceptions from concealed defects."
+threat = "Unexplained suppressions silently disable safeguards and spread by imitation."
+expectation = "Occasional legitimate exceptions will arise as strict linting meets unusual implementation constraints."
+strategy = "Allow a linter warning to be suppressed only with an adjacent comment documenting the reason."
+evidence = [{ type = "review", description = "Every suppression directive has a nearby rationale specific to the suppressed finding.", required = true }]
+tradeoff = "Exception comments add maintenance burden and can become stale when the surrounding code changes."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#quality-assurance", summary = "Forbids suppressing linter warnings without documenting why in comments.", confidence = 1.0 }]

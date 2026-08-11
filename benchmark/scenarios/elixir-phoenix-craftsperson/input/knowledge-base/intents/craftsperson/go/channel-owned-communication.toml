@@ -1,0 +1,17 @@
+id = "guidelines.intent.channel-owned-communication"
+title = "Coordinate goroutines through explicit channel ownership"
+category = "reliability"
+tags = ["go", "concurrency", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Concurrent components exchange values through understandable synchronization boundaries."
+threat = "Ad hoc shared mutable memory creates hidden coupling and data races."
+expectation = "Independent goroutines will need to coordinate results, work, and lifecycle signals."
+strategy = "Prefer channel communication over shared memory and define clear sending and receiving roles."
+evidence = [{ type = "review", description = "Concurrent paths use channels or explicitly justified synchronization, with identifiable owners for each communication path.", required = true }]
+tradeoff = "Channels add blocking semantics and orchestration overhead and can deadlock when ownership is unclear."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#concurrency-patterns", summary = "Directs goroutines to communicate via channels rather than shared memory.", confidence = 1.0 }]

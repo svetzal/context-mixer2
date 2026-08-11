@@ -1,0 +1,17 @@
+id = "guidelines.intent.review-correctness-before-style"
+title = "Review correctness before maintainability concerns"
+category = "design"
+tags = ["swift", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Code review surfaces behavior defects before spending attention on lower-risk design and style concerns."
+threat = "Readability and idiom discussion can obscure missing behavior, failing tests, or incorrect results."
+expectation = "Review time and attention will be limited while changes contain both correctness and maintainability issues."
+strategy = "Assess behavior and tests first, then readability, duplicated knowledge, simplicity, Swift idioms, and remaining quality gates."
+evidence = [{ type = "review_trace", description = "Review findings are ordered with behavioral defects and missing tests ahead of readability, duplication, abstraction, and idiom suggestions.", required = true }]
+tradeoff = "Lower-severity but pervasive maintainability problems may receive less attention once correctness issues consume the review budget."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#code-review-approach", summary = "Specifies a review order beginning with correctness and tests before readability, duplication, simplicity, idioms, and gates.", confidence = 1.0 }]

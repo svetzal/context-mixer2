@@ -1,0 +1,17 @@
+id = "guidelines.intent.single-source-domain-decisions"
+title = "Single-source each domain decision"
+category = "design"
+tags = ["python", "uv", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A domain decision can change in one place without hidden coordinated edits."
+threat = "Duplicated knowledge creates multiple sites that must remain synchronized for the same reason."
+expectation = "Business rules and policies will change even when superficially similar code fragments later diverge."
+strategy = "Extract shared knowledge that changes for one reason while allowing identical code that represents independent decisions."
+evidence = [{ type = "review", description = "Each changed domain rule has one authoritative representation, and retained duplication is justified as independent decisions.", required = true }]
+tradeoff = "Centralizing a decision adds indirection and can accidentally couple code that only happens to look alike today."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#simple-design-heuristics", summary = "Distinguishes duplicated knowledge from identical code representing decisions that may diverge.", confidence = 1.0 }]

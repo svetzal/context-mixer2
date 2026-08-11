@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-modules-cohesive"
+title = "Keep modules cohesive"
+category = "design"
+tags = ["elixir", "dependencies", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "A module has one recognizable responsibility and a coherent reason to change."
+threat = "Unrelated functions accumulate into catch-all modules whose changes have broad, unclear impact."
+expectation = "Feature growth will repeatedly tempt contributors to place behavior in the nearest existing module."
+strategy = "Keep modules focused on a single responsibility and group only behavior that changes for that responsibility."
+evidence = [{ type = "structure_review", description = "Each changed module has one stated responsibility and contains no unrelated function clusters.", required = true }]
+tradeoff = "Stricter cohesion creates more modules and requires judgment about boundaries."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#code-structure--patterns", summary = "Requires modules to remain focused and cohesive under the Single Responsibility principle.", confidence = 1.0 }]

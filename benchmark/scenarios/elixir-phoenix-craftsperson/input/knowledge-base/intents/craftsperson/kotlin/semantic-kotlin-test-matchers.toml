@@ -1,0 +1,17 @@
+id = "guidelines.intent.semantic-kotlin-test-matchers"
+title = "State test expectations with semantic matchers"
+category = "design"
+tags = ["kotlin", "testing", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "Ability to read assertions as behavioral expectations and diagnose mismatches from test output."
+threat = "Generic boolean assertions conceal intent and produce uninformative failure messages."
+expectation = "Assertions will cover richer values, collections, and domain results."
+strategy = "Use expressive Kotest-style matchers that name the relationship being asserted."
+evidence = [{ type = "review", description = "Assertions use value- or collection-specific matchers and representative forced failures report useful expected and actual values.", required = true }]
+tradeoff = "A matcher library adds dependencies and unfamiliar assertion vocabulary, and custom matchers require maintenance."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#kotest-when-appropriate", summary = "The source demonstrates semantic Kotest matchers for values and exact collection contents.", confidence = 0.95 }]

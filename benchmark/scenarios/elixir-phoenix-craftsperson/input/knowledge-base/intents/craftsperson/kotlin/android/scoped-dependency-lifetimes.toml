@@ -1,0 +1,17 @@
+id = "guidelines.intent.scoped-dependency-lifetimes"
+title = "Align dependency lifetimes with Android ownership"
+category = "reliability"
+tags = ["kotlin", "android", "dependencies", "build-and-delivery", "resource-management", "cleanup"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to retain and release shared state according to the lifecycle that owns it."
+threat = "Incorrectly scoped dependencies leak activities, duplicate state, or outlive their valid context."
+expectation = "The app will mix application-, ViewModel-, and activity-lived collaborators."
+strategy = "Assign explicit Hilt scopes such as Singleton, ViewModelScoped, and ActivityScoped based on ownership."
+evidence = [{ type = "gate", description = "DI graph review verifies every stateful binding has a deliberate scope consistent with consumers and lifecycle tests show expected identity.", required = true }]
+tradeoff = "Scope design adds DI complexity and incorrect choices can be subtle."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#dependency-injection-hilt", summary = "The source explicitly requires clear Hilt scoping.", confidence = 1.0 }]

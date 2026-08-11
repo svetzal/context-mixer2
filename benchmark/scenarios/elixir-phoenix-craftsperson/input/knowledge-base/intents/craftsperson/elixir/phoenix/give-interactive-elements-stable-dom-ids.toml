@@ -1,0 +1,17 @@
+id = "guidelines.intent.give-interactive-elements-stable-dom-ids"
+title = "Give interactive elements stable DOM IDs"
+category = "design"
+tags = ["elixir", "phoenix", "testing", "persistence", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "LiveView patches, JavaScript hooks, and browser tests can address elements unambiguously."
+threat = "Missing or duplicate identifiers make selectors brittle and cause stateful DOM behavior to attach to the wrong node."
+expectation = "Interfaces will gain repeated forms, streamed items, hooks, and interaction tests."
+strategy = "Assign explicit unique DOM IDs to forms, hooks, stream containers and items, and other key interactive elements."
+evidence = [{ type = "dom_test", description = "Rendered pages contain unique IDs for every interactive contract and LiveView tests select those IDs successfully.", required = true }]
+tradeoff = "ID naming becomes a maintained public testing contract and requires coordination across reusable components."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#form-building", summary = "Repeatedly requires unique IDs on forms, hooks, streams, and key elements for testing and LiveView behavior.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-qobject-metaobject-contract"
+title = "Preserve QObject meta-object declarations"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Signals, slots, and properties remain generated."
+threat = "Missing Q_OBJECT disables required metadata."
+expectation = "QObject subclasses will gain meta-object features."
+strategy = "Require Q_OBJECT when meta-object features are used."
+evidence = [{ type = "gate", description = "Relevant subclasses contain Q_OBJECT and link generated moc output.", required = true }]
+tradeoff = "Generated-code coupling is needless for plain subclasses."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#red-flags-to-catch", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

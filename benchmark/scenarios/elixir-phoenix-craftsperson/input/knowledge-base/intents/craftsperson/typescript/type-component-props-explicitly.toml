@@ -1,0 +1,17 @@
+id = "guidelines.intent.type-component-props-explicitly"
+title = "Give React components explicit prop contracts"
+category = "design"
+tags = ["typescript", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability for component callers to discover required data, optional behavior, and callback signatures statically"
+threat = "Implicit or weak prop typing permits invalid composition and obscures component responsibilities"
+expectation = "Components will be reused by callers with different interaction needs"
+strategy = "Declare a named props interface and destructure a functional component against it"
+evidence = [{ type = "static-check", description = "Type-checking rejects missing required props and callbacks with incompatible argument types at component call sites", required = true }]
+tradeoff = "Named prop interfaces add declarations and can be excessive for tiny private components"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#react-patterns", summary = "The React component example uses an explicit documented props interface and typed functional component.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-on-green-tests"
+title = "Never deliver with a failing test suite"
+category = "quality"
+tags = ["go", "testing", "error-handling", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The repository always has a trusted executable baseline for expected behavior at delivery boundaries."
+threat = "Accepted test failures normalize uncertainty and conceal new regressions among known breakage."
+expectation = "Frequent changes and refactoring will continually challenge existing contracts."
+strategy = "Treat red tests as temporary development states and require the complete suite to pass before work is completed or committed."
+evidence = [{ type = "gate", description = "go test ./... exits successfully before the change is considered complete.", required = true }]
+tradeoff = "A single flaky or unrelated failing test can block otherwise valuable delivery."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#quality-assurance", summary = "Repeatedly states that tests are the spec, must be green, and must pass before completion.", confidence = 1.0 }]

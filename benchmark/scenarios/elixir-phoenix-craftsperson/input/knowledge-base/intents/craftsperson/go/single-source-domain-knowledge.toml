@@ -1,0 +1,17 @@
+id = "guidelines.intent.single-source-domain-knowledge"
+title = "Represent each domain decision in one place"
+category = "design"
+tags = ["go", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A business rule can change without locating and synchronizing multiple independent representations."
+threat = "Duplicated knowledge diverges when one copy changes and another is missed."
+expectation = "Domain decisions will evolve and be reused across features."
+strategy = "Remove knowledge duplication while tolerating identical code that does not encode the same decision."
+evidence = [{ type = "review", description = "For each changed business rule, reviewers can identify one authoritative representation and no parallel decision that must change for the same reason.", required = true }]
+tradeoff = "Centralizing knowledge can introduce indirection or coupling where small local duplication would be easier to read."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#simple-design-heuristics-in-priority-order", summary = "Distinguishes duplicated knowledge from merely identical code and avoids spots that change together for one reason.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-documentation-synchronized"
+title = "Keep documentation synchronized with behavior"
+category = "documentation"
+tags = ["typescript", "bun", "cli", "documentation", "synchronization", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Users and maintainers can rely on examples and API descriptions to reflect the current CLI."
+threat = "Behavior changes leave examples and comments describing commands or contracts that no longer exist."
+expectation = "The command surface and public functions will evolve through frequent incremental changes."
+strategy = "Review docs for every completed change, execute or verify examples, and update descriptive JSDoc at the same time as behavior."
+evidence = [{ type = "documentation_check", description = "Documented command examples execute successfully against the built CLI and changed public APIs have matching JSDoc and docs updates in the same change.", required = true }]
+tradeoff = "Documentation synchronization adds work to small changes and executable examples require ongoing test harness support."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#quality-assurance-process", summary = "Requires docs review, current examples, and updated descriptive JSDoc before completion.", confidence = 1.0 }]

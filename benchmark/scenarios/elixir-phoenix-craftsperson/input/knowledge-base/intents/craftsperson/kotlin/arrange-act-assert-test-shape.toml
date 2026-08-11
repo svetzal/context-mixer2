@@ -1,0 +1,17 @@
+id = "guidelines.intent.arrange-act-assert-test-shape"
+title = "Separate test setup, action, and observation"
+category = "design"
+tags = ["kotlin", "testing", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Ability to see what stimulus caused an observed result in each test."
+threat = "Interleaved setup, actions, and assertions conceal causality and make failures difficult to localize."
+expectation = "Test scenarios will require richer fixtures and multiple collaborators."
+strategy = "Structure tests into Arrange, Act, and Assert phases with a single clear behavioral action."
+evidence = [{ type = "review", description = "Non-trivial tests have visibly separable setup, execution, and verification phases without assertions buried in fixture construction.", required = true }]
+tradeoff = "Explicit phases can feel repetitive and may be unnatural for property or fluent behavior specifications."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#test-structure", summary = "The source explicitly defines Arrange, Act, and Assert phases.", confidence = 1.0 }]

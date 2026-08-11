@@ -1,0 +1,17 @@
+id = "guidelines.intent.optimize-code-for-human-readers"
+title = "Optimize code for the next human reader"
+category = "design"
+tags = ["python", "uv", "dependencies", "readability", "clarity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Future maintainers can infer purpose, contracts, and domain boundaries directly from the code."
+threat = "Opaque names and technically convenient boundaries force readers to reconstruct intent from implementation details."
+expectation = "Code will outlive its original context and be changed by people who were not present for its design."
+strategy = "Choose intention-revealing names, contract-bearing signatures, and module boundaries that reflect domain concepts."
+evidence = [{ type = "review", description = "A reviewer can explain the changed code's purpose and contracts from names, signatures, and module placement without external narration.", required = true }]
+tradeoff = "Explicit names and domain-shaped modules can be more verbose and require renaming or reorganization as understanding changes."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#code-is-communication", summary = "Says every line should optimize for the next human reader through names, signatures, and domain boundaries.", confidence = 1.0 }]

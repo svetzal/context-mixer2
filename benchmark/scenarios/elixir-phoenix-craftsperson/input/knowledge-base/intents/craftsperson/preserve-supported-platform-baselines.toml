@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-supported-platform-baselines"
+title = "Preserve supported platform baselines"
+category = "delivery"
+tags = ["compatibility", "runtime-versions", "platform-support"]
+relations = [
+  { type = "related-to", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Delivered code continues to run on the project's declared language, runtime, and platform range."
+threat = "Locally available syntax, APIs, or toolchain versions silently raise the minimum supported baseline."
+expectation = "Developer environments and ecosystem defaults will advance faster than some supported deployment targets."
+strategy = "Declare supported baselines, avoid unsupported features, and verify changes against the oldest meaningful supported configuration."
+evidence = [{ type = "compatibility_gate", description = "Versioned configuration declares the baseline and verification covers the oldest supported language, runtime, or platform target.", required = true }]
+tradeoff = "Maintaining older baselines delays adoption of newer capabilities and expands the test matrix."
+scope = { project = "guidelines", paths = ["plugins"] }
+sources = [{ type = "synthesis", ref = "intents", summary = "Generalizes recurring runtime, language-edition, framework, OS, and deployment-target compatibility guidance.", confidence = 0.98 }]

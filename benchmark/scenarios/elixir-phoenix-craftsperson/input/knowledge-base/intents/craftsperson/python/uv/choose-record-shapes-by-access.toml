@@ -1,0 +1,17 @@
+id = "guidelines.intent.choose-record-shapes-by-access"
+title = "Choose record shapes by access contract"
+category = "design"
+tags = ["python", "uv", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "A record's representation communicates whether it is validated, positional, or dictionary-shaped."
+threat = "Using one generic container everywhere hides access semantics and permits invalid operations."
+expectation = "Domain models, compact immutable tuples, and external mapping payloads will evolve under different constraints."
+strategy = "Use Pydantic models for validated containers, NamedTuple only for simple immutable positional records, and TypedDict for typed external dictionary access."
+evidence = [{ type = "static_review", description = "Each new record type uses the representation matching its validation and access contract, with deviations explicitly justified.", required = true }]
+tradeoff = "Multiple representation types require conversions at boundaries and more conventions for contributors to remember."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#data-structures", summary = "Assigns Pydantic models, NamedTuple, and TypedDict to distinct data-access roles.", confidence = 1.0 }]

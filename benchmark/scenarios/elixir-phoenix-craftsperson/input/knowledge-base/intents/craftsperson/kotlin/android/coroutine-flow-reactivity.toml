@@ -1,0 +1,17 @@
+id = "guidelines.intent.coroutine-flow-reactivity"
+title = "Preserve non-blocking reactive state propagation"
+category = "reliability"
+tags = ["kotlin", "android", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability to represent asynchronous work and evolving state without blocking threads or manual callback coordination."
+threat = "Blocking calls and callback-style state propagation create responsiveness problems and tangled lifecycle handling."
+expectation = "Android features will increasingly combine concurrent I/O, streams, and UI state updates."
+strategy = "Use Kotlin coroutines and Flow as the standard asynchronous and reactive primitives."
+evidence = [{ type = "gate", description = "Async-path review finds suspend functions or Flow streams with no blocking calls on UI execution paths.", required = true }]
+tradeoff = "Coroutines and streams introduce cancellation, collection, and hot-versus-cold lifecycle complexity."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#architectural-principles", summary = "The source directs implementations to leverage Flow and coroutines for asynchronous operations and state management.", confidence = 1.0 }]

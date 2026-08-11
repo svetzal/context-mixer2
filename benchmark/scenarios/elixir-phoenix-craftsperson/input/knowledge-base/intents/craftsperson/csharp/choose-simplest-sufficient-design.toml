@@ -1,0 +1,17 @@
+id = "guidelines.intent.choose-simplest-sufficient-design"
+title = "Choose the simplest sufficient design"
+category = "design"
+tags = ["csharp", "testing", "simplicity", "design-priorities", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/apply-simple-design-priorities" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A solution meets current behavior with the least accidental complexity compatible with correctness and clarity."
+threat = "Premature optimization and pattern-driven design introduce machinery before its value or constraints are known."
+expectation = "Future requirements will differ from guesses made during today's implementation."
+strategy = "Start with the simplest design that can work, then add structure or optimization only when tests, clarity, duplication, or measured constraints require it."
+evidence = [{ type = "design_review", description = "Every nontrivial abstraction or optimization addresses an observed requirement, duplication, clarity problem, or measured constraint.", required = true }]
+tradeoff = "A minimal first design may require refactoring when scale, reuse, or variation emerges."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#decision-making-framework", summary = "Starts design choices with the simplest thing that could work and rejects premature optimization.", confidence = 1.0 }]

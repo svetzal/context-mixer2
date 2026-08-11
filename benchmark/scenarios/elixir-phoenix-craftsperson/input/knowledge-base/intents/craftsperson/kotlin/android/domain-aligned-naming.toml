@@ -1,0 +1,17 @@
+id = "guidelines.intent.domain-aligned-naming"
+title = "Preserve business meaning in code vocabulary"
+category = "design"
+tags = ["kotlin", "android", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability for maintainers and stakeholders to map implementation concepts to business behavior."
+threat = "Generic or technical names hide intent and make business rules harder to locate."
+expectation = "Domain complexity and contributor count will grow."
+strategy = "Name types, functions, state, and modules using meaningful business-domain concepts."
+evidence = [{ type = "gate", description = "Review can trace requirement terms to code identifiers without relying on generic manager, helper, or data names.", required = true }]
+tradeoff = "Domain names can become verbose and require coordinated renaming as terminology changes."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#code-quality", summary = "The source requires meaningful names reflecting business-domain concepts.", confidence = 1.0 }]

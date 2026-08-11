@@ -1,0 +1,17 @@
+id = "guidelines.intent.data-bearing-exceptions"
+title = "Represent failures with contextual ex-info data"
+category = "design"
+tags = ["clojure", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to diagnose and handle failures using structured contextual information"
+threat = "Generic exceptions and message-only failures discard machine-readable cause and input context"
+expectation = "Failures will need to be logged, classified, and handled by code outside their origin"
+strategy = "Throw ex-info with a meaningful message, relevant data map, and original cause instead of generic exceptions"
+evidence = [{ type = "test", description = "Failure-path tests assert the ExceptionInfo type, stable ex-data keys, and preserved cause for wrapped failures", required = true }]
+tradeoff = "Exception data can expose sensitive inputs if context is chosen carelessly and creates a schema callers may depend on"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#error-handling", summary = "The source prefers ex-info carrying contextual data and the original exception over generic exceptions.", confidence = 1.0 }]

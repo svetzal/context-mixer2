@@ -1,0 +1,17 @@
+id = "guidelines.intent.reserve-exceptions-for-exceptional-failures"
+title = "Reserve exceptions for exceptional failures"
+category = "design"
+tags = ["cpp", "qt", "error-handling", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Normal control flow remains visible in types."
+threat = "Exceptions make expected outcomes implicit."
+expectation = "APIs face both routine and rare failures."
+strategy = "Throw only for exceptional conditions; use optional or results otherwise."
+evidence = [{ type = "gate", description = "Contracts distinguish throws, absence, and recoverable errors.", required = true }]
+tradeoff = "Failure classification is context-dependent."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#error-handling", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

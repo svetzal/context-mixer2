@@ -1,0 +1,17 @@
+id = "guidelines.intent.gate-runtime-upgrades"
+title = "Gate Elixir and OTP upgrades explicitly"
+category = "delivery"
+tags = ["elixir", "persistence", "build-and-delivery", "compatibility", "runtime-versions", "platform-support"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-supported-platform-baselines" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Runtime migrations occur as intentional changes with their compatibility impact understood."
+threat = "A feature change incidentally raises the Elixir or OTP baseline and breaks deployment or contributor environments."
+expectation = "Some future features and dependencies will require newer language or VM releases."
+strategy = "Stop and obtain explicit approval before changing the supported Elixir or OTP version."
+evidence = [{ type = "diff_review", description = "Any Elixir or OTP version change is isolated and carries explicit approval rather than arriving inside unrelated work.", required = true }]
+tradeoff = "Work that depends on a newer runtime pauses for coordination even when the upgrade appears straightforward."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#supported-versions-invariant", summary = "Directs the implementer to stop and ask before bumping Elixir or OTP.", confidence = 1.0 }]

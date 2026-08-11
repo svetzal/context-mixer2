@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimize-structural-entities"
+title = "Minimize structural entities"
+category = "design"
+tags = ["java", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "The system remains as small and navigable as its current behavior permits."
+threat = "Unnecessary classes, methods, layers, indirection, and configuration enlarge the change surface without adding capability."
+expectation = "Refactoring and framework conventions will continually offer opportunities to add structure that no requirement needs."
+strategy = "Remove entities that carry no distinct behavior, policy, boundary, or explanatory value."
+evidence = [{ type = "architecture_review", description = "Every retained class, method, layer, and configuration element has a distinct current responsibility that cannot be expressed more simply.", required = true }]
+tradeoff = "Aggressive minimization can collapse useful seams and make later variation require broader refactoring."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Makes minimal entities the fourth Simple Design rule and names unnecessary classes, methods, indirection, and configuration.", confidence = 1.0 }]

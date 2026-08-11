@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-build-configuration-explicit"
+title = "Make build configuration explicit"
+category = "delivery"
+tags = ["builds", "configuration", "reproducibility"]
+relations = [
+  { type = "related-to", target = "craftsperson/make-dependency-resolution-reproducible" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A build can be understood and reproduced from versioned project configuration."
+threat = "Implicit defaults, workstation state, and scattered flags make build behavior environment-dependent and difficult to diagnose."
+expectation = "Targets, generators, compiler modes, packaging, and release settings will evolve independently across projects and environments."
+strategy = "Declare build inputs, targets, modes, and required platform settings in the repository's canonical build configuration."
+evidence = [{ type = "build_review", description = "A clean environment can discover and execute the supported build from versioned configuration without undocumented local state.", required = true }]
+tradeoff = "Explicit configuration adds maintenance and can duplicate defaults that rarely change."
+scope = { project = "guidelines", paths = ["plugins"] }
+sources = [{ type = "synthesis", ref = "intents", summary = "Generalizes recurring CMake, Gradle, .NET, Cargo, SwiftPM, Mix, and packaging configuration guidance.", confidence = 0.98 }]

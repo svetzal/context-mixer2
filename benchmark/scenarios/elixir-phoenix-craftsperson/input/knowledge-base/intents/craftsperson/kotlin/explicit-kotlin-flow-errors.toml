@@ -1,0 +1,17 @@
+id = "guidelines.intent.explicit-kotlin-flow-errors"
+title = "Handle recoverable stream failures in the Flow pipeline"
+category = "reliability"
+tags = ["kotlin", "concurrency", "error-handling", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to define observable recovery behavior for asynchronous stream failures."
+threat = "Unhandled upstream exceptions terminate collection unexpectedly or disappear into broad outer catches."
+expectation = "Flow producers will depend on unreliable I/O and transformations that can fail."
+strategy = "Use the Flow catch operator at a scope that handles only intended upstream failures."
+evidence = [{ type = "test", description = "Flow tests inject upstream failures and assert the documented fallback, emitted error, or propagation without swallowing cancellation.", required = true }]
+tradeoff = "Pipeline-local recovery can conceal failures if catch scopes are too broad or fallback values are ambiguous."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#flow-patterns", summary = "The source requires Flow errors to be handled with catch and separately warns against swallowed exceptions.", confidence = 1.0 }]

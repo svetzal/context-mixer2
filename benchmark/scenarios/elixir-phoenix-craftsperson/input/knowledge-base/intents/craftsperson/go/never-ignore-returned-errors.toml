@@ -1,0 +1,17 @@
+id = "guidelines.intent.never-ignore-returned-errors"
+title = "Account for every returned error"
+category = "reliability"
+tags = ["go", "error-handling", "error-modeling", "recoverability", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Failures cannot disappear silently at the call site where they first become observable."
+threat = "Discarded errors let partial or corrupt operations appear successful."
+expectation = "More fallible calls will be composed as features and integrations grow."
+strategy = "Check returned errors immediately and handle or propagate each one explicitly."
+evidence = [{ type = "static_check", description = "Static analysis and focused review find no discarded error returns or blank-identifier error assignments.", required = true }]
+tradeoff = "Immediate checks add repetitive branches and can interrupt otherwise linear code."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#error-handling-patterns", summary = "Says to check errors immediately and never ignore returned errors.", confidence = 1.0 }]

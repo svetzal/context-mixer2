@@ -1,0 +1,17 @@
+id = "guidelines.intent.annotate-intentionally-unused-values"
+title = "Annotate intentionally unused values"
+category = "quality"
+tags = ["cpp", "qt", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Warnings distinguish intentional interface obligations from forgotten or obsolete code."
+threat = "Unused parameters create warning noise that hides accidental omissions or encourages broad suppression."
+expectation = "Callback and interface signatures will sometimes require values an implementation does not consume."
+strategy = "Mark intentionally unused parameters or values with [[maybe_unused]] at the narrow declaration."
+evidence = [{ type = "static_check", description = "The build is warning-free and every intentionally unused declaration is locally annotated rather than globally suppressed.", required = true }]
+tradeoff = "The annotation can conceal a parameter that became obsolete or should now be used."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "Prescribes [[maybe_unused]] for intentionally unused parameters.", confidence = 1.0 }]

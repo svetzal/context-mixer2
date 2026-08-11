@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-docfx-documentation-structured"
+title = "Keep generated documentation on a conventional DocFX surface"
+category = "documentation"
+tags = ["csharp", "docfx", "documentation", "persistence", "build-and-delivery", "public-api"]
+relations = [
+  { type = "specializes", target = "craftsperson/document-public-contracts" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Maintainers can build and discover project documentation through a predictable, supported workflow."
+threat = "Scattered prose and bespoke generation steps make documentation difficult to locate, publish, or validate."
+expectation = "Documentation volume and its audience will grow beyond the people who created the initial project."
+strategy = "Maintain DocFX-compatible documentation under the repository docs directory."
+evidence = [{ type = "documentation_build", description = "The DocFX build succeeds from the documented docs directory and includes the intended project documentation.", required = true }]
+tradeoff = "DocFX adds configuration, tooling dependencies, and a prescribed repository structure."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#documentation", summary = "Directs documentation to use DocFX and live in the docs directory.", confidence = 1.0 }]

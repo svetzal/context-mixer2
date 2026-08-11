@@ -1,0 +1,17 @@
+id = "guidelines.intent.inject-boundary-dependencies"
+title = "Inject boundary dependencies through explicit contracts"
+category = "testing"
+tags = ["typescript", "testing", "dependencies", "build-and-delivery", "test-doubles", "boundaries"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to substitute external collaborators in tests and alternative deployments"
+threat = "Hard-coded or module-mocked dependencies hide coupling and make isolation depend on loader tricks"
+expectation = "Services will require deterministic tests and may acquire alternate adapters"
+strategy = "Pass typed gateway collaborators into consumers instead of replacing imported modules"
+evidence = [{ type = "test", description = "A consumer test supplies a contract-compatible fake directly and exercises behavior without module mocking", required = true }]
+tradeoff = "Dependency injection adds constructor or function parameters and composition-root wiring"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#testing-patterns", summary = "The mocking-at-boundaries example explicitly prefers dependency injection over module mocking.", confidence = 1.0 }]

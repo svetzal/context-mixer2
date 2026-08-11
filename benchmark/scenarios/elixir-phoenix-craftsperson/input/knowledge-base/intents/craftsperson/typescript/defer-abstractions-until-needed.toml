@@ -1,0 +1,17 @@
+id = "guidelines.intent.defer-abstractions-until-needed"
+title = "Defer abstractions until a pattern demands them"
+category = "design"
+tags = ["typescript", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to keep the design direct and adaptable while the problem is still being discovered"
+threat = "Premature indirection encodes guessed variation points and makes simple behavior harder to change"
+expectation = "Early assumptions about reuse and extension will often differ from the patterns that actually emerge"
+strategy = "Inline unnecessary entities and introduce abstractions only when concrete repeated needs appear"
+evidence = [{ type = "review", description = "Every new abstraction has at least one current responsibility or variation point that cannot be expressed more directly", required = true }]
+tradeoff = "Waiting can permit short-lived duplication and require a later refactor once the pattern becomes clear"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Minimal entities and the self-correction guidance reject abstractions before they are needed.", confidence = 1.0 }]

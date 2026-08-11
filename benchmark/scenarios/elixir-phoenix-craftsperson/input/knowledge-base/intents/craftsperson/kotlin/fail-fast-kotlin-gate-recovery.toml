@@ -1,0 +1,17 @@
+id = "guidelines.intent.fail-fast-kotlin-gate-recovery"
+title = "Repair quality-gate failures before continuing"
+category = "quality"
+tags = ["kotlin", "error-handling", "quality-gates", "project-conventions", "completion"]
+relations = [
+  { type = "specializes", target = "craftsperson/honor-the-project-quality-gate" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to keep the working revision in a trusted, diagnosable state throughout change work."
+threat = "Continuing after a failed gate compounds defects and encourages symptom suppression."
+expectation = "Changes and their fixes will interact across formatting, analysis, tests, security, and documentation."
+strategy = "Stop on a failing gate, identify and properly fix its root cause, then rerun the complete gate set."
+evidence = [{ type = "trace", description = "Change-session logs show work paused at the first failed gate, record a root-cause fix rather than suppression, and end with all mandatory gates passing.", required = true }]
+tradeoff = "Fail-fast recovery interrupts delivery flow and a full rerun can be expensive after a localized fix."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#when-quality-gates-fail", summary = "The source requires immediate stop, root-cause repair, and rerunning all checks after any gate failure.", confidence = 1.0 }]

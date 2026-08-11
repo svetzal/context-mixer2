@@ -1,0 +1,17 @@
+id = "guidelines.intent.spike-uncertain-solutions-disposably"
+title = "Explore uncertainty with disposable spikes"
+category = "design"
+tags = ["java", "testing", "build-and-delivery", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The team can learn about unfamiliar technology without allowing exploratory compromises into production design."
+threat = "Uncertainty either stalls progress or turns provisional experiments into permanent low-quality code."
+expectation = "Some integrations and techniques will remain unfamiliar until exercised concretely."
+strategy = "Build narrowly scoped throwaway spikes to answer specific questions, then delete them and implement the learned solution cleanly."
+evidence = [{ type = "workflow_trace", description = "An exploratory spike has a stated learning question, is excluded from the delivered implementation, and its conclusion informs clean production code.", required = true }]
+tradeoff = "Throwing code away duplicates effort and can tempt teams to polish the spike instead."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#when-stuck-or-uncertain", summary = "Recommends throwaway spikes for unfamiliar territory followed by a clean implementation.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.model-alternatives-with-variant"
+title = "Model closed alternatives with variant"
+category = "design"
+tags = ["cpp", "qt", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A value can represent one of a known set of alternatives without unsafe storage or parallel type tags."
+threat = "Raw unions, base-pointer conventions, or separately maintained tags allow invalid states and unchecked access."
+expectation = "Domain values will gain alternatives that every consumer must handle deliberately."
+strategy = "Use std::variant for closed sum types and visit the active alternative explicitly."
+evidence = [{ type = "compile_gate", description = "Closed alternatives use variant and consumers handle every declared alternative without unchecked casts.", required = true }]
+tradeoff = "Large variants increase compile time and make visitation and evolution verbose."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "Prescribes std::variant for sum types and type-safe unions.", confidence = 1.0 }]

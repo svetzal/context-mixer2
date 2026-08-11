@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimize-structural-entities"
+title = "Use no more structure than the solution needs"
+category = "design"
+tags = ["go", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The codebase remains easy to navigate and change without ceremony unrelated to behavior."
+threat = "Unnecessary abstractions, types, parameters, and layers multiply change points and obscure the actual solution."
+expectation = "Design work will continually offer opportunities to generalize or add indirection."
+strategy = "Remove entities that do not protect a current behavior, contract, or boundary."
+evidence = [{ type = "review", description = "Every new abstraction, type, parameter, or layer has a concrete current responsibility that cannot be expressed more simply.", required = true }]
+tradeoff = "A minimal present design may require later restructuring when genuinely new variation appears."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#simple-design-heuristics-in-priority-order", summary = "Lists minimal entities and removal of unnecessary indirection, types, parameters, and abstractions as a priority.", confidence = 1.0 }]

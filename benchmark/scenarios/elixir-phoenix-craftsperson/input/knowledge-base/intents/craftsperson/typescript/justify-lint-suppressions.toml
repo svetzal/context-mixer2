@@ -1,0 +1,17 @@
+id = "guidelines.intent.justify-lint-suppressions"
+title = "Make lint suppressions exceptional and explained"
+category = "quality"
+tags = ["typescript", "documentation", "static-analysis", "error-handling", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to distinguish intentional exceptions from hidden violations of static policy"
+threat = "Unexplained eslint-disable comments silently disable safeguards and spread by imitation"
+expectation = "Occasional legitimate exceptions will arise as lint rules meet unusual integrations"
+strategy = "Avoid suppression when possible and document the necessity beside every accepted eslint-disable"
+evidence = [{ type = "static-check", description = "Every eslint-disable directive has a scoped rule list and an adjacent explanation that identifies why compliant code is impractical", required = true }]
+tradeoff = "Documenting and reviewing exceptions adds friction, and comments can become stale when code changes"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "Warnings must not be suppressed unless absolutely necessary and documented; unexplained disables are a red flag.", confidence = 1.0 }]

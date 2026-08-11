@@ -1,0 +1,17 @@
+id = "guidelines.intent.make-technical-debt-actionable"
+title = "Turn identified technical debt into an actionable decision"
+category = "collaboration"
+tags = ["ruby", "error-handling", "code-review", "feedback", "remediation"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-review-feedback-actionable" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to manage consciously accepted design liabilities before their cost compounds"
+threat = "Unrecorded or vague technical debt becomes invisible until it blocks delivery or causes failure"
+expectation = "Pragmatic changes will sometimes defer preferable design or remediation"
+strategy = "Flag technical debt explicitly, estimate its impact, and propose a mitigation plan"
+evidence = [{ type = "decision-record", description = "Each accepted debt item states the compromise, affected capability, estimated impact, and concrete mitigation path", required = true }]
+tradeoff = "Assessing and recording debt takes time and estimates may create false precision or stale plans"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#edge-cases-and-escalation", summary = "Technical debt must be flagged, its impact estimated, and mitigation proposed.", confidence = 1.0 }]

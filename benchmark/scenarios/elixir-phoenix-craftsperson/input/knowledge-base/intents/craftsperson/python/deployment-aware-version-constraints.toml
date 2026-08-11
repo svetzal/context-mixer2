@@ -1,0 +1,17 @@
+id = "guidelines.intent.deployment-aware-version-constraints"
+title = "Choose version constraints according to deployment ownership"
+category = "reliability"
+tags = ["python", "dependencies", "build-and-delivery", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Applications reproduce their deployed environment while libraries remain installable within compatible consumer ecosystems."
+threat = "Loose application versions create nonreproducible deploys, while exact library pins prevent compatible dependency resolution."
+expectation = "Applications control complete environments but libraries must coexist with dependencies selected by downstream consumers."
+strategy = "Pin dependency versions for applications and publish compatible version ranges for libraries."
+evidence = [{ type = "review", description = "Application manifests or locks resolve exact deployable versions, while library metadata declares bounded compatibility ranges rather than exact transitive pins.", required = true }]
+tradeoff = "Application pins require deliberate upgrades, and library ranges admit combinations the maintainer may not have tested."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#dependency-management", summary = "The source distinguishes pinned application dependencies from ranged library dependencies.", confidence = 1.0 }]

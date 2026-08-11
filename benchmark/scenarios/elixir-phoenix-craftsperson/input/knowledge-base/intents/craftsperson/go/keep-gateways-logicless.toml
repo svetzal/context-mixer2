@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-gateways-logicless"
+title = "Keep gateway adapters free of business logic"
+category = "testing"
+tags = ["go", "testing", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Domain decisions remain reusable and directly testable outside integration infrastructure."
+threat = "Custom logic embedded in adapters becomes coupled to vendor libraries and requires slow integration tests."
+expectation = "Adapters will be rewritten as vendors, protocols, and deployment environments change."
+strategy = "Keep gateway structs as thin library wrappers and move custom decision logic into the functional core."
+evidence = [{ type = "review", description = "Gateway methods contain only translation and external calls; any branching business rule has a core function with direct tests.", required = true }]
+tradeoff = "Moving logic out of adapters creates additional data mapping and can split a locally cohesive operation across layers."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#functional-core-imperative-shell", summary = "Says gateway structs should be thin wrappers with no logic and moves custom logic into the core.", confidence = 1.0 }]

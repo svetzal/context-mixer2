@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-swiftformat"
+title = "Gate changes on canonical Swift formatting"
+category = "quality"
+tags = ["swift", "swiftformat", "formatting", "static-analysis", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Swift source retains a consistent machine-checkable format across contributors and tools."
+threat = "Formatting drift creates noisy diffs and recurring subjective review discussion."
+expectation = "Code will be edited by multiple humans and automated agents with different formatting defaults."
+strategy = "Apply SwiftFormat and require its lint mode to pass before completion."
+evidence = [{ type = "gate", description = "swiftformat --lint . exits successfully for the candidate change.", required = true }]
+tradeoff = "Automated formatting can produce large mechanical diffs and may conflict with locally preferred layout."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#quality-gates-mandatory", summary = "Requires SwiftFormat lint mode to report no formatting issues before commit or completion.", confidence = 1.0 }]

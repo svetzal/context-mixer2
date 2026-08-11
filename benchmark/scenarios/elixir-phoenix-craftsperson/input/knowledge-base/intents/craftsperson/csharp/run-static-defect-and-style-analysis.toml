@@ -1,0 +1,17 @@
+id = "guidelines.intent.run-static-defect-and-style-analysis"
+title = "Run static defect and style analysis"
+category = "design"
+tags = ["csharp", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Common C# defects and repository style violations are detected consistently before runtime or review."
+threat = "Manual review misses repeatable defects and applies conventions unevenly."
+expectation = "The codebase and contributor count will grow faster than reviewers can inspect every pattern manually."
+strategy = "Configure Roslyn analyzers, StyleCop, and .editorconfig and require zero reported violations."
+evidence = [{ type = "analysis_gate", description = "The configured Roslyn and StyleCop analysis completes with zero violations under the repository editor configuration.", required = true }]
+tradeoff = "Strict analyzers add configuration and remediation work and can report noisy or context-insensitive findings."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#quality-enforcement", summary = "Prescribes Roslyn analyzers, StyleCop, and editor configuration; the mandatory gate requires zero violations.", confidence = 1.0 }]

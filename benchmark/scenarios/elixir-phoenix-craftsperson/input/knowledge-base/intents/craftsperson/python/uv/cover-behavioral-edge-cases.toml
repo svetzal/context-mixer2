@@ -1,0 +1,17 @@
+id = "guidelines.intent.cover-behavioral-edge-cases"
+title = "Cover behavioral edge cases"
+category = "testing"
+tags = ["python", "uv", "testing", "error-handling", "edge-cases", "failure-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "The test suite protects behavior at input boundaries and unusual but supported states."
+threat = "Happy-path tests miss failures triggered by empty, extreme, invalid, or boundary inputs."
+expectation = "Production inputs and state transitions will be more varied than examples used during implementation."
+strategy = "Identify edge conditions from the behavioral contract and include explicit tests for them before completion."
+evidence = [{ type = "test_review", description = "Changed behavior has tests for its applicable empty, boundary, invalid, and exceptional cases, with omissions justified by the contract.", required = true }]
+tradeoff = "Enumerating edge cases grows the suite and requires judgment about where exhaustive coverage stops."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#quality-assurance-process", summary = "Requires edge cases to be covered as part of the testing gate.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.kotlin-race-condition-validation"
+title = "Validate shared-state concurrency under contention"
+category = "design"
+tags = ["kotlin", "concurrency", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to preserve state invariants when operations execute concurrently."
+threat = "Unsynchronized shared mutation produces races that rarely appear in ordinary sequential tests."
+expectation = "Coroutine and parallel workloads will increase contention and scheduling variability."
+strategy = "Minimize shared mutable state, apply appropriate synchronization where unavoidable, and test concurrency-sensitive invariants repeatedly."
+evidence = [{ type = "test", description = "Stress or deterministic concurrency tests exercise contested operations and preserve invariants under repeated and varied scheduling, with race-prone shared state explicitly synchronized.", required = true }]
+tradeoff = "Synchronization can reduce throughput or deadlock, while concurrency tests are slower and may still miss rare schedules."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#error-prevention", summary = "The source requires validation for race conditions and proper synchronization.", confidence = 1.0 }]

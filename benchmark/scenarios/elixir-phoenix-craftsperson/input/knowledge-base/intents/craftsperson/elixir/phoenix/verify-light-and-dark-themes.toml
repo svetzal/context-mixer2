@@ -1,0 +1,17 @@
+id = "guidelines.intent.verify-light-and-dark-themes"
+title = "Verify light and dark themes"
+category = "quality"
+tags = ["elixir", "phoenix", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Text, controls, borders, overlays, and feedback remain legible in every supported color theme."
+threat = "Hardcoded light-theme colors create invisible or low-contrast content in dark mode."
+expectation = "Every UI component and custom style may be rendered under either light or dark theme."
+strategy = "Use daisyUI semantic theme tokens for color roles and verify every UI change in both light and dark modes before completion."
+evidence = [{ type = "visual_gate", description = "Light- and dark-theme screenshots or browser checks show readable text, visible controls and borders, and adequate contrast for every changed state.", required = true }]
+tradeoff = "Semantic tokens limit arbitrary color choices and double visual verification effort."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#dark-mode-guidelines", summary = "Makes dual-theme verification mandatory and replaces hardcoded colors with semantic daisyUI tokens.", confidence = 1.0 }]

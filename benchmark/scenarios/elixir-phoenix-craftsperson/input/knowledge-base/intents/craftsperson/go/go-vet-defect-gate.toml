@@ -1,0 +1,17 @@
+id = "guidelines.intent.go-vet-defect-gate"
+title = "Gate changes on Go compiler-aware diagnostics"
+category = "quality"
+tags = ["go", "testing", "dependencies", "formatting", "static-analysis", "warnings"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Common Go mistakes that compile successfully are detected before delivery."
+threat = "Misused formatting directives, unreachable code, invalid tags, and similar defects can evade compilation and tests."
+expectation = "The codebase will adopt APIs and constructs whose correctness requires semantic checks beyond compilation."
+strategy = "Run go vet across all packages as a mandatory completion gate."
+evidence = [{ type = "gate", description = "go vet ./... exits successfully with no diagnostics.", required = true }]
+tradeoff = "Vet adds CI time and may require code changes for diagnostics that are harmless in a specific context."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#apply-quality-gates-mandatory-before-completion", summary = "Lists go vet ./... as a mandatory quality gate.", confidence = 1.0 }]

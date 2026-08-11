@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-tarpaulin-only-when-appropriate"
+title = "Use tarpaulin only when project or environment requires it"
+category = "testing"
+tags = ["rust", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Coverage tooling works consistently across the project's target environments."
+threat = "A Linux-oriented ptrace coverage tool is introduced where its platform limitations make results unavailable or misleading."
+expectation = "Rust projects will run quality gates on heterogeneous architectures and operating systems."
+strategy = "Default to LLVM instrumentation and retain tarpaulin only for repositories already standardized on it or constrained environments where it fits."
+evidence = [{ type = "ci_gate", description = "The selected coverage tool runs successfully on every required CI platform or has an explicit scoped exception.", required = true }]
+tradeoff = "LLVM coverage setup can be more involved than following an existing tarpaulin recipe."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#coverage", summary = "Limits tarpaulin to established or constrained cases because its default backend is platform-limited.", confidence = 1.0 }]

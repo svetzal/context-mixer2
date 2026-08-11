@@ -1,0 +1,17 @@
+id = "guidelines.intent.kotlin-function-extraction-thresholds"
+title = "Extract Kotlin functions when isolation improves changeability"
+category = "design"
+tags = ["kotlin", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to name, reuse, test, and change cohesive logic independently."
+threat = "Long, duplicated, or expression-dense functions hide concepts and force broad tests."
+expectation = "Feature logic will grow and initially local expressions may acquire reuse or testing pressure."
+strategy = "Extract a function when logic repeats, exceeds roughly twenty lines, needs a descriptive name, or becomes easier to test in isolation."
+evidence = [{ type = "review", description = "Review of changed functions finds no duplicated cohesive logic, unexplained long bodies, or complex unnamed expressions matching the extraction triggers.", required = true }]
+tradeoff = "Over-extraction fragments reading flow and creates shallow indirection with little semantic value."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#when-to-extract-to-a-function", summary = "The source lists reuse, approximate length, naming, and testing-isolation triggers for extraction.", confidence = 1.0 }]

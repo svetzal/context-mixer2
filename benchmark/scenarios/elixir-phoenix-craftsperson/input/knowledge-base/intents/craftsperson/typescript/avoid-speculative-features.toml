@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-speculative-features"
+title = "Build only capabilities that are currently needed"
+category = "design"
+tags = ["typescript", "testing", "build-and-delivery", "yagni", "scope-control", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/avoid-speculative-capability" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to keep the system focused on validated needs"
+threat = "Speculative features add maintenance surface and constrain design around imagined requirements"
+expectation = "Future needs are uncertain and may not resemble today's predictions"
+strategy = "Apply YAGNI and remove functionality that lacks a present requirement"
+evidence = [{ type = "review", description = "Every added behavior traces to a current requirement, test, or accepted user decision", required = true }]
+tradeoff = "A later requirement may require revisiting code that could have been generalized earlier"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Small increments and self-correction explicitly reject speculative work through YAGNI.", confidence = 1.0 }]

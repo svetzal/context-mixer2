@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-immutable-transformations"
+title = "Prefer immutable data transformations"
+category = "design"
+tags = ["typescript", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "Ability to reason locally about state transitions and reuse data safely"
+threat = "In-place mutation creates action-at-a-distance and order-dependent behavior"
+expectation = "Data will flow through composed functions and concurrent or asynchronous operations"
+strategy = "Use immutable values and pure transformations unless mutation has a justified boundary"
+evidence = [{ type = "test", description = "Transformation tests verify outputs without observing mutation of their input values", required = true }]
+tradeoff = "Immutable updates can allocate more objects and require copying or specialized data structures"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#core-identity-expertise", summary = "The agent explicitly embraces functional patterns including immutability and pure functions.", confidence = 0.95 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.logic-free-gateway-testing-boundary"
+title = "Test decisions in the core rather than forwarding gateways"
+category = "architecture"
+tags = ["python", "testing", "gateways", "business-logic", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-gateways-logic-free" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The test suite concentrates effort on project-owned behavior instead of duplicating third-party library verification."
+threat = "Unit tests for logic-free forwarding adapters add brittle interaction assertions while domain decisions left in gateways remain hard to test."
+expectation = "The number of external integrations and thin gateway wrappers will grow."
+strategy = "Do not unit-test gateways that only isolate I/O; when a gateway contains custom logic, move that logic into the core and test it there."
+evidence = [{ type = "review", description = "Gateway modules contain only translation and delegation, their specs exist only for retained project-owned behavior, and extracted decisions have core specifications.", required = true }]
+tradeoff = "Skipping thin-gateway tests can miss project mistakes in argument mapping or library configuration until integration tests run."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#tests-are-the-executable-spec", summary = "The source says not to test I/O-isolating gateways without custom logic and prefers moving any such logic into the core.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.report-recoverable-ui-errors"
+title = "Report recoverable UI errors without crashing"
+category = "design"
+tags = ["elixir", "phoenix", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Users receive actionable feedback and retain their session when an event operation fails normally."
+threat = "An expected context error crashes the LiveView or fails silently, losing state and trust."
+expectation = "Interactive operations will encounter validation, authorization, and transient service failures."
+strategy = "Handle tagged errors in event callbacks and present success or failure through appropriate flash messages."
+evidence = [{ type = "liveview_test", description = "A forced recoverable context error keeps the view alive and renders an error flash; success renders an info flash.", required = true }]
+tradeoff = "Generic flash handling can oversimplify errors and requires deliberate user-facing copy."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#flash-messages", summary = "Requires event handlers to handle errors with flash feedback instead of crashing.", confidence = 1.0 }]

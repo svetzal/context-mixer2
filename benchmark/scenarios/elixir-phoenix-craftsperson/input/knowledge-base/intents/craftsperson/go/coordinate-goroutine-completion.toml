@@ -1,0 +1,17 @@
+id = "guidelines.intent.coordinate-goroutine-completion"
+title = "Wait explicitly for owned goroutines to finish"
+category = "reliability"
+tags = ["go", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A parent operation knows when all goroutines it started have completed."
+threat = "Uncoordinated goroutines outlive their owner, leak resources, or lose results during shutdown."
+expectation = "Fan-out work will involve multiple goroutines completing at nondeterministic times."
+strategy = "Use sync.WaitGroup to coordinate completion of a known set of goroutines."
+evidence = [{ type = "test", description = "Lifecycle tests prove the parent does not return before all owned goroutines complete and no goroutines remain blocked.", required = true }]
+tradeoff = "WaitGroup bookkeeping is manual and incorrect Add or Done placement can panic or deadlock."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#concurrency-patterns", summary = "Prescribes sync.WaitGroup for coordinating goroutine completion.", confidence = 1.0 }]

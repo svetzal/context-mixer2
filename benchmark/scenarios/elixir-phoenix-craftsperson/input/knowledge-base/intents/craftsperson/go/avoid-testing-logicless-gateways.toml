@@ -1,0 +1,17 @@
+id = "guidelines.intent.avoid-testing-logicless-gateways"
+title = "Do not unit-test logicless gateway wrappers"
+category = "testing"
+tags = ["go", "testing", "dependencies", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The test suite concentrates on application-owned decisions instead of reproducing dependency behavior."
+threat = "Tests for pass-through adapters duplicate vendor contracts and become expensive noise during upgrades."
+expectation = "The system will accumulate many thin adapters around external libraries."
+strategy = "Omit unit tests for I/O-isolating gateway structs unless they contain custom logic, and move such logic into the core when practical."
+evidence = [{ type = "test_review", description = "Logicless gateway wrappers have no mock-heavy unit tests; any custom gateway decision is extracted and covered as core behavior.", required = true }]
+tradeoff = "Adapter wiring and translation defects may be discovered only by integration tests or production-like checks."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#maintain-comprehensive-tests", summary = "Says not to test I/O-isolating gateways without custom logic and prefers moving such logic into the core.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-non-owning-view-types"
+title = "Use explicit non-owning views"
+category = "reliability"
+tags = ["cpp", "qt", "concurrency", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "APIs process slices without copying while exposing bounds."
+threat = "Pointer-length pairs obscure bounds and ownership."
+expectation = "Performance paths will pass more slices."
+strategy = "Use string_view and span where caller lifetime dominates."
+evidence = [{ type = "gate", description = "Slice APIs use views and do not retain them beyond owners.", required = true }]
+tradeoff = "Views can dangle or lack null termination."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.unidirectional-data-flow"
+title = "Preserve predictable UI state transitions"
+category = "quality"
+tags = ["kotlin", "android", "concurrency", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to understand and verify how user actions become rendered UI state."
+threat = "Bidirectional or implicit state mutation creates feedback loops and state changes with unclear ownership."
+expectation = "Features will add more screens, events, asynchronous inputs, and contributors over time."
+strategy = "Route UI events to ViewModels for processing and expose resulting state back to the UI through one-way data flow."
+evidence = [{ type = "gate", description = "Architecture tests or focused review show that composables emit events, ViewModels own transitions, and UI state is exposed read-only.", required = true }]
+tradeoff = "One-way flow adds event and state models and can feel verbose for simple interactions."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#architectural-principles", summary = "The source explicitly requires UI events to flow to ViewModels and state to flow back.", confidence = 1.0 }]

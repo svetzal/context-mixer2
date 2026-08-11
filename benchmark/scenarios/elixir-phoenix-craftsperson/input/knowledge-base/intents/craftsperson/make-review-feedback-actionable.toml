@@ -1,0 +1,285 @@
+id = "guidelines.intent.make-review-feedback-actionable"
+title = "Make review feedback actionable"
+category = "collaboration"
+tags = ["code-review", "feedback", "remediation"]
+status = "hypothesized"
+confidence = 0.98
+capability = "A contributor can understand, prioritize, and resolve each review finding without guessing the reviewer's intent."
+threat = "Vague criticism names a dislike without locating the evidence, explaining the consequence, or offering a path forward."
+expectation = "Reviewers and implementers will have different local context and may not share the same preferred solution."
+strategy = "Tie each finding to concrete evidence, explain why it matters, classify its severity, and offer alternatives with tradeoffs where useful."
+evidence = [{ type = "review_audit", description = "Each required finding identifies a location or behavior, consequence, priority, and feasible next action.", required = true }]
+tradeoff = "Detailed feedback takes longer to prepare and can over-prescribe implementation if alternatives are framed too narrowly."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#code-review-protocol", summary = "Makes findings actionable and explains technical rationale and tradeoffs.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#code-review-approach", summary = "Requires concrete actionable review findings.", confidence = 1.0 }, { type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#communication-style", summary = "Makes review feedback specific, respectful, and actionable.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+[blocking] handlers/orders.clj:41 — the `swap!` into `cache`
+runs after the jdbc insert but outside the transaction. If
+the insert rolls back, the cache serves a phantom order (this
+caused incident #212). Suggest moving it to the :after-commit
+hook, or dropping the cache here — reads are already fast per
+the June benchmarks.
+
+[nit, non-blocking] `ord` -> `order`, matching this ns.
+'''
+bad = '''
+"This caching code is messy. Please clean it up."
+
+"Not how I would have done it."
+
+"Did you think about edge cases?"
+
+; no location, no consequence, no severity, and no way to
+; know what change would satisfy the reviewer
+'''
+
+[examples.cpp]
+good = '''
+[blocking] src/session.cpp:84 — the mutex is released before
+sessions_.erase(it), so a concurrent lookup can hit a freed
+iterator (same class of bug as INC-231). Suggest holding the
+lock through the erase, or the scoped-lock pattern already
+used at session.cpp:41. Happy to pair on it.
+
+[nit, non-blocking] mgr -> sessionManager would match this
+file's naming; fine to skip if you disagree.
+'''
+bad = '''
+This is wrong.
+
+Also I wouldn't have done it this way.
+
+Needs work. Please fix and re-request review.
+
+(no file, no line, no consequence, no severity, no path
+forward — the author is left to guess all four)
+'''
+
+[examples.csharp]
+good = '''
+review: OrderService.cs:41 [blocking]
+Retry wraps all of Checkout(), so a timeout after the
+charge re-charges the card — double billing on flaky
+networks. Either retry only the idempotent Reserve()
+call, or pass an idempotency key through Charge().
+Happy to pair on it.
+
+review: OrderService.cs:12 [nit, non-blocking]
+`data` → `pendingOrders` would say what it holds.
+'''
+bad = '''
+review: "this file is a mess, clean it up"
+
+review: "not how I'd do it"
+
+review: "did you even test this?"
+
+review: "rewrite"
+'''
+
+[examples.elixir]
+good = '''
+[blocking] cart.ex:41 — total/1 sums floats; at invoice
+scale 0.1 + 0.2 drift produces real billing errors.
+Suggest Decimal (already a dep) or integer cents —
+happy with either.
+
+[nit, non-blocking] cart_test.exs:88 — name says "works";
+"empty cart totals zero" would read as the spec.
+
+Nice catch on the nil coupon guard — that was a real bug.
+'''
+bad = '''
+Review comments, in full:
+
+  "this is messy"
+  "not a fan of this approach"
+  "did you even test this?"
+  "refactor pls"
+
+(no locations, no consequences, no severity, no path
+forward — the author is left guessing on all four)
+'''
+
+[examples.go]
+good = '''
+[blocking] internal/auth/token.go:41
+Comparing tokens with == leaks timing information; an attacker
+who can measure response times can recover a token byte by
+byte (CWE-208). subtle.ConstantTimeCompare closes it — happy
+to pair on the change if useful.
+
+[suggestion] token.go:12 — "mgr" reads ambiguously here;
+"issuer" would match the package vocabulary. Fine to skip.
+'''
+bad = '''
+Review comments, in full:
+
+  "This doesn't feel right to me."
+  "Why would you do it this way?"
+  "Please rework the approach."
+
+# no file, no line, no consequence, no severity, no next
+# action — the author is left to guess what "right" means
+'''
+
+[examples.java]
+good = '''
+[major] OrderService.java:142 — the retry loop re-sends the
+charge on read-timeout. Stripe treats each send as a new
+payment, so one timeout can double-charge (this caused the
+03-12 incident). Two workable fixes: pass an idempotency
+key, or move the retry below the dedupe check. Happy to
+pair on either.
+
+[nit, non-blocking] `amt` -> `amountMinorUnits`; the unit
+has been misread twice in this file's history.
+'''
+bad = '''
+"This retry code is wrong, please fix."
+
+"I don't like this approach."
+
+"Did you even test this?"
+
+# no location, no consequence, no severity, no path
+# forward — the author must guess what to change and
+# whether any of it blocks the merge
+'''
+
+[examples.kotlin]
+good = '''
+[blocking] InvoiceService.kt:42 — total() mutates `lines`
+while iterating; concurrent callers hit
+ConcurrentModificationException (see flaky CI run #8123).
+Fix: copy with toList() first, or fold instead. Happy to
+pair on it.
+
+[non-blocking nit] `doCalc` -> `recalculateTotals` would
+say what it does.
+'''
+bad = '''
+Review feedback, in its entirety:
+
+  "This is messy."
+  "I would not have done it this way."
+  "Clean it up and re-request review."
+
+(no location, no consequence, no severity, no next step —
+ the author must guess what "clean" means to this reviewer)
+'''
+
+[examples.python]
+good = '''
+[blocking] src/sync.py:88 — retry() re-sends the payment
+request on timeout, but the endpoint isn't idempotent: a
+timeout after server receipt double-charges the customer.
+Suggest an idempotency key per attempt (docs/payments.md#keys)
+or retrying only on connection errors. Happy to pair on it.
+
+[nit, non-blocking] `tmp` on line 91 — `pending_ids` would
+say what it holds.
+'''
+bad = '''
+This retry logic doesn't look right to me. I wouldn't
+have done it this way. Please rewrite.
+
+Also the naming in this file is bad.
+
+# no location, no consequence, no severity, no way for the
+# author to know what "right" would even look like
+'''
+
+[examples.ruby]
+good = '''
+[blocking] app/services/refund.rb:42 — `retry` re-runs the
+Stripe charge on timeout, so a slow network can double-charge.
+Consequence: duplicate refunds, support escalations.
+Suggestion: pass an idempotency_key, or check charge status
+before retrying. Happy to pair if useful.
+
+[nit, non-blocking] `amt` -> `amount_cents` matches the
+naming convention in this module. Fine to defer.
+'''
+bad = '''
+"This doesn't look right."
+
+"I wouldn't do it this way."
+
+"The retry logic is bad, please fix."
+
+# no location, no consequence, no severity, no path forward —
+# the author must guess what to change and how much it matters
+'''
+
+[examples.rust]
+good = '''
+[blocking] src/auth.rs:41 — session tokens are compared
+with `==`, which is not constant-time; that leaks a timing
+side-channel on login. `subtle::ConstantTimeEq` is already
+in our tree. Happy to pair on it.
+
+[suggestion] parse_config: the nested matches would flatten
+with `?`; fine to leave if you prefer the explicit form.
+'''
+bad = '''
+This doesn't look right to me.
+
+The auth code has issues, please rework.
+
+Not a fan of the config parsing either.
+
+(no location, no consequence, no severity, no way
+forward — the author is left guessing on all three)
+'''
+
+[examples.swift]
+good = '''
+Review on OrderSync.swift, line 84:
+
+[blocking] `try? await push(order)` swallows the failure, so
+a failed sync still marks the order synced (state write at
+line 90). Repro: OrderSyncTests with network killed. Fix:
+propagate the error and keep status .pending on throw —
+happy to pair on it.
+
+[nit, non-blocking] `doStuff()` -> `reconcileLineItems()`.
+'''
+bad = '''
+Review on OrderSync.swift:
+
+"This error handling isn't great."
+"Not how I would have written the sync logic."
+"Naming needs work throughout."
+
+No location, consequence, severity, or path forward — the
+author must guess what to change and what may merge as-is.
+'''
+
+[examples.typescript]
+good = '''
+Review comment on src/cart.ts:42
+
+[blocking] `total` mutates `items` via sort() — callers'
+arrays get reordered as a side effect. Same defect class
+as #812. Fix: `[...items].sort(...)`, or sort at the
+render edge instead. Happy to pair if useful.
+
+[nit, non-blocking] `tmp` would read better as
+`sortedLines` — take it or leave it.
+'''
+bad = '''
+Review comments:
+
+"This isn't how I'd do it."
+"Messy."
+"Did you even test this?"
+"Rewrite the cart module."
+
+# No location, no consequence, no severity, no next step —
+# the author is left guessing what would satisfy review.
+'''

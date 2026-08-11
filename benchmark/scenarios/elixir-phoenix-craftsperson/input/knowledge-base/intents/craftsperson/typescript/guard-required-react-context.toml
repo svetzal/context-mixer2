@@ -1,0 +1,17 @@
+id = "guidelines.intent.guard-required-react-context"
+title = "Fail clearly when required React context is absent"
+category = "design"
+tags = ["typescript", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Ability for context consumers to receive a non-null typed contract only within the required provider"
+threat = "A permissive default masks missing provider composition and lets null errors occur later"
+expectation = "Components will be mounted in tests and application trees with varying provider structure"
+strategy = "Create required context with a null default and expose a hook that throws immediately outside its provider"
+evidence = [{ type = "test", description = "The consumer hook returns the typed context under its provider and throws a clear provider-specific error without one", required = true }]
+tradeoff = "The guard turns a missing provider into a runtime exception and adds a wrapper hook"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#react-patterns", summary = "The context example uses a nullable default and a useAuth guard that throws outside AuthProvider.", confidence = 1.0 }]

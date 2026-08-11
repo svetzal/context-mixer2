@@ -1,0 +1,17 @@
+id = "guidelines.intent.write-descriptive-commit-messages"
+title = "Write commit messages that preserve rationale"
+category = "delivery"
+tags = ["csharp", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Future maintainers can understand what a change did and why without reconstructing the original conversation."
+threat = "Vague commit messages turn repository history into an opaque sequence of diffs."
+expectation = "Debugging and maintenance will rely on history after the original author and context are unavailable."
+strategy = "Give each atomic commit a descriptive message that explains the change and its reason."
+evidence = [{ type = "history_review", description = "Each commit message accurately summarizes its scoped diff and records the non-obvious reason for the change.", required = true }]
+tradeoff = "Crafting precise messages takes time and can become repetitive for very small mechanical changes."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#incremental-development", summary = "Requires descriptive commit messages that explain why; version-control etiquette repeats the requirement.", confidence = 1.0 }]

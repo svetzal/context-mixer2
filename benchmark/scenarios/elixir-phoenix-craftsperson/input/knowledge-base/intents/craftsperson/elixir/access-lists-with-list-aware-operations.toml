@@ -1,0 +1,17 @@
+id = "guidelines.intent.access-lists-with-list-aware-operations"
+title = "Access lists with list-aware operations"
+category = "design"
+tags = ["elixir", "dependencies", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "List elements are accessed with operations that are valid for linked lists."
+threat = "Array-style bracket indexing is assumed to work on lists and fails at runtime."
+expectation = "Developers familiar with array-oriented languages will work with Elixir collections."
+strategy = "Use pattern matching, Enum.at/2, or List module functions instead of list[index] syntax."
+evidence = [{ type = "static_check", description = "List-processing code contains no bracket indexing and tests exercise required positional access.", required = true }]
+tradeoff = "Positional access is more verbose and remains linear-time on linked lists."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#core-language-patterns", summary = "Forbids bracket syntax on lists and names pattern matching, Enum.at/2, and List functions as alternatives.", confidence = 1.0 }]

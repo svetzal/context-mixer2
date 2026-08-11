@@ -1,0 +1,17 @@
+id = "guidelines.intent.immutable-data-defaults"
+title = "Preserve state reasoning with immutable data defaults"
+category = "design"
+tags = ["clojure", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to reason about state changes as explicit value transformations"
+threat = "In-place mutation introduces hidden temporal coupling and makes behavior depend on execution history"
+expectation = "The codebase will accumulate more transformations and concurrent consumers over time"
+strategy = "Use immutable data structures by default and require a compelling, explicit reason for mutation"
+evidence = [{ type = "review", description = "Changed code uses persistent values for domain state, with every mutable construct justified at its declaration", required = true }]
+tradeoff = "Persistent updates can allocate more objects and may require targeted optimization in measured hot paths"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#core-philosophy", summary = "Immutability is prescribed as the default unless a compelling reason exists otherwise.", confidence = 1.0 }]

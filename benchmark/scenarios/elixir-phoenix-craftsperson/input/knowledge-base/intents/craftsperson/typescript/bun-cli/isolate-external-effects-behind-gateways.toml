@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolate-external-effects-behind-gateways"
+title = "Isolate external effects behind owned gateways"
+category = "architecture"
+tags = ["typescript", "bun", "cli", "concurrency", "testing", "gateways"]
+relations = [
+  { type = "specializes", target = "craftsperson/put-gateways-at-external-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business behavior can be exercised deterministically without invoking filesystems, subprocesses, APIs, or environment state."
+threat = "Direct external interactions spread nondeterminism through the design and make core behavior slow or difficult to test."
+expectation = "The CLI will add more integrations whose availability, latency, and failure modes vary across environments."
+strategy = "Route every external interaction through an application-owned gateway injected at the imperative shell boundary."
+evidence = [{ type = "architecture_check", description = "Imports and call sites for filesystem, subprocess, API, and environment access occur only in gateway modules, while core tests substitute those gateway contracts.", required = true }]
+tradeoff = "Gateway interfaces and dependency injection add modules and wiring around otherwise direct library calls."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Prescribes a functional core, imperative shell, with all filesystem, subprocess, API, and environment access behind gateway classes.", confidence = 1.0 }]

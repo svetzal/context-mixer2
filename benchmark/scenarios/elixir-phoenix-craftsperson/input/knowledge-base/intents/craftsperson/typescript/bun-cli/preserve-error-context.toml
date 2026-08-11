@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-error-context"
+title = "Preserve actionable error context"
+category = "reliability"
+tags = ["typescript", "bun", "cli", "testing", "error-handling", "diagnostics"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-error-context" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Users and maintainers can identify the failed operation and the underlying diagnostic."
+threat = "Generic errors discard the command, stable category, and stderr needed to understand and correct a failure."
+expectation = "CLI operations and integrations will fail in diverse ways that require different remediation."
+strategy = "Use contextual custom error types carrying a stable code and operation-specific diagnostic details."
+evidence = [{ type = "test", description = "Failure-path tests assert the error class, stable code, and operation-specific message fields for each supported failure category.", required = true }]
+tradeoff = "A structured error taxonomy expands the public failure contract and must be maintained as behavior evolves."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#error-handling-patterns", summary = "Demonstrates custom CLI and subprocess errors carrying stable codes, command context, and stderr.", confidence = 0.95 }]

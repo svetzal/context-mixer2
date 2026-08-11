@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-zero-style-violations"
+title = "Enforce a zero-violation style gate"
+category = "delivery"
+tags = ["java", "formatting", "builds", "configuration", "reproducibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Java code remains mechanically consistent and review attention stays on behavior and design."
+threat = "Unchecked formatting and style drift create noisy diffs and recurring subjective review debates."
+expectation = "Many contributors and IDEs will modify the codebase with different local defaults."
+strategy = "Run Checkstyle or the repository's Gradle equivalent and require zero violations."
+evidence = [{ type = "quality_gate", description = "The configured style task exits successfully with zero violations.", required = true }]
+tradeoff = "Strict style rules can reject harmless code and impose churn when rules change."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#quality-gates-mandatory", summary = "Requires Checkstyle or its Gradle equivalent with zero violations.", confidence = 1.0 }]

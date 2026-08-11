@@ -1,0 +1,17 @@
+id = "guidelines.intent.validate-untrusted-boundaries"
+title = "Validate untrusted data at runtime boundaries"
+category = "architecture"
+tags = ["typescript", "security", "trust-boundaries", "authorization"]
+relations = [
+  { type = "specializes", target = "craftsperson/enforce-security-at-trust-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to establish trustworthy typed data before it enters application logic"
+threat = "Type assertions claim external values are valid without checking their runtime shape"
+expectation = "APIs, requests, and persisted data can violate compile-time assumptions"
+strategy = "Parse boundary data with a runtime schema such as Zod and derive TypeScript types from that schema"
+evidence = [{ type = "test", description = "Boundary tests show malformed payloads are rejected and valid parsed values enter the core with the inferred schema type", required = true }]
+tradeoff = "Runtime schemas add dependency, execution cost, and a validation layer that must evolve with contracts"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#type-system-patterns", summary = "The source rejects safety-bypassing assertions and prescribes Zod validation at API boundaries.", confidence = 1.0 }]

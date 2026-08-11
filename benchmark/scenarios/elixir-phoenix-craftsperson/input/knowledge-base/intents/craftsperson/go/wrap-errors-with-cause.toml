@@ -1,0 +1,17 @@
+id = "guidelines.intent.wrap-errors-with-cause"
+title = "Add operational context without losing error identity"
+category = "design"
+tags = ["go", "testing", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Failures remain diagnosable at higher layers while callers can still inspect their underlying causes."
+threat = "Bare propagation lacks operational context, while string replacement destroys the causal error chain."
+expectation = "Errors will cross multiple package and abstraction boundaries before being logged or handled."
+strategy = "Wrap errors with contextual fmt.Errorf messages using the %w verb."
+evidence = [{ type = "test", description = "Boundary tests verify contextual messages and errors.Is or errors.As still reaches the original cause.", required = true }]
+tradeoff = "Repeated wrapping lengthens messages and requires discipline to avoid redundant or sensitive context."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#error-handling-patterns", summary = "Prescribes contextual wrapping with fmt.Errorf and %w.", confidence = 1.0 }]

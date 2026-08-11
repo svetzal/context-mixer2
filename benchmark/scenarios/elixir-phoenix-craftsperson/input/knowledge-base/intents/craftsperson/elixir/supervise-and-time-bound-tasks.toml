@@ -1,0 +1,17 @@
+id = "guidelines.intent.supervise-and-time-bound-tasks"
+title = "Supervise and time-bound tasks"
+category = "reliability"
+tags = ["elixir", "concurrency", "error-handling", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Asynchronous work fails and stalls within an observable, recoverable lifecycle."
+threat = "Detached tasks crash unnoticed or run indefinitely while callers assume completion."
+expectation = "Background operations will encounter faults, latency spikes, and shutdown races."
+strategy = "Run tasks under Task.Supervisor, set finite timeouts, and resolve failures through Task.yield/2 or Task.shutdown/2."
+evidence = [{ type = "fault_test", description = "Task crash and timeout tests produce explicit caller outcomes and leave no orphan task running.", required = true }]
+tradeoff = "Task supervision and timeout handling add orchestration and may terminate slow but valid work."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#otp-best-practices", summary = "Prescribes Task.Supervisor, failure handling, and appropriate task timeouts.", confidence = 1.0 }]

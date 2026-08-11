@@ -1,0 +1,17 @@
+id = "guidelines.intent.encapsulate-large-systems-with-modules"
+title = "Use modules when large-scale encapsulation warrants them"
+category = "design"
+tags = ["java", "dependencies", "build-and-delivery", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.88
+capability = "Large Java systems can enforce intended package visibility and dependency boundaries."
+threat = "Classpath-wide visibility lets internal packages become accidental cross-module contracts."
+expectation = "Some repositories will grow large enough that conventions alone no longer preserve encapsulation."
+strategy = "Adopt JPMS selectively when project scale and deployment constraints justify enforced module boundaries."
+evidence = [{ type = "compile_gate", description = "Module descriptors export only intended packages and the modular build rejects undeclared cross-module access.", required = true }]
+tradeoff = "JPMS adds descriptor maintenance and can complicate reflection-heavy frameworks and legacy dependencies."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#modern-java-mastery", summary = "Recommends JPMS where appropriate for large-scale encapsulation.", confidence = 1.0 }]

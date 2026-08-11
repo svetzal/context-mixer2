@@ -1,0 +1,17 @@
+id = "guidelines.intent.static-analysis-gate"
+title = "Catch Kotlin defects before completion"
+category = "quality"
+tags = ["kotlin", "android", "testing", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 1
+capability = "Ability to detect maintainability and correctness risks not exercised by tests."
+threat = "Code smells, complexity, and suspicious constructs can compile and evade scenario tests."
+expectation = "The codebase and rule set will grow beyond what reviewers can inspect consistently."
+strategy = "Require ./gradlew detekt to pass before work is complete."
+evidence = [{ type = "gate", description = "The recorded completion run shows Detekt passing with no unsuppressed findings.", required = true }]
+tradeoff = "Static rules can produce false positives and require configuration maintenance."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#quality-gates-mandatory", summary = "The source makes Detekt a mandatory completion gate.", confidence = 1.0 }]

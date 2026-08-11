@@ -1,0 +1,17 @@
+id = "guidelines.intent.actionable-review-feedback"
+title = "Make review findings concrete and actionable"
+category = "collaboration"
+tags = ["go", "security", "testing", "code-review", "feedback", "remediation"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-review-feedback-actionable" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "An author can understand the impact of a review concern and apply a verifiable improvement."
+threat = "Vague preference statements create churn without showing what is wrong or how to evaluate a fix."
+expectation = "Reviews will identify correctness, clarity, testing, security, error-handling, and documentation gaps."
+strategy = "Describe the specific issue, its consequence, and a concrete example or acceptance condition for improvement."
+evidence = [{ type = "review", description = "Each blocking review comment identifies a location, observable risk, and specific example or condition that would resolve it.", required = true }]
+tradeoff = "Constructing examples and acceptance conditions increases review time and can over-prescribe the author's solution."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#code-review-approach", summary = "Asks reviewers to focus on substantive risks and suggest improvements with specific examples.", confidence = 1.0 }]

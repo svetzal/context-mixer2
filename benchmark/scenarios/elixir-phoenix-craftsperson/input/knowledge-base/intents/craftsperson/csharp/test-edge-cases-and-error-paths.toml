@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-edge-cases-and-error-paths"
+title = "Test edge cases and error paths"
+category = "testing"
+tags = ["csharp", "testing", "error-handling", "edge-cases", "failure-paths", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/cover-edge-cases-and-failure-paths" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The system behaves deliberately under boundary inputs and expected failures, not only on the happy path."
+threat = "Happy-path-only tests leave rare inputs and external failures to produce unhandled or unsafe behavior in production."
+expectation = "Unusual inputs and dependency failures will occur as usage and integration diversity grow."
+strategy = "Add focused behavioral tests for meaningful boundaries, invalid inputs, and error paths introduced or affected by a change."
+evidence = [{ type = "test_inventory", description = "Changed behavior has tests for its identified boundary conditions and expected failure outcomes in addition to its successful path.", required = true }]
+tradeoff = "Enumerating failure modes expands the suite and can over-invest in low-probability cases."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#self-verification-steps", summary = "Explicitly requires tests to cover edge cases and error paths.", confidence = 1.0 }]

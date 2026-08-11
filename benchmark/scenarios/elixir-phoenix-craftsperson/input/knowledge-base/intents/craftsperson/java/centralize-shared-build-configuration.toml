@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralize-shared-build-configuration"
+title = "Centralize shared build configuration"
+category = "delivery"
+tags = ["java", "concurrency", "dependencies", "build-and-delivery", "builds", "configuration"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Build policy changes can be made consistently without editing every module."
+threat = "Duplicated plugin and property configuration drifts across modules and creates inconsistent gates."
+expectation = "Multi-module builds will add plugins, modules, and environment-specific settings over time."
+strategy = "Factor common Maven configuration into parent POMs and properties, and keep Gradle build logic composable and explicit."
+evidence = [{ type = "manifest", description = "Shared plugin versions and policies have one authoritative declaration while module-specific configuration remains local.", required = true }]
+tradeoff = "Inherited build behavior can be harder to trace and over-centralization can make modules less autonomous."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#build-and-dependency-management", summary = "Calls for DRY parent POMs and properties and composable, explicit Gradle build logic.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-ambiguous-requirements"
+title = "Resolve ambiguous product behavior before implementation"
+category = "collaboration"
+tags = ["kotlin", "android", "build-and-delivery", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to build behavior that matches the intended business logic and user experience."
+threat = "Unexamined ambiguity produces internally coherent software that solves the wrong problem."
+expectation = "Feature requests will omit cases, priorities, and experience details."
+strategy = "Ask targeted clarifying questions when business requirements or user experience are ambiguous."
+evidence = [{ type = "gate", description = "Decision records or acceptance criteria resolve identified ambiguities before dependent implementation is finalized.", required = true }]
+tradeoff = "Clarification pauses delivery and can burden stakeholders with questions."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#when-to-seek-clarification", summary = "The source requires clarification when business requirements are ambiguous and begins the workflow by understanding business logic and UX.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliver-small-independent-changes"
+title = "Deliver changes in independently shippable increments"
+category = "delivery"
+tags = ["typescript", "bun", "cli", "dependencies", "error-handling", "incremental-delivery"]
+relations = [
+  { type = "specializes", target = "craftsperson/deliver-small-independent-increments" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Each change can be understood, validated, shipped, or reverted without depending on unrelated work."
+threat = "Multi-purpose changes enlarge failure blast radius and make review, diagnosis, and rollback ambiguous."
+expectation = "CLI work will proceed continuously while defects and changing priorities require selective integration or reversal."
+strategy = "Use single-reason commits and focused review units that are complete enough to ship independently."
+evidence = [{ type = "review", description = "Each commit and review unit has one stated reason, passes its gates independently, and can be reverted without removing unrelated behavior.", required = true }]
+tradeoff = "Decomposing work adds commit and integration overhead and may require temporary seams between increments."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Calls for single-reason, independently shippable commits; the workflow section repeats focused, reviewable scope.", confidence = 1.0 }]

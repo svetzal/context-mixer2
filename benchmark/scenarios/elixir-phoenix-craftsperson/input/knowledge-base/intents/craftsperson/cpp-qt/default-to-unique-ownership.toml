@@ -1,0 +1,17 @@
+id = "guidelines.intent.default-to-unique-ownership"
+title = "Default to unique ownership"
+category = "reliability"
+tags = ["cpp", "qt", "security", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Object lifetime has one clear authority."
+threat = "Shared ownership hides responsibility and permits cycles."
+expectation = "Object graphs will become more connected."
+strategy = "Use unique_ptr unless shared lifetime is demonstrated."
+evidence = [{ type = "gate", description = "Every shared_ptr has a documented multi-owner need.", required = true }]
+tradeoff = "Unique ownership can require redesign or moves."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#modern-c-patterns", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-psychological-safety-in-review"
+title = "Critique ideas without diminishing people"
+category = "collaboration"
+tags = ["swift", "testing", "code-review", "psychological-safety", "feedback"]
+relations = [
+  { type = "specializes", target = "craftsperson/review-with-psychological-safety" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Developers can ask questions, receive feedback, and improve code without fear of condescension or personal blame."
+threat = "Person-directed or unexplained criticism makes contributors defensive and suppresses questions and learning."
+expectation = "Code review will repeatedly expose mistakes and disagreements among people with different experience and context."
+strategy = "Frame feedback as constructive alternatives, explain the technical rationale, acknowledge sound patterns, and address review responses respectfully."
+evidence = [{ type = "review_audit", description = "Review comments identify code or behavior rather than personal fault, provide a why or alternative for requested changes, and include no condescending language.", required = true }]
+tradeoff = "Careful feedback takes more time and may sound less direct when an urgent defect requires decisive correction."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#critique-ideas-not-people", summary = "Requires constructive, rationale-backed critique of ideas rather than people and names psychological safety as a core responsibility.", confidence = 1.0 }]

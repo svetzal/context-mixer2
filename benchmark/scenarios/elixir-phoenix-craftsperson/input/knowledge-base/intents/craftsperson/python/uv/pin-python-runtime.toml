@@ -1,0 +1,17 @@
+id = "guidelines.intent.pin-python-runtime"
+title = "Pin the project Python runtime"
+category = "delivery"
+tags = ["python", "uv", "dependencies", "compatibility", "runtime-versions", "platform-support"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-supported-platform-baselines" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Every uv command and contributor runs the project against the intended Python interpreter version."
+threat = "Ambient interpreter selection changes syntax support, dependency resolution, and runtime behavior between machines."
+expectation = "Developers and CI hosts will have multiple Python versions installed."
+strategy = "Pin the project interpreter with uv and commit the resulting .python-version file."
+evidence = [{ type = "manifest_gate", description = ".python-version exists, contains the intended version, and uv reports that interpreter for project commands.", required = true }]
+tradeoff = "A strict runtime pin requires deliberate updates and can reduce flexibility for contributors testing multiple supported versions."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#managing-python-versions", summary = "Directs projects to pin Python through uv so all uv commands use the stored version.", confidence = 1.0 }]

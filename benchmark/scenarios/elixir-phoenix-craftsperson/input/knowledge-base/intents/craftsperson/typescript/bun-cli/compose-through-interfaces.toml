@@ -1,0 +1,17 @@
+id = "guidelines.intent.compose-through-interfaces"
+title = "Compose behavior through interfaces"
+category = "reliability"
+tags = ["typescript", "bun", "cli", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Behavior can be combined or substituted without inheriting implementation and lifecycle assumptions."
+threat = "Class inheritance creates rigid coupling between contracts and shared implementation."
+expectation = "CLI capabilities and adapters will need alternative implementations as integrations and environments change."
+strategy = "Prefer composition, pure functions, and interface-based polymorphism over inheritance and abstract classes."
+evidence = [{ type = "architecture_check", description = "Polymorphic extension points are TypeScript interfaces composed by consumers; production modules do not depend on abstract base classes for reuse.", required = true }]
+tradeoff = "Composition can require more explicit delegation and wiring than inheriting ready-made behavior."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Explicitly favors composition and interfaces over inheritance and abstract classes.", confidence = 1.0 }]

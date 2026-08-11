@@ -1,0 +1,17 @@
+id = "guidelines.intent.start-test-processes-under-supervision"
+title = "Start test processes under supervision"
+category = "reliability"
+tags = ["elixir", "phoenix", "concurrency", "testing", "error-handling", "structured-concurrency"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Each process test cleans up reliably and remains isolated from later tests."
+threat = "Manually started processes leak state, names, or resources after failures and contaminate the suite."
+expectation = "Concurrent and failing tests will exercise process lifecycle edge cases."
+strategy = "Start processes in tests with start_supervised!/1 so ExUnit owns their lifecycle."
+evidence = [{ type = "static_check", description = "Process-starting tests use start_supervised!/1 and repeated or randomized suite runs show no leaked registered processes.", required = true }]
+tradeoff = "Test setup must fit a child specification and may be more verbose than direct start_link calls."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#testing-strategy", summary = "Always requires start_supervised!/1 to guarantee test cleanup.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.parameterize-related-test-cases"
+title = "Parameterize related behavioral examples"
+category = "design"
+tags = ["python", "uv", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.81
+capability = "Equivalent input-output examples exercise one behavior without duplicating the test procedure."
+threat = "Copy-pasted tests drift in setup or assertions and make it harder to see the complete example matrix."
+expectation = "Many deterministic behaviors will need coverage across several representative and boundary values."
+strategy = "Use pytest.mark.parametrize when cases differ only by data and expected outcome."
+evidence = [{ type = "test_review", description = "Repeated examples with the same arrange-act-assert flow are represented as one parameterized test whose case IDs make failures identifiable.", required = true }]
+tradeoff = "Large or heterogeneous parameter tables can obscure scenario-specific setup and produce hard-to-read failure identifiers."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#parametrized-tests", summary = "Provides pytest.mark.parametrize as the specification pattern for multiple input-output examples.", confidence = 0.9 }]

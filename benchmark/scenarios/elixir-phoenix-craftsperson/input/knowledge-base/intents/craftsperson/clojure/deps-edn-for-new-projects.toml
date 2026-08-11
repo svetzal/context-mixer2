@@ -1,0 +1,17 @@
+id = "guidelines.intent.deps-edn-for-new-projects"
+title = "Start new projects on the Clojure CLI"
+category = "delivery"
+tags = ["clojure", "dependencies", "persistence", "build-and-delivery", "tooling", "project-management"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to manage dependencies and development workflows with current Clojure-native tooling"
+threat = "Starting on a legacy build convention creates avoidable migration and ecosystem friction"
+expectation = "New projects will add test, lint, security, and documentation workflows as they mature"
+strategy = "Use deps.edn and named Clojure CLI aliases for new projects"
+evidence = [{ type = "manifest", description = "A new project's deps.edn declares source paths, dependencies, and named aliases for its development workflows", required = true }]
+tradeoff = "Teams familiar with Leiningen must learn CLI alias semantics and may lose plugin conveniences"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#build-system-preferences", summary = "New projects are explicitly directed to deps.edn with the Clojure CLI and named aliases.", confidence = 1.0 }]

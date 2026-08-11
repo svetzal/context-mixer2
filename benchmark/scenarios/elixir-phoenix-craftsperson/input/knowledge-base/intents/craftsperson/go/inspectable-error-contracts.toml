@@ -1,0 +1,17 @@
+id = "guidelines.intent.inspectable-error-contracts"
+title = "Give machine-readable identity to actionable failures"
+category = "delivery"
+tags = ["go", "testing", "error-handling", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Callers can branch reliably on failure categories that require distinct behavior."
+threat = "String matching couples control flow to unstable human-readable messages."
+expectation = "Some failures will need programmatic recovery, translation, retry, or status mapping."
+strategy = "Expose sentinel errors or custom error types for cases callers must inspect."
+evidence = [{ type = "test", description = "Contract tests use errors.Is or errors.As to distinguish every documented actionable failure category.", required = true }]
+tradeoff = "Public error identities expand the compatibility surface and can constrain later refactoring."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#error-handling-patterns", summary = "Calls for sentinel or custom errors when programmatic inspection is required.", confidence = 1.0 }]

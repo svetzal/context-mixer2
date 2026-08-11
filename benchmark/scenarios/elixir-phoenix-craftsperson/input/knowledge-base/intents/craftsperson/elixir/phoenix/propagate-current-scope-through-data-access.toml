@@ -1,0 +1,17 @@
+id = "guidelines.intent.propagate-current-scope-through-data-access"
+title = "Propagate current scope through data access"
+category = "reliability"
+tags = ["elixir", "phoenix", "security", "persistence", "data-integrity", "transactions"]
+relations = [
+  { type = "specializes", target = "craftsperson/protect-persistent-data-integrity" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Every user-scoped query and UI render is anchored to the authenticated request scope."
+threat = "Passing bare user IDs or relying on @current_user allows queries and templates to bypass tenant or permission context."
+expectation = "Request scope will expand beyond a user to organizations and permissions."
+strategy = "Pass current_scope as the first context argument, filter through current_scope.user, and expose @current_scope.user to templates."
+evidence = [{ type = "security_test", description = "Cross-user tests prove context functions cannot read or mutate records outside current_scope and templates contain no @current_user access.", required = true }]
+tradeoff = "Scope parameters propagate through many APIs and make context calls more verbose."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#authentication-with-phxgenauth", summary = "Mandates current_scope as the context boundary and source for query filtering and template user access.", confidence = 1.0 }]

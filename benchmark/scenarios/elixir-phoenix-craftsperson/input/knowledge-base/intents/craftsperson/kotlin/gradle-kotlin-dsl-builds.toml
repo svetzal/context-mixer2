@@ -1,0 +1,17 @@
+id = "guidelines.intent.gradle-kotlin-dsl-builds"
+title = "Keep Kotlin builds in a statically navigable DSL"
+category = "delivery"
+tags = ["kotlin", "gradle", "concurrency", "build-and-delivery", "builds", "configuration"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-build-configuration-explicit" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to maintain build configuration with Kotlin-aware completion, refactoring, and type checking."
+threat = "Loosely typed or mixed build scripts make configuration drift and plugin mistakes harder to detect."
+expectation = "Build logic will grow as server and desktop targets add plugins, modules, and dependencies."
+strategy = "Use Gradle Kotlin DSL as the primary build configuration."
+evidence = [{ type = "gate", description = "Active Gradle scripts use .gradle.kts and the Gradle configuration phase completes without script compilation errors.", required = true }]
+tradeoff = "Kotlin DSL can have slower script compilation and less copy-paste compatibility with Groovy-centric documentation."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#build-and-dependency-management", summary = "The source makes build.gradle.kts the primary build tool.", confidence = 1.0 }]

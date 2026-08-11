@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-conflicting-design-priorities"
+title = "Escalate conflicts between design heuristics and requirements"
+category = "design"
+tags = ["typescript", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to make accountable choices when quality principles and requested behavior cannot both be satisfied"
+threat = "A developer silently sacrifices either user intent or an important design property"
+expectation = "Real changes will create tensions that generic heuristics cannot resolve without product context"
+strategy = "Make the tension explicit and consult the user before choosing the compromise"
+evidence = [{ type = "decision-record", description = "The conflicting requirement, affected heuristic, and user-approved resolution are recorded with the change", required = true }]
+tradeoff = "Escalation interrupts delivery and asks the user to engage with technical tradeoffs"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly requires surfacing tensions when heuristics conflict with user requirements.", confidence = 1.0 }]

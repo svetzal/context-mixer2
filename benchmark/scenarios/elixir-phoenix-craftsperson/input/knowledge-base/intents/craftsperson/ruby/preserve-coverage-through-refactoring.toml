@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-coverage-through-refactoring"
+title = "Preserve or improve coverage during refactoring"
+category = "testing"
+tags = ["ruby", "concurrency", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to retain behavioral confidence while changing internal structure"
+threat = "Deleting or weakening tests during a refactor can hide behavior lost by the new design"
+expectation = "Refactors will change seams and collaborators in ways that tempt removal of inconvenient tests"
+strategy = "Maintain or increase meaningful test coverage throughout refactoring"
+evidence = [{ type = "gate", description = "Coverage and behavioral scenario comparison show no unexplained loss between the pre-refactor and post-refactor revisions", required = true }]
+tradeoff = "Preserving coverage can require rewriting tests whose old seams no longer exist"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#when-refactoring", summary = "Refactoring must maintain or improve test coverage and confidence.", confidence = 1.0 }]

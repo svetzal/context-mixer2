@@ -1,0 +1,17 @@
+id = "guidelines.intent.monitor-outdated-dependencies"
+title = "Monitor dependency version drift"
+category = "dependencies"
+tags = ["typescript", "security", "dependencies", "reproducibility", "lockfiles", "build-stability"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-dependency-resolution-reproducible" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to plan upgrades before dependencies become unsupported or dangerously stale"
+threat = "Unobserved version drift compounds compatibility and security risk"
+expectation = "Upstream packages will publish fixes and eventually stop supporting old releases"
+strategy = "Run npm outdated as part of dependency review and assess reported drift"
+evidence = [{ type = "report", description = "A current npm outdated result is attached to the change or reviewed with explicit disposition for material version gaps", required = true }]
+tradeoff = "Monitoring creates recurring review work and can encourage churn toward upgrades without immediate value"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "The security audit step explicitly calls for npm outdated to check dependency freshness.", confidence = 1.0 }]

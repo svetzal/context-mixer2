@@ -1,0 +1,17 @@
+id = "guidelines.intent.minimize-date-time-dependencies"
+title = "Minimize date and time dependencies"
+category = "dependencies"
+tags = ["elixir", "dependencies", "supply-chain", "complexity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/minimize-dependency-surface" },
+]
+status = "hypothesized"
+confidence = 0.91
+capability = "Ordinary calendar and clock logic remains understandable without unnecessary third-party maintenance."
+threat = "Convenience packages duplicate standard capabilities and expand the dependency surface."
+expectation = "Date and time requirements will usually fit Elixir's evolving Time, Date, DateTime, and Calendar APIs."
+strategy = "Use the standard library for manipulation and add a dependency only for parsing needs it does not cover."
+evidence = [{ type = "manifest_review", description = "Date/time packages are absent unless a documented parsing requirement cannot be met by the standard library.", required = true }]
+tradeoff = "Standard APIs may require more application code and specialized parsing can still demand a package."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#date-and-time", summary = "Says the standard library covers manipulation and reserves added dependencies for parsing.", confidence = 1.0 }]

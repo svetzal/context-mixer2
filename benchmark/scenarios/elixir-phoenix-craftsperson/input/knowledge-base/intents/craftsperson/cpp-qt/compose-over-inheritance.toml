@@ -1,0 +1,17 @@
+id = "guidelines.intent.compose-over-inheritance"
+title = "Compose behavior instead of deep inheritance"
+category = "design"
+tags = ["cpp", "qt", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Behavior varies without fragile hierarchy coupling."
+threat = "Deep inheritance binds changes to base assumptions."
+expectation = "New variants will combine behavior unpredictably."
+strategy = "Favor composition and small pure virtual contracts."
+evidence = [{ type = "gate", description = "Hierarchies stay shallow and substitutable.", required = true }]
+tradeoff = "Composition introduces objects and delegation."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

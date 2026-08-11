@@ -1,0 +1,277 @@
+id = "guidelines.intent.require-canonical-formatting"
+title = "Require canonical formatting"
+category = "quality"
+tags = ["formatting", "automation", "consistency"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Source changes remain visually consistent and reviews focus on behavior rather than personal formatting choices."
+threat = "Formatting drift creates noisy diffs, recurring style debate, and merge friction."
+expectation = "Many humans and agents will edit the same source with different local habits."
+strategy = "Use the project's canonical automated formatter and treat an unformatted result as incomplete."
+evidence = [{ type = "format_gate", description = "The project formatter reports no changes or violations across the completed scope.", required = true }]
+tradeoff = "Canonical formatting can produce unrelated churn when configuration or formatter versions change."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/elixir-ecosystem/agents/elixir-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#quality-assurance-process", summary = "Requires deterministic automated formatting.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#quality-assurance", summary = "Keeps all source canonically formatted.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#quality-assurance-process", summary = "Applies the project formatter as a completion gate.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+$ clojure -M:cljfmt check
+All source files formatted.   ; part of "done", not optional
+
+$ git diff --stat
+ src/app/pricing.clj | 14 ++++++-----
+ 1 file changed                ; the diff is behavior, no churn
+'''
+bad = '''
+(defn total[x]
+     (reduce +
+   (map :price
+        x)))   ; hand-rolled layout, cljfmt never run
+
+; the review diff: 60 whitespace lines around 3 real ones,
+; plus a comment thread debating indentation instead of
+; discussing behavior
+'''
+
+[examples.cpp]
+good = '''
+$ clang-format --dry-run --Werror \
+    $(git diff --name-only main -- '*.h' '*.cpp')
+  (no output — the completed scope is canonical)
+
+# .pre-commit-config.yaml — formatting is automatic,
+# never a matter of personal taste in review:
+- repo: local
+  hooks:
+    - id: clang-format
+      entry: clang-format -i
+'''
+bad = '''
+int  total(const Cart &c){
+        int t=0;
+    for( auto &i : c.items() )   // three indent styles, 1 file
+      t += i.price;
+        return t; }
+
+// .clang-format exists but was never run on this change.
+// Review thread: 14 comments about braces and spacing,
+// zero about behavior. The real diff is invisible in noise.
+'''
+
+[examples.csharp]
+good = '''
+# .editorconfig is committed; CI runs the same check
+$ dotnet format --verify-no-changes
+  Format complete in 3.1s. No files needed
+  formatting.
+
+$ git diff --stat HEAD~1 | tail -1
+ 3 files changed, 41 insertions(+), 6 deletions(-)
+# the diff is the behavior change, nothing else
+'''
+bad = '''
+$ git diff --stat HEAD~1 | tail -1
+ 19 files changed, 402 insertions(+), 398 deletions(-)
+# brace-style and tab/space churn from a personally
+# configured IDE; the 4-line behavior change is
+# invisible inside the noise
+
+$ dotnet format --verify-no-changes
+  error: 17 files need formatting
+# shipped anyway
+'''
+
+[examples.elixir]
+good = '''
+$ mix format --check-formatted
+  (no output — all files canonical)
+
+# .formatter.exs is the single authority; CI runs the
+# same check, so review diffs contain behavior changes,
+# never whitespace opinions
+'''
+bad = '''
+# hand-aligned "for readability"; mix format never ran
+def rate(:standard),   do:  0.05
+def rate( :premium ),  do:  0.08
+def rate(:vip)      ,  do:  0.12
+
+# the next contributor's editor reflows all of this on
+# save, producing a diff of pure churn — and the review
+# thread argues alignment taste instead of the rates
+'''
+
+[examples.go]
+good = '''
+$ gofmt -l .          # canonical formatter, part of "done"
+$ echo $?
+0
+
+$ git diff --stat     # the diff shows behavior, not style
+ internal/pricing/tax.go | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+'''
+bad = '''
+func Total(lines []Line) Money{
+    var t Money            // spaces here, tabs elsewhere
+	for _,l:=range lines{t=t.Add(l.Amount)}
+  return t
+}
+// gofmt never ran; the next commit reformats and buries a
+// one-line behavior change inside 300 lines of style churn
+'''
+
+[examples.java]
+good = '''
+$ ./gradlew spotlessCheck
+BUILD SUCCESSFUL — 0 violations
+
+$ git diff --stat
+ src/main/java/billing/InvoiceTotals.java | 14 +++---
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+# the diff contains only the behavior change; the
+# formatter ran before commit, so review reads intent,
+# not indentation
+'''
+bad = '''
+$ git diff --stat
+ src/main/java/billing/InvoiceTotals.java | 212 ++++----
+
+# 8 behavioral lines buried in 204 lines of personal
+# re-indentation, import shuffling, and brace restyling
+
+Review thread:
+  "tabs?" "we use 2 spaces" "actually 4" "see the wiki"
+  — 14 comments, none about the rounding bug on line 96
+'''
+
+[examples.kotlin]
+good = '''
+$ ./gradlew ktlintFormat ktlintCheck
+BUILD SUCCESSFUL — 0 violations
+
+$ git diff --stat
+ src/main/kotlin/Invoice.kt | 12 ++--
+# only behavioral lines changed; the formatter owns style
+'''
+bad = '''
+$ git diff --stat
+ src/main/kotlin/Invoice.kt | 412 +++++++++++------------
+
+# 12 behavioral lines buried in 400 lines of hand-reflowed
+# indentation and re-wrapped imports; ktlintCheck never ran,
+# and the review thread is arguing brace placement instead
+# of the rounding bug the change was actually for
+'''
+
+[examples.python]
+good = '''
+$ ruff format --check . && ruff check --select I .
+84 files already formatted
+
+$ git diff --stat
+ src/orders/pricing.py | 12 ++++--
+
+# pre-commit and CI run the same formatter; the diff is
+# behavior only, no restyling noise for review to wade
+# through
+'''
+bad = '''
+$ git diff src/orders/pricing.py
+-def price(qty, rate):
+-    return qty * rate
++def price( qty , rate ):
++        return qty*rate     # personal 8-space style
+
+review thread: "use 4 spaces" / "8 reads better" —
+14 replies, none of them about behavior
+'''
+
+[examples.ruby]
+good = '''
+$ bundle exec rubocop app/ spec/
+  128 files inspected, no offenses detected
+
+$ git diff --stat
+  app/services/refund.rb | 14 +++++++-------
+  # behavior change only — canonical style means no style noise
+
+CI gate: rubocop must report zero offenses to merge.
+'''
+bad = '''
+def refund( amount ,reason:nil)   # hand-rolled spacing
+    if amount>0 then
+          process( amount )       # tabs-vs-spaces PR argument
+    end
+end
+
+# review thread: 11 comments on formatting,
+# 0 on the missing negative-amount check
+'''
+
+[examples.rust]
+good = '''
+$ cargo fmt --all --check && echo clean
+clean
+
+$ git commit -m "feat: per-kg US rates"
+
+# CI runs the identical check; a rustfmt diff would mean
+# the change simply is not finished yet
+'''
+bad = '''
+$ cargo fmt --all --check
+Diff in src/handlers.rs at line 12
+
+# committed anyway, hooks skipped — "my editor aligns
+# braces this way"
+$ git commit -m "feature" --no-verify
+
+# the next contributor's save reformats the whole file and
+# their two-line fix arrives as a 400-line diff
+'''
+
+[examples.swift]
+good = '''
+$ swiftformat . && git diff --exit-code
+(no changes)
+
+# the project formatter is the single arbiter; an
+# unformatted result fails the gate and the change is
+# simply not complete yet
+'''
+bad = '''
+# .swiftformat ignored locally — "my editor prefers 2-space"
+
+$ git diff --stat
+  OrderService.swift | 214 ++++++++++----------
+
+# 6 lines of behavior change hidden inside 208 re-indented
+# lines; review argues style instead of reading behavior
+'''
+
+[examples.typescript]
+good = '''
+$ npx prettier --check .
+All matched files use Prettier code style!
+
+$ git diff --stat
+ src/cart.ts | 14 ++++++++------
+
+# The diff contains only the behavior change — no drive-by
+# whitespace, quote-style, or import-order churn.
+'''
+bad = '''
+$ git diff --stat
+ src/cart.ts      |  14 +++++++-----
+ src/checkout.ts  | 388 ++++++++++++++++----------------
+ src/pricing.ts   | 251 +++++++++++-----------------
+
+# checkout.ts and pricing.ts: an editor re-indented, quotes
+# flipped to single, imports reshuffled by hand. The real
+# change hides inside 600 lines of style noise, and the
+# next contributor's formatter will flip it all back.
+'''

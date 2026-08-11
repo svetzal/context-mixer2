@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-blocking-work-out-of-async-tasks"
+title = "Keep blocking work out of async tasks"
+category = "reliability"
+tags = ["rust", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The async runtime can continue scheduling unrelated work responsively under load."
+threat = "Blocking operations occupy executor threads and stall other futures."
+expectation = "Services will mix asynchronous coordination with filesystem, CPU-heavy, or legacy blocking operations."
+strategy = "Use runtime-approved blocking isolation such as Tokio spawn_blocking and account for its non-abortable execution."
+evidence = [{ type = "review", description = "Potentially blocking calls in async flows are isolated or proven non-blocking, with cancellation semantics documented.", required = true }]
+tradeoff = "Blocking isolation adds task handoff overhead and cannot guarantee cancellation after work begins."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#async", summary = "Forbids blocking work in async tasks and recommends runtime-approved patterns while noting spawn_blocking cancellation limits.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliver-small-independent-increments"
+title = "Deliver small independent increments"
+category = "delivery"
+tags = ["csharp", "incremental-delivery", "change-scope", "reversibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/deliver-small-independent-increments" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Each change can be understood, validated, reverted, and integrated independently."
+threat = "Large mixed changes hide defects, compound review uncertainty, and make rollback unsafe."
+expectation = "Concurrent work and changing requirements will increase the cost of long feedback cycles."
+strategy = "Work in small safe increments and record each single logical reason as an atomic commit."
+evidence = [{ type = "history_review", description = "Each commit has one coherent purpose, passes its required checks, and can be reverted without removing unrelated behavior.", required = true }]
+tradeoff = "Small increments require more planning and commits and may temporarily expose intermediate internal structures."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#incremental-development", summary = "Requires small safe increments and single-reason commits; version-control etiquette repeats atomic logical changes.", confidence = 1.0 }]

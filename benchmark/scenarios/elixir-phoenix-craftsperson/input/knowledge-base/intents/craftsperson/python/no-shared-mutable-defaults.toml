@@ -1,0 +1,17 @@
+id = "guidelines.intent.no-shared-mutable-defaults"
+title = "Prevent calls from sharing accidental default state"
+category = "design"
+tags = ["python", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Each function invocation receives independent default mutable state."
+threat = "Python evaluates mutable default arguments once, causing state to leak across calls."
+expectation = "Functions with optional collections will be called repeatedly over long-lived process execution."
+strategy = "Use an immutable sentinel such as None and allocate the mutable value inside the function."
+evidence = [{ type = "test", description = "Two calls that omit the mutable argument return or mutate independent objects, and linting reports no mutable defaults.", required = true }]
+tradeoff = "Sentinel handling adds a branch and can blur the semantic difference between an omitted value and an explicit None."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#common-mistakes-to-avoid", summary = "The source identifies shared mutable defaults as a bug and prescribes a None sentinel.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.merge-only-with-green-ci"
+title = "Merge only with green CI"
+category = "quality"
+tags = ["elixir", "build-and-delivery", "test-gate", "completion", "regression-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The integration branch retains its automated correctness and quality baseline."
+threat = "Merging a known failing change transfers avoidable breakage to every subsequent contributor and release."
+expectation = "Concurrent delivery will make main the shared starting point for new work."
+strategy = "Require all configured CI checks to pass before merging."
+evidence = [{ type = "gate", description = "Branch protection or merge records show every required CI check succeeded before integration.", required = true }]
+tradeoff = "Flaky or slow checks can delay otherwise valid changes and become availability dependencies for delivery."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#workflow--collaboration", summary = "Requires CI to be green before merge.", confidence = 1.0 }]

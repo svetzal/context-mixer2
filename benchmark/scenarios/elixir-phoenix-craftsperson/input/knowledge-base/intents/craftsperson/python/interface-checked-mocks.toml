@@ -1,0 +1,17 @@
+id = "guidelines.intent.interface-checked-mocks"
+title = "Constrain test doubles to real interfaces"
+category = "testing"
+tags = ["python", "concurrency", "testing", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Mock-based tests fail when production interfaces change incompatibly."
+threat = "Unconstrained mocks accept nonexistent methods and invalid calls, allowing tests to pass against impossible collaborators."
+expectation = "Gateway interfaces will change as integrations and requirements evolve."
+strategy = "Construct mocks with `Mock(spec=ClassName)` and use `AsyncMock` for asynchronous collaborators."
+evidence = [{ type = "test", description = "A test or review demonstrates that access to a nonexistent collaborator member fails, and all gateway doubles carry the corresponding class spec.", required = true }]
+tradeoff = "Spec-constrained mocks require concrete interface definitions and more maintenance when interfaces change intentionally."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#tests-are-the-executable-spec", summary = "The source repeatedly requires `Mock(spec=ClassName)` and prescribes `AsyncMock` for async functions.", confidence = 1.0 }]

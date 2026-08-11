@@ -1,0 +1,17 @@
+id = "guidelines.intent.replace-boolean-mode-parameters"
+title = "Replace boolean mode parameters with explicit behaviors"
+category = "design"
+tags = ["typescript", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability for call sites to communicate which behavior they request"
+threat = "Boolean parameters hide multiple operations behind true or false and make calls unreadable"
+expectation = "Each mode may evolve with distinct rules and additional variants"
+strategy = "Split distinct behaviors or represent the choice with a named union or options contract"
+evidence = [{ type = "review", description = "Changed public calls contain no unexplained boolean mode argument; the selected behavior is named at the call site", required = true }]
+tradeoff = "Separate functions or named options enlarge the API surface for very small two-way choices"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#red-flags-to-catch", summary = "Boolean parameters are flagged because they often hide two distinct behaviours.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-explicit-casts"
+title = "Require semantically explicit casts"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Reviewers see the intended conversion category."
+threat = "C-style casts silently combine unsafe operations."
+expectation = "Boundary code will require conversions."
+strategy = "Use the narrowest named C++ cast; forbid C-style casts."
+evidence = [{ type = "gate", description = "Static analysis finds no C-style casts.", required = true }]
+tradeoff = "Named casts can give false confidence."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#common-mistakes-to-avoid", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

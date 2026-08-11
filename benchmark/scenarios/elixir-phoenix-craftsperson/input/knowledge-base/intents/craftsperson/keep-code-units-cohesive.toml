@@ -1,0 +1,342 @@
+id = "guidelines.intent.keep-code-units-cohesive"
+title = "Keep code units cohesive"
+category = "design"
+tags = ["cohesion", "single-responsibility", "maintainability"]
+status = "hypothesized"
+confidence = 0.98
+capability = "Each unit can be understood and changed for one coherent reason without unrelated behavior moving with it."
+threat = "Functions, modules, classes, or components accumulate unrelated responsibilities and become change magnets."
+expectation = "Features will grow incrementally and nearby behavior will otherwise collect in convenient existing units."
+strategy = "Give each code unit one cohesive responsibility and split it when its reasons to change diverge."
+evidence = [{ type = "design_review", description = "Each changed unit has a concise purpose and its members support that purpose.", required = true }]
+tradeoff = "Smaller cohesive units increase navigation, naming, and composition overhead."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md", "plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#engineering-principles-you-follow", summary = "Keeps functions focused on one reason to change.", confidence = 1.0 }, { type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#code-structure--patterns", summary = "Requires cohesive modules with navigable responsibilities.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#project-structure", summary = "Keeps functions and objects focused on cohesive concerns.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defn parse-signup [params]
+  (select-keys params [:email :name]))
+
+(defn valid-signup? [{:keys [email]}]
+  (boolean (re-matches #".+@.+" email)))
+
+(defn signup! [store mailer params]
+  (let [s (parse-signup params)]
+    (when (valid-signup? s)
+      (store s)
+      (mailer (:email s) :welcome))))
+; parsing, validation, orchestration change independently
+'''
+bad = '''
+(defn handle-signup [params]
+  ; parses, validates, persists, emails, logs, and formats
+  ; the HTTP response — six reasons to change, one function
+  (let [email (str/lower-case (get params "email"))]
+    (if (re-matches #".+@.+" email)
+      (do (jdbc/execute! db ["insert into users values (?)"
+                             email])
+          (smtp/send! {:to email :template :welcome})
+          (log/info "signup" email)
+          {:status 201 :body (json/write-str {:ok true})})
+      {:status 400 :body (json/write-str {:err "bad email"})})))
+'''
+
+[examples.cpp]
+good = '''
+class InvoiceCalculator {    // one reason to change: pricing
+public:
+  Money subtotal(const Invoice&) const;
+  Money total(const Invoice&) const;
+};
+
+class InvoiceRenderer {      // one reason: presentation
+public:
+  QString toHtml(const Invoice&) const;
+};
+'''
+bad = '''
+class InvoiceManager {  // pricing + rendering + email + ops
+public:
+  Money total(const Invoice&);
+  QString toHtml(const Invoice&);
+  void emailToCustomer(const Invoice&, QString smtpHost);
+  void retryFailedEmails();
+  void migrateLegacyRecords();  // and a data migration, why not
+};
+// every sprint touches this file; every touch risks the rest
+'''
+
+[examples.csharp]
+good = '''
+// one job: allocate sequential invoice numbers
+public sealed class InvoiceNumberer
+{
+    private int _last;
+    public string Next() => $"INV-{++_last:D6}";
+}
+
+// one job: render an invoice for humans
+public sealed class InvoiceRenderer
+{
+    public string ToHtml(Invoice invoice) { ... }
+}
+'''
+bad = '''
+public sealed class InvoiceManager
+{
+    // numbering, rendering, email, tax, retries:
+    // five reasons to change welded into one unit
+    public string NextNumber() { ... }
+    public string ToHtml(Invoice i) { ... }
+    public Task Email(Invoice i, string to) { ... }
+    public decimal Tax(Invoice i, string prov) { ... }
+    public Task RetryFailedEmails() { ... }
+}
+'''
+
+[examples.elixir]
+good = '''
+# each module has one reason to change
+defmodule Pricing do
+  def format(%Money{} = m), do: Money.to_string(m)
+  def with_tax(%Money{} = m, rate), do: Money.mult(m, rate)
+end
+
+defmodule Onboarding do
+  def send_welcome_email(user),
+    do: Mailer.deliver(welcome(user))
+end
+'''
+bad = '''
+defmodule Utils do
+  # four unrelated responsibilities, one change magnet:
+  # pricing, onboarding, imports, and ops all edit here
+  def format_price(m), do: Money.to_string(m)
+  def send_welcome_email(u), do: Mailer.deliver(welcome(u))
+  def parse_csv(bin), do: String.split(bin, "\n")
+  def rotate_logs, do: File.rm_rf!("/var/log/app")
+end
+'''
+
+[examples.go]
+good = '''
+$ go doc ./internal/pricing Pricer
+type Pricer struct{ rates TaxTable }
+    func (p Pricer) Total(o Order) Money
+
+$ go doc ./internal/notify ConfirmationEmail
+type ConfirmationEmail struct{ tmpl *template.Template }
+    func (e ConfirmationEmail) Render(o Order) (string, error)
+
+# each unit has one reason to change; a tax-rule edit cannot
+# break email rendering
+'''
+bad = '''
+$ go doc ./internal/orders OrderManager
+type OrderManager struct{ ... }
+    func (m *OrderManager) Total(o Order) Money
+    func (m *OrderManager) RenderConfirmation(o Order) string
+    func (m *OrderManager) ExportCSV(w io.Writer, o []Order) error
+    func (m *OrderManager) ReindexSearch(ctx context.Context) error
+    func (m *OrderManager) ApplyRefund(ctx context.Context) error
+
+# pricing, email, export, and search all change this one type:
+# four unrelated reasons to change, one change magnet
+'''
+
+[examples.java]
+good = '''
+// each unit changes for one reason
+final class OrderPricing {
+    Money total(Order o) { return o.lines().total(); }
+}
+
+final class InvoiceRenderer {
+    String html(Order o) { return template.render(o); }
+}
+
+final class WarehouseSync {
+    void push(Order o) { warehouseApi.push(o); }
+}
+'''
+bad = '''
+// pricing, rendering, fulfillment, and auth in one unit —
+// four unrelated reasons to change, one change magnet
+class OrderManager {
+    Money total(Order o) { return o.lines().total(); }
+    String invoiceHtml(Order o) { return template.render(o); }
+    void syncToWarehouse(Order o) { warehouseApi.push(o); }
+    boolean passwordValid(User u, String pw) {
+        return hasher.matches(pw, u.hash());
+    }
+}
+'''
+
+[examples.kotlin]
+good = '''
+// each unit has one reason to change
+class InvoiceCalculator(private val tax: TaxPolicy) {
+    fun total(inv: Invoice): Money = tax.apply(inv.subtotal())
+}
+
+class InvoicePdfRenderer(private val layout: Layout) {
+    fun render(inv: Invoice): Pdf = layout.paint(inv)
+}
+'''
+bad = '''
+class InvoiceManager {        // a change magnet: five
+    fun total(inv: Invoice): Money = TODO()
+    fun renderPdf(inv: Invoice): Pdf = TODO()
+    suspend fun email(inv: Invoice, to: Email): Unit = TODO()
+    fun auditLog(entry: String): Unit = TODO()
+    fun migrateLegacyRows(): Unit = TODO()
+}                             // unrelated reasons to change
+'''
+
+[examples.python]
+good = '''
+class Registration:
+    """Creates accounts; changes only when signup rules do."""
+    def register(self, email: Email) -> User: ...
+
+class WelcomeEmail:
+    def render(self, user: User) -> str: ...
+
+class UserCsvExport:
+    def write(self, users: list[User], path: Path) -> None: ...
+'''
+bad = '''
+class UserService:
+    def register(self, email: str) -> User: ...
+    def hash_password(self, pw: str) -> str: ...
+    def render_welcome_email(self, user: User) -> str: ...
+    def export_users_csv(self, path: Path) -> None: ...
+    def rotate_api_logs(self) -> None: ...
+    # five unrelated reasons to change share one home;
+    # every team edits this file and merges collide
+'''
+
+[examples.ruby]
+good = '''
+class InvoiceTotaler
+  def initialize(lines:) = @lines = lines
+  def total = @lines.sum(&:amount)
+end
+
+class InvoiceMailer
+  def initialize(invoice:) = @invoice = invoice
+
+  def deliver
+    Mail.deliver(to: @invoice.email, body: render(@invoice))
+  end
+end
+'''
+bad = '''
+class InvoiceManager
+  # totaling, mailing, persistence, and PDF: four reasons to
+  # change riding in one change magnet
+  def total(lines) = lines.sum(&:amount)
+  def deliver!(invoice) = Mail.deliver(to: invoice.email)
+  def save(invoice) = DB[:invoices].insert(invoice.to_h)
+  def to_pdf(invoice) = PdfRenderer.render(invoice)
+  def sync_to_quickbooks(invoice) = Qb.push(invoice)
+end
+'''
+
+[examples.rust]
+good = '''
+// one reason to change per unit
+pub struct PriceList { rates: HashMap<Sku, Cents> }
+impl PriceList {
+    pub fn quote(&self, cart: &Cart) -> Cents {
+        cart.items().map(|i| self.rates[&i.sku] * i.qty).sum()
+    }
+}
+pub struct ReceiptPrinter;
+impl ReceiptPrinter {
+    pub fn render(&self, total: Cents) -> String {
+        format!("TOTAL {total}")
+    }
+}
+'''
+bad = '''
+// pricing, rendering, retry policy, and audit in one magnet
+impl OrderManager {
+    pub fn handle(&mut self, cart: &Cart) -> Result<(), Error> {
+        let total: Cents = cart.items()
+            .map(|i| self.rates[&i.sku] * i.qty).sum();
+        let receipt = format!("TOTAL {total}");
+        for attempt in 0..3 {                 // retry policy
+            if self.smtp.send(&receipt).is_ok() { break; }
+            std::thread::sleep(RETRY_DELAY * attempt);
+        }
+        self.audit_log.push(receipt);         // audit trail
+        Ok(())
+    }
+}
+'''
+
+[examples.swift]
+good = '''
+protocol ProfileLoading {
+    func load(id: UUID) async throws -> Profile
+}
+protocol WelcomeMailing {
+    func sendWelcome(to profile: Profile) async throws
+}
+struct AvatarRenderer {
+    func thumbnail(for profile: Profile) -> Image {
+        profile.avatar.resized(to: .thumbnail)
+    }
+}
+// each unit changes for exactly one reason
+'''
+bad = '''
+final class ProfileManager {
+    func loadProfile(id: UUID) async throws -> Profile { ... }
+    func renderThumbnail(_ p: Profile) -> Image { ... }
+    func sendWelcomeEmail(to p: Profile) async throws { ... }
+    func trackScreenView(_ name: String) { ... }
+    func syncToICloud() async throws { ... }
+}
+// five unrelated reasons to change share one unit; every
+// team edits this file and every edit risks the others
+'''
+
+[examples.typescript]
+good = '''
+// Each unit changes for exactly one reason.
+export class InvoiceCalculator {
+  total(lines: Line[]): number {
+    return lines.reduce((s, l) => s + l.price * l.qty, 0);
+  }
+}
+
+export class InvoicePdfRenderer {
+  render(inv: Invoice): Uint8Array {
+    return pdf.layout(inv, { font: "Inter", margin: 24 });
+  }
+}
+'''
+bad = '''
+// Pricing, layout, delivery, and retry policy all force
+// changes through this one class.
+export class InvoiceManager {
+  total(lines: Line[]): number {
+    return lines.reduce((s, l) => s + l.price * l.qty, 0);
+  }
+  async renderPdf(inv: Invoice): Promise<Uint8Array> {
+    return pdf.layout(inv, { font: "Inter", margin: 24 });
+  }
+  async email(inv: Invoice, to: string): Promise<void> {
+    await smtp.send(to, "Invoice", await this.renderPdf(inv));
+  }
+  async retryFailedEmails(): Promise<void> {
+    for (const j of await queue.failed())
+      await this.email(j.invoice, j.to);
+  }
+}
+'''

@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralize-shared-knowledge"
+title = "Centralize shared decisions"
+category = "design"
+tags = ["swift", "knowledge-duplication", "single-source-of-truth", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/single-source-each-decision" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "A business or technical decision can change once without leaving contradictory implementations behind."
+threat = "The same knowledge encoded in multiple places drifts when only some copies are updated."
+expectation = "Rules and policies will evolve, requiring coordinated maintenance across growing codebases."
+strategy = "Remove knowledge duplication while tolerating identical code that does not represent a shared decision."
+evidence = [{ type = "change_impact_review", description = "A representative rule change has one authoritative implementation or configuration point and does not require synchronized edits to independent copies.", required = true }]
+tradeoff = "Centralization can introduce coupling or indirection and may incorrectly unify code that only happens to look alike."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#simple-design-heuristics", summary = "Rejects multiple places that change for the same reason while distinguishing duplicated knowledge from merely identical code.", confidence = 1.0 }]

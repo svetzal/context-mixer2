@@ -1,0 +1,17 @@
+id = "guidelines.intent.order-simple-design-tradeoffs"
+title = "Resolve design tradeoffs in an explicit priority order"
+category = "design"
+tags = ["swift", "concurrency", "testing", "simplicity", "design-priorities", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/apply-simple-design-priorities" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Engineers can make consistent design decisions when correctness, clarity, duplication, and minimality conflict."
+threat = "Treating every heuristic as absolute or equally weighted produces arbitrary compromises and dogmatic refactoring."
+expectation = "Real changes will force tradeoffs among behavior, readability, shared knowledge, and abstraction cost."
+strategy = "Apply the simple-design heuristics in order—passing tests, revealed intent, no knowledge duplication, then minimal entities—while treating them as guidelines and escalating genuine conflicts."
+evidence = [{ type = "decision_review", description = "A change that knowingly sacrifices one heuristic records which higher-priority concern prevailed, the tradeoff, and any user confirmation required by the conflict.", required = true }]
+tradeoff = "A fixed ordering can undervalue context-specific concerns and adds deliberation and escalation to otherwise reversible design choices."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#simple-design-heuristics", summary = "Explicitly orders four design heuristics, calls them guidelines rather than iron laws, and requires consultation when they conflict.", confidence = 1.0 }]

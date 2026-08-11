@@ -1,0 +1,17 @@
+id = "guidelines.intent.exhaust-safe-alternatives-before-unsafe"
+title = "Exhaust safe alternatives before using unsafe"
+category = "quality"
+tags = ["rust", "performance", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The codebase retains compiler-enforced memory safety wherever a safe design can satisfy the requirement."
+threat = "Unsafe is introduced as a local convenience before ownership, API, or performance alternatives are investigated."
+expectation = "Difficult interoperability, ownership, and optimization problems will make unsafe code appear expedient."
+strategy = "Pause before adding unsafe and verify that no practical safe Rust design meets the requirement."
+evidence = [{ type = "safety_review", description = "Each newly introduced unsafe surface records the safe alternatives considered and why they cannot meet the requirement.", required = true }]
+tradeoff = "Safe alternatives may require extra allocation, copying, API constraints, or investigation time."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#self-correction-mechanisms", summary = "Directs the craftsperson to verify that no safe alternative exists before reaching for unsafe.", confidence = 1.0 }]

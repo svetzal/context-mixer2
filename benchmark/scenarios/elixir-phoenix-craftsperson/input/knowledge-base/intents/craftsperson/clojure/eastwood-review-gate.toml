@@ -1,0 +1,17 @@
+id = "guidelines.intent.eastwood-review-gate"
+title = "Apply deep static analysis to every completed review"
+category = "quality"
+tags = ["clojure", "testing", "documentation", "static-analysis", "error-handling", "warnings"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to detect subtle Clojure defects beyond the primary linter's fast feedback"
+threat = "Semantically suspicious forms can survive tests and lightweight lint checks"
+expectation = "Reviewed changes, especially significant ones, will introduce interactions broad enough to escape local inspection"
+strategy = "Run Eastwood before completing every code review and resolve every warning except an explicitly documented exception"
+evidence = [{ type = "gate", description = "clojure -M:eastwood exits successfully with no warnings other than checked-in, rationale-bearing exceptions", required = true }]
+tradeoff = "Deep analysis on every review adds latency, and documented suppressions can become stale or conceal real regressions"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-tools-you-wield", summary = "Eastwood is required at least before significant commits, with all warnings addressed except documented exceptions.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-gates-mandatory", summary = "The stronger completion gate requires Eastwood before any code review is complete.", confidence = 1.0 }]

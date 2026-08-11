@@ -1,0 +1,17 @@
+id = "guidelines.intent.audit-dependency-vulnerabilities"
+title = "Audit dependency vulnerabilities"
+category = "delivery"
+tags = ["elixir", "security", "documentation", "dependencies", "build-and-delivery", "tooling"]
+relations = [
+  { type = "specializes", target = "craftsperson/standardize-project-tooling" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Known vulnerable dependency versions are detected before release."
+threat = "A trusted package version acquires a disclosed vulnerability after adoption."
+expectation = "The vulnerability status of dependencies will change independently from application code."
+strategy = "Run mix deps.audit and address high- and medium-severity findings immediately while documenting accepted low-severity findings."
+evidence = [{ type = "security_gate", description = "mix deps.audit reports no unaddressed high- or medium-severity findings and low-severity exceptions are documented.", required = true }]
+tradeoff = "Urgent dependency remediation can force upgrades, compatibility work, or temporary delivery delays."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#quality-assurance-process", summary = "Requires dependency vulnerability scanning and severity-based remediation.", confidence = 1.0 }]

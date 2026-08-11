@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-zero-curated-warnings"
+title = "Enforce zero curated warnings in CI"
+category = "quality"
+tags = ["rust", "static-analysis", "build-and-delivery", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "New compiler and Clippy diagnostics remain visible and actionable instead of accumulating as background noise."
+threat = "Accepted warnings normalize degradation until important diagnostics are lost in a large baseline."
+expectation = "Compiler and curated lint diagnostics will evolve as the codebase and toolchain change."
+strategy = "Run Clippy for all targets and features with warnings denied after selecting an appropriate lint set."
+evidence = [{ type = "ci_gate", description = "cargo clippy --all-targets --all-features -- -D warnings succeeds.", required = true }]
+tradeoff = "Toolchain upgrades can unexpectedly block CI on newly introduced lints."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#lint-configuration", summary = "Sets zero warnings in CI as the standard after curating lint policy.", confidence = 1.0 }]

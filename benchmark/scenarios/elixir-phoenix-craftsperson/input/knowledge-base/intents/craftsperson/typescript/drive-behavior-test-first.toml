@@ -1,0 +1,17 @@
+id = "guidelines.intent.drive-behavior-test-first"
+title = "Clarify behavior with a failing test first"
+category = "collaboration"
+tags = ["typescript", "concurrency", "testing", "requirements", "decision-making", "ambiguity"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to define expected behavior before implementation choices bias the contract"
+threat = "Implementation-first work produces tests that merely ratify accidental behavior"
+expectation = "New requirements will contain ambiguities best exposed through concrete examples"
+strategy = "Use a red-green-refactor cycle beginning with a focused failing test"
+evidence = [{ type = "trace", description = "A focused test fails for the intended reason before the implementation and passes after the smallest behavior change", required = true }]
+tradeoff = "Test-first sequencing can feel slower for exploratory work and may lead to discarded tests as understanding changes"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Tests are the executable specification and should be written red before the simplest green implementation.", confidence = 1.0 }]

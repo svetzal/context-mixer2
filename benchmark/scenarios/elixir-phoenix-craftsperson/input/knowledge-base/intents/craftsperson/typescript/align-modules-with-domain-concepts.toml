@@ -1,0 +1,17 @@
+id = "guidelines.intent.align-modules-with-domain-concepts"
+title = "Align module boundaries with domain concepts"
+category = "design"
+tags = ["typescript", "dependencies", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to locate and evolve behavior according to the business concepts it implements"
+threat = "Technical or arbitrary module boundaries scatter one domain decision across unrelated locations"
+expectation = "Domain concepts and their rules will evolve independently over time"
+strategy = "Organize module boundaries around coherent domain concepts"
+evidence = [{ type = "review", description = "Each changed domain rule has a clear owning module and does not require unrelated modules to know its internals", required = true }]
+tradeoff = "Domain-aligned organization may duplicate small technical structures and require moves as understanding improves"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "The code-as-communication principle says module boundaries should reflect domain concepts.", confidence = 1.0 }]

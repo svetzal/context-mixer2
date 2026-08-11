@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-behavior-red-green"
+title = "Clarify behavior through red-green testing"
+category = "testing"
+tags = ["cpp", "qt", "concurrency", "testing", "tdd", "red-green-refactor"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Expected behavior is explicit before implementation constrains it."
+threat = "Implementation-first tests can mirror internals."
+expectation = "Behavior will be refactored while contracts remain stable."
+strategy = "Write a failing behavior test, make it pass simply, then refactor."
+evidence = [{ type = "gate", description = "A focused test fails before and passes after the change.", required = true }]
+tradeoff = "Test-first work can slow exploratory spikes."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

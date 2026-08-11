@@ -1,0 +1,17 @@
+id = "guidelines.intent.dependency-freshness-review"
+title = "Keep dependency age visible before it becomes migration debt"
+category = "design"
+tags = ["python", "concurrency", "dependencies", "persistence", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "Maintainers can make informed upgrade decisions before dependencies become prohibitively stale."
+threat = "Unobserved outdated packages accumulate compatibility, support, and migration risk."
+expectation = "The Python ecosystem and supported package versions will continue to advance."
+strategy = "Run `pip list --outdated` as part of the quality process and assess available upgrades explicitly."
+evidence = [{ type = "gate", description = "A current `pip list --outdated` report is reviewed and each deferred upgrade has an explicit reason.", required = true }]
+tradeoff = "Frequent freshness reviews consume maintenance time and can encourage upgrades that provide little immediate value."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#quality-assurance-process", summary = "The source requires checking outdated dependencies in addition to vulnerability auditing.", confidence = 0.96 }]

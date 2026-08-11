@@ -1,0 +1,17 @@
+id = "guidelines.intent.commit-cross-platform-lockfile"
+title = "Commit the cross-platform dependency lockfile"
+category = "dependencies"
+tags = ["python", "uv", "dependencies", "build-and-delivery", "reproducibility", "lockfiles"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-dependency-resolution-reproducible" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A project resolves the same exact dependency versions across supported machines and fresh checkouts."
+threat = "Unconstrained re-resolution silently changes transitive packages and makes builds drift."
+expectation = "Dependencies will publish new versions while the project is built on multiple platforms over time."
+strategy = "Generate uv.lock from project metadata and commit it as the reproducible dependency resolution."
+evidence = [{ type = "manifest_gate", description = "uv.lock is version-controlled and a clean uv sync completes without rewriting it.", required = true }]
+tradeoff = "The lockfile creates review churn and must be deliberately refreshed for dependency updates."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#lockfile", summary = "Defines uv.lock as a cross-platform exact resolution that must be committed.", confidence = 1.0 }]

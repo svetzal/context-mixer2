@@ -1,0 +1,17 @@
+id = "guidelines.intent.logicless-kotlin-gateway-adapters"
+title = "Keep gateway adapters mechanically thin"
+category = "testing"
+tags = ["kotlin", "testing", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to test business decisions in a deterministic core while replacing I/O technologies independently."
+threat = "Business logic embedded in gateway adapters becomes expensive to exercise and entangled with external systems."
+expectation = "External libraries and infrastructure will be replaced or upgraded while business rules remain."
+strategy = "Keep gateways as thin wrappers with no business logic and move any custom decisions into core code."
+evidence = [{ type = "review", description = "Gateway classes contain only protocol translation and delegation; branches expressing business rules live in core services with unit tests.", required = true }]
+tradeoff = "Separating mapping from decisions can create extra data transformations and small pass-through classes."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#dependency-injection", summary = "The source says gateway classes should be thin wrappers with no logic to test and logic should move to the core.", confidence = 1.0 }]

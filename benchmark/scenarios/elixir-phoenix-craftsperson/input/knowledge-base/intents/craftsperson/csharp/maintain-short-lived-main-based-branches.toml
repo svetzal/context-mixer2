@@ -1,0 +1,17 @@
+id = "guidelines.intent.maintain-short-lived-main-based-branches"
+title = "Maintain short-lived branches from main"
+category = "delivery"
+tags = ["csharp", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Parallel work stays close enough to the integration baseline to merge predictably."
+threat = "Long-lived or stale-base branches accumulate conflicts and untested assumptions about neighboring changes."
+expectation = "Other contributors will continue changing main while feature work is underway."
+strategy = "Create feature branches from main and keep their lifetime and divergence small."
+evidence = [{ type = "history_review", description = "Feature branches begin from a recent main revision and integrate after limited divergence without avoidable large conflict resolution.", required = true }]
+tradeoff = "Frequent synchronization interrupts feature work and a branch still adds workflow overhead for very small changes."
+scope = { project = "guidelines", paths = ["plugins/dotnet-ecosystem/agents/csharp-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#version-control-etiquette", summary = "Requires branching from main and keeping feature branches short-lived.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.deliver-small-independent-increments"
+title = "Deliver small independent increments"
+category = "delivery"
+tags = ["cpp", "qt", "incremental-delivery", "change-scope", "reversibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/deliver-small-independent-increments" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Changes ship and revert with narrow blast radius."
+threat = "Mixed-purpose changes hide regressions and entangle rollback."
+expectation = "Concurrent development will create occasional failures."
+strategy = "Make single-reason commits that pass relevant gates."
+evidence = [{ type = "gate", description = "Each commit has one coherent reason and can stand alone.", required = true }]
+tradeoff = "More commits and compatibility work add overhead."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

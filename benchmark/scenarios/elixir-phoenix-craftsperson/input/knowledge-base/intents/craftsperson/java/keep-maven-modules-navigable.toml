@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-maven-modules-navigable"
+title = "Keep Maven modules and coordinates navigable"
+category = "reliability"
+tags = ["java", "dependencies", "build-and-delivery", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Developers and tooling can identify module ownership and relationships from the Maven project structure."
+threat = "Ad hoc layouts and ambiguous coordinates make multi-module builds difficult to navigate and publish safely."
+expectation = "Projects may grow into multiple artifacts maintained and consumed independently."
+strategy = "Use a clean modular Maven layout with logical groupId and artifactId names."
+evidence = [{ type = "manifest", description = "The reactor structure and artifact coordinates map consistently to documented module responsibilities.", required = true }]
+tradeoff = "Renaming or restructuring modules can disrupt consumers and add ceremony to small projects."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#build-and-dependency-management", summary = "Requires a clean modular Maven structure with logical groupId and artifactId naming.", confidence = 1.0 }]

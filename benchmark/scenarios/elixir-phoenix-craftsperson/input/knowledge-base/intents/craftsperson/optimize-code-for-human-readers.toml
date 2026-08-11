@@ -1,0 +1,273 @@
+id = "guidelines.intent.optimize-code-for-human-readers"
+title = "Optimize code for human readers"
+category = "design"
+tags = ["readability", "clarity", "maintainability"]
+status = "hypothesized"
+confidence = 0.99
+capability = "A future maintainer can understand intent and change behavior safely without reconstructing clever hidden reasoning."
+threat = "Concise, magical, or overly clever code obscures decisions and raises the cost of modification."
+expectation = "Code will be read and changed more often than it is initially written, often by contributors lacking its full history."
+strategy = "Prefer intention-revealing names, explicit control and data flow, and straightforward structures over clever brevity."
+evidence = [{ type = "review", description = "A reviewer can explain the purpose and flow of changed code from its names and structure without external narration.", required = true }]
+tradeoff = "Explicit code can be longer and may repeat mechanics that a compact abstraction would hide."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/ruby-ecosystem/agents/ruby-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#code-is-communication", summary = "Treats code as communication and optimizes it for the next reader.", confidence = 1.0 }, { type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#code-is-communication", summary = "Prioritizes intention-revealing, explicit Ruby over clever brevity.", confidence = 1.0 }, { type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#engineering-principles-your-north-star", summary = "Requires code to communicate domain intent to human readers.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defn active-premium-emails [users]
+  (->> users
+       (filter :active?)
+       (filter #(= :premium (:tier %)))
+       (keep :email)
+       distinct
+       sort))
+; each step names itself; the flow reads top to bottom
+'''
+bad = '''
+(def apes   ; "active premium email sort"
+  (comp (partial sort)
+        (partial into #{}
+                 (keep #(when (and (:active? %)
+                                   (= :premium (:tier %)))
+                          (:email %))))))
+; point-free golf: the reader must mentally execute comp
+; order, partial arity, and keep/when semantics to recover
+; what the previous version simply said
+'''
+
+[examples.cpp]
+good = '''
+bool isLeapYear(int year) {
+  const bool divisibleBy4   = year % 4 == 0;
+  const bool centuryYear    = year % 100 == 0;
+  const bool divisibleBy400 = year % 400 == 0;
+  return divisibleBy4 && (!centuryYear || divisibleBy400);
+}
+// a reviewer can restate the rule from the names alone
+'''
+bad = '''
+// calendar helpers, golfed to impress
+bool ily(int y){return !(y&3)&&((y%25)||!(y&15));}
+int nd(int m,int y){return m==2?28+ily(y):30|(m^(m>>3));}
+// both correct — and the next maintainer must re-derive two
+// bit tricks before daring to touch a calendar rule; the
+// "obvious fix" attempt in March broke leap centuries
+'''
+
+[examples.csharp]
+good = '''
+public static bool IsEligibleForRenewal(Member member)
+{
+    var inGoodStanding = member.Balance <= Money.Zero;
+    var expiresSoon = member.ExpiresOn <=
+        _clock.Today.AddDays(RenewalWindowDays);
+    return inGoodStanding && expiresSoon;
+}
+'''
+bad = '''
+// clever, compact, and hostile to the next reader
+public static bool E(Member m) =>
+    !(m.Balance > Money.Zero |
+      (m.ExpiresOn.DayNumber -
+       _clock.Today.DayNumber ^ 0) > 30) &&
+    new[] { m }.All(x => x.Status is not (null or ""));
+'''
+
+[examples.elixir]
+good = '''
+# names carry the intent; the flow reads top to bottom
+def first_listing_per_sku(listings) do
+  listings
+  |> Enum.sort_by(& &1.listed_at, Date)
+  |> Enum.uniq_by(& &1.sku)
+end
+'''
+bad = '''
+# compact, clever, and hostile to the next maintainer
+def f(l),
+  do:
+    l
+    |> Enum.reduce({%{}, []}, fn x, {m, a} ->
+      (m[x.k] && {m, a}) ||
+        {Map.put(m, x.k, 1), [x | a]}
+    end)
+    |> elem(1)
+    |> :lists.reverse()
+'''
+
+[examples.go]
+good = '''
+func risingOrSampledEvens(readings []int, every int) []int {
+	var kept []int
+	for i, r := range readings {
+		sampledEven := r%2 == 0 && i%every == 0
+		risesAbovePrev :=
+			len(kept) > 0 && kept[len(kept)-1] < r
+		if sampledEven || risesAbovePrev {
+			kept = append(kept, r)
+		}
+	}
+	return kept
+}
+'''
+bad = '''
+func f(rs []int, n int) []int {
+	var o []int
+	for i, x := range rs {
+		// one dense condition, three unnamed ideas
+		if x&1 == 0 && i%n == 0 || len(o) > 0 && o[len(o)-1] < x {
+			o = append(o, x)
+		}
+	}
+	return o
+}
+'''
+
+[examples.java]
+good = '''
+// the rule reads the way a reviewer would state it
+static int doubledEvenIndexTotal(int[] readings) {
+    var total = 0;
+    for (int i = 0; i < readings.length; i += 2) {
+        var reading = readings[i];
+        if (reading < 0) {
+            continue;   // negatives are sensor noise
+        }
+        total += reading * 2;
+    }
+    return total;
+}
+'''
+bad = '''
+// clever, compressed, and hostile to the next maintainer
+static int f(int[] a) {
+    return IntStream.range(0, a.length)
+        .reduce(0, (r, i) -> (i & 1) == 0
+            ? r + ((a[i] >> 31 | 1) > 0 ? a[i] << 1 : 0)
+            : r);
+}
+// the sensor-noise rule is in there — encoded as bit
+// tricks nobody can safely modify
+'''
+
+[examples.kotlin]
+good = '''
+fun eligibleForRenewalDiscount(customer: Customer): Boolean {
+    val loyalTenure = customer.tenure.toYears() >= 3
+    val claimFreeYear =
+        customer.claims.none { it.withinDays(365) }
+    return loyalTenure && claimFreeYear
+}
+'''
+bad = '''
+// clever, compact, and opaque — units and intent hidden
+fun e(c: Customer) =
+    (c.t / 31_536_000L).toInt().takeIf { it >= 3 } != null &&
+        c.cl.none {
+            (System.currentTimeMillis() - it.ts) <
+                31_536_000_000L
+        }
+'''
+
+[examples.python]
+good = '''
+def parse_config_lines(lines: list[str]) -> dict[str, str]:
+    settings: dict[str, str] = {}
+    for line in lines:
+        if not line or line.startswith("#"):
+            continue
+        key, _, value = line.partition("=")
+        settings[key.strip()] = value.strip()
+    return settings
+'''
+bad = '''
+def f(xs):
+    # clever and compact; the reader reconstructs the
+    # comment-skipping and default-value rules from syntax
+    return {
+        k.strip(): v.strip()
+        for k, v in ((x.split("=", 1) + [""])[:2]
+                     for x in xs if x and x[0] != "#")
+    }
+'''
+
+[examples.ruby]
+good = '''
+def eligible_for_renewal?(subscription:)
+  return false if subscription.cancelled?
+
+  active = subscription.status == :active
+  expiring_soon = subscription.ends_on <= 30.days.from_now
+
+  active && expiring_soon
+end
+'''
+bad = '''
+# clever, compact, opaque — the reviewer must decode bit
+# flags and magic status integers to review a boolean
+def e?(s)
+  !(s.f & 0b100 > 0) && [1, 3].include?(s.st) &&
+    (s.e - Date.today) < 30
+rescue StandardError
+  false # swallows everything to stay on one screen
+end
+'''
+
+[examples.rust]
+good = '''
+fn is_eligible_for_renewal(sub: &Subscription, today: Date)
+    -> bool {
+    let in_renewal_window =
+        today >= sub.expires_on - RENEWAL_WINDOW;
+    let in_good_standing = !sub.has_overdue_balance();
+    in_renewal_window && in_good_standing
+}
+'''
+bad = '''
+// compact and clever; the next maintainer must reconstruct
+// the renewal rule from bit twiddling and magic numbers
+fn e(s: &Sub, t: u32) -> bool {
+    // what is 30? what is x? which flag is 0b0100?
+    (t + 30 >= s.x) & (s.f & 0b0100 == 0)
+}
+'''
+
+[examples.swift]
+good = '''
+func sumOfEvens(in numbers: [Int]) -> Int {
+    let evens = numbers.filter { $0.isMultiple(of: 2) }
+    return evens.reduce(0, +)
+}
+'''
+bad = '''
+func f(_ a: [Int]) -> Int {
+    // reviewer must hand-simulate the tuple machine to
+    // discover that only .0 was ever wanted
+    a.reduce((0, 0)) { r, x in
+        x % 2 == 0 ? (r.0 + x, r.1) : (r.0, r.1 ^ x)
+    }.0
+}
+'''
+
+[examples.typescript]
+good = '''
+export function isLeapYear(year: number): boolean {
+  const divisibleBy = (n: number): boolean => year % n === 0;
+  if (divisibleBy(400)) return true;
+  if (divisibleBy(100)) return false;
+  return divisibleBy(4);
+}
+'''
+bad = '''
+// Clever, compact, and hostile to the next maintainer —
+// the bitwise tricks hide the calendar rule entirely.
+export const ly = (y: number): boolean =>
+  !(y & 3) && (!!(y % 25) || !(y & 15));
+
+// Same spirit, applied to a checksum:
+const f = (a: number[], b = 0): number =>
+  a.length ? f(a.slice(1), b ^ a[0]!) : b;
+'''

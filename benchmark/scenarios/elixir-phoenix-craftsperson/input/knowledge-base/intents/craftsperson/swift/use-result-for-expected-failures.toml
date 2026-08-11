@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-result-for-expected-failures"
+title = "Represent expected domain failures with Result"
+category = "reliability"
+tags = ["swift", "error-handling", "error-modeling", "recoverability", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Callers can see and handle expected domain failure as part of a function's ordinary contract."
+threat = "Throwing expected validation or business outcomes makes routine branches look exceptional and hides their domain type."
+expectation = "Domain operations will gain multiple expected rejection cases that callers must handle explicitly."
+strategy = "Return Result values with typed domain errors for expected failures."
+evidence = [{ type = "api_review", description = "Functions with expected rejection outcomes expose Result<Success, DomainError>, and tests cover each documented failure case.", required = true }]
+tradeoff = "Result introduces explicit switching and can become cumbersome through long call chains compared with throws."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#error-handling", summary = "Explicitly assigns Result to expected failures and domain errors.", confidence = 1.0 }]

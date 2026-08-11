@@ -1,0 +1,17 @@
+id = "guidelines.intent.document-public-api-contracts"
+title = "Document public API contracts and rationale"
+category = "documentation"
+tags = ["java", "documentation", "public-api", "contracts", "consumer-guidance"]
+relations = [
+  { type = "specializes", target = "craftsperson/document-public-contracts" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Consumers can understand what a public Java API promises and why it exists without reading its implementation."
+threat = "Undocumented public contracts force callers to infer semantics that can change accidentally."
+expectation = "Public classes, interfaces, and methods will gain consumers separated from their implementers."
+strategy = "Write Javadoc for public APIs that explains purpose, behavior, constraints, and rationale rather than restating implementation steps."
+evidence = [{ type = "documentation_gate", description = "The Javadoc task succeeds and every public API has meaningful contract-oriented documentation.", required = true }]
+tradeoff = "Comprehensive Javadoc adds maintenance cost and can duplicate obvious declarations if written mechanically."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#documentation", summary = "Requires Javadoc for public APIs and says it should explain what and why rather than how.", confidence = 1.0 }]

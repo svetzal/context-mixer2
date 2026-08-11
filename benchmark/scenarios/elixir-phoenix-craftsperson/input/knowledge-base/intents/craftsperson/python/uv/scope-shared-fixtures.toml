@@ -1,0 +1,17 @@
+id = "guidelines.intent.scope-shared-fixtures"
+title = "Scope shared fixtures to their consumers"
+category = "design"
+tags = ["python", "uv", "testing", "dependencies", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Tests reuse setup without making unrelated parts of the suite depend on invisible global fixtures."
+threat = "Duplicated setup drifts, while overly broad conftest files create implicit coupling and fixture-name collisions."
+expectation = "The suite will grow across packages whose setup needs overlap only partially."
+strategy = "Place reusable fixtures in conftest.py at the narrowest package level that contains all intended consumers."
+evidence = [{ type = "test_structure_review", description = "Shared fixtures resolve for their intended subtree, are not duplicated across spec files, and are not exposed to unrelated packages.", required = true }]
+tradeoff = "Conftest discovery is implicit, so readers may need to search parent directories to find fixture definitions."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#test-organization", summary = "Requires shared fixtures to live in conftest.py at the appropriate package level.", confidence = 1.0 }]

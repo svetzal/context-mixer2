@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-structured-concurrency"
+title = "Use structured concurrency for asynchronous work"
+category = "reliability"
+tags = ["swift", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Concurrent Swift code preserves understandable lifetimes, cancellation, and isolation."
+threat = "Completion-handler nesting and unsynchronized shared state obscure control flow and introduce races."
+expectation = "Applications will perform more overlapping asynchronous work across independently evolving features."
+strategy = "Prefer async/await and TaskGroup for asynchronous flow and actors for shared-state isolation."
+evidence = [{ type = "static_review", description = "New asynchronous APIs use async functions or structured tasks, and mutable state crossing task boundaries is actor-isolated or otherwise proven Sendable-safe.", required = true }]
+tradeoff = "Structured concurrency can require deployment-target changes, actor hops, Sendable remediation, and migration of callback APIs."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#swift-language-mastery", summary = "Prescribes async/await, TaskGroup, and actors and later prefers async/await over completion handlers.", confidence = 1.0 }]

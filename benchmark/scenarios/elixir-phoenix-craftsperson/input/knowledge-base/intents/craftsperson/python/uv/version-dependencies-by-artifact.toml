@@ -1,0 +1,17 @@
+id = "guidelines.intent.version-dependencies-by-artifact"
+title = "Version dependencies according to artifact role"
+category = "design"
+tags = ["python", "uv", "dependencies", "build-and-delivery", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Applications deploy reproducibly while libraries remain compatible with downstream resolution."
+threat = "One universal version policy either permits deployed applications to drift or overconstrains library consumers."
+expectation = "The ecosystem will produce both independently deployed applications and reusable libraries."
+strategy = "Use compatible version ranges for library requirements and exact resolved versions for applications."
+evidence = [{ type = "manifest_review", description = "Declared requirements and lock policy match whether the project is consumed as a library or deployed as an application.", required = true }]
+tradeoff = "Mixed-purpose projects require nuanced policy, and ranges can expose libraries to combinations not exercised by the current lockfile."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#dependency-management", summary = "Directs libraries to use version ranges and applications to pin versions.", confidence = 1.0 }]

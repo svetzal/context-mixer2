@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-public-behavior"
+title = "Test stable behavior rather than internal structure"
+category = "testing"
+tags = ["go", "concurrency", "testing", "behavior", "public-boundaries", "refactor-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/test-observable-behavior" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The implementation can be refactored while tests continue to protect user-visible contracts."
+threat = "Tests coupled to private calls and representations fail during safe refactoring without signaling a behavior regression."
+expectation = "Internal designs will change more frequently than the behavior users depend on."
+strategy = "Assert observable behavior and contracts through stable entry points, not implementation details."
+evidence = [{ type = "test_review", description = "Tests assert public outputs, errors, and effects and do not depend on private call order or internal representation absent a contract reason.", required = true }]
+tradeoff = "Behavior-level tests can make it harder to pinpoint the exact internal cause of a failure."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#tests-are-the-executable-spec", summary = "Directs tests toward behavior users depend on rather than internal implementation.", confidence = 1.0 }]

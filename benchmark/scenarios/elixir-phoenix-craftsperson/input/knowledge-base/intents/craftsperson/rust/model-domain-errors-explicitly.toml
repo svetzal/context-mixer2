@@ -1,0 +1,17 @@
+id = "guidelines.intent.model-domain-errors-explicitly"
+title = "Model domain errors explicitly"
+category = "reliability"
+tags = ["rust", "error-handling", "error-modeling", "recoverability", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Callers can distinguish domain failure modes while retaining actionable context."
+threat = "Opaque strings or overly generic errors erase semantics needed for recovery, mapping, and diagnosis."
+expectation = "Callers and external interfaces will need different behavior for different failure categories."
+strategy = "Define ergonomic domain error types that preserve context at their call sites."
+evidence = [{ type = "test", description = "Tests distinguish domain error variants and verify relevant context is retained.", required = true }]
+tradeoff = "Typed errors add variants, conversion implementations, and maintenance overhead."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#error-handling", summary = "Prefers domain error types that preserve context and remain ergonomic.", confidence = 1.0 }]

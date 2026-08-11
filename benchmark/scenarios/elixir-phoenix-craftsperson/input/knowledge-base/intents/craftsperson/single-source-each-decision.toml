@@ -1,0 +1,327 @@
+id = "guidelines.intent.single-source-each-decision"
+title = "Single-source each decision"
+category = "design"
+tags = ["knowledge-duplication", "single-source-of-truth", "maintainability"]
+status = "hypothesized"
+confidence = 0.99
+capability = "A domain or engineering decision can change consistently from one authoritative representation."
+threat = "Duplicated knowledge drifts and produces contradictory behavior or configuration."
+expectation = "Shared rules, constants, schemas, and policies will evolve over the life of the system."
+strategy = "Represent each decision once and derive or delegate all other uses from that source."
+evidence = [{ type = "design_review", description = "A change to one decision requires editing one authoritative representation rather than coordinated copies.", required = true }]
+tradeoff = "Centralization can create an indirection or dependency that is not worthwhile for coincidentally similar values."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/elixir-ecosystem/agents/elixir-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "Single-sources each domain decision.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#simple-design-heuristics-in-priority-order", summary = "Eliminates duplication of knowledge after behavior and intent are clear.", confidence = 1.0 }, { type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#simple-design-heuristics", summary = "Centralizes shared decisions instead of duplicating their representation.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; policy.clj — the one authoritative representation
+(def free-shipping-threshold 75.00M)
+
+;; every use derives from it:
+(defn free-shipping? [order]
+  (>= (:total order) free-shipping-threshold))
+
+(defn banner-text []
+  (str "Free shipping over $" free-shipping-threshold "!"))
+; raising the threshold is a one-line change, everywhere
+'''
+bad = '''
+;; checkout.clj
+(defn free-shipping? [order] (>= (:total order) 75.0))
+
+;; banner.clj
+(def banner "Free shipping over $50!")   ; older copy
+
+;; email/templates.clj
+(def promo-line "Orders $75+ ship free (US only)")
+
+; marketing raised it to $85 — which of the three copies
+; gets the memo?
+'''
+
+[examples.cpp]
+good = '''
+// pricing/constants.h — the one authoritative representation
+inline constexpr Rate kStandardVatRate{0.20};
+
+Money vatOn(Money net) { return net * kStandardVatRate; }
+
+QString vatLabel() {
+  return QStringLiteral("VAT (%1%)")
+      .arg(kStandardVatRate.percent());  // derived, not copied
+}
+// a rate change is one edit; every use follows automatically
+'''
+bad = '''
+// pricing.cpp
+Money vatOn(Money net) { return net * 0.20; }
+
+// invoice_view.cpp
+label->setText("VAT (20%)");        // second copy, hand-typed
+
+// legacy_export.cpp
+row.vat = net * 0.175;              // third copy, already drifted
+
+// changing the rate means finding every copy — and last
+// quarter's exports prove one was missed
+'''
+
+[examples.csharp]
+good = '''
+public static class Limits
+{
+    // single authority for the upload cap
+    public const long MaxUploadBytes = 25 * 1024 * 1024;
+}
+
+builder.Services.Configure<FormOptions>(o =>
+    o.MultipartBodyLengthLimit = Limits.MaxUploadBytes);
+
+app.MapPost("/upload", (IFormFile f) =>
+    f.Length <= Limits.MaxUploadBytes
+        ? Accept(f) : Results.StatusCode(413));
+'''
+bad = '''
+// three copies of "the" limit, already disagreeing
+builder.Services.Configure<FormOptions>(o =>
+    o.MultipartBodyLengthLimit = 26_214_400); // 25MB
+
+app.MapPost("/upload", (IFormFile f) =>
+    f.Length <= 20 * 1024 * 1024              // 20MB?
+        ? Accept(f) : Results.StatusCode(413));
+
+// docs/api.md: "Uploads are limited to 30 MB."
+'''
+
+[examples.elixir]
+good = '''
+defmodule Pricing.Policy do
+  # the single authority for this business decision
+  def free_shipping_threshold, do: Money.new(50_00)
+end
+
+defmodule Cart do
+  def free_shipping?(total) do
+    threshold = Pricing.Policy.free_shipping_threshold()
+    Money.gte?(total, threshold)
+  end
+end
+# emails and templates derive from the same call site
+'''
+bad = '''
+# the free-shipping threshold, decided three times
+defmodule Cart do
+  def free_shipping?(t), do: t >= 50_00
+end
+
+defmodule Emails do
+  def upsell(t), do: "Spend #{50_00 - t} more!"
+end
+
+# checkout.html.heex, edited months later:
+#   "Free shipping on orders over $49"   <- drifted
+'''
+
+[examples.go]
+good = '''
+// shipping/policy.go — the one authoritative representation
+const FreeShippingThreshold Money = 5000
+
+func QualifiesForFreeShipping(subtotal Money) bool {
+	return subtotal >= FreeShippingThreshold
+}
+
+// checkout, banner, and email all call the same decision;
+// changing the promo threshold is a one-line edit
+'''
+bad = '''
+// checkout.go
+if subtotal >= 5000 {
+	order.Shipping = 0
+}
+
+// banner.go
+if subtotal >= 5000 {
+	showFreeShippingBanner()
+}
+
+// email.go — updated for last month's promo; the others weren't
+if subtotal >= 4500 {
+	body += "You qualified for free shipping!"
+}
+'''
+
+[examples.java]
+good = '''
+// one authoritative representation of the decision
+public record ShippingPolicy(Money freeShippingMinimum) {
+    boolean qualifies(Money subtotal) {
+        return subtotal.atLeast(freeShippingMinimum);
+    }
+}
+
+// checkout logic and banner copy both derive from it
+var free   = policy.qualifies(cart.subtotal());
+var banner = "Free shipping over "
+    + policy.freeShippingMinimum();
+'''
+bad = '''
+class Checkout {
+    static final int FREE_SHIP_MIN = 50;      // decided here
+}
+class CartBanner {
+    static final int FREE_SHIPPING_AT = 50;   // and here
+}
+// marketing.properties (drifted last quarter):
+//   free.shipping.threshold=35
+
+// the banner now promises what checkout denies; fixing
+// the rule means finding every copy, every time
+'''
+
+[examples.kotlin]
+good = '''
+// the idle-timeout decision lives in exactly one place
+object SessionPolicy {
+    val idleTimeout: Duration = 30.minutes
+}
+
+// middleware, reaper, and docs all derive from it
+val expiresAt = clock.now() + SessionPolicy.idleTimeout
+'''
+bad = '''
+// three independent copies of "30 minutes"
+class AuthMiddleware { val timeoutMs = 30 * 60 * 1000 }
+class SessionReaper { val idleMinutes = 30L }
+// application.yml: session.timeout: 25m  <- drifted already
+// users get logged out by whichever copy fires first;
+// changing the policy means hunting every representation
+'''
+
+[examples.python]
+good = '''
+# pricing.py — the one authoritative representation
+FREE_SHIPPING_THRESHOLD = Money(75, "CAD")
+
+def qualifies_for_free_shipping(cart: Cart) -> bool:
+    return cart.subtotal >= FREE_SHIPPING_THRESHOLD
+
+def cart_banner(cart: Cart) -> str:
+    gap = FREE_SHIPPING_THRESHOLD - cart.subtotal
+    return f"Add {gap} for free shipping"
+'''
+bad = '''
+# shipping.py
+def free_shipping(cart: Cart) -> bool:
+    return cart.subtotal >= 75            # decision copy #1
+
+# banner.py
+def cart_banner(cart: Cart) -> str:
+    gap = 80 - cart.subtotal              # copy #2, already
+    return f"Add {gap} for free shipping" # drifted after a
+                                          # promo changed one
+'''
+
+[examples.ruby]
+good = '''
+# one authoritative representation of the free-shipping rule
+module Policy
+  FREE_SHIPPING_CENTS = 50_00
+
+  def self.free_shipping?(cents:)
+    cents >= FREE_SHIPPING_CENTS
+  end
+end
+
+# every use derives from the single source
+show_banner if Policy.free_shipping?(cents: cart.cents)
+waive_fee   if Policy.free_shipping?(cents: order.cents)
+'''
+bad = '''
+# checkout.rb
+show_banner if cart.cents >= 50_00   # copy 1
+
+# shipping_calculator.rb
+fee = 0 if order.cents >= 5000       # copy 2
+
+# emails/promo.html.erb
+#   "Free shipping on orders over $45!"  # copy 3 — already
+#   drifted; every change needs three edits and a lucky grep
+'''
+
+[examples.rust]
+good = '''
+// the 90-day retention decision exists exactly once
+pub const RETENTION: Duration =
+    Duration::from_secs(90 * 24 * 60 * 60);
+
+pub fn is_expired(age: Duration) -> bool {
+    age > RETENTION
+}
+pub fn purge_cutoff(now: SystemTime) -> SystemTime {
+    now - RETENTION // derived from the single source
+}
+'''
+bad = '''
+// "90 days" is decided in three places that drift apart
+pub fn is_expired(age: Duration) -> bool {
+    age.as_secs() > 90 * 86_400
+}
+pub fn purge_cutoff(now: SystemTime) -> SystemTime {
+    now - Duration::from_secs(7_776_000) // also 90 days
+}
+// docs/retention.md meanwhile promises "60 days" — which
+// one is the decision?
+'''
+
+[examples.swift]
+good = '''
+enum ShippingPolicy {
+    static let freeThreshold = Money(50, .usd)
+}
+
+// checkout, cart badge, and receipt all derive from it
+let qualifies = order.total >= ShippingPolicy.freeThreshold
+footer.text =
+    "Free shipping over \(ShippingPolicy.freeThreshold)"
+// changing the policy is one edit, everywhere at once
+'''
+bad = '''
+// Checkout.swift
+let freeShippingThreshold = 50.0
+
+// CartBadge.swift
+let freeShipMin = 50.0   // copy — later bumped to 60 alone
+
+// ReceiptFooter.swift
+label.text = "Free shipping over $50"  // third copy, prose
+// three answers to one question, already contradicting
+'''
+
+[examples.typescript]
+good = '''
+// One authoritative representation of the decision.
+export const MAX_UPLOAD_MB = 25;
+
+// Every other use derives from it.
+export const uploadSchema = z.object({
+  sizeMb: z.number().max(MAX_UPLOAD_MB),
+});
+export const uploadHint =
+  `Files up to ${MAX_UPLOAD_MB} MB are accepted.`;
+'''
+bad = '''
+// The same decision, four independently drifting copies:
+export const uploadSchema = z.object({
+  sizeMb: z.number().max(25),
+});
+export const uploadHint = "Files up to 20 MB are accepted.";
+
+// nginx.conf:          client_max_body_size 10m;
+// mobile app config:   maxUploadMb: 25
+
+// Support now explains three different limits to users.
+'''

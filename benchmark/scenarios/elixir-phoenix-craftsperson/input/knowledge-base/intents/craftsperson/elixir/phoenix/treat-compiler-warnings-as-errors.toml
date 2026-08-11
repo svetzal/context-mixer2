@@ -1,0 +1,17 @@
+id = "guidelines.intent.treat-compiler-warnings-as-errors"
+title = "Treat compiler warnings as errors"
+category = "quality"
+tags = ["elixir", "phoenix", "testing", "static-analysis", "error-handling", "build-and-delivery"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "The test build remains free of compiler-detected ambiguity and deprecated or suspicious constructs."
+threat = "Warnings accumulate as tolerated debt until upgrades turn them into failures or conceal new defects."
+expectation = "Compiler diagnostics will evolve as Elixir, OTP, and dependencies change."
+strategy = "Compile the test environment with warnings-as-errors before declaring work complete."
+evidence = [{ type = "gate", description = "MIX_ENV=test mix compile --warnings-as-errors exits successfully from a clean build.", required = true }]
+tradeoff = "Dependency or toolchain warning changes can block delivery before application behavior is affected."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#quality-assurance-process", summary = "Requires compilation in the test environment with warnings promoted to errors.", confidence = 1.0 }]

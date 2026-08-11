@@ -1,0 +1,17 @@
+id = "guidelines.intent.human-owned-performance-tradeoffs"
+title = "Keep product-sensitive performance tradeoffs human-owned"
+category = "performance"
+tags = ["kotlin", "android", "performance", "profiling", "evidence", "optimization"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-from-measurement" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to optimize the quality attributes users and the business actually value."
+threat = "Technical optimization can sacrifice cost, fidelity, battery, latency, or delivery speed without product consent."
+expectation = "Performance decisions will involve competing product outcomes and incomplete usage data."
+strategy = "Seek product input when performance tradeoffs materially affect user or business outcomes."
+evidence = [{ type = "gate", description = "Performance decisions record measured options, their product impacts, and an explicit stakeholder choice.", required = true }]
+tradeoff = "Waiting for product input can defer optimization and adds decision coordination."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#when-to-seek-clarification", summary = "The source explicitly requires product input for performance tradeoffs.", confidence = 1.0 }]

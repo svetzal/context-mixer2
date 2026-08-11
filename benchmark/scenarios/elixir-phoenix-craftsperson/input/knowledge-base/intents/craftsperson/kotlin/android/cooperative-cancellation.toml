@@ -1,0 +1,17 @@
+id = "guidelines.intent.cooperative-cancellation"
+title = "Preserve prompt cancellation of asynchronous work"
+category = "reliability"
+tags = ["kotlin", "android", "concurrency", "error-handling", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to stop obsolete work cleanly without reporting cancellation as failure or leaking resources."
+threat = "Broad exception handling and incomplete cleanup swallow cancellation or leave partial operations active."
+expectation = "Navigation, superseding requests, and lifecycle changes will cancel more concurrent operations."
+strategy = "Design coroutine and Flow paths to propagate cancellation and use completion handling for necessary cleanup."
+evidence = [{ type = "gate", description = "Cancellation tests show jobs terminate promptly, cleanup executes, and CancellationException is not converted into an application error.", required = true }]
+tradeoff = "Cancellation-safe cleanup and partial-operation semantics add branches and test cases."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#coroutines--flow", summary = "The source explicitly requires graceful cancellation handling with try-catch or onCompletion.", confidence = 1.0 }]

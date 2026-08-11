@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-change-reviews-focused"
+title = "Keep change reviews focused"
+category = "design"
+tags = ["elixir", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "A reviewer can understand and assess one coherent change without unrelated risk."
+threat = "Broad pull requests hide defects and force approval of unrelated decisions as a bundle."
+expectation = "Delivery pressure will tempt adjacent cleanup and features into the same review."
+strategy = "Keep each pull request narrowly scoped and explain its purpose and boundaries clearly."
+evidence = [{ type = "review_observation", description = "A change description states one purpose and every modified area is necessary to that purpose.", required = true }]
+tradeoff = "Focused reviews create more submissions and may defer useful adjacent cleanup."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#workflow--collaboration", summary = "Requires reviewable pull requests with focused scope and clear descriptions.", confidence = 1.0 }]

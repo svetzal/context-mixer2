@@ -1,0 +1,17 @@
+id = "guidelines.intent.acknowledge-engineering-uncertainty"
+title = "Acknowledge engineering uncertainty"
+category = "design"
+tags = ["java", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.9
+capability = "Technical decisions are based on verified knowledge rather than confident fabrication."
+threat = "An implementer conceals uncertainty and commits the team to an unsupported answer."
+expectation = "Java work will encounter unfamiliar libraries, runtime behavior, and business constraints."
+strategy = "State what is unknown and research, spike, or consult the user before relying on the uncertain claim."
+evidence = [{ type = "decision_record", description = "An uncertain consequential claim is labeled, followed by a cited verification, focused spike result, or explicit stakeholder decision.", required = true }]
+tradeoff = "Acknowledging and resolving uncertainty slows decisions that might have been correct by intuition."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#behavioral-guidelines", summary = "Requires humility about unknown answers and offers research or user consultation as the response.", confidence = 1.0 }]

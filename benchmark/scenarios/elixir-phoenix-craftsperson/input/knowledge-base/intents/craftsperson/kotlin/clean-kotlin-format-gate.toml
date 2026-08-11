@@ -1,0 +1,17 @@
+id = "guidelines.intent.clean-kotlin-format-gate"
+title = "Reject Kotlin changes that violate the shared format"
+category = "quality"
+tags = ["kotlin", "formatting", "automation", "consistency"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-canonical-formatting" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to read diffs and code under one mechanically enforced Kotlin style."
+threat = "Formatting drift creates review noise and recurring subjective style disputes."
+expectation = "More contributors and generated changes will touch the same Kotlin sources."
+strategy = "Run Ktlint for every code-change session and require a clean result before completion."
+evidence = [{ type = "gate", description = "./gradlew ktlintCheck exits successfully on the delivered revision.", required = true }]
+tradeoff = "Strict formatting can cause unrelated churn and leaves little room for locally preferred layout."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#mandatory-quality-gates", summary = "The source makes a successful ktlintCheck mandatory before completion.", confidence = 1.0 }]

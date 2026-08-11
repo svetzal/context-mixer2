@@ -1,0 +1,18 @@
+id = "guidelines.intent.enforce-security-at-trust-boundaries"
+title = "Enforce security controls at trust boundaries"
+category = "architecture"
+tags = ["security", "trust-boundaries", "authorization"]
+relations = [
+  { type = "related-to", target = "craftsperson/validate-untrusted-input-at-boundaries" },
+  { type = "related-to", target = "craftsperson/put-gateways-at-external-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Untrusted callers and data receive only explicitly authorized access to application capabilities."
+threat = "Authentication, authorization, request forgery protection, unsafe decoding, or secret handling is applied inconsistently after untrusted input has entered the system."
+expectation = "Applications will expose routes, commands, decoders, uploads, and integrations to actors with different trust levels."
+strategy = "Authenticate, authorize, validate, and safely decode at the earliest enforceable boundary, with secure framework protections enabled by default."
+evidence = [{ type = "security_test", description = "Boundary tests cover unauthenticated, unauthorized, forged, malformed, and malicious inputs and verify denial before protected effects occur.", required = true }]
+tradeoff = "Central boundary enforcement can duplicate checks across interfaces and requires careful context propagation."
+scope = { project = "guidelines", paths = ["plugins"] }
+sources = [{ type = "synthesis", ref = "intents", summary = "Generalizes recurring web, CLI, decoder, upload, secret, and framework security controls.", confidence = 0.98 }]

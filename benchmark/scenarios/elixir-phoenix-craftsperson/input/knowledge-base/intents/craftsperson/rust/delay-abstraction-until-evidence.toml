@@ -1,0 +1,17 @@
+id = "guidelines.intent.delay-abstraction-until-evidence"
+title = "Delay abstraction until evidence justifies it"
+category = "design"
+tags = ["rust", "testing", "abstraction", "evidence", "duplication"]
+relations = [
+  { type = "specializes", target = "craftsperson/delay-abstraction-until-evidence" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "The design retains only abstractions that represent demonstrated variation or shared decisions."
+threat = "Speculative traits, parameters, and generalized layers add indirection before a real pattern exists."
+expectation = "Contributors will be tempted to prepare for hypothetical consumers and future variants."
+strategy = "Inline premature abstractions, remove speculative features, and keep a concrete type until a second consumer demonstrates the seam."
+evidence = [{ type = "design_review", description = "Every new abstraction has at least two concrete uses or a stated externally imposed contract.", required = true }]
+tradeoff = "Waiting may require a later refactor when the second use appears and can duplicate a small amount of code temporarily."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#self-correction-mechanisms", summary = "Directs agents to inline premature abstractions and avoid a trait for one implementation.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.type-safe-kotlin-builders"
+title = "Make Kotlin DSL construction type-safe"
+category = "design"
+tags = ["kotlin", "build-and-delivery", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.88
+capability = "Ability to construct valid declarative configurations with compiler guidance."
+threat = "Stringly typed or loosely structured builders permit invalid combinations that fail only at runtime."
+expectation = "The codebase will introduce or extend domain-specific configuration APIs."
+strategy = "Use type-safe Kotlin builders when defining DSL-style construction APIs."
+evidence = [{ type = "test", description = "Compile-time usage examples accept valid builder combinations, while compile-testing or API review demonstrates that invalid combinations are not representable.", required = true }]
+tradeoff = "A typed builder adds API surface, generic complexity, and maintenance cost that may exceed the value of a small DSL."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#core-identity", summary = "The source names type-safe builders as the mechanism for DSL construction.", confidence = 0.9 }]

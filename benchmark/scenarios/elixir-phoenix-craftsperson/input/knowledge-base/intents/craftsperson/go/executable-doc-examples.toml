@@ -1,0 +1,17 @@
+id = "guidelines.intent.executable-doc-examples"
+title = "Keep documentation examples executable"
+category = "documentation"
+tags = ["go", "testing", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Readers can copy documented usage patterns with confidence that they still work."
+threat = "Illustrative examples drift silently as APIs and behavior change."
+expectation = "Documentation will outlive individual API revisions and be consumed without manual verification."
+strategy = "Write documentation examples as executable Go examples and run them with the test suite."
+evidence = [{ type = "test", description = "All documentation examples compile and execute successfully under go test ./....", required = true }]
+tradeoff = "Executable examples constrain presentation and add test maintenance for illustrative material."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#synchronize-documentation", summary = "Says documentation examples must remain executable and tested.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.prevent-implicit-single-argument-conversions"
+title = "Prevent accidental implicit construction"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Values are not silently reinterpreted as domain objects."
+threat = "Single-argument constructors bypass call-site intent."
+expectation = "Overloads and call sites will increase."
+strategy = "Mark single-argument constructors explicit unless intentional."
+evidence = [{ type = "gate", description = "Constructors are explicit or document the conversion contract.", required = true }]
+tradeoff = "Explicit construction adds verbosity."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#common-mistakes-to-avoid", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-throws-for-unexpected-failures"
+title = "Use throwing functions for unexpected failures"
+category = "reliability"
+tags = ["swift", "error-handling", "error-modeling", "recoverability", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Unexpected failure interrupts the normal value path and propagates until a capable boundary handles it."
+threat = "Encoding unexpected infrastructure or programming failures as ordinary values encourages accidental ignoring or exhaustive domain handling."
+expectation = "I/O and system operations will continue to produce failures that local domain callers cannot reasonably recover from."
+strategy = "Use Swift throwing functions for programming errors and unexpected operational failures."
+evidence = [{ type = "api_review", description = "An operation with an unexpected failure path marks it throws and has a boundary test showing propagation or deliberate recovery.", required = true }]
+tradeoff = "Throws does not declare concrete error types in the basic signature and can blur programming defects with recoverable operational errors."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#error-handling", summary = "Explicitly assigns throwing functions to programming errors and unexpected failures.", confidence = 1.0 }]

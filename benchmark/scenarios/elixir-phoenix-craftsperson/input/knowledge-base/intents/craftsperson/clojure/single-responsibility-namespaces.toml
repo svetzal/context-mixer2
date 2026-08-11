@@ -1,0 +1,17 @@
+id = "guidelines.intent.single-responsibility-namespaces"
+title = "Keep namespace responsibilities narrow and explicit"
+category = "design"
+tags = ["clojure", "cohesion", "single-responsibility", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to locate, change, and reuse behavior without understanding unrelated concerns"
+threat = "Namespaces that mix responsibilities become high-coupling change hotspots"
+expectation = "New features will otherwise concentrate more unrelated behavior in established namespaces"
+strategy = "Give each namespace one clear responsibility and split it when that responsibility becomes ambiguous"
+evidence = [{ type = "review", description = "Every changed namespace can be summarized by one responsibility and contains no unrelated workflow or integration concern", required = true }]
+tradeoff = "Narrow namespaces increase file count and require more namespace declarations and navigation"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#core-philosophy", summary = "Small focused namespaces with one clear responsibility are a core principle.", confidence = 1.0 }, { type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#4-namespace-organization", summary = "Namespace reviews explicitly check for a single clear responsibility.", confidence = 1.0 }]

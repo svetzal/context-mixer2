@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-behavioral-coverage-threshold"
+title = "Enforce a coverage threshold"
+category = "testing"
+tags = ["cpp", "qt", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Behavior remains exercised as code expands."
+threat = "New paths can ship without regression protection."
+expectation = "Contributors may focus only on happy paths."
+strategy = "Collect coverage and fail below the project threshold."
+evidence = [{ type = "gate", description = "lcov reports coverage at or above the threshold.", required = true }]
+tradeoff = "Coverage can reward low-value assertions."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#quality-assurance-process", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

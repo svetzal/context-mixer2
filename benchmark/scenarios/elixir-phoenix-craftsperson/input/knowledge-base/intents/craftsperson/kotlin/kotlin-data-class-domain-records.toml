@@ -1,0 +1,17 @@
+id = "guidelines.intent.kotlin-data-class-domain-records"
+title = "Give domain records explicit value semantics"
+category = "design"
+tags = ["kotlin", "testing", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Ability to compare, copy, and inspect domain data consistently without hand-written structural boilerplate."
+threat = "Ordinary mutable classes make equality and state transitions inconsistent across entities and value objects."
+expectation = "The domain will accumulate more records that move between layers and participate in tests."
+strategy = "Use data classes for domain entities and value objects whose intended semantics are structural."
+evidence = [{ type = "review", description = "Structurally valued domain records use data classes, and tests confirm equality and copy behavior matches the domain's identity semantics.", required = true }]
+tradeoff = "Generated structural equality and copy are inappropriate for some identity-bearing or mutable entities and can expose too much constructor state."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#domain-modeling", summary = "The source prescribes data classes for entities and value objects and describes them as immutable domain models.", confidence = 1.0 }]

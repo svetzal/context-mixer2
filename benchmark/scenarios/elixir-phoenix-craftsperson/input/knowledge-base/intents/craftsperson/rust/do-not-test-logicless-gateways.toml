@@ -1,0 +1,17 @@
+id = "guidelines.intent.do-not-test-logicless-gateways"
+title = "Do not test logicless gateway wrappers"
+category = "testing"
+tags = ["rust", "testing", "gateways", "unit-testing", "test-value"]
+relations = [
+  { type = "specializes", target = "craftsperson/do-not-unit-test-logicless-gateways" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "The test suite concentrates on project behavior rather than reasserting third-party library mechanics."
+threat = "Tests for thin adapters duplicate upstream behavior and become brittle without increasing confidence."
+expectation = "Functional-core architecture will create small gateway structs that merely delegate I/O."
+strategy = "Leave logicless gateways untested and move any custom decision-making into the core where it can be tested directly."
+evidence = [{ type = "test_review", description = "Gateway tests exist only for project-owned behavior; delegation-only wrappers contain no custom logic.", required = true }]
+tradeoff = "Adapter misconfiguration or incorrect third-party calls may escape until integration or system testing."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#testing-strategy", summary = "Rejects tests for I/O-isolating gateway structs without custom logic.", confidence = 1.0 }]

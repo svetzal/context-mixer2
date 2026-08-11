@@ -1,0 +1,17 @@
+id = "guidelines.intent.independently-shippable-increments"
+title = "Deliver changes as independently shippable increments"
+category = "delivery"
+tags = ["python", "incremental-delivery", "change-scope", "reversibility"]
+relations = [
+  { type = "specializes", target = "craftsperson/deliver-small-independent-increments" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Each logical change can be understood, validated, shipped, or reverted independently."
+threat = "Multi-purpose changes entangle risk, obscure intent, and make rollback or review harder."
+expectation = "The system will be changed continuously and failures will sometimes require selective diagnosis or reversal."
+strategy = "Use small, single-reason commits with descriptive messages and keep review scopes focused."
+evidence = [{ type = "gate", description = "Each commit passes its required checks and its diff and message describe one independently deployable reason for change.", required = true }]
+tradeoff = "Small increments increase commit and integration overhead and may require temporary sequencing constraints."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#small-safe-increments", summary = "The source requires single-reason independently shippable commits and later asks for focused, clearly described reviews.", confidence = 1.0 }]

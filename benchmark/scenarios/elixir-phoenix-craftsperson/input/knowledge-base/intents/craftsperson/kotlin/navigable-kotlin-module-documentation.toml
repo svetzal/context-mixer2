@@ -1,0 +1,17 @@
+id = "guidelines.intent.navigable-kotlin-module-documentation"
+title = "Give Kotlin modules an executable documentation entry point"
+category = "documentation"
+tags = ["kotlin", "documentation", "dependencies", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability for newcomers to understand a module's purpose and reach representative usage examples."
+threat = "Symbol-level API pages lack architectural context and examples drift into non-compiling prose."
+expectation = "The modular project will add packages and APIs whose relationships are not obvious from signatures."
+strategy = "Provide Module.md overviews and use Dokka @sample references for example code."
+evidence = [{ type = "gate", description = "Generated Dokka contains a module overview and resolves each @sample to compiled example code representative of current usage.", required = true }]
+tradeoff = "Module narratives and sample code add artifacts that must evolve with APIs and build structure."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#documentation-with-dokka", summary = "The source requires Module.md overviews and @sample-based examples.", confidence = 1.0 }]

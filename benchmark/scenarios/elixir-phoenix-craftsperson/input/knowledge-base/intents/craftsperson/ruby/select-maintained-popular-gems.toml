@@ -1,0 +1,17 @@
+id = "guidelines.intent.select-maintained-popular-gems"
+title = "Select gems with durable maintenance signals"
+category = "dependencies"
+tags = ["ruby", "security", "dependencies", "supply-chain", "complexity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/minimize-dependency-surface" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to depend on Ruby libraries that continue receiving fixes, compatibility updates, and community knowledge"
+threat = "Abandoned or obscure gems leave vulnerabilities and runtime incompatibilities unresolved"
+expectation = "Ruby, Rails, and security requirements will evolve after a dependency is adopted"
+strategy = "Research candidate gems thoroughly and prefer well-maintained, widely used options"
+evidence = [{ type = "review", description = "Dependency selection records recent releases, maintainer activity, supported runtimes, adoption signals, open-risk review, and considered alternatives", required = true }]
+tradeoff = "Popular maintained gems may be larger, more opinionated, or less tailored than a niche alternative"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#edge-cases-and-escalation", summary = "Gem selection requires thorough research and preference for well-maintained, widely used gems.", confidence = 1.0 }]

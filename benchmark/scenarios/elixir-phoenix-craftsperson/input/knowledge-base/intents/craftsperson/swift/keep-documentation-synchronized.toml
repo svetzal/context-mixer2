@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-documentation-synchronized"
+title = "Keep DocC synchronized with implementation"
+category = "documentation"
+tags = ["swift", "documentation", "synchronization", "behavior", "maintenance"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Users and maintainers can rely on DocC catalogs as accurate descriptions of current Swift behavior."
+threat = "Implementation changes leave documentation describing obsolete APIs, examples, or behavior."
+expectation = "Public contracts and implementation details will continue to evolve after documentation is written."
+strategy = "Update DocC catalogs in docs as part of the same change whenever implementation or public behavior changes."
+evidence = [{ type = "review_gate", description = "A behavior- or contract-changing diff includes corresponding DocC updates, and its documented examples agree with tests and current signatures.", required = true }]
+tradeoff = "Synchronous documentation work lengthens small changes and can require updates across several catalog pages."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#documentation-standards", summary = "Requires documentation to remain synchronized and makes DocC sync a completion gate and workflow step.", confidence = 1.0 }]

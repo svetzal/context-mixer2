@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-behavioral-coverage-thresholds"
+title = "Enforce line and branch coverage thresholds"
+category = "testing"
+tags = ["java", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Broad behavioral areas remain exercised as the Java codebase changes."
+threat = "Tests can stay green while new branches and code paths receive no regression protection."
+expectation = "Delivery pressure will otherwise favor feature completion over adding tests for less obvious paths."
+strategy = "Measure JaCoCo line and branch coverage and enforce the project's thresholds, typically at least eighty percent."
+evidence = [{ type = "coverage_gate", description = "JaCoCo reports meet the configured line and branch thresholds for the revision.", required = true }]
+tradeoff = "Numeric thresholds can reward superficial tests and add effort to low-risk glue code."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#quality-gates-mandatory", summary = "Requires JaCoCo reports to meet project thresholds, typically 80 percent or more for line and branch coverage.", confidence = 1.0 }]

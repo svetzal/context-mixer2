@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-idiomatic-modern-python"
+title = "Use Python's idiomatic modern language strengths"
+category = "design"
+tags = ["python", "uv", "concurrency", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.91
+capability = "Python code remains concise, recognizable, and natural for maintainers who know the language ecosystem."
+threat = "Transplanted patterns and unnecessary ceremony obscure intent and bypass language features that already solve the problem."
+expectation = "The codebase will evolve with Python-literate contributors and modern supported interpreters."
+strategy = "Use duck typing, comprehensions, generators, context managers, decorators, unpacking, protocols, async syntax, and pattern matching where each improves the design, while applying functional techniques pragmatically."
+evidence = [{ type = "review", description = "Changed code uses language-native constructs where they make behavior clearer and avoids ceremonial substitutes without an explicit reason.", required = true }]
+tradeoff = "Idiomatic modern constructs can be unfamiliar to contributors from other languages and may narrow compatibility with older Python versions."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#core-identity--expertise", summary = "Directs the craftsperson to use Python strengths, idiomatic constructs, modern syntax, and nondogmatic functional principles.", confidence = 1.0 }]

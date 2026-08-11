@@ -1,0 +1,17 @@
+id = "guidelines.intent.require-green-ci-for-pull-requests"
+title = "Require green CI for pull requests"
+category = "quality"
+tags = ["ruby", "security", "testing", "static-analysis", "error-handling", "build-and-delivery"]
+relations = [
+  { type = "specializes", target = "craftsperson/require-passing-tests-before-completion" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to integrate reviewed changes only after automated project checks succeed"
+threat = "Human approval can overlook reproducible test, lint, or security failures"
+expectation = "Pull requests will remain a shared integration path for Ruby changes"
+strategy = "Block pull-request integration until required CI checks are green"
+evidence = [{ type = "gate", description = "Every required CI job reports success on the pull-request revision before merge", required = true }]
+tradeoff = "Slow, flaky, or unavailable CI can delay integration even when reviewers believe a change is sound"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "The version-control guidance states that pull requests require green CI.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.express-transformations-declaratively"
+title = "Express data transformations declaratively"
+category = "design"
+tags = ["java", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.92
+capability = "Readers can understand a data transformation from its operations without tracing mutable loop state."
+threat = "Stateful iteration scatters filtering, mapping, and aggregation decisions across control flow."
+expectation = "Collection-processing logic will gain more stages and be refactored as domain rules evolve."
+strategy = "Use Streams for suitable collection transformations while keeping pipelines clear and side-effect-free."
+evidence = [{ type = "review", description = "Transformation code expresses filtering, mapping, and reduction directly, has no pipeline side effects, and remains simpler than an equivalent loop.", required = true }]
+tradeoff = "Stream pipelines can obscure debugging, allocate intermediate machinery, or become less readable when heavily nested."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#modern-java-mastery", summary = "Recommends Streams for declarative data transformations.", confidence = 1.0 }]

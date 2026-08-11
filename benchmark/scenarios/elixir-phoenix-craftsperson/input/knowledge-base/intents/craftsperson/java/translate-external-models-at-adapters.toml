@@ -1,0 +1,17 @@
+id = "guidelines.intent.translate-external-models-at-adapters"
+title = "Translate external models at adapter boundaries"
+category = "design"
+tags = ["java", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "External schemas can change without forcing those representations into business logic."
+threat = "DTOs and persistence entities leak transport or storage concerns into the domain model."
+expectation = "HTTP contracts, database schemas, and vendor formats will evolve independently."
+strategy = "Map DTOs, entities, and vendor payloads to clean domain models inside adapters."
+evidence = [{ type = "architecture_review", description = "Core APIs accept domain types, while conversions to and from external representations occur in adapter packages.", required = true }]
+tradeoff = "Explicit mapping adds code, allocation, and opportunities for translation mistakes."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Requires adapters to translate external DTOs and entities into clean domain models.", confidence = 1.0 }]

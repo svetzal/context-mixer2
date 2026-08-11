@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-free-functions-without-object-state"
+title = "Prefer free functions for stateless behavior"
+category = "design"
+tags = ["cpp", "qt", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.95
+capability = "Stateless operations remain reusable."
+threat = "Convenience members enlarge class responsibilities."
+expectation = "Classes tend to accumulate unrelated utilities."
+strategy = "Use free functions when private access is unnecessary."
+evidence = [{ type = "gate", description = "Stateless members are justified or moved to focused free functions.", required = true }]
+tradeoff = "Free functions may reduce type-based discoverability."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

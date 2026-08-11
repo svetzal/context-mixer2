@@ -1,0 +1,17 @@
+id = "guidelines.intent.validated-pydantic-data-models"
+title = "Use one validated model system for data containers"
+category = "design"
+tags = ["python", "pydantic", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Data containers validate inputs and expose consistent serialization and schema behavior across system layers."
+threat = "A mix of unvalidated containers and modeling frameworks produces inconsistent construction, conversion, and validation semantics."
+expectation = "Internal and external data shapes will evolve and cross multiple boundaries."
+strategy = "Represent data containers with Pydantic 2 models rather than dataclasses."
+evidence = [{ type = "static-analysis", description = "Production data-container classes inherit from Pydantic 2 BaseModel and no project dataclass is used as a data model.", required = true }]
+tradeoff = "Pydantic adds a runtime dependency, construction overhead, and framework-specific APIs even for simple internal values."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#data-structures", summary = "The source mandates Pydantic 2 for data containers and rejects dataclasses to obtain consistent validation, serialization, and schemas.", confidence = 1.0 }]

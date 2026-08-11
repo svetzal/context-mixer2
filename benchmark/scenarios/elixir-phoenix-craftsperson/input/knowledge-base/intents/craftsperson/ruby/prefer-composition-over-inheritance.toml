@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-composition-over-inheritance"
+title = "Compose collaborators instead of deep inheritance"
+category = "design"
+tags = ["ruby", "dependencies", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability to vary behavior through small explicit collaborators"
+threat = "Deep inheritance couples subclasses to hidden superclass state and makes behavior hard to combine"
+expectation = "New variants will require independent combinations of behavior rather than one rigid taxonomy"
+strategy = "Favor composition with small objects, modules, and clear collaborators over deep class hierarchies"
+evidence = [{ type = "architecture", description = "New behavioral variants are assembled through explicit collaborators and do not deepen an inheritance hierarchy without a documented reason", required = true }]
+tradeoff = "Composition introduces delegation and may require more objects and constructor wiring"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "The source favors small collaborators and composition over deep inheritance hierarchies.", confidence = 1.0 }]

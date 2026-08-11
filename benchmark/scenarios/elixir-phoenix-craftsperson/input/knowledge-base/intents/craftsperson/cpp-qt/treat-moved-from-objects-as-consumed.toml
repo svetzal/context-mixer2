@@ -1,0 +1,17 @@
+id = "guidelines.intent.treat-moved-from-objects-as-consumed"
+title = "Treat moved-from objects as consumed"
+category = "reliability"
+tags = ["cpp", "qt", "dependencies", "resource-management", "cleanup", "ownership"]
+relations = [
+  { type = "specializes", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ownership transfer cannot lead to invalid reuse."
+threat = "Code assumes a moved-from value still owns state."
+expectation = "More refactors will introduce moves."
+strategy = "Reassign or destroy a source before value-dependent reuse."
+evidence = [{ type = "gate", description = "Analysis finds no invalid moved-from use.", required = true }]
+tradeoff = "Conservative handling can forbid legal reuse."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#common-mistakes-to-avoid", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

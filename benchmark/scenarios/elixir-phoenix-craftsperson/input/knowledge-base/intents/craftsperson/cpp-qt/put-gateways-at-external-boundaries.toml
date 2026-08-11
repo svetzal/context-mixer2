@@ -1,0 +1,17 @@
+id = "guidelines.intent.put-gateways-at-external-boundaries"
+title = "Put gateways at external boundaries"
+category = "architecture"
+tags = ["cpp", "qt", "gateways", "external-systems", "dependency-inversion"]
+relations = [
+  { type = "specializes", target = "craftsperson/put-gateways-at-external-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Integrations can change without rewriting domain logic."
+threat = "Direct I/O leaks vendor concerns into the core."
+expectation = "Services and libraries will change or be absent in tests."
+strategy = "Route external interactions through owned pure virtual interfaces."
+evidence = [{ type = "gate", description = "Core modules contain no direct external I/O calls.", required = true }]
+tradeoff = "Interfaces can merely mirror stable libraries."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#engineering-principles-your-north-star", summary = "The source explicitly prescribes this judgment.", confidence = 1.0 }]

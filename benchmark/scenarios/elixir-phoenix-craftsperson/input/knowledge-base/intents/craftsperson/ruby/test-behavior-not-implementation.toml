@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-behavior-not-implementation"
+title = "Specify behavior without coupling tests to implementation"
+category = "testing"
+tags = ["ruby", "concurrency", "testing", "behavior", "public-boundaries", "refactor-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/test-observable-behavior" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to refactor internals while retaining confidence in observable behavior"
+threat = "Tests coupled to private structure fail during safe refactors and preserve accidental implementation choices"
+expectation = "Internal Ruby designs will evolve while their externally meaningful behavior remains stable"
+strategy = "Write RSpec examples as executable specifications of behavior rather than implementation"
+evidence = [{ type = "review", description = "Specs assert public outcomes and remain valid when internal collaborators or algorithms change without changing behavior", required = true }]
+tradeoff = "Behavior-level failures can localize defects less precisely than tests of internal units"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#additional-principles", summary = "Tests are executable specifications and must test behavior rather than implementation.", confidence = 1.0 }]

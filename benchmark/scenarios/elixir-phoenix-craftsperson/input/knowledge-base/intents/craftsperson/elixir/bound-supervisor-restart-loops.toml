@@ -1,0 +1,17 @@
+id = "guidelines.intent.bound-supervisor-restart-loops"
+title = "Bound supervisor restart loops"
+category = "design"
+tags = ["elixir", "concurrency", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Persistent child failures escalate instead of consuming resources in an endless restart storm."
+threat = "A deterministically failing child restarts rapidly and degrades the node while obscuring the root cause."
+expectation = "Some process failures will not be transient and will recur immediately after restart."
+strategy = "Configure supervisor :max_restarts and :max_seconds to cap tolerated restart intensity."
+evidence = [{ type = "fault_test", description = "A repeatedly failing child causes the supervisor to terminate or escalate after the configured restart intensity is exceeded.", required = true }]
+tradeoff = "An aggressive bound can take a supervision subtree down during a burst of otherwise recoverable failures."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#otp-best-practices", summary = "Requires max_restarts and max_seconds to prevent restart loops.", confidence = 1.0 }]

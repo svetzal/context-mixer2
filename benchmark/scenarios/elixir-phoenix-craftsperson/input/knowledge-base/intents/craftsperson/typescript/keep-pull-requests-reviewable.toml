@@ -1,0 +1,17 @@
+id = "guidelines.intent.keep-pull-requests-reviewable"
+title = "Keep pull requests focused and reviewable"
+category = "delivery"
+tags = ["typescript", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Ability for reviewers to understand a proposed change and evaluate its risk"
+threat = "Broad scope and missing context overwhelm review attention and conceal defects"
+expectation = "Changes will need asynchronous review by people who did not implement them"
+strategy = "Limit each pull request to a focused purpose and provide a clear description"
+evidence = [{ type = "review", description = "The pull request description states one coherent objective, relevant evidence, and excludes unrelated diffs", required = true }]
+tradeoff = "Splitting changes and writing context increases coordination overhead and may create dependent pull requests"
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-craftsperson.md#workflow-collaboration", summary = "Pull requests are required to have focused scope and clear descriptions so they remain reviewable.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.optimize-code-for-human-readers"
+title = "Optimize code for the next human reader"
+category = "design"
+tags = ["swift", "security", "readability", "clarity", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-code-for-human-readers" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "A maintainer can infer business intent and change Swift code safely without relying on its original author."
+threat = "Clever, compressed, or poorly named code makes correct behavior expensive to discover and review."
+expectation = "Swift code will be read and modified repeatedly after its initial delivery by people with less context."
+strategy = "Prefer meaningful names and straightforward structure that reads like an explanation of the domain behavior."
+evidence = [{ type = "review", description = "A reviewer unfamiliar with the change can state its business behavior from the names, types, and control flow without decoding incidental mechanics.", required = true }]
+tradeoff = "Reader-oriented structure can be more verbose and may sacrifice compactness or micro-optimizations."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#core-identity", summary = "Defines code as communication optimized for the next human reader and ranks revealed intent directly after correctness.", confidence = 1.0 }]

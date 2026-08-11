@@ -1,0 +1,17 @@
+id = "guidelines.intent.descriptive-organized-kotlin-tests"
+title = "Make test intent legible from names and structure"
+category = "testing"
+tags = ["kotlin", "testing", "readability", "executable-specification", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-tests-readable-specifications" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Ability to understand the behavior under test and the failed scenario without reverse-engineering setup code."
+threat = "Generic names and flat suites hide behavioral context as test suites grow."
+expectation = "Business behavior will accumulate many success, failure, and edge scenarios."
+strategy = "Use descriptive test names and nested or behavior-oriented grouping for related cases."
+evidence = [{ type = "review", description = "Test reports and source names state the expected behavior and condition, with related scenarios grouped under a shared context.", required = true }]
+tradeoff = "Long descriptive names and nested structures add verbosity and can over-structure small suites."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#junit-5--mockk", summary = "The source prescribes descriptive test names and nested classes, reinforced by readable Kotest behavior specs.", confidence = 1.0 }]

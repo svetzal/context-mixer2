@@ -1,0 +1,17 @@
+id = "guidelines.intent.isolated-compose-component-tests"
+title = "Verify reusable composables without full-screen assembly"
+category = "quality"
+tags = ["kotlin", "android", "testing", "verification", "completion", "evidence"]
+relations = [
+  { type = "specializes", target = "craftsperson/verify-before-declaring-completion" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to test component rendering and interaction under controlled state."
+threat = "Tests that require navigation, DI, and complete screens make component defects slow to isolate."
+expectation = "Shared composables will gain variants and be consumed in many screens."
+strategy = "Use composeTestRule.setContent to mount focused components with explicit inputs."
+evidence = [{ type = "gate", description = "Component tests render the target composable directly and cover representative state and callback combinations.", required = true }]
+tradeoff = "Isolated tests can miss integration behavior from themes, navigation, and real owners."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#ui-tests-compose-ui-test", summary = "The source prescribes setContent for isolated component tests.", confidence = 1.0 }]

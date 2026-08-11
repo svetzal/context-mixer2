@@ -1,0 +1,17 @@
+id = "guidelines.intent.apply-simple-design-priorities"
+title = "Resolve design conflicts with ordered heuristics"
+category = "design"
+tags = ["java", "testing", "simplicity", "design-priorities", "maintainability"]
+relations = [
+  { type = "specializes", target = "craftsperson/apply-simple-design-priorities" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Conflicting design improvements can be resolved through a stable, explainable priority order."
+threat = "A lower-value cleanup displaces correctness or clarity because the team treats all design heuristics as equally urgent."
+expectation = "Passing tests, readability, duplication removal, and structural minimization will sometimes recommend different next changes."
+strategy = "Resolve conflicts by prioritizing passing tests, revealed intent, removal of duplicated knowledge, and minimal entities in that order, escalating project constraints."
+evidence = [{ type = "decision_review", description = "When simple-design heuristics conflict, the chosen change records which higher-priority rule controlled the decision or which project constraint required escalation.", required = true }]
+tradeoff = "A fixed priority order can underweight performance, framework, or delivery constraints that require stakeholder judgment."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "States Kent Beck's four simple-design rules in priority order and makes conflicts subject to user consultation.", confidence = 1.0 }]

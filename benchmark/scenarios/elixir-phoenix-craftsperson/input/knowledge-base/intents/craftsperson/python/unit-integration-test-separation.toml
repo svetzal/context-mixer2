@@ -1,0 +1,17 @@
+id = "guidelines.intent.unit-integration-test-separation"
+title = "Distinguish fast isolated tests from integration tests"
+category = "testing"
+tags = ["python", "testing", "dependencies", "test-strategy", "test-pyramid", "risk-based-testing"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-purpose-specific-test-layers" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Developers and automation can select rapid local feedback or broader integration confidence deliberately."
+threat = "An undifferentiated suite becomes slow, environment-dependent, and difficult to run at the right cadence."
+expectation = "Integration coverage and external dependencies will grow while a fast edit-test loop remains necessary."
+strategy = "Keep unit tests isolated and label integration tests with pytest markers."
+evidence = [{ type = "gate", description = "The unit-test marker selection runs without external services, while the integration selection is independently discoverable and exercised in its configured environment.", required = true }]
+tradeoff = "Markers and suite boundaries require upkeep and can hide failures if CI omits one selection."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#testing-patterns", summary = "The source directs separation of fast isolated unit tests from integration tests through pytest markers.", confidence = 1.0 }]

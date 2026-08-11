@@ -1,0 +1,10 @@
+{
+  "algorithm_commit": "15c04fd",
+  "approximate_tokens": 16960,
+  "compression_ratio": 1.7692,
+  "output_bytes": 67840,
+  "selection_precision": 0.9896,
+  "selection_recall": 1.0,
+  "vocabulary_jaccard": 0.2852,
+  "vocabulary_original_recall": 0.573
+}

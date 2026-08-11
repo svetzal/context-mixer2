@@ -1,0 +1,17 @@
+id = "guidelines.intent.reserve-optionals-for-absence"
+title = "Reserve Optional for ordinary absence"
+category = "design"
+tags = ["swift", "error-handling", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "A function signature distinguishes missing data from failed computation."
+threat = "Using nil for errors erases failure reasons and makes callers mistake failure for legitimate absence."
+expectation = "Callers will need different responses to not-found conditions and actual errors as APIs evolve."
+strategy = "Return Optional only when absence is a complete, non-error outcome; use typed Result or throws for failures."
+evidence = [{ type = "api_review", description = "Each Optional-returning API documents absence as its sole nil meaning and does not collapse parse, validation, transport, or persistence failures into nil.", required = true }]
+tradeoff = "Separating absence from errors can make signatures and call-site handling more elaborate."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#error-handling", summary = "Explicitly reserves Optional for absence rather than error signaling.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.branch-from-main"
+title = "Branch from main for new work"
+category = "delivery"
+tags = ["elixir", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.94
+capability = "Each line of work begins from the current integration baseline."
+threat = "Branches based on stale or unrelated work inherit hidden divergence and merge surprises."
+expectation = "Main and concurrent work will continue changing while features are developed."
+strategy = "Create each work branch from main and keep its ancestry aligned with the integration branch."
+evidence = [{ type = "history_review", description = "The branch merge base is an intentional main revision and contains no dependency on an unrelated feature branch.", required = true }]
+tradeoff = "Long-running work must repeatedly absorb main changes and teams using trunk-based development may not need branches."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#workflow--collaboration", summary = "Directs all work to branch from main.", confidence = 1.0 }]

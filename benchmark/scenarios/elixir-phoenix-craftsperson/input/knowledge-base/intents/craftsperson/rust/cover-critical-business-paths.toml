@@ -1,0 +1,17 @@
+id = "guidelines.intent.cover-critical-business-paths"
+title = "Prioritize coverage of critical business paths"
+category = "testing"
+tags = ["rust", "testing", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Business-critical logic has measurable regression protection without treating a percentage as the objective."
+threat = "Coverage effort chases 100 percent mechanically while important paths remain weak or exclusions go unexplained."
+expectation = "Teams and quality gates will use coverage metrics to evaluate incomplete test suites."
+strategy = "Use LLVM-based coverage, target high coverage of business logic, and justify uncovered critical paths."
+evidence = [{ type = "coverage_gate", description = "cargo-llvm-cov reports critical modules covered and any uncovered critical branch has an explicit justification.", required = true }]
+tradeoff = "Coverage instrumentation costs CI time and judgment about criticality can vary among reviewers."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#coverage", summary = "Prefers cargo-llvm-cov and high coverage of business logic without requiring universal 100 percent.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.full-build-gate"
+title = "Require a production-representative build before completion"
+category = "design"
+tags = ["kotlin", "android", "testing", "dependencies", "error-handling", "build-and-delivery"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-code-units-cohesive" },
+]
+status = "hypothesized"
+confidence = 1
+capability = "Ability to know that all configured modules, generated sources, resources, and packaging steps integrate."
+threat = "Passing focused tests can miss compilation, resource merge, manifest, or packaging failures."
+expectation = "Build variants and module interactions will become more complex."
+strategy = "Require ./gradlew build to pass before declaring work complete."
+evidence = [{ type = "gate", description = "The recorded completion run shows the full Gradle build passing from a clean or appropriately reproducible state.", required = true }]
+tradeoff = "Full builds are slower than targeted checks and can duplicate earlier tasks."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-android-craftsperson.md#quality-gates-mandatory", summary = "The source makes the full Gradle build a mandatory completion gate.", confidence = 1.0 }]

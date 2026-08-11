@@ -1,0 +1,17 @@
+id = "guidelines.intent.colocated-module-specifications"
+title = "Keep each module's executable specification beside it"
+category = "testing"
+tags = ["python", "testing", "dependencies", "coverage", "risk", "critical-paths"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-coverage-as-a-risk-signal" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Maintainers can immediately find a module's tests and see when a module lacks specification coverage."
+threat = "A distant tests hierarchy lets code and tests drift and obscures missing module-level coverage."
+expectation = "The package hierarchy will grow and be reorganized over time."
+strategy = "Place one `module_spec.py` beside each `module.py` and configure pytest to discover `*_spec.py` files."
+evidence = [{ type = "gate", description = "Pytest collection recognizes the configured `*_spec.py` convention and every production module requiring tests has a colocated spec file.", required = true }]
+tradeoff = "Production package directories contain test modules, which can clutter navigation and packaging configuration."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#test-co-location", summary = "The source explicitly rejects a separate tests directory in favor of colocated module specs and supplies pytest discovery settings.", confidence = 1.0 }]

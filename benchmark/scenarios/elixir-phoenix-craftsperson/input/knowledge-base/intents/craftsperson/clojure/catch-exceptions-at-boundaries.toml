@@ -1,0 +1,17 @@
+id = "guidelines.intent.catch-exceptions-at-boundaries"
+title = "Catch exceptions only at meaningful boundaries"
+category = "reliability"
+tags = ["clojure", "error-handling", "error-modeling", "recoverability", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.93
+capability = "Ability to preserve actionable failures until a layer can translate, recover, or report them responsibly"
+threat = "Scattered try-catch blocks swallow causes, duplicate policy, and mix recovery concerns into core logic"
+expectation = "New integrations will introduce diverse exceptions requiring consistent application-level treatment"
+strategy = "Place try-catch at I/O or application boundaries and keep pure transformations free of recovery policy"
+evidence = [{ type = "review", description = "Each catch block is located at a named boundary and either translates with preserved cause, performs defined recovery, or reports and rethrows", required = true }]
+tradeoff = "Allowing exceptions to travel farther can enlarge stack traces and defer local recovery opportunities"
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#3-idiomatic-patterns", summary = "Proper error handling is characterized as ex-info with try-catch at boundaries.", confidence = 1.0 }]

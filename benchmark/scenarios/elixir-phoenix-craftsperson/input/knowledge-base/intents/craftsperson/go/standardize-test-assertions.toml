@@ -1,0 +1,17 @@
+id = "guidelines.intent.standardize-test-assertions"
+title = "Use a shared readable assertion vocabulary"
+category = "design"
+tags = ["go", "testing", "dependencies", "error-handling", "idioms", "language-design"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Test intent and fatal versus nonfatal expectations remain immediately recognizable across packages."
+threat = "Ad hoc assertion helpers and verbose conditionals make failures inconsistent and harder to diagnose."
+expectation = "The test suite will grow across many contributors and packages."
+strategy = "Use testify assert for nonfatal checks and require for preconditions that must stop the test."
+evidence = [{ type = "test_review", description = "Tests use testify assert and require consistently, with require reserved for conditions after which execution is unsafe or meaningless.", required = true }]
+tradeoff = "The project takes a third-party test dependency and may overuse assertions where ordinary Go comparisons would be clearer."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#maintain-comprehensive-tests", summary = "Specifies testify/assert and testify/require for clear assertions.", confidence = 1.0 }]

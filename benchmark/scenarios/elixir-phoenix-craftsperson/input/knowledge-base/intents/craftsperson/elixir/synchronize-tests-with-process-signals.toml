@@ -1,0 +1,17 @@
+id = "guidelines.intent.synchronize-tests-with-process-signals"
+title = "Synchronize process tests with observable signals"
+category = "design"
+tags = ["elixir", "concurrency", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Concurrent tests deterministically observe when processing or termination has occurred."
+threat = "Sleep durations and liveness polling race the scheduler and create flaky, slow tests."
+expectation = "Scheduler timing and CI load will vary across runs and machines."
+strategy = "Use monitors and DOWN assertions for termination and :sys.get_state/1 as a message-processing synchronization barrier."
+evidence = [{ type = "test_review", description = "Process tests contain no synchronization sleeps or alive polling and pass repeatedly under randomized ordering and load.", required = true }]
+tradeoff = "Signal-based synchronization exposes OTP mechanics and requires more explicit test choreography."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#testing-strategy", summary = "Rejects Process.sleep and Process.alive? in favor of monitors and :sys.get_state synchronization.", confidence = 1.0 }]

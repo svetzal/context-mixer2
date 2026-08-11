@@ -1,0 +1,17 @@
+id = "guidelines.intent.suppress-only-expected-exceptions"
+title = "Suppress expected exceptions explicitly"
+category = "design"
+tags = ["python", "uv", "error-handling", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Intentional exception suppression is narrow and visible to readers."
+threat = "A try-except-pass block can swallow unrelated failures and conceal which condition is considered harmless."
+expectation = "Cleanup and idempotent operations will sometimes encounter specific failures that require no response."
+strategy = "Use contextlib.suppress with the exact expected exception type instead of a bare or empty try-except block."
+evidence = [{ type = "static_review", description = "Intentional no-op handling uses contextlib.suppress with named exception types, and no except block silently passes unrelated errors.", required = true }]
+tradeoff = "Compact suppression provides no logging or recovery context and can hide an expected failure that later becomes diagnostically important."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#context-managers", summary = "Directs use of contextlib.suppress instead of bare try-except-pass handling.", confidence = 1.0 }]

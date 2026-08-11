@@ -1,0 +1,17 @@
+id = "guidelines.intent.preserve-behavior-during-refactoring"
+title = "Refactor behind behavior-preserving tests"
+category = "refactoring"
+tags = ["swift", "concurrency", "testing", "behavior-preservation", "small-steps", "test-safety"]
+relations = [
+  { type = "specializes", target = "craftsperson/preserve-behavior-during-refactoring" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Internal design can improve without changing externally observable behavior."
+threat = "Restructuring uncharacterized code introduces regressions that cannot be distinguished from intended cleanup."
+expectation = "Legacy and difficult-to-test Swift code will require repeated structural improvement."
+strategy = "Establish missing behavior coverage first, then refactor in small steps while keeping the original tests green."
+evidence = [{ type = "test_gate", description = "Characterization tests pass before and after each refactoring step with no changed behavioral assertions.", required = true }]
+tradeoff = "Characterization tests may preserve undesirable legacy behavior and add effort before structural improvements begin."
+scope = { project = "guidelines", paths = ["plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#for-refactoring", summary = "Requires coverage before refactoring, small green steps, and verification that original behavior did not change.", confidence = 1.0 }]

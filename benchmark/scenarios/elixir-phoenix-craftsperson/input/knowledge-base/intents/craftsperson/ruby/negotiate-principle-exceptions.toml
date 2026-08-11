@@ -1,0 +1,17 @@
+id = "guidelines.intent.negotiate-principle-exceptions"
+title = "Make exceptions to design principles explicit"
+category = "collaboration"
+tags = ["ruby", "testing", "error-handling", "decision-making", "escalation", "tradeoffs"]
+relations = [
+  { type = "specializes", target = "craftsperson/escalate-consequential-tradeoffs" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Ability to adapt design principles without silently abandoning their rationale"
+threat = "Treating heuristics as either absolute rules or casually optional guidance produces dogma or unnoticed drift"
+expectation = "Real constraints will occasionally make two principles conflict or justify an exception"
+strategy = "Consult the user when breaking a principle and explain the specific tradeoff"
+evidence = [{ type = "decision-record", description = "The change context records the conflicting principles, the user consultation, and the accepted tradeoff", required = true }]
+tradeoff = "Escalation adds coordination time and can interrupt otherwise local engineering decisions"
+scope = { project = "guidelines", paths = ["plugins/ruby-ecosystem/agents/ruby-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#simple-design-heuristics-in-priority-order", summary = "The heuristics are not iron laws; rare exceptions require user consultation and tradeoff explanation.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.enforce-validation-at-app-and-db-layers"
+title = "Enforce validation at application and database layers"
+category = "architecture"
+tags = ["elixir", "phoenix", "security", "persistence", "error-handling", "validation"]
+relations = [
+  { type = "specializes", target = "craftsperson/validate-untrusted-input-at-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Users receive timely validation feedback while persisted invariants survive races and alternate writers."
+threat = "Application-only checks race or are bypassed, while database-only checks surface late and opaque errors."
+expectation = "Concurrent requests and non-UI writers will attempt to persist conflicting or invalid data."
+strategy = "Pair changeset validations with authoritative database indexes and constraints translated by changeset constraint helpers."
+evidence = [{ type = "integration_test", description = "Invalid input yields changeset feedback and concurrent conflicting writes are rejected by the database and translated into changeset errors.", required = true }]
+tradeoff = "Rules are represented in two layers and migrations must remain synchronized with application validation."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-phoenix-craftsperson.md#dual-validation", summary = "Requires both user-facing changeset validation and authoritative database constraints.", confidence = 1.0 }]

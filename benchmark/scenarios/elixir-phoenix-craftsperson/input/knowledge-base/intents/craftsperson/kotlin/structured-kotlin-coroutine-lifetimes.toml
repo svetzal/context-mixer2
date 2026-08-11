@@ -1,0 +1,17 @@
+id = "guidelines.intent.structured-kotlin-coroutine-lifetimes"
+title = "Bind coroutine work to an explicit owner"
+category = "reliability"
+tags = ["kotlin", "concurrency", "error-handling", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Ability to observe, cancel, and await asynchronous work as part of a defined operation lifecycle."
+threat = "Detached GlobalScope work outlives its caller, leaks resources, and hides failures."
+expectation = "Applications will perform more concurrent I/O and parallel tasks with cancellation requirements."
+strategy = "Use structured concurrency and coroutineScope so child work remains owned by a caller-visible scope."
+evidence = [{ type = "static_check", description = "Production code contains no GlobalScope use, and coroutine tests show parent completion waits for children and parent cancellation reaches them.", required = true }]
+tradeoff = "Structured ownership can propagate cancellation and suspend boundaries farther through the call graph."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/kotlin-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#coroutines-best-practices", summary = "The source bans GlobalScope and prefers coroutineScope for parallel operations.", confidence = 1.0 }]

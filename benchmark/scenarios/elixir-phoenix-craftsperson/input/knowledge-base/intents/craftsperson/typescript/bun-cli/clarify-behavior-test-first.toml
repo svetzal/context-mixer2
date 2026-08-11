@@ -1,0 +1,17 @@
+id = "guidelines.intent.clarify-behavior-test-first"
+title = "Clarify intended behavior with a failing test"
+category = "collaboration"
+tags = ["typescript", "bun", "cli", "testing", "requirements", "decision-making"]
+relations = [
+  { type = "specializes", target = "craftsperson/clarify-ambiguous-intent-before-implementation" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "The team can establish an executable behavioral target before implementation choices constrain it."
+threat = "Implementation-first work silently defines requirements through accidental structure rather than explicit outcomes."
+expectation = "New commands and edge cases will often begin with incomplete or ambiguous behavioral descriptions."
+strategy = "Start each behavioral change with a descriptive failing test, then implement the simplest code that makes it pass."
+evidence = [{ type = "trace", description = "Change history or development trace shows the new behavioral test failing before the production change and passing afterward.", required = true }]
+tradeoff = "Test-first development adds an initial feedback step and can cause churn when requirements are still exploratory."
+scope = { project = "guidelines", paths = ["plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md#engineering-principles-your-north-star", summary = "Defines tests as the executable specification and prescribes red-green development with the simplest implementation.", confidence = 1.0 }]

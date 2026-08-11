@@ -1,0 +1,17 @@
+id = "guidelines.intent.escalate-uncertain-high-impact-decisions"
+title = "Escalate uncertain high-impact decisions"
+category = "performance"
+tags = ["python", "uv", "security", "documentation", "performance", "profiling"]
+relations = [
+  { type = "specializes", target = "craftsperson/optimize-from-measurement" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Requirement-sensitive and high-impact choices reflect stakeholder intent rather than implementer assumptions."
+threat = "Local optimization silently changes requirements, architecture, security posture, or clarity guarantees."
+expectation = "Heuristics will conflict and tests, audits, or documentation will sometimes expose ambiguity beyond technical authority."
+strategy = "Surface the tension and seek user guidance for requirement conflicts, architectural security changes, uncovered requirement gaps, unclear documented behavior, and clarity-performance compromises."
+evidence = [{ type = "decision_record", description = "High-impact work with unresolved tradeoffs records the conflict, options, and explicit stakeholder direction before proceeding.", required = true }]
+tradeoff = "Escalation interrupts flow and delays decisions an implementer might otherwise make quickly."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#escalation-strategy", summary = "Lists requirement, security, coverage, documentation, and performance tensions that require user guidance.", confidence = 1.0 }]

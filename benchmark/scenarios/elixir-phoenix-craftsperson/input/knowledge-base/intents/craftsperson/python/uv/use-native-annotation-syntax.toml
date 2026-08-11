@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-native-annotation-syntax"
+title = "Use native modern annotation syntax"
+category = "design"
+tags = ["python", "uv", "domain-modeling", "type-safety", "invariants"]
+relations = [
+  { type = "specializes", target = "craftsperson/make-invalid-states-explicit" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Type contracts remain concise and aligned with the supported Python language."
+threat = "Legacy typing aliases and compatibility imports preserve obsolete syntax and make annotations noisier."
+expectation = "The project will remain on Python versions where built-in generics and union operators are native."
+strategy = "Use built-in generic types and the | union operator; avoid typing.List, Dict, Tuple, Optional, and postponed-annotation imports."
+evidence = [{ type = "static_check", description = "Source contains no forbidden legacy typing aliases or from __future__ import annotations, except a documented generated-code exception.", required = true }]
+tradeoff = "The syntax prevents the same source from running unchanged on older Python interpreters."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/uv-python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/uv-python-craftsperson.md#type-hints", summary = "Prefers built-in generics and union syntax and explicitly forbids legacy typing aliases and future annotations.", confidence = 1.0 }]

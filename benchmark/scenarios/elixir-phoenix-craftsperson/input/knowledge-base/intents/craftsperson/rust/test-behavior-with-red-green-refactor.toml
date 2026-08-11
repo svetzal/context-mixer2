@@ -1,0 +1,17 @@
+id = "guidelines.intent.test-behavior-with-red-green-refactor"
+title = "Test behavior through red-green-refactor"
+category = "testing"
+tags = ["rust", "concurrency", "testing", "tdd", "red-green-refactor", "behavior"]
+relations = [
+  { type = "specializes", target = "craftsperson/develop-behavior-red-green-refactor" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Tests specify user-visible or domain behavior and detect meaningful regressions while permitting refactoring."
+threat = "Tests mirror implementation structure, pass for the wrong reasons, or lock in internals."
+expectation = "Implementation details will change more often than required behavior."
+strategy = "Write a decisively failing behavior test, make it pass with the smallest change, then refactor while preserving the test."
+evidence = [{ type = "test_review", description = "Tests fail when the intended behavior is absent and remain valid across implementation refactors.", required = true }]
+tradeoff = "Strict test-first work can feel slower for exploratory code whose desired behavior is still being discovered."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#engineering-practices", summary = "Calls tests the executable specification and directs red-green-refactor around behavior.", confidence = 1.0 }]

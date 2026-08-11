@@ -1,0 +1,17 @@
+id = "guidelines.intent.write-descriptive-commit-messages"
+title = "Write descriptive imperative commit messages"
+category = "delivery"
+tags = ["java", "version-control", "history", "rationale"]
+relations = [
+  { type = "specializes", target = "craftsperson/write-descriptive-commit-messages" },
+]
+status = "hypothesized"
+confidence = 0.96
+capability = "Repository history communicates the action and intent of each change to future maintainers."
+threat = "Vague or inconsistent messages make archaeology and automated changelog review expensive."
+expectation = "Future debugging and maintenance will depend on understanding changes without the original author present."
+strategy = "Use concise descriptive commit subjects in imperative mood."
+evidence = [{ type = "history_review", description = "Each delivered commit subject states a concrete action in imperative mood and corresponds to its diff.", required = true }]
+tradeoff = "Crafting precise messages takes time and style enforcement can become pedantic."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#version-control-and-collaboration", summary = "Requires descriptive commit messages in imperative mood.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.remediate-gate-failures-before-proceeding"
+title = "Remediate quality-gate failures before proceeding"
+category = "quality"
+tags = ["java", "static-analysis", "error-handling", "quality-gates", "project-conventions", "completion"]
+relations = [
+  { type = "specializes", target = "craftsperson/honor-the-project-quality-gate" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Quality gates remain credible stop conditions rather than advisory reports."
+threat = "Warnings are suppressed or work continues after failure, allowing known defects to accumulate."
+expectation = "Schedule pressure and false positives will create recurring incentives to bypass gates."
+strategy = "Stop on a failed gate, fix its root cause, require explicit approval and rationale for suppression, then rerun the complete gate."
+evidence = [{ type = "quality_gate", description = "A failed check is followed by a root-cause change or documented approved exception and a successful full rerun.", required = true }]
+tradeoff = "Strict stop-the-line behavior can delay unrelated work and amplify the impact of flaky or misconfigured checks."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#quality-gates-mandatory", summary = "Requires work to stop on gate failure, forbids unapproved suppression, and demands a complete rerun after fixes.", confidence = 1.0 }]

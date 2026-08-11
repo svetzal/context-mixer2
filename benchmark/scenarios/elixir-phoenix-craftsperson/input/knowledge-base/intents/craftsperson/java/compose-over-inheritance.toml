@@ -1,0 +1,17 @@
+id = "guidelines.intent.compose-over-inheritance"
+title = "Compose behavior instead of building deep hierarchies"
+category = "design"
+tags = ["java", "build-and-delivery", "composition", "inheritance", "coupling"]
+relations = [
+  { type = "specializes", target = "craftsperson/prefer-composition-over-inheritance" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Behavior can change through small replaceable collaborators without fragile superclass coupling."
+threat = "Deep inheritance hierarchies spread implicit contracts and make local changes affect distant subclasses."
+expectation = "New variants and extension points will be added as requirements evolve."
+strategy = "Prefer small interfaces, records, delegation, composition, and sealed types over deep class inheritance."
+evidence = [{ type = "architecture_review", description = "New polymorphism uses focused interfaces or closed sealed variants, and inheritance depth does not grow without a documented substitutability need.", required = true }]
+tradeoff = "Composition introduces more objects and wiring, while sealed alternatives may require additional boilerplate."
+scope = { project = "guidelines", paths = ["plugins/jvm-ecosystem/agents/java-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Explicitly favors small interfaces, records, delegation, composition, and sealed types over deep hierarchies.", confidence = 1.0 }]
