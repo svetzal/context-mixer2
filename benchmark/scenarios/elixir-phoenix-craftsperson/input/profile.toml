@@ -17,7 +17,7 @@ categories = [
   "reliability",
   "testing",
 ]
-tags = ["phoenix"]
+tags = ["phoenix", "elixir"]
 
 [content]
 include = ["guidance", "rationale", "evidence"]
