@@ -41,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **cmf now renders intents as compact semantic blocks.** Each selected intent
+  keeps capability, threat, expectation, preferred strategy, evidence, and
+  accepted trade-off together. Repeated section headings, per-section intent
+  titles, and evidence-type labels no longer consume installed context; intent
+  keys remain available through `assemble --explain`.
 - **DRY refactoring (no behavior change except where noted):**
   - Collapsed `version_label`, `change_counts`, and `write_change_lines` display helpers from `sync.rs` and `promote.rs` display modules into `cmx/src/display/util.rs`.
   - Extracted `gather_platform_copies` primitive in `cmx/src/platform_copies.rs` — encodes the "iterate managed platforms → filter `supports(kind)` → dedup by physical install path" loop; used by diff discovery, `sync`, and set deactivation.

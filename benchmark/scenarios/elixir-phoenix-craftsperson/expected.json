@@ -3,6 +3,7 @@
   "catalog_intent_set_sha256": "197c71441c9d9e24552bd7261446151703b0744dc8962d08f2435ad1b73d6f78",
   "minimum_selection_precision": 1.0,
   "minimum_selection_recall": 1.0,
+  "minimum_semantic_field_coverage": 1.0,
   "minimum_strategy_coverage": 1.0,
   "original_sha256": "fb26aac1314ab56032fdccfbcf0ca4b94deff26e73ae37217967d12d692ee11c",
   "relevant_intent_count": 95,

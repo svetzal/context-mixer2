@@ -12,7 +12,10 @@ import sys
 WORD = re.compile(r"[a-z0-9][a-z0-9_?!.-]*", re.IGNORECASE)
 SELECTED = re.compile(r"^selected intents \((\d+)\):$", re.MULTILINE)
 TOKENS = re.compile(r"^estimated tokens: (\d+)$", re.MULTILINE)
-STRATEGY = re.compile(r'^strategy = ("(?:[^"\\]|\\.)*")$', re.MULTILINE)
+FIELD = re.compile(
+    r'^(capability|threat|expectation|strategy|tradeoff) = ("(?:[^"\\]|\\.)*")$',
+    re.MULTILINE,
+)
 
 
 def sha256(data):
@@ -74,16 +77,43 @@ def main():
     relevant_keys = {
         path.relative_to(args.intents).with_suffix("").as_posix() for path in relevant_paths
     }
-    strategies = []
+    field_values = {
+        "capability": [],
+        "evidence": [],
+        "expectation": [],
+        "strategy": [],
+        "threat": [],
+        "tradeoff": [],
+    }
     for path in relevant_paths:
         data = path.read_bytes()
         text = data.decode("utf-8")
-        strategies.extend(json.loads(match.group(1)) for match in STRATEGY.finditer(text))
+        for match in FIELD.finditer(text):
+            field_values[match.group(1)].append(json.loads(match.group(2)))
+
+    # Evidence descriptions share TOML basic-string syntax with scalar fields.
+    evidence_pattern = re.compile(r'description = ("(?:[^"\\]|\\.)*")')
+    field_values["evidence"] = []
+    for path in relevant_paths:
+        field_values["evidence"].extend(
+            json.loads(match.group(1))
+            for match in evidence_pattern.finditer(path.read_text(encoding="utf-8"))
+        )
 
     token_match = TOKENS.search(explanation)
     selected = set(selected_keys(explanation))
     estimated_tokens = int(token_match.group(1)) if token_match else 0
-    retained = sum(strategy in assembled for strategy in strategies)
+    field_metrics = {}
+    for name, values in field_values.items():
+        retained = sum(value in assembled for value in values)
+        field_metrics[name] = {
+            "available": len(values),
+            "exactly_retained": retained,
+            "exact_coverage": rounded(retained / len(values)) if values else 0,
+        }
+    available_fields = sum(item["available"] for item in field_metrics.values())
+    retained_fields = sum(item["exactly_retained"] for item in field_metrics.values())
+    semantic_field_coverage = retained_fields / available_fields if available_fields else 0
     true_positives = selected & relevant_keys
     selection_precision = len(true_positives) / len(selected) if selected else 0
     selection_recall = len(true_positives) / len(relevant_keys) if relevant_keys else 0
@@ -102,9 +132,13 @@ def main():
     targets = {
         "selection_precision": selection_precision >= expected["minimum_selection_precision"],
         "selection_recall": selection_recall >= expected["minimum_selection_recall"],
+        "semantic_field_coverage": (
+            semantic_field_coverage >= expected["minimum_semantic_field_coverage"]
+        ),
         "strategy_coverage": (
-            retained / len(strategies) if strategies else 0
-        ) >= expected["minimum_strategy_coverage"],
+            field_metrics["strategy"]["exact_coverage"]
+            >= expected["minimum_strategy_coverage"]
+        ),
     }
     metrics = {
         "assembled": {
@@ -131,10 +165,9 @@ def main():
             "selected_intents": len(selected),
             "true_positives": len(true_positives),
         },
-        "strategy": {
-            "available": len(strategies),
-            "exactly_retained": retained,
-            "exact_coverage": rounded(retained / len(strategies)),
+        "semantic_fields": {
+            "exact_coverage": rounded(semantic_field_coverage),
+            "fields": field_metrics,
         },
         "targets": targets,
         "targets_met": all(targets.values()),
@@ -156,6 +189,10 @@ def main():
         ),
         "selection_recall": rounded(
             metrics["selection"]["recall"] - baseline["selection_recall"]
+        ),
+        "semantic_field_coverage": rounded(
+            metrics["semantic_fields"]["exact_coverage"]
+            - baseline["semantic_field_coverage"]
         ),
         "vocabulary_jaccard": rounded(
             metrics["vocabulary"]["jaccard"] - baseline["vocabulary_jaccard"]

@@ -19,3 +19,9 @@ knowledge but is substantially more verbose than the source agent.
 The target is full relevant-intent recall and strategy coverage with no
 cross-agent false positives, followed by better source vocabulary recovery at
 a materially smaller context footprint.
+
+The first block-oriented renderer reaches 15,907 approximate tokens on the
+fixed baseline profile, 1,053 fewer than the original grouped renderer. It
+also adds the capability clause that the baseline omitted, eliminates repeated
+intent titles and section headings, and keeps each intent's rationale,
+strategy, evidence, and trade-off adjacent.

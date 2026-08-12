@@ -53,3 +53,10 @@ A profile must name exact keys or combine category and tag filters. This guard
 prevents accidental whole-catalogue exports. Graph expansion is bounded, and
 generation fails instead of truncating when the shaped artifact exceeds its
 declared context budget.
+
+Selected intents render as compact, ordered blocks rather than separate
+guidance, rationale, and evidence sections. Within each block, `rationale`
+contributes the capability, threat, expectation, and accepted trade-off;
+`guidance` contributes the preferred strategy; and `evidence` contributes
+required or optional verification. Intent titles and evidence-type metadata
+stay in `--explain` provenance instead of consuming delivered context.

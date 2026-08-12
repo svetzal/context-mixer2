@@ -42,7 +42,7 @@ Copied originals are excluded from Markdown auto-fixing because byte identity
 is part of each scenario's integrity contract.
 
 The scorer currently reports corpus integrity, selection precision and recall,
-exact strategy retention, vocabulary overlap, output size, compression
-relative to the original, and deltas from the checked-in baseline. These are
-mechanical signals, not a claim that lexical similarity alone measures
-guidance quality.
+exact retention for every semantic intent field, vocabulary overlap, output
+size, compression relative to the original, and deltas from the checked-in
+baseline. These are mechanical signals, not a claim that lexical similarity
+alone measures guidance quality.

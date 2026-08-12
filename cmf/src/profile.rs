@@ -90,7 +90,8 @@ impl Default for Graph {
 /// Fields to include in the delivered artifact.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Content {
-    /// Optional sections: `guidance`, `rationale`, and `evidence`.
+    /// Optional clause groups rendered together inside each intent block:
+    /// `guidance`, `rationale`, and `evidence`.
     #[serde(default = "default_include")]
     pub include: Vec<String>,
 }

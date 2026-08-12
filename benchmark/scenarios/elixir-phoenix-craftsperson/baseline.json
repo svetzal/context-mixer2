@@ -3,6 +3,7 @@
   "approximate_tokens": 16960,
   "compression_ratio": 1.7692,
   "output_bytes": 67840,
+  "semantic_field_coverage": 0.8333,
   "selection_precision": 0.9896,
   "selection_recall": 1.0,
   "vocabulary_jaccard": 0.2852,

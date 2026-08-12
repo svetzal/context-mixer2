@@ -129,68 +129,71 @@ fn render(
     selected: &BTreeSet<String>,
 ) -> String {
     let name = profile.artifact_name();
-    let mut out = format!(
-        "---\nname: {name}\ndescription: {}\n---\n\n# {}\n\n",
-        yaml_scalar(&profile.description),
-        title_case(name)
-    );
+    let mut out =
+        format!("---\nname: {name}\ndescription: {}\n---\n\n", yaml_scalar(&profile.description));
     if profile.surface == Surface::Skill {
         out.push_str("Use this guidance when the task matches the description above. Confirm the relevant repository evidence before applying specialized instructions.\n\n");
     }
-    if profile.content.include.iter().any(|section| section == "guidance") {
-        out.push_str("## Guidance\n\n");
-        for key in selected {
-            let intent = &intents[key];
-            let _ = write!(out, "### {}\n\n{}\n\n", intent.record.title, intent.record.strategy);
+    let guidance = profile.content.include.iter().any(|section| section == "guidance");
+    let rationale = profile.content.include.iter().any(|section| section == "rationale");
+    let evidence = profile.content.include.iter().any(|section| section == "evidence");
+    for key in selected {
+        let record = &intents[key].record;
+        out.push('-');
+        if rationale {
+            write_clause(&mut out, "Preserve", &record.capability);
+            write_connector(&mut out, "Because", &record.threat);
+            write_clause(&mut out, "Expect", &record.expectation);
         }
-    }
-    if profile.content.include.iter().any(|section| section == "rationale") {
-        out.push_str("## Decision rationale\n\n");
-        for key in selected {
-            let record = &intents[key].record;
-            let _ = writeln!(
-                out,
-                "- **{}:** {} This guards against {} Trade-off: {}",
-                record.title, record.expectation, record.threat, record.tradeoff
-            );
+        if guidance {
+            write_clause(&mut out, "Prefer", &record.strategy);
         }
-        out.push('\n');
-    }
-    if profile.content.include.iter().any(|section| section == "evidence") {
-        out.push_str("## Completion evidence\n\n");
-        for key in selected {
-            let record = &intents[key].record;
-            for evidence in &record.evidence {
-                let required = if evidence.required {
-                    "Required"
-                } else {
-                    "Optional"
-                };
-                let _ = writeln!(
-                    out,
-                    "- **{} ({required}, {}):** {}",
-                    record.title, evidence.kind, evidence.description
-                );
-            }
+        if evidence {
+            write_evidence(&mut out, record);
         }
+        if rationale {
+            write_clause(&mut out, "Accept", &record.tradeoff);
+        }
+        out.push_str("\n\n");
     }
     out
 }
 
+fn write_clause(out: &mut String, label: &str, value: &str) {
+    let _ = write!(out, " {label}: {}.", trim_terminal_punctuation(value));
+}
+
+fn write_connector(out: &mut String, connector: &str, value: &str) {
+    let _ = write!(out, " {connector} {}.", trim_terminal_punctuation(value));
+}
+
+fn write_evidence(out: &mut String, record: &crate::catalog::IntentRecord) {
+    let required: Vec<_> = record
+        .evidence
+        .iter()
+        .filter(|item| item.required)
+        .map(|item| trim_terminal_punctuation(&item.description))
+        .collect();
+    if !required.is_empty() {
+        write_clause(out, "Require", &required.join("; "));
+    }
+    let optional: Vec<_> = record
+        .evidence
+        .iter()
+        .filter(|item| !item.required)
+        .map(|item| trim_terminal_punctuation(&item.description))
+        .collect();
+    if !optional.is_empty() {
+        write_clause(out, "Observe when useful", &optional.join("; "));
+    }
+}
+
+fn trim_terminal_punctuation(value: &str) -> &str {
+    value.trim().trim_end_matches(['.', '!', '?'])
+}
+
 fn yaml_scalar(value: &str) -> String {
     format!("{value:?}")
-}
-fn title_case(value: &str) -> String {
-    value
-        .split(['-', '_'])
-        .map(|word| {
-            let mut chars = word.chars();
-            chars.next().map_or_else(String::new, |first| {
-                first.to_uppercase().collect::<String>() + chars.as_str()
-            })
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 #[cfg(test)]
@@ -198,6 +201,19 @@ mod tests {
     use super::*;
     use crate::catalog::{Evidence, IntentRecord, Relation};
     use crate::profile::{Content, Graph, Selection};
+
+    fn title_case(value: &str) -> String {
+        value
+            .split(['-', '_'])
+            .map(|word| {
+                let mut chars = word.chars();
+                chars.next().map_or_else(String::new, |first| {
+                    first.to_uppercase().collect::<String>() + chars.as_str()
+                })
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
 
     fn intent(key: &str, category: &str, tags: &[&str], relations: Vec<Relation>) -> Intent {
         Intent {
@@ -245,7 +261,42 @@ mod tests {
             content: Content::default(),
         };
         let assembled = assemble(&profile, &intents).unwrap();
-        assert!(assembled.content.contains("Apply testing."));
+        assert!(assembled.content.contains("- Prefer: Apply testing. Require: The gate passes."));
+        assert!(!assembled.content.contains("## Guidance"));
         assert_eq!(assembled.selected, vec!["testing"]);
+    }
+
+    #[test]
+    fn renders_each_intent_as_one_ordered_block() {
+        let intents = BTreeMap::from([(
+            "testing".to_string(),
+            intent("testing", "quality", &["tests"], vec![]),
+        )]);
+        let profile = Profile {
+            id: "test-work".to_string(),
+            name: None,
+            version: "1.0.0".to_string(),
+            description: "Use for test work".to_string(),
+            surface: Surface::Agent,
+            budget_tokens: 500,
+            select: Selection {
+                keys: vec!["testing".to_string()],
+                ..Default::default()
+            },
+            graph: Graph::default(),
+            content: Content {
+                include: vec![
+                    "guidance".to_string(),
+                    "rationale".to_string(),
+                    "evidence".to_string(),
+                ],
+            },
+        };
+
+        let content = assemble(&profile, &intents).unwrap().content;
+        let block = "- Preserve: Good result. Because Bad result. Expect: This helps. Prefer: Apply testing. Require: The gate passes. Accept: Some effort.";
+        assert!(content.contains(block));
+        assert!(!content.contains("Testing"));
+        assert!(!content.contains("##"));
     }
 }
