@@ -1,0 +1,14 @@
+{
+  "acceptance_check_count": 10,
+  "knowledge_base_intent_count": 14,
+  "scored_intents": [
+    "craftsperson/python/colocated-module-specifications",
+    "craftsperson/python/functional-core-imperative-shell",
+    "craftsperson/python/gateway-only-mocking",
+    "craftsperson/python/immutable-domain-models",
+    "craftsperson/python/native-modern-type-syntax",
+    "craftsperson/python/native-pytest-assertions",
+    "craftsperson/python/readable-bdd-specifications",
+    "craftsperson/python/specific-domain-errors"
+  ]
+}

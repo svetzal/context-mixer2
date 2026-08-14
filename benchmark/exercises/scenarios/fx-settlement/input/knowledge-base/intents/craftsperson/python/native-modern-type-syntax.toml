@@ -1,0 +1,17 @@
+id = "guidelines.intent.native-modern-type-syntax"
+title = "Target one modern annotation model natively"
+category = "design"
+tags = ["python", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Type annotations remain concise and have consistent runtime semantics across the supported Python environment."
+threat = "Legacy typing aliases and postponed-annotation compatibility layers create parallel syntax and subtle runtime differences."
+expectation = "The project will target Python 3.11 or newer rather than carrying support for older interpreters."
+strategy = "Use built-in generics and `|` unions, reject legacy `typing` collection aliases, and avoid `from __future__ import annotations`."
+evidence = [{ type = "static-analysis", description = "Source search or linting finds no `typing.List`, `typing.Dict`, `typing.Tuple`, `typing.Optional`, or future-annotations import, and the declared minimum Python version is at least 3.11.", required = true }]
+tradeoff = "The code cannot run on older Python versions and may need changes when libraries assume postponed annotations."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#type-hints", summary = "The source prescribes built-in generic and union syntax and explicitly targets Python 3.11+ without future annotations.", confidence = 1.0 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.functional-core-imperative-shell"
+title = "Keep business logic pure and side effects at the shell"
+category = "architecture"
+tags = ["python", "testing", "functional-core", "side-effects", "separation-of-concerns"]
+relations = [
+  { type = "specializes", target = "craftsperson/isolate-functional-core-from-effects" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Business rules remain deterministic, easy to test, and reusable independently of infrastructure."
+threat = "Interleaving I/O, mutable state, and domain decisions makes behavior nondeterministic and forces expensive integration tests."
+expectation = "Infrastructure and delivery mechanisms will change more frequently than core business rules."
+strategy = "Place pure functions in a functional core and contain I/O and state changes in an imperative shell of thin gateways."
+evidence = [{ type = "review", description = "Core modules perform no filesystem, network, database, git, clock, or process I/O, and repeated calls with equal inputs return equal outputs.", required = true }]
+tradeoff = "Separating effects from decisions introduces boundary plumbing and can feel artificial for tightly coupled workflows."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#functional-core-imperative-shell", summary = "The source explicitly requires pure core functions and pushes side effects to shell boundaries.", confidence = 1.0 }]

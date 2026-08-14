@@ -1,0 +1,30 @@
+id = "python-craftsperson-fx"
+name = "AGENTS"
+version = "0.1.0"
+description = "Python engineering guidance for the fx-settlement behavioural exercise."
+surface = "agent"
+budget_tokens = 4000
+
+# Explicit keys, not category-and-tag matching. The exercise measures whether
+# eight named behaviours reach the agent's output, so the slice under test must
+# be exactly those eight records and nothing else.
+[select]
+keys = [
+  "craftsperson/python/colocated-module-specifications",
+  "craftsperson/python/functional-core-imperative-shell",
+  "craftsperson/python/gateway-only-mocking",
+  "craftsperson/python/immutable-domain-models",
+  "craftsperson/python/native-modern-type-syntax",
+  "craftsperson/python/native-pytest-assertions",
+  "craftsperson/python/readable-bdd-specifications",
+  "craftsperson/python/specific-domain-errors",
+]
+
+# The universal parents are present in the knowledge base but deliberately not
+# traversed. A later variant can set follow = ["specializes"] to measure whether
+# generalized guidance helps or dilutes.
+[graph]
+follow = []
+
+[content]
+include = ["guidance", "rationale", "evidence"]

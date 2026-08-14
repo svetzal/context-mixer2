@@ -1,0 +1,290 @@
+id = "guidelines.intent.use-coverage-as-a-risk-signal"
+title = "Use coverage as a risk signal"
+category = "testing"
+tags = ["coverage", "risk", "critical-paths"]
+status = "hypothesized"
+confidence = 0.97
+capability = "Important behavior retains executable regression protection as the system grows."
+threat = "Untested paths accumulate behind a passing happy-path suite, or a numeric target substitutes for meaningful assertions."
+expectation = "Feature growth will add alternate flows faster than reviewers can remember them."
+strategy = "Measure coverage to find unexercised risk, meet the project's justified floor, and inspect whether important outcomes are actually asserted."
+evidence = [{ type = "coverage_review", description = "Coverage meets the project threshold and uncovered changed paths are either tested or explicitly judged low risk.", required = true }]
+tradeoff = "Coverage measurement adds runtime and can incentivize low-value tests when the number is treated as the goal."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-gates-mandatory", summary = "Maintains a project coverage floor while prioritizing critical paths.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#tests-are-the-executable-spec", summary = "Uses coverage to expose untested critical behavior rather than as proof by itself.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#coverage", summary = "Prioritizes critical business paths over indiscriminate percentage chasing.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+$ clojure -M:coverage     ; cloverage, project floor 85%
+Coverage: 91.2%
+
+Uncovered in changed code: refund/partial-refund else-branch
+-> inspected: reachable when the gateway returns :partial;
+   added refund-test/partial-approval-refunds-remainder
+Remaining uncovered: generated spec printers — judged low
+risk, rationale noted in the change description
+'''
+bad = '''
+(deftest touch-all-the-lines   ; coverage now 90.1%, gate green
+  ; executes every branch, asserts nothing about any of them
+  (doseq [args [[nil] [{}] [{:amount -5}] [{:amount 1e9}]]]
+    (try (apply process-refund args)
+         (catch Throwable _)))
+  (is true))
+; the number is met; every refund outcome remains unprotected
+'''
+
+[examples.cpp]
+good = '''
+$ gcovr --fail-under-line 85
+  TOTAL: 91%   (project floor: 85% — met)
+
+Report inspection, not just the number: refund_paths.cpp
+lines 71-84 show uncovered — that's the NEW partial-refund
+branch, so it got a real test:
+  TEST(Refunds, PartialRefundRestoresRemainingBalance)
+Generated protobuf/order.pb.cc stays excluded, rationale
+recorded in coverage.cfg (machine-generated, no decisions).
+'''
+bad = '''
+// Floor is 85%; these exist only to touch lines.
+TEST(Cov, Pump1) { Refunds r; r.processAll(); }  // no asserts
+TEST(Cov, Pump2) { toString(Order{}); toJson(Order{}); }
+TEST(Cov, Pump3) {
+  for (int i = 0; i < 6; ++i)
+    menuLabel(i);              // return value ignored
+}
+// Dashboard: 91% covered. The new partial-refund branch
+// still asserts nothing anywhere — the number was the goal.
+'''
+
+[examples.csharp]
+good = '''
+$ dotnet test /p:CollectCoverage=true
+  Line coverage: 87.4% (project floor: 85%)
+
+# inspect what the number is hiding, not the number
+uncovered: RefundService.cs 88–101 (partial refunds)
+→ added Partial_refund_returns_remaining_balance
+uncovered: StartupBanner.cs (console art)
+→ judged no-risk, noted in the PR description
+'''
+bad = '''
+// written to move the number, asserts nothing
+[Fact]
+public void Touch_refund_paths_for_coverage()
+{
+    var s = new RefundService(new FakeDb());
+    s.Refund(OrderId, 10m);
+    s.Refund(OrderId, 0m);
+    try { s.Refund(default, -1m); } catch { }
+    // 96% coverage achieved; zero behavior protected
+}
+'''
+
+[examples.elixir]
+good = '''
+$ mix test --cover
+  Refunds.process/1 ....... 41%  (project floor: 80%)
+
+Uncovered branches inspected, not just counted:
+  - partial-refund path: REAL risk -> test added
+    asserting remaining balance and ledger entry
+  - :legacy_csv clause: dead since v2 — recorded as
+    low-risk in the coverage notes, deletion queued
+'''
+bad = '''
+# written to move the number, not to protect behavior
+test "exercise refunds module for coverage" do
+  Refunds.process(build(:refund))
+  Refunds.process(build(:refund, amount: 0))
+  Refunds.process(build(:refund, partial: true))
+
+  assert true   # 94% covered, zero outcomes asserted
+end
+'''
+
+[examples.go]
+good = '''
+$ go test -coverprofile=c.out ./internal/refund
+coverage: 87.4% of statements   (project floor: 80%)
+
+$ go tool cover -func=c.out | awk '$3 == "0.0%"'
+refund.go:74:   reverseTransfer   0.0%
+
+# the uncovered path moves money — a test was added before
+# merge instead of arguing the number was already high enough
+'''
+bad = '''
+// exists to push the number over the 80% gate
+func TestReverseTransferForCoverage(t *testing.T) {
+	_ = reverseTransfer(context.Background(), txn{}, 0)
+	// no assertions: the lines count as "covered" and the
+	// gate is green, but a wrong transfer amount would pass
+	// unnoticed
+}
+'''
+
+[examples.java]
+good = '''
+$ ./gradlew jacocoTestCoverageVerification
+Coverage 87% (project floor 85%) — PASS
+
+Report inspected, not just the number:
+  RefundPolicy.partialRefund — uncovered branch, line 44
+  -> added refundOverRemainingBalanceIsRejected()
+     (it failed: the branch had a real bug)
+  Generated DTO accessors uncovered
+  -> judged low risk, noted in the PR description
+'''
+bad = '''
+// written to move the number from 79% to 85%
+@Test
+void coverRefundPolicy() {
+    var policy = new RefundPolicy();
+    policy.partialRefund(order, dollars(5));
+    policy.partialRefund(order, dollars(500));
+    policy.toString();
+    assertTrue(true);   // executes lines, asserts nothing
+}
+// coverage rises, the uncovered-branch bug on line 44
+// ships anyway
+'''
+
+[examples.kotlin]
+good = '''
+$ ./gradlew koverVerify   # project floor: 80% changed code
+Coverage: 84% — PASSED
+
+# the report showed RefundService.reverse() uncovered; that
+# path moves money, so it got a real behavioral test.
+# CsvHeader.toString() stays uncovered — judged low risk
+# and said so in the change description.
+'''
+bad = '''
+// written only to push the number over the 80% line
+@Test fun `exercise refund paths`() {
+    val service = RefundService(mockk(relaxed = true))
+    runCatching { service.reverse(refund) }
+    runCatching { service.reverse(refund) }
+    assertThat(true).isTrue() // lines covered, nothing
+}                             // asserted, risk unchanged
+'''
+
+[examples.python]
+good = '''
+$ coverage report --fail-under=85
+TOTAL    91%
+
+$ coverage report -m src/billing/proration.py
+proration.py   76%   missing: 41-48    # leap-year branch
+
+# the uncovered path is real risk, so it gets a real test
+def test_february_29_prorates_over_29_days():
+    charge = prorate(FEB_PLAN, start=date(2028, 2, 29))
+    assert charge == Money.cents(103)
+'''
+bad = '''
+def test_boost_coverage():
+    # executes every line, asserts nothing: the 90% badge
+    # goes green while prorate() can silently return 0
+    for day in range(1, 32):
+        try:
+            prorate(FEB_PLAN, day)
+        except Exception:
+            pass
+    # the number was the goal; the risk signal is gone
+'''
+
+[examples.ruby]
+good = '''
+$ bundle exec rspec
+  Line coverage: 91.2% (project floor: 90%)
+
+Uncovered in this change: refund.rb #partial_refund branch.
+That path moves money — added refund_spec cases for it.
+
+Still uncovered: #inspect debug formatting — judged low risk
+and noted as such in the PR description.
+'''
+bad = '''
+# floor is 90% — met by executing code, asserting nothing
+it "covers the refund paths" do
+  begin
+    Refund.new(order: order).process # lines now "covered"
+  rescue StandardError
+  end
+  expect(true).to be true
+end
+# money-moving branch: green on the report, unprotected in fact
+'''
+
+[examples.rust]
+good = '''
+$ cargo llvm-cov --workspace --fail-under-lines 80
+lines: 86.4% (project floor: 80%)
+
+# uncovered lines inspected as risk, not just a number:
+#   refund::partial_rounding  0% -> real risk, test added
+#   cli::print_banner         0% -> judged low risk,
+#                                   noted in the report
+'''
+bad = '''
+// written to move the number; asserts nothing
+#[test]
+fn cover_refund_paths() {
+    let _ = refund(&order(), Cents(500)); // result discarded
+    let _ = refund(&order(), Cents(0));
+    let _ = refund(&order(), Cents(9_999_999));
+    // 100% line coverage on refund.rs, zero protection —
+    // any wrong answer still passes
+}
+'''
+
+[examples.swift]
+good = '''
+$ swift test --enable-code-coverage
+Line coverage: 87%  (project floor: 85%)
+
+Uncovered in this change:
+  RefundFlow.partialRefund guard — real risk, added a test
+  that refuses an over-refund.
+  CrashReporter forwarding glue — inspected, logic-free,
+  judged low risk and left uncovered on purpose.
+'''
+bad = '''
+Coverage: 92% — target met, done.
+
+@Test func touchRefundFlow() {
+    _ = RefundFlow().partialRefund(.zero, for: order)
+    _ = RefundFlow().partialRefund(.max, for: order)
+    // no assertions: executes lines to raise the number,
+    // protects nothing
+}
+'''
+
+[examples.typescript]
+good = '''
+$ npx vitest run --coverage
+Coverage: 87.4% (project floor: 85%)
+
+Uncovered lines in this change, inspected one by one:
+  src/refunds.ts 41-58 — partial-refund path. Real risk:
+    added refund.spec.ts for split and over-refund cases.
+  src/cli/banner.ts — static help text. Judged low risk,
+    left uncovered with that note in the PR.
+'''
+bad = '''
+// The 85% gate said no, so lines got "covered":
+it("touches everything", () => {
+  render(App);        // no assertions at all
+  runAllHandlers();
+  expect(true).toBe(true);
+});
+
+// 91% coverage, zero meaningful outcomes asserted.
+// The unexercised refund math still ships unprotected —
+// the number satisfied, the risk untouched.
+'''

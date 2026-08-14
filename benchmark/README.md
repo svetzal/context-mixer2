@@ -46,3 +46,17 @@ exact retention for every semantic intent field, vocabulary overlap, output
 size, compression relative to the original, and deltas from the checked-in
 baseline. These are mechanical signals, not a claim that lexical similarity
 alone measures guidance quality.
+
+Scenario inputs are fixtures, not configuration. Editing
+`scenarios/*/input/profile.toml` redefines what a scenario measures, and the
+metric movement that follows is indistinguishable from an algorithm regression.
+Refresh a snapshot deliberately, in its own commit, with `baseline.json`
+updated in the same change.
+
+## Behavioural exercises
+
+`benchmark/exercises/` answers the question this directory cannot: whether an
+agent given the assembled guidance builds anything differently. It runs a real
+coding task with and without a cmf-assembled `AGENTS.md` and reports task
+completion against a hidden acceptance suite alongside per-intent adherence
+measured from the finished code. See `exercises/README.md`.

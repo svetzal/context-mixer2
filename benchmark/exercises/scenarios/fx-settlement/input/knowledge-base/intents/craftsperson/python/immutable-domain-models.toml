@@ -1,0 +1,17 @@
+id = "guidelines.intent.immutable-domain-models"
+title = "Make domain model values immutable by default"
+category = "design"
+tags = ["python", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Domain values remain stable after validation and can be reasoned about without hidden mutation."
+threat = "In-place mutation creates action-at-a-distance and invalidates assumptions made when a model was constructed."
+expectation = "Validated domain objects will be shared across functions and layers over nontrivial lifetimes."
+strategy = "Configure Pydantic domain models with `ConfigDict(frozen=True)`."
+evidence = [{ type = "test", description = "A model test confirms post-construction field assignment is rejected, and review finds frozen configuration on domain models.", required = true }]
+tradeoff = "Updates require creating replacement instances and can be awkward for workflows that naturally accumulate state."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#data-structures", summary = "The source specifically prescribes frozen Pydantic configuration for immutable models.", confidence = 1.0 }]

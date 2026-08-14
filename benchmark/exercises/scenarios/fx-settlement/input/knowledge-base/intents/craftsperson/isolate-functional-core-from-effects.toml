@@ -1,0 +1,362 @@
+id = "guidelines.intent.isolate-functional-core-from-effects"
+title = "Isolate the functional core from effects"
+category = "architecture"
+tags = ["functional-core", "side-effects", "separation-of-concerns"]
+status = "hypothesized"
+confidence = 0.99
+capability = "Business rules can be understood and tested without databases, networks, filesystems, clocks, or runtime orchestration."
+threat = "I/O and mutation spread through domain logic and make behavior expensive, fragile, or nondeterministic to test."
+expectation = "Infrastructure integrations and delivery mechanisms will change independently from core policy."
+strategy = "Keep decisions in a deterministic functional core and push external effects and orchestration to a thin imperative shell."
+evidence = [{ type = "test", description = "Core behavior tests run without real external infrastructure or process-global state.", required = true }]
+tradeoff = "Separating core and shell introduces mapping and orchestration code that can be excessive for simple behavior."
+scope = { project = "guidelines", paths = ["plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md", "plugins/swift-ecosystem/agents/swift-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#functional-core-imperative-shell", summary = "Separates pure decision logic from effectful orchestration.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#architectural-patterns", summary = "Keeps business logic testable independently of infrastructure.", confidence = 1.0 }, { type = "document", ref = "plugins/swift-ecosystem/agents/swift-craftsperson.md#functional-core-imperative-shell", summary = "Places pure logic in a functional core and I/O in an imperative shell.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; core: pure decision — no I/O, no clock
+(defn renewal-decision [{:keys [paid-through rate]} today]
+  (if (neg? (compare paid-through today))
+    {:action :suspend}
+    {:action :renew :charge rate}))
+
+(deftest suspends-lapsed-subscription   ; runs with no infra
+  (is (= {:action :suspend}
+         (renewal-decision {:paid-through "2026-01-01"}
+                           "2026-02-01"))))
+;; thin shell elsewhere: fetch sub, call decision, run effects
+'''
+bad = '''
+(defn process-renewal! [id]
+  (let [sub (jdbc/execute-one!
+             db ["select * from subs where id = ?" id])
+        today (java.time.LocalDate/now)]   ; hidden clock
+    (if (.isBefore (:subs/paid_through sub) today)
+      (jdbc/execute!
+       db ["update subs set state = 'suspended' where id = ?" id])
+      (charge-card! (:subs/card sub) (:subs/rate sub)))))
+; the renewal rule cannot be tested without a database, a
+; card processor, and control of the system clock
+'''
+
+[examples.cpp]
+good = '''
+// Core: pure decision — tests need no DB, clock, or network.
+Discount discountFor(const Cart& cart, LocalDate today) {
+  if (cart.total() > Money{200} && today.isWeekend())
+    return Discount::percent(10);
+  return Discount::none();
+}
+// Shell: gathers effects, then delegates the decision.
+void applyDiscount(CartId id) {
+  auto cart = repo_.load(id);            // I/O lives here only
+  repo_.store(id, discountFor(cart, clock_.today()));
+}
+'''
+bad = '''
+Discount discountFor(CartId id) {
+  QSqlQuery q("SELECT total FROM carts WHERE id = ?");  // I/O
+  q.addBindValue(id.value());
+  q.exec();
+  q.next();
+  auto today = QDate::currentDate();     // hidden ambient clock
+  if (q.value(0).toInt() > 200 && today.dayOfWeek() >= 6)
+    return Discount::percent(10);   // rule buried in plumbing
+  return Discount::none();
+}
+// testing "weekend discount" now needs a database and Saturday
+'''
+
+[examples.csharp]
+good = '''
+// core: pure decision — tests need no infrastructure
+public static ShippingQuote Quote(Cart cart, Rates r) =>
+    cart.Weight >= r.FreeOverKg
+        ? ShippingQuote.Free
+        : new(cart.Weight * r.PerKg);
+
+// shell: effects only, no decisions
+app.MapGet("/quote/{id}", async (Guid id, Db db) =>
+    Results.Ok(Quote(await db.Cart(id),
+                     await db.CurrentRates())));
+'''
+bad = '''
+public async Task<decimal> Quote(Guid cartId)
+{
+    var cart = await _db.Carts.FindAsync(cartId);
+    var rates = await _http.GetFromJsonAsync<Rates>(
+        "https://rates.example.com/current");
+    // the pricing rule is buried between two I/O
+    // calls: testing it needs a database and a live
+    // rates service
+    if (cart!.Weight >= rates!.FreeOverKg) return 0m;
+    return cart.Weight * rates.PerKg;
+}
+'''
+
+[examples.elixir]
+good = '''
+# core: pure decision — tested with plain data, no infra
+defmodule Billing.Core do
+  def late_fee(invoice, today) do
+    if Date.after?(today, invoice.due_on),
+      do: Money.mult(invoice.total, 0.02),
+      else: Money.zero()
+  end
+end
+
+# shell: effects stay at the edge, thin and obvious
+def apply_late_fee(id) do
+  inv = Repo.get!(Invoice, id)
+  fee = Billing.Core.late_fee(inv, Date.utc_today())
+  Repo.update!(change(inv, fee: fee))
+end
+'''
+bad = '''
+def late_fee(id) do
+  invoice = Repo.get!(Invoice, id)   # I/O inside logic
+  today = Date.utc_today()           # hidden clock
+
+  if Date.after?(today, invoice.due_on) do
+    fee = Money.mult(invoice.total, 0.02)
+    Repo.update!(change(invoice, fee: fee))
+    Logger.info("fee applied")   # effect mid-decision
+  end
+end
+# testing the 2% rule now requires a database and today's
+# date to cooperate
+'''
+
+[examples.go]
+good = '''
+// pure core: decidable and testable with no infrastructure
+func Overdue(now time.Time, all []Invoice) []Invoice {
+	return slices.DeleteFunc(slices.Clone(all),
+		func(i Invoice) bool { return !now.After(i.DueDate) })
+}
+
+// thin shell: effects in, decision, effects out
+func (s *Service) SendReminders(ctx context.Context) error {
+	invs, err := s.repo.OpenInvoices(ctx)
+	if err != nil {
+		return fmt.Errorf("load invoices: %w", err)
+	}
+	return s.mail.Remind(ctx, Overdue(s.now(), invs))
+}
+'''
+bad = '''
+func (s *Service) SendReminders(ctx context.Context) error {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, due FROM inv`)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var inv Invoice
+		rows.Scan(&inv.ID, &inv.DueDate)
+		// the rule is wedged between two effects: untestable
+		// without a real database, an SMTP server, and midnight
+		if time.Now().After(inv.DueDate.Add(720 * time.Hour)) {
+			s.smtp.Send(ctx, inv.ID)
+		}
+	}
+	return rows.Err()
+}
+'''
+
+[examples.java]
+good = '''
+// pure core: the decision needs no clock, db, or mailer
+static Money lateFee(Invoice invoice, LocalDate today) {
+    return today.isAfter(invoice.dueDate())
+        ? invoice.total().percent(5)
+        : Money.ZERO;
+}
+
+// thin shell owns every effect
+void applyLateFees() {
+    var today = LocalDate.now(clock);
+    repository.overdue(today).forEach(inv ->
+        repository.save(inv.plus(lateFee(inv, today))));
+}
+'''
+bad = '''
+Money lateFee(long invoiceId) throws SQLException {
+    var invoice = jdbc.queryForObject(      // db inside rule
+        "select * from invoices where id=?",
+        invoiceMapper, invoiceId);
+    if (LocalDate.now()                     // hidden wall clock
+            .isAfter(invoice.dueDate())) {
+        mailer.send(invoice.customerEmail(),// side effect fired
+            "Late fee applied");            // from a "getter"
+        return invoice.total().percent(5);
+    }
+    return Money.ZERO;
+}
+'''
+
+[examples.kotlin]
+good = '''
+// core: pure decision, tested with plain values
+fun nextRetryAt(attempt: Int, now: Instant): Instant =
+    now.plusSeconds(1L shl attempt.coerceAtMost(6))
+
+// shell: effects only, no decisions
+suspend fun scheduleRetry(job: Job) {
+    val at = nextRetryAt(job.attempt, clock.instant())
+    queue.enqueue(job, at)
+}
+'''
+bad = '''
+suspend fun scheduleRetry(job: Job) {
+    // the backoff decision is buried among DB, clock, and
+    // queue effects — untestable without all three running
+    val row = db.query("SELECT attempt FROM jobs WHERE id=?")
+    val delay = 1L shl row.attempt.coerceAtMost(6)
+    queue.enqueue(job, Instant.now().plusSeconds(delay))
+    db.execute("UPDATE jobs SET attempt = attempt + 1")
+}
+'''
+
+[examples.python]
+good = '''
+def overdue(invoices: list[Invoice],
+            today: date) -> list[Invoice]:
+    # pure decision: no clock, no database, trivial to test
+    return [i for i in invoices
+            if i.due < today and not i.paid]
+
+def send_reminders(repo: InvoiceRepo, mail: Mailer) -> None:
+    # thin shell owns the effects
+    for invoice in overdue(repo.all(), date.today()):
+        mail.remind(invoice)
+'''
+bad = '''
+def overdue_invoices() -> list[Invoice]:
+    conn = psycopg.connect(DSN)   # I/O buried in the rule
+    rows = conn.execute(
+        "select id, due, paid from invoices").fetchall()
+    today = date.today()          # hidden clock dependency
+    return [Invoice(*r) for r in rows
+            if r[1] < today and not r[2]]
+    # testing the date rule now needs a live database
+'''
+
+[examples.ruby]
+good = '''
+# core: pure decision, testable without infrastructure
+module Pricing
+  def self.quote(items:, rate:)
+    net = items.sum(&:price)
+    { net: net, tax: net * rate, total: net * (1 + rate) }
+  end
+end
+
+# shell: effects stay at the edge
+def create
+  quote = Pricing.quote(items: cart_items, rate: tax_rate)
+  QuoteRecord.create!(quote) # I/O out here
+  render json: quote
+end
+'''
+bad = '''
+module Pricing
+  def self.quote(cart_id)
+    items = Item.where(cart_id: cart_id) # DB inside the rules
+    rate = TaxApi.get("/rate?at=#{Time.now}") # network + clock
+    net = items.sum(&:price)
+    QuoteRecord.create!(net: net, tax: net * rate) # write too
+    net * (1 + rate) # untestable without DB, HTTP, real time
+  end
+end
+'''
+
+[examples.rust]
+good = '''
+// the decision is pure; no I/O can reach it
+pub fn overdue(invoices: &[Invoice], today: Date) -> Vec<Id> {
+    invoices.iter()
+        .filter(|i| i.due < today && !i.paid)
+        .map(|i| i.id)
+        .collect()
+}
+// a thin shell owns every effect
+pub fn run(db: &Db, clock: &impl Clock) -> Result<(), AppErr> {
+    let ids = overdue(&db.load_invoices()?, clock.today());
+    db.mark_overdue(&ids)
+}
+#[test]
+fn flags_unpaid_past_due() { /* no db, no clock, no sleep */ }
+'''
+bad = '''
+// decision logic interleaved with db, clock, and smtp —
+// the rule cannot be tested without all three
+pub fn process_overdue(conn: &mut PgConn) -> Result<(), Err> {
+    let today = chrono::Utc::now().date_naive(); // hidden clock
+    for row in conn.query(SELECT_INVOICES, &[])? {
+        let inv = Invoice::from_row(&row)?;
+        if inv.due < today && !inv.paid {
+            conn.execute(MARK_OVERDUE, &[&inv.id])?;
+            send_email(&inv.customer_email)?;
+        }
+    }
+    Ok(())
+}
+'''
+
+[examples.swift]
+good = '''
+// Pure decision: deterministic, testable with values alone.
+func renewalDate(for plan: Plan, from now: Date) -> Date {
+    now.addingTimeInterval(plan.period)
+}
+
+// Thin shell owns clock, network, and persistence.
+func processRenewal(_ sub: Subscription) async throws {
+    let plan = try await api.fetchPlan(sub.planID)
+    let due = renewalDate(for: plan, from: clock.now)
+    try await store.save(sub.renewed(on: due))
+}
+'''
+bad = '''
+func renewalDate(for sub: Subscription) async throws -> Date {
+    // clock, network, and logging inside the decision
+    let now = Date()
+    let plan = try await api.fetchPlan(sub.planID)
+    try db.append("renewal computed for \(sub.id)")
+    return now.addingTimeInterval(plan.period)
+}
+// testing this one rule now needs a live API and database
+'''
+
+[examples.typescript]
+good = '''
+// Core: pure decision, testable with plain values.
+export const priceAfterDiscount = (
+  subtotal: number, tier: Tier, now: Date,
+): number =>
+  tier === "gold" && isQ4(now) ? subtotal * 0.9 : subtotal;
+
+// Shell: gathers effects, calls the core, persists.
+export async function quote(orderId: string): Promise<void> {
+  const order = await repo.load(orderId);
+  const total = priceAfterDiscount(
+    order.subtotal, order.tier, clock.now());
+  await repo.saveQuote(orderId, total);
+}
+'''
+bad = '''
+// The discount rule is buried between awaits; testing the
+// 10% decision now needs a database and the real clock.
+export async function quote(orderId: string): Promise<void> {
+  const order = await db.orders.findOne(orderId);
+  let total = order.subtotal;
+  if (order.tier === "gold" &&
+      new Date().getMonth() >= 9) {
+    total = total * 0.9;
+  }
+  await db.quotes.insert({ orderId, total });
+}
+'''

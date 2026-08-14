@@ -1,0 +1,21 @@
+{
+  "copied_paths": [
+    "intents/craftsperson/python/colocated-module-specifications.toml",
+    "intents/craftsperson/python/functional-core-imperative-shell.toml",
+    "intents/craftsperson/python/gateway-only-mocking.toml",
+    "intents/craftsperson/python/immutable-domain-models.toml",
+    "intents/craftsperson/python/native-modern-type-syntax.toml",
+    "intents/craftsperson/python/native-pytest-assertions.toml",
+    "intents/craftsperson/python/readable-bdd-specifications.toml",
+    "intents/craftsperson/python/specific-domain-errors.toml",
+    "intents/craftsperson/isolate-functional-core-from-effects.toml",
+    "intents/craftsperson/keep-documentation-aligned.toml",
+    "intents/craftsperson/make-tests-readable-specifications.toml",
+    "intents/craftsperson/mock-only-owned-boundaries.toml",
+    "intents/craftsperson/use-coverage-as-a-risk-signal.toml",
+    "intents/craftsperson/use-language-and-ecosystem-idioms.toml"
+  ],
+  "note": "Copied from the elixir-phoenix-craftsperson scenario's catalogue snapshot, which is itself a copy of the guidelines repository. The eight python records are the scored slice; the six universal records are their specialization parents, present so a variant profile can measure whether traversing to them helps or dilutes.",
+  "source_scenario": "benchmark/scenarios/elixir-phoenix-craftsperson/input/knowledge-base",
+  "skeleton_origin": "written for this exercise; not derived from any existing project"
+}

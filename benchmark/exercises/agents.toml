@@ -1,0 +1,82 @@
+# Agent and model parameters — the first of the harness's three inputs.
+#
+# `command` is argv. `{prompt}` is replaced with the task prompt and `{workspace}`
+# with the absolute workspace path. `guidance_files` names where this agent reads
+# project guidance from; the assembled cmf artifact is written to each of them.
+# `env` is layered onto the inherited environment.
+#
+# Ambient configuration is the main threat to interpreting these numbers. A
+# globally installed CLAUDE.md, a user-level AGENTS.md, or an installed skill can
+# carry the same advice the exercise is trying to attribute to the assembled
+# slice. It is present in both arms, so it cannot invent a difference between
+# them — but it does raise the control arm's floor and so understates lift.
+#
+# `home_env` names the environment variable that relocates an agent's
+# configuration home. The runner only sets it under `--isolate-agent-home`,
+# because an empty home also drops any credentials that live there rather than
+# in the system keychain. Run isolated when a number needs to stand alone; run
+# unisolated when the guided-versus-control delta is what matters.
+
+[agents.claude-opus-5]
+description = "Claude Code, Opus 5"
+command = [
+    "claude",
+    "--print",
+    "--model", "opus",
+    "--permission-mode", "bypassPermissions",
+    "--setting-sources", "project",
+    "--no-session-persistence",
+    "--disable-slash-commands",
+    "{prompt}",
+]
+guidance_files = ["AGENTS.md", "CLAUDE.md"]
+home_env = "CLAUDE_CONFIG_DIR"
+isolation_notes = [
+    "--setting-sources project excludes user and local settings files",
+    "--disable-slash-commands excludes installed skills",
+]
+[agents.claude-opus-5.env]
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
+
+[agents.claude-sonnet-5]
+description = "Claude Code, Sonnet 5"
+command = [
+    "claude",
+    "--print",
+    "--model", "sonnet",
+    "--permission-mode", "bypassPermissions",
+    "--setting-sources", "project",
+    "--no-session-persistence",
+    "--disable-slash-commands",
+    "{prompt}",
+]
+guidance_files = ["AGENTS.md", "CLAUDE.md"]
+home_env = "CLAUDE_CONFIG_DIR"
+isolation_notes = [
+    "--setting-sources project excludes user and local settings files",
+    "--disable-slash-commands excludes installed skills",
+]
+[agents.claude-sonnet-5.env]
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
+
+[agents.codex-gpt-5-6]
+description = "Codex CLI, GPT-5.6"
+command = [
+    "codex",
+    "exec",
+    "--model", "gpt-5.6",
+    "--cd", "{workspace}",
+    "--sandbox", "workspace-write",
+    "--skip-git-repo-check",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "--ephemeral",
+    "{prompt}",
+]
+guidance_files = ["AGENTS.md"]
+home_env = "CODEX_HOME"
+isolation_notes = [
+    "--ignore-user-config skips $CODEX_HOME/config.toml",
+    "--ignore-rules skips user and project execpolicy rules",
+    "--ephemeral keeps session files off disk",
+]

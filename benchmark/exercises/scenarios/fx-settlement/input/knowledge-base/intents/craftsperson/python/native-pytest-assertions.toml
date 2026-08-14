@@ -1,0 +1,17 @@
+id = "guidelines.intent.native-pytest-assertions"
+title = "Keep test expectations transparent through native assertions"
+category = "design"
+tags = ["python", "pytest", "testing", "idioms", "language-design", "ecosystem-conventions"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-language-and-ecosystem-idioms" },
+]
+status = "hypothesized"
+confidence = 0.89
+capability = "A failing specification displays the compared values and expectation in a form familiar to Python maintainers."
+threat = "Custom or framework-specific assertion APIs hide ordinary expressions and can produce opaque diagnostics or lock-in."
+expectation = "The suite will grow across many contributors and behavior types."
+strategy = "Prefer plain pytest assertion expressions over custom assertion wrappers or matcher DSLs."
+evidence = [{ type = "review", description = "Behavior specifications use plain `assert` expressions unless a specialized helper provides demonstrably clearer failure output for a repeated domain assertion.", required = true }]
+tradeoff = "Plain assertions can duplicate complex domain checks and may be less expressive than a carefully designed matcher."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#tests-are-the-executable-spec", summary = "The source explicitly prefers pytest's built-in assertions.", confidence = 0.94 }]

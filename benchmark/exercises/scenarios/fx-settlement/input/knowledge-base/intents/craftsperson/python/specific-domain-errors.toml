@@ -1,0 +1,17 @@
+id = "guidelines.intent.specific-domain-errors"
+title = "Expose precise and documented failure contracts"
+category = "documentation"
+tags = ["python", "concurrency", "testing", "documentation", "error-handling", "synchronization"]
+relations = [
+  { type = "specializes", target = "craftsperson/keep-documentation-aligned" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "Callers can distinguish, handle, and understand expected failure modes."
+threat = "Generic or swallowed exceptions erase meaning and can accidentally intercept process-control signals."
+expectation = "New failure modes and recovery policies will be added as domain behavior expands."
+strategy = "Raise specific exceptions, define custom classes for domain errors, document raised exceptions, and catch only expected exception types."
+evidence = [{ type = "review", description = "Public failure paths document and raise named exception types, and static search finds no bare `except` or generic `raise Exception` in production code.", required = true }]
+tradeoff = "A richer exception taxonomy adds public API surface and requires callers to maintain more handling branches."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#error-handling", summary = "The source requires specific and domain exceptions, documented failure contracts, and demonstrates why bare except is unsafe.", confidence = 1.0 }]

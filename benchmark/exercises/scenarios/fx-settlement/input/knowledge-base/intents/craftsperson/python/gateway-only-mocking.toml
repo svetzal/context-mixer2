@@ -1,0 +1,17 @@
+id = "guidelines.intent.gateway-only-mocking"
+title = "Mock only owned gateways at external boundaries"
+category = "testing"
+tags = ["python", "testing", "dependencies", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Core behavior can be tested deterministically without coupling tests to third-party library internals."
+threat = "Direct mocking of libraries leaks vendor APIs into tests and makes them fragile under dependency changes."
+expectation = "Filesystems, databases, APIs, git, and third-party packages will evolve independently of the domain core."
+strategy = "Wrap every external interaction in a thin, logic-free gateway and mock that owned gateway rather than the underlying library."
+evidence = [{ type = "review", description = "Test doubles target only project-owned gateway interfaces, and no mock patches a third-party library's internal objects.", required = true }]
+tradeoff = "Gateway wrappers add files and indirection and can become busywork for very small integrations."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#functional-core-imperative-shell", summary = "The source mandates thin gateways for all external interactions and forbids mocking library internals.", confidence = 1.0 }]

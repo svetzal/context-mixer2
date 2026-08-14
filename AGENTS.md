@@ -394,10 +394,33 @@ Read-only materializer for an externally maintained TOML intent knowledge base.
 
 ### cmf Assembly Benchmarks
 
+Measure the assembled artifact: what was selected, what survived rendering, how large it is.
+
 - `benchmark/run.sh` — scenario runner; assembles fixed inputs and writes ignored results
 - `benchmark/score.py` — deterministic corpus, selection, retention, size, and vocabulary metrics
 - `benchmark/scenarios/<name>/input/` — copied original artifact, complete intent catalogue, and profile
 - `benchmark/scenarios/<name>/{expected,baseline,provenance}.json` — integrity targets, comparison baseline, and source revision
+
+Scenario inputs are fixtures. Never let automated maintenance edit
+`benchmark/scenarios/*/input/` — changing a profile silently redefines what the
+benchmark means, and the resulting metric movement looks like an algorithm
+regression.
+
+### cmf Behavioural Exercises
+
+Measure what the assembled artifact *does*: an agent performs a real task with
+and without the guidance, and the difference is the result. Size and lexical
+overlap say nothing about whether guidance changes work; these do.
+
+- `benchmark/exercises/run.sh` — wrapper over `runner.py`
+- `benchmark/exercises/runner.py` — takes agent parameters, a scenario skeleton, and a cmf-assembled AGENTS.md; runs both arms and reports per-intent lift
+- `benchmark/exercises/adherence.py` — per-intent verdicts by parsing the finished code; never asks a model, never reads the agent transcript
+- `benchmark/exercises/agents.toml` — argv, guidance file locations, and isolation flags per agent CLI
+- `benchmark/exercises/scenarios/<name>/` — `TASK.md`, neutral `input/skeleton/`, intent snapshot and profile, hidden `acceptance/`, and a `reference/` solution that proves the targets are jointly reachable
+
+Validate harness changes against both ends before trusting a run:
+`--implementation reference` must score full marks and `--skip-agent` must
+score zero. A check that cannot fail is not measuring anything.
 
 ## Spec
 

@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Behavioural exercises for assembled guidance.** `benchmark/exercises/`
+  measures what an assembled artifact *does* rather than how large it is. The
+  harness takes agent and model parameters, a scenario skeleton, and an
+  `AGENTS.md` that cmf assembles at run time, then runs the same task with and
+  without the guidance. Each trial reports task completion against a hidden
+  acceptance suite the agent never sees, and a per-intent adherence verdict
+  derived by parsing the finished code — never by asking a model and never by
+  reading the agent's transcript. The first scenario, `fx-settlement`, scores
+  eight Python intents whose behaviour is observable in code, and ships a
+  reference solution proving acceptance and adherence are jointly reachable.
 - **Repeatable cmf assembly benchmarks.** Self-contained scenarios snapshot an
   original guidance artifact, the full intent catalogue, and an assembly
   profile. The runner records selection precision and recall, exact strategy
