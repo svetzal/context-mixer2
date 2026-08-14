@@ -1,0 +1,379 @@
+id = "guidelines.intent.mock-only-owned-boundaries"
+title = "Mock only owned boundaries"
+category = "testing"
+tags = ["test-doubles", "boundaries", "contracts"]
+status = "hypothesized"
+confidence = 0.98
+capability = "Tests isolate external effects without coupling themselves to third-party implementation details."
+threat = "Mocks of library internals duplicate someone else's implementation and pass while real integration behavior diverges."
+expectation = "Dependencies and infrastructure clients will change independently from application-owned contracts."
+strategy = "Substitute only narrow application-owned gateway contracts, preferring simple fakes when they communicate behavior clearly."
+evidence = [{ type = "test_review", description = "Test doubles implement owned boundary contracts and do not intercept third-party internals.", required = true }]
+tradeoff = "Owned boundaries and fakes require additional design and maintenance even when a direct mock would be quicker initially."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/ruby-ecosystem/agents/ruby-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#testing", summary = "Mocks owned gateway contracts rather than library internals.", confidence = 1.0 }, { type = "document", ref = "plugins/ruby-ecosystem/agents/ruby-craftsperson.md#functional-core-imperative-shell", summary = "Mocks owned gateways instead of third-party internals.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#testing-strategy", summary = "Prefers fakes and confines mocks to owned boundaries.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defprotocol PaymentGateway   ; owned boundary contract
+  (charge! [this amount token]))
+
+(defrecord FakeGateway [charges]   ; simple, readable fake
+  PaymentGateway
+  (charge! [_ amount token]
+    (swap! charges conj {:amount amount :token token})
+    {:status :approved}))
+
+(deftest checkout-charges-exactly-once
+  (let [gw (->FakeGateway (atom []))]
+    (checkout gw (cart-with {:total 100}))
+    (is (= 1 (count @(:charges gw))))))
+'''
+bad = '''
+(deftest checkout-charges-exactly-once
+  ; intercepts the Stripe library's internals — this test
+  ; re-implements someone else's API and keeps passing while
+  ; real integration behavior drifts
+  (with-redefs [stripe.http/post-form
+                (fn [_url _params] {"status" "succeeded"})]
+    (checkout (cart-with {:total 100}))
+    (is true)))
+'''
+
+[examples.cpp]
+good = '''
+// Owned contract, defined by this application:
+struct RateSource {
+  virtual ~RateSource() = default;
+  virtual std::optional<Rate> rateFor(Currency) = 0;
+};
+
+class FakeRateSource : public RateSource {   // simple fake
+public:
+  std::optional<Rate> rateFor(Currency c) override {
+    auto it = rates.find(c);
+    return it == rates.end() ? std::nullopt
+                             : std::optional{it->second};
+  }
+  std::map<Currency, Rate> rates;
+};
+'''
+bad = '''
+TEST(Rates, FetchesEurRate) {
+  MockQNetworkAccessManager nam;   // Qt's internals, not ours
+  EXPECT_CALL(nam, createRequest(
+      QNetworkAccessManager::GetOperation, _, _))
+      .WillOnce(Return(fakeReplyWithJson("{\"eur\":1.08}")));
+  RateClient client(&nam);
+  EXPECT_EQ(client.rateFor(Currency::EUR)->value, 1.08);
+}
+// re-implements Qt's HTTP plumbing; redirects, timeouts and
+// encoding can all diverge in production while this passes
+'''
+
+[examples.csharp]
+good = '''
+// simple fake of the contract we own
+public sealed class FakePayments : IPaymentGateway
+{
+    public List<Payment> Charged { get; } = [];
+    public Task<PaymentResult> Charge(Payment p)
+    { Charged.Add(p); return Task.FromResult(Ok); }
+}
+
+[Fact]
+public async Task Checkout_charges_the_order_total()
+{
+    var payments = new FakePayments();
+    await new Checkout(payments).Complete(Cart(120m));
+    payments.Charged.Single().Cents.Should().Be(12000);
+}
+'''
+bad = '''
+// re-implements the vendor SDK's wire behavior
+var handler = Substitute.For<HttpMessageHandler>();
+handler.Protected("SendAsync",
+        Arg.Is<HttpRequestMessage>(r =>
+            r.RequestUri!.AbsolutePath == "/v1/charges"
+            && r.Headers.Contains("Idempotency-Key")),
+        Arg.Any<CancellationToken>())
+    .Returns(Json("{\"status\":\"succeeded\"}"));
+// green forever — even after the SDK changes its
+// endpoints and real integration silently breaks
+'''
+
+[examples.elixir]
+good = '''
+# an application-owned contract at the boundary
+defmodule App.WeatherPort do
+  @callback forecast(city :: String.t()) ::
+              {:ok, map()} | {:error, term()}
+end
+
+Mox.defmock(WeatherMock, for: App.WeatherPort)
+
+test "advises an umbrella when rain is forecast" do
+  expect(WeatherMock, :forecast, fn "YYZ" ->
+    {:ok, %{rain: true}}
+  end)
+
+  assert Advice.for_city("YYZ") == :bring_umbrella
+end
+'''
+bad = '''
+test "advises an umbrella when rain is forecast" do
+  # intercepts a third party's internals: this passes
+  # even after real Req usage (headers, body shape)
+  # has silently diverged in production
+  :meck.new(Req, [:passthrough])
+
+  :meck.expect(Req, :get!, fn _url, _opts ->
+    %Req.Response{status: 200, body: %{"rain" => true}}
+  end)
+
+  assert Advice.for_city("YYZ") == :bring_umbrella
+end
+'''
+
+[examples.go]
+good = '''
+// the app owns this contract; a simple fake shows behavior
+type ObjectStore interface {
+	Fetch(ctx context.Context, key string) ([]byte, error)
+}
+
+type fakeStore struct{ objects map[string][]byte }
+
+func (f fakeStore) Fetch(_ context.Context, k string) ([]byte, error) {
+	b, ok := f.objects[k]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	return b, nil
+}
+'''
+bad = '''
+// re-implements the vendor SDK's surface inside a mock
+mockS3 := new(MockS3Client)
+mockS3.On("GetObject", mock.Anything, &s3.GetObjectInput{
+	Bucket: aws.String("assets"),
+	Key:    aws.String("logo.png"),
+}).Return(&s3.GetObjectOutput{Body: body}, nil)
+
+svc := Thumbnailer{s3: mockS3}
+// passes while real S3 pagination, retry, and error shapes
+// diverge — this verifies our guess about AWS, not AWS
+'''
+
+[examples.java]
+good = '''
+// owned boundary contract, substituted by a simple fake
+interface ExchangeRates {
+    Rate usdToEur();
+}
+
+final class FixedRates implements ExchangeRates {
+    public Rate usdToEur() { return new Rate("1.07"); }
+}
+
+@Test
+void convertsUsingCurrentRate() {
+    var converter = new Converter(new FixedRates());
+    assertEquals(euros("107"), converter.toEur(dollars("100")));
+}
+'''
+bad = '''
+// mocks the JDK http client's own interface — duplicates
+// someone else's contract, then trusts the duplicate
+@Test
+void fetchesRate() throws Exception {
+    var client = mock(HttpClient.class);
+    var response = mock(HttpResponse.class);
+    when(response.body()).thenReturn("{\"rate\":1.07}");
+    when(client.send(any(), any())).thenReturn(response);
+
+    assertEquals(1.07, new RateService(client).usdToEur());
+}
+// passes even when real calls fail: auth, encoding,
+// redirects, and the vendor's actual JSON all unexercised
+'''
+
+[examples.kotlin]
+good = '''
+interface Clock { fun now(): Instant }  // owned contract
+class FixedClock(private val at: Instant) : Clock {
+    override fun now() = at             // simple honest fake
+}
+
+@Test fun `trial expires after 14 days`() {
+    val service = TrialService(FixedClock(day15))
+    assertThat(service.isExpired(trialStartedOn(day1)))
+        .isTrue()
+}
+'''
+bad = '''
+@Test fun `trial expires after 14 days`() {
+    // intercepting a third-party client's internals —
+    // re-implements OkHttp instead of an owned boundary
+    mockkConstructor(OkHttpClient::class)
+    val call = mockk<Call>()
+    every { anyConstructed<OkHttpClient>().newCall(any()) }
+        .returns(call)
+    every { call.execute() } returns fakeTrialResponse()
+    // passes even when real OkHttp behavior diverges
+}
+'''
+
+[examples.python]
+good = '''
+class RateSource(Protocol):    # boundary contract we own
+    def rate(self, base: str, quote: str) -> Decimal: ...
+
+class FixedRates:              # simple fake of our contract
+    def __init__(self, rates: dict[tuple[str, str], Decimal]):
+        self._rates = rates
+    def rate(self, base: str, quote: str) -> Decimal:
+        return self._rates[(base, quote)]
+
+def test_converts_using_current_rate():
+    rates = FixedRates({("CAD", "USD"): Decimal("0.74")})
+    money = convert(Money(100, "CAD"), "USD", rates)
+    assert money == Money(74, "USD")
+'''
+bad = '''
+@patch("httpx.Client.send")        # third-party internals
+@patch("httpx.Response.json")
+def test_convert(mock_json, mock_send):
+    mock_send.return_value = Mock(status_code=200)
+    mock_json.return_value = {"rates": {"USD": 0.74}}
+    # re-implements httpx's call chain; stays green even
+    # if the real API shape or our request is wrong
+    money = convert(Money(100, "CAD"), "USD")
+    assert money == Money(74, "USD")
+'''
+
+[examples.ruby]
+good = '''
+# Clock is our owned boundary contract; the fake implements
+# it, not any library's internals
+class FrozenClock
+  def initialize(now:) = @now = now
+  attr_reader :now
+end
+
+it "expires tokens after one hour" do
+  t0 = Time.utc(2026, 1, 1)
+  token = Token.new(clock: FrozenClock.new(now: t0), issued: t0)
+  expect(token.expired?(at: t0 + 3601)).to be true
+end
+'''
+bad = '''
+it "expires tokens after one hour" do
+  # stubs a third party's internals — mirrors their private
+  # implementation; passes while real behavior diverges
+  allow(Net::HTTP).to receive(:start)
+    .and_return(double(body: '{"exp": 3600}'))
+  allow(Time).to receive(:now).and_return(t0) # global patch
+
+  expect(Token.fetch.expired?).to be false
+end
+'''
+
+[examples.rust]
+good = '''
+// the boundary contract is ours; a fake states behavior
+pub trait Mailer {
+    fn send(&self, to: &Email, body: &str) -> Result<(), Err>;
+}
+#[derive(Default)]
+struct FakeMailer { sent: RefCell<Vec<Email>> }
+impl Mailer for FakeMailer {
+    fn send(&self, to: &Email, _b: &str) -> Result<(), Err> {
+        self.sent.borrow_mut().push(to.clone());
+        Ok(())
+    }
+}
+#[test]
+fn welcome_mail_goes_to_the_new_user() { /* FakeMailer */ }
+'''
+bad = '''
+// mocks the SMTP library's internals — the test now
+// re-implements lettre's protocol and drifts from reality
+#[test]
+fn welcome_mail_sends() {
+    let mut t = MockSmtpTransport::new();
+    t.expect_connect().returning(|| Ok(Session::default()));
+    t.expect_ehlo().times(1).returning(|_| Ok(()));
+    t.expect_mail_from().returning(|_| Ok(()));
+    t.expect_data()
+        .withf(|b| b.starts_with(b"MIME-Version"))
+        .returning(|_| Ok(()));
+    signup(&mut t, "a@example.com").unwrap();
+}
+'''
+
+[examples.swift]
+good = '''
+// The app owns this narrow contract; tests substitute the
+// contract, never URLSession itself.
+protocol RateFetching {
+    func rate(for currency: Currency) async throws -> Decimal
+}
+
+struct FixedRates: RateFetching {
+    var rates: [Currency: Decimal]
+    func rate(for c: Currency) async throws -> Decimal {
+        rates[c] ?? .zero
+    }
+}
+'''
+bad = '''
+final class MockURLSession: URLSessionProtocol {
+    var stubbedData: Data?
+    var stubbedStatus = 200
+    // re-implements Apple's semantics — redirects, caching,
+    // cancellation — and quietly drifts from the real ones
+    func data(for request: URLRequest) async throws
+        -> (Data, URLResponse) {
+        (stubbedData ?? Data(), fakeResponse(stubbedStatus))
+    }
+}
+'''
+
+[examples.typescript]
+good = '''
+// Owned contract at the boundary...
+interface MailSender {
+  send(to: string, body: string): Promise<void>;
+}
+// ...substituted with a simple, readable fake.
+class FakeMailSender implements MailSender {
+  sent: Array<{ to: string; body: string }> = [];
+  async send(to: string, body: string): Promise<void> {
+    this.sent.push({ to, body });
+  }
+}
+it("mails a receipt after checkout", async () => {
+  const mail = new FakeMailSender();
+  await checkout(cart, mail);
+  expect(mail.sent[0]?.to).toBe("kim@example.com");
+});
+'''
+bad = '''
+// Mocking nodemailer's internals — someone else's
+// implementation detail, re-created inside our suite.
+vi.mock("nodemailer", () => ({
+  createTransport: vi.fn(() => ({
+    sendMail: vi.fn(async () => ({ accepted: ["kim"] })),
+  })),
+}));
+
+it("mails a receipt after checkout", async () => {
+  await checkout(cart);
+  const factory = nodemailer.createTransport as Mock;
+  const transport = factory.mock.results[0]!.value;
+  expect(transport.sendMail).toHaveBeenCalled();
+});
+'''

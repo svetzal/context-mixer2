@@ -250,7 +250,9 @@ def run_trial(
     )
 
     expected = json.loads((scenario / "expected.json").read_text(encoding="utf-8"))
-    report = adherence.score(workspace, expected["scored_intents"])
+    report = adherence.score(
+        workspace, expected["scored_intents"], expected.get("check_config", {})
+    )
 
     metrics = {
         "acceptance": acceptance_results,
@@ -280,25 +282,38 @@ def run_trial(
 def summarize(runs):
     by_arm = {}
     for metrics in runs:
-        bucket = by_arm.setdefault(metrics["arm"], {"trials": 0, "complete": 0, "followed": {}})
+        bucket = by_arm.setdefault(
+            metrics["arm"], {"trials": 0, "complete": 0, "followed": {}, "applicable": {}}
+        )
         bucket["trials"] += 1
         bucket["complete"] += int(metrics["task_complete"])
         for key, item in metrics["principles"].items():
-            bucket["followed"][key] = bucket["followed"].get(key, 0) + int(item["followed"])
+            counts = int(item.get("applicable", True))
+            bucket["applicable"][key] = bucket["applicable"].get(key, 0) + counts
+            bucket["followed"][key] = bucket["followed"].get(key, 0) + int(bool(item["followed"]))
 
     summary = {}
     for arm, bucket in by_arm.items():
         trials = bucket["trials"]
+        applicable_total = sum(bucket["applicable"].values())
         summary[arm] = {
             "trials": trials,
             "task_completion_rate": round(bucket["complete"] / trials, 4),
-            "adherence_rate": round(
-                sum(bucket["followed"].values()) / (trials * len(bucket["followed"])), 4
-            )
-            if bucket["followed"]
+            # Rates are per intent over the trials where that intent applied, so
+            # a conditional intent never leaves the denominator inflated.
+            "adherence_rate": round(sum(bucket["followed"].values()) / applicable_total, 4)
+            if applicable_total
             else 0,
             "followed_by_intent": {
-                key: round(count / trials, 4) for key, count in sorted(bucket["followed"].items())
+                key: round(count / bucket["applicable"][key], 4)
+                if bucket["applicable"][key]
+                else None
+                for key, count in sorted(bucket["followed"].items())
+            },
+            "not_applicable_trials": {
+                key: trials - applied
+                for key, applied in sorted(bucket["applicable"].items())
+                if applied < trials
             },
         }
 
@@ -313,8 +328,9 @@ def summarize(runs):
                 summary["guided"]["adherence_rate"] - summary["control"]["adherence_rate"], 4
             ),
             "by_intent": {
-                key: round(value - summary["control"]["followed_by_intent"].get(key, 0), 4)
+                key: round(value - (summary["control"]["followed_by_intent"].get(key) or 0), 4)
                 for key, value in summary["guided"]["followed_by_intent"].items()
+                if value is not None
             },
         }
     return summary
@@ -380,7 +396,8 @@ def main():
             print(
                 f"{arm} trial {trial}: "
                 f"acceptance {metrics['acceptance']['passed']}/{metrics['acceptance']['collected']}, "
-                f"adherence {metrics['adherence']['followed_count']}/{metrics['adherence']['scored_count']}",
+                f"adherence {metrics['adherence']['followed_count']}"
+                f"/{metrics['adherence']['applicable_count']} applicable",
                 file=sys.stderr,
             )
 

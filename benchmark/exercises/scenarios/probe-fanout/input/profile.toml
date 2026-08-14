@@ -1,0 +1,27 @@
+id = "python-craftsperson-async"
+name = "AGENTS"
+version = "0.1.0"
+description = "Python concurrency and resource-lifetime guidance for the probe-fanout behavioural exercise."
+surface = "agent"
+budget_tokens = 4000
+
+# Explicit keys. Eight named behaviours, disjoint from fx-settlement's set, so
+# the two exercises measure different guidance rather than the same guidance
+# twice.
+[select]
+keys = [
+  "craftsperson/python/deterministic-resource-cleanup",
+  "craftsperson/python/graceful-async-timeouts-and-cancellation",
+  "craftsperson/python/interface-checked-mocks",
+  "craftsperson/python/isolated-async-tests",
+  "craftsperson/python/no-shared-mutable-defaults",
+  "craftsperson/python/nonblocking-async-io",
+  "craftsperson/python/parametrized-behavior-cases",
+  "craftsperson/python/structured-concurrent-lifetimes",
+]
+
+[graph]
+follow = []
+
+[content]
+include = ["guidance", "rationale", "evidence"]

@@ -1,0 +1,18 @@
+id = "guidelines.intent.structure-concurrent-lifetimes"
+title = "Structure concurrent lifetimes"
+category = "reliability"
+tags = ["concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "related-to", target = "craftsperson/manage-resource-lifetimes-explicitly" },
+  { type = "related-to", target = "craftsperson/preserve-error-context" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "Concurrent work completes, fails, or cancels within an explicit owning lifetime."
+threat = "Detached tasks and processes outlive their callers, leak resources, hide failures, or continue after their results are irrelevant."
+expectation = "Applications will use language-specific tasks, actors, processes, threads, or async runtimes to overlap work."
+strategy = "Give concurrent work an owner, propagate cancellation and failure, and join or supervise it before the owning scope ends."
+evidence = [{ type = "concurrency_test", description = "Tests demonstrate completion, failure propagation, cancellation, and cleanup for owned concurrent work.", required = true }]
+tradeoff = "Structured lifetimes require coordination code and can reduce the convenience of fire-and-forget execution."
+scope = { project = "guidelines", paths = ["plugins"] }
+sources = [{ type = "synthesis", ref = "intents", summary = "Generalizes task, process, thread, actor, and async lifetime guidance across ecosystems.", confidence = 0.98 }]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.structured-concurrent-lifetimes"
+title = "Keep concurrent task lifetimes inside an explicit scope"
+category = "reliability"
+tags = ["python", "concurrency", "error-handling", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Concurrent operations complete or fail as an observable group without orphaning background tasks."
+threat = "Ad hoc task creation lets failures, unfinished work, and task ownership escape the calling scope."
+expectation = "I/O workflows will fan out into multiple concurrent operations with partial failures."
+strategy = "Use asyncio TaskGroup for structured concurrency and gather when aggregating concurrent operations is sufficient."
+evidence = [{ type = "test", description = "A failure in one child operation causes the concurrency scope to exit only after sibling tasks are completed or cancelled, with no pending-task warnings.", required = true }]
+tradeoff = "Structured groups can cancel useful sibling work and impose all-or-nothing lifetime boundaries."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#asyncawait-best-practices", summary = "The source recommends gather for concurrency and TaskGroup for structured concurrency on Python 3.11+.", confidence = 1.0 }]

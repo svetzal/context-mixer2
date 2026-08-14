@@ -1,0 +1,19 @@
+{
+  "copied_paths": [
+    "intents/craftsperson/python/deterministic-resource-cleanup.toml",
+    "intents/craftsperson/python/graceful-async-timeouts-and-cancellation.toml",
+    "intents/craftsperson/python/interface-checked-mocks.toml",
+    "intents/craftsperson/python/isolated-async-tests.toml",
+    "intents/craftsperson/python/no-shared-mutable-defaults.toml",
+    "intents/craftsperson/python/nonblocking-async-io.toml",
+    "intents/craftsperson/python/parametrized-behavior-cases.toml",
+    "intents/craftsperson/python/structured-concurrent-lifetimes.toml",
+    "intents/craftsperson/manage-resource-lifetimes-explicitly.toml",
+    "intents/craftsperson/mock-only-owned-boundaries.toml",
+    "intents/craftsperson/structure-concurrent-lifetimes.toml",
+    "intents/craftsperson/use-language-and-ecosystem-idioms.toml"
+  ],
+  "note": "Copied from the elixir-phoenix-craftsperson scenario's catalogue snapshot. The eight python records are the scored slice and are disjoint from fx-settlement's; the four universal records are their specialization parents.",
+  "source_scenario": "benchmark/scenarios/elixir-phoenix-craftsperson/input/knowledge-base",
+  "skeleton_origin": "written for this exercise; not derived from any existing project"
+}

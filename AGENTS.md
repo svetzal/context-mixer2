@@ -414,9 +414,16 @@ overlap say nothing about whether guidance changes work; these do.
 
 - `benchmark/exercises/run.sh` — wrapper over `runner.py`
 - `benchmark/exercises/runner.py` — takes agent parameters, a scenario skeleton, and a cmf-assembled AGENTS.md; runs both arms and reports per-intent lift
-- `benchmark/exercises/adherence.py` — per-intent verdicts by parsing the finished code; never asks a model, never reads the agent transcript
+- `benchmark/exercises/adherence.py` — workspace partitioning and orchestration; never asks a model, never reads the agent transcript
+- `benchmark/exercises/checks.py` — one check per intent, taking `(workspace, config)`
+- `benchmark/exercises/predicates.py` — the traversals checks share: symbol use, syntactic containment, construct shape, declared tool config
 - `benchmark/exercises/agents.toml` — argv, guidance file locations, and isolation flags per agent CLI
 - `benchmark/exercises/scenarios/<name>/` — `TASK.md`, neutral `input/skeleton/`, intent snapshot and profile, hidden `acceptance/`, and a `reference/` solution that proves the targets are jointly reachable
+
+Scenario-specific knowledge lives in `expected.json` under `check_config`, never
+in `checks.py`. A constant that would have to change per scenario — which
+literals mark the business rules, which symbols count as blocking — belongs to
+the exercise that knows it.
 
 Validate harness changes against both ends before trusting a run:
 `--implementation reference` must score full marks and `--skip-agent` must

@@ -16,6 +16,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A second behavioural exercise, and the check library that generalizing
+  produced.** `probe-fanout` scores eight concurrency, cancellation, and
+  resource-lifetime intents, disjoint from `fx-settlement`'s eight. Where the
+  first exercise asked mostly whether a name was present or a symbol absent,
+  these ask whether a call sits *inside* a construct and what shape an argument
+  has — so the checks moved into `checks.py` over a shared `predicates.py`
+  offering symbol use, syntactic containment, construct shape, and merged tool
+  configuration. Scenario-specific constants moved out of the scorer into each
+  scenario's `expected.json` under `check_config`; while the first scenario's
+  fee-tier regex sat in the shared code, the scorer was not shared.
+- **Adherence verdicts have three states.** Conditional intents — ones that bind
+  only code doing the thing they govern, such as mocking — report
+  `applicable: false` when their condition never arose, and leave the
+  denominator rather than failing. The first `probe-fanout` run found this the
+  hard way: an agent that tested against a live HTTP server and used no doubles
+  was scored as violating "mock only owned boundaries", which is not a true
+  statement about its work. Rates now read "of the intents this work had
+  occasion to exhibit", and `not_applicable` is reported alongside them.
 - **Behavioural exercises for assembled guidance.** `benchmark/exercises/`
   measures what an assembled artifact *does* rather than how large it is. The
   harness takes agent and model parameters, a scenario skeleton, and an

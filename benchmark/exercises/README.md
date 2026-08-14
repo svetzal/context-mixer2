@@ -55,6 +55,15 @@ the agent's transcript. What an agent said it would do is not evidence that it
 did. Each verdict ships with the signals behind it, so a `false` distinguishes
 "the guidance never arrived" from "it arrived and was partly applied".
 
+Verdicts have three states, not two. Some intents are conditional: "mock only
+owned boundaries" binds code that mocks something. An agent that tested
+everything against a live server has no doubles to spec, and scoring that as a
+violation says something false about its work. Conditional intents whose
+condition never arose report `applicable: false` and leave the denominator, so
+an adherence rate always reads "of the intents this work had occasion to
+exhibit". `not_applicable` is reported alongside every rate — a slice that is
+mostly inapplicable is telling you the profile is wrong for the task.
+
 `summary.json` reports both per arm, and the per-intent lift between them.
 
 ## Arms and confounds
@@ -73,6 +82,33 @@ And adherence checks recognize the shapes they were written to recognize; a
 defensible design they do not anticipate scores as a violation. Read the
 `signals` before believing a low score.
 
+## How the checks are built
+
+Three modules, split along the line between what generalizes and what does not.
+
+`predicates.py` holds the traversals. They are question forms, not answers:
+*is a symbol used at all* (`calls_to`, `references`, `imported_roots`), *is it
+used there* (`guarded_by_call`, `in_async_context`, `within`), *what shape does
+this construct have* (`defaults`, `keyword_map`, `decorator_names`,
+`class_shape`), and *what did the project declare* (`tool_config`, which finds
+a setting in `pyproject.toml`, `pytest.ini`, `setup.cfg`, or `tox.ini` without
+the caller caring which).
+
+`checks.py` holds one function per intent. Each takes `(workspace, config)` and
+returns a verdict, its signals, and evidence.
+
+`expected.json` holds `check_config` — the facts only one exercise knows. Which
+literals mark its business rules, which symbols count as blocking for its
+domain, which operations must be bounded. A constant that would have to change
+per scenario belongs there. When the first scenario's fee-tier regex was
+sitting in the shared scorer, the scorer was not shared; it was one scenario's
+scorer with a second scenario's checks bolted on.
+
+The split was not designed up front. It came out of writing the second
+scenario, where three questions the first had never asked — containment,
+syntactic context, and argument shape — would otherwise have grown three more
+bespoke walks.
+
 ## Scenario contract
 
 Each directory under `scenarios/` contains:
@@ -88,8 +124,14 @@ Each directory under `scenarios/` contains:
 - `reference/` — a solution satisfying every acceptance check and every scored
   intent. Its purpose is to prove the targets are simultaneously reachable; a
   benchmark nobody has ever passed is measuring its own bugs.
-- `expected.json` — the scored intent keys and the acceptance check count.
+- `expected.json` — the scored intent keys, the acceptance check count, and the
+  `check_config` block carrying anything scenario-specific the checks need.
 - `provenance.json` — where the intent snapshot came from.
+
+Two scenarios exist. `fx-settlement` scores eight intents about structure,
+naming, and typing; `probe-fanout` scores eight about concurrency, cancellation,
+and resource lifetime. The sets are disjoint on purpose — two exercises scoring
+the same intents would measure the harness twice and the guidance once.
 
 ## Adding a scenario
 

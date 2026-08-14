@@ -1,5 +1,10 @@
 {
   "acceptance_check_count": 10,
+  "check_config": {
+    "business_rule_minimum_matches": 2,
+    "business_rule_pattern": "0\\.025|0\\.015|0\\.008|\\b2\\.5\\b|\\b1\\.5\\b|\\b0\\.8\\b",
+    "package": "fxsettle"
+  },
   "knowledge_base_intent_count": 14,
   "scored_intents": [
     "craftsperson/python/colocated-module-specifications",

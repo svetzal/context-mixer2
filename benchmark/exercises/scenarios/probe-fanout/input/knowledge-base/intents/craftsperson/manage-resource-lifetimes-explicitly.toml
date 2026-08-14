@@ -1,0 +1,313 @@
+id = "guidelines.intent.manage-resource-lifetimes-explicitly"
+title = "Manage resource lifetimes explicitly"
+category = "reliability"
+tags = ["resource-management", "cleanup", "ownership"]
+status = "hypothesized"
+confidence = 0.97
+capability = "Files, connections, processes, tasks, subscriptions, and other resources are released deterministically on every exit path."
+threat = "Implicit or mismatched ownership leaks resources, outlives the work that needs them, or cleans them up from the wrong context."
+expectation = "Operations will fail, cancel, return early, and cross concurrency or lifecycle boundaries."
+strategy = "Give each resource one clear owner, bind cleanup to that owner's lifetime, and make transfer or cancellation semantics explicit."
+evidence = [{ type = "lifecycle_test", description = "Success, failure, cancellation, and early-return paths release owned resources exactly once from the correct context.", required = true }]
+tradeoff = "Explicit ownership and cleanup add structure and can constrain otherwise convenient sharing."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md", "plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#memory-management", summary = "Binds resource ownership and cleanup to explicit object lifetimes.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#error-prevention", summary = "Releases coroutine and test resources on cancellation and every exit path.", confidence = 1.0 }, { type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#core-language-patterns", summary = "Makes resource cleanup deterministic with explicit lifetime scopes.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defn load-orders [path]
+  (with-open [r (io/reader path)]
+    (->> (csv/read-csv r)
+         (map parse-order)
+         doall)))   ; realized before the reader closes
+
+; this fn owns the reader; every exit path — success, parse
+; throw, early return — releases it exactly once
+'''
+bad = '''
+(defn load-orders [path]
+  (let [r (io/reader path)]   ; nothing owns closing r
+    (map parse-order (csv/read-csv r))))
+
+; the lazy seq escapes the fn: either the handle leaks until
+; GC, or a caller realizes it after someone "fixes" this with
+; with-open and reads from a closed reader
+'''
+
+[examples.cpp]
+good = '''
+void exportReport(const QString& path) {
+  QFile file(path);                      // single clear owner
+  if (!file.open(QIODevice::WriteOnly))
+    throw ExportError(file.errorString());
+  QTextStream out(&file);
+  out << renderReport();
+  if (!needsSummary()) return;   // RAII closes the file here
+  out << renderSummary();
+}                                // ...and here, exactly once
+'''
+bad = '''
+void exportReport(const QString& path) {
+  FILE* f = std::fopen(path.toUtf8(), "w");
+  auto* buf = new char[1 << 20];
+  std::fputs(renderReport().toUtf8(), f);
+  if (!needsSummary()) return;   // leaks buf AND the handle
+  std::fputs(renderSummary().toUtf8(), f);
+  std::fclose(f);                // never runs on early return
+  delete[] buf;                  // ownership by convention only
+}
+'''
+
+[examples.csharp]
+good = '''
+public async Task Export(Stream target,
+    CancellationToken ct)
+{
+    // this method owns both; released on every path
+    await using var conn = await _db.OpenAsync(ct);
+    await using var writer = new StreamWriter(
+        target, leaveOpen: true);
+    await foreach (var row in conn.Rows(ct))
+        await writer.WriteLineAsync(row.ToCsv());
+}
+'''
+bad = '''
+public void Export(Stream target)
+{
+    var conn = _db.Open();       // never disposed
+    var writer = new StreamWriter(target);
+    _ = Task.Run(() =>           // orphaned task owns
+    {                            // nothing, outlives
+        foreach (var row in conn.Rows())
+            writer.WriteLine(row.ToCsv());
+    });                          // no cancellation,
+}                                // no flush, no owner
+'''
+
+[examples.elixir]
+good = '''
+def export(path, rows) do
+  # owner opens, owner closes — on every exit path,
+  # including a raise mid-stream
+  File.open(path, [:write], fn file ->
+    Enum.each(rows, &IO.write(file, [&1, "\n"]))
+  end)
+end
+
+# long-lived work is owned by the supervision tree, so
+# shutdown and cancellation release it deterministically
+Task.Supervisor.async_nolink(App.TaskSup, &sync_all/0)
+'''
+bad = '''
+def export(path, rows) do
+  {:ok, file} = File.open(path, [:write])
+  Enum.each(rows, &IO.write(file, [&1, "\n"]))
+  File.close(file)
+  # a raise inside the loop skips close: the fd leaks
+  # until the whole owning process dies
+end
+
+# fire-and-forget: nobody owns it, nothing can cancel it
+spawn(fn -> sync_all() end)
+'''
+
+[examples.go]
+good = '''
+func processUpload(ctx context.Context, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", path, err)
+	}
+	defer f.Close() // one owner; released on every exit path
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel() // worker lifetime bound to this call
+
+	return ingest(ctx, f)
+}
+'''
+bad = '''
+func processUpload(path string) error {
+	f, _ := os.Open(path)
+	data, err := parse(f)
+	if err != nil {
+		return err // early return leaks the file handle
+	}
+	go watch(f) // second owner: who closes it, and when?
+	f.Close()   // ...the watcher now reads from a closed file
+	return store(data)
+}
+'''
+
+[examples.java]
+good = '''
+List<String> readHeaders(Path file) throws IOException {
+    try (var reader = Files.newBufferedReader(file)) {
+        return reader.lines()
+            .limit(10)
+            .toList();
+    }
+    // released exactly once — on success, on exception,
+    // and on early return alike; owner and lifetime are
+    // the try block, visibly
+}
+'''
+bad = '''
+List<String> readHeaders(Path file) throws IOException {
+    var reader = Files.newBufferedReader(file);
+    var lines = reader.lines().limit(10).toList();
+    if (lines.isEmpty()) {
+        return List.of();   // reader leaks on this path
+    }
+    reader.close();         // and never runs on a throw
+    return lines;
+}
+'''
+
+[examples.kotlin]
+good = '''
+suspend fun copyReport(src: Path, dest: Path) =
+    withContext(Dispatchers.IO) {
+        src.inputStream().use { input ->
+            dest.outputStream().use { output ->
+                input.copyTo(output)
+            } // released on success, failure, and cancel
+        }
+    }
+'''
+bad = '''
+suspend fun copyReport(src: Path, dest: Path) {
+    val input = src.inputStream()
+    val output = dest.outputStream()
+    input.copyTo(output) // throws -> both streams leak
+    input.close()
+    output.close()
+}
+'''
+
+[examples.python]
+good = '''
+@contextmanager
+def export_session(path: Path) -> Iterator[Writer]:
+    conn = connect(DSN)      # one owner for both resources
+    try:
+        with path.open("w") as fh:
+            yield Writer(conn, fh)
+    finally:
+        conn.close()         # released on every exit path
+
+def export(path: Path) -> None:
+    with export_session(path) as writer:
+        writer.dump()
+'''
+bad = '''
+def export(path: Path) -> None:
+    conn = connect(DSN)
+    fh = open(path, "w")
+    Writer(conn, fh).dump()   # a raise above leaks both
+    fh.close()
+    # conn is never closed on any path; under load the
+    # pool drains and unrelated requests start timing out
+'''
+
+[examples.ruby]
+good = '''
+class ExportJob
+  def run(path:)
+    File.open(path, "w") do |file| # owner: this block
+      rows.each { |row| file.puts(row.to_csv) }
+    end # closed on success, raise, and early return alike
+  end
+
+  def rows = Order.recent.lazy.map(&:to_row)
+end
+'''
+bad = '''
+class ExportJob
+  def run(path:)
+    @file = File.open(path, "w") # no owner, no close anywhere
+    rows.each do |row|
+      @file.puts(row.to_csv) # a raise here leaks the handle
+    end
+    # handle survives until GC finalizes it, maybe at shutdown
+  end
+end
+'''
+
+[examples.rust]
+good = '''
+pub struct TempWorkspace { dir: PathBuf }
+impl TempWorkspace {
+    pub fn create() -> io::Result<Self> {
+        let dir = std::env::temp_dir().join(unique_name());
+        fs::create_dir(&dir)?;
+        Ok(Self { dir })
+    }
+}
+impl Drop for TempWorkspace {
+    // one owner; cleanup bound to its lifetime on every path
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.dir);
+    }
+}
+'''
+bad = '''
+pub fn build(job: &Job) -> io::Result<Artifact> {
+    let dir = std::env::temp_dir().join(unique_name());
+    fs::create_dir(&dir)?;
+    let artifact = compile(job, &dir)?; // early Err leaks dir
+    fs::remove_dir_all(&dir)?;          // happy path only
+    Ok(artifact)
+}
+'''
+
+[examples.swift]
+good = '''
+func exportLog(to url: URL) throws {
+    let handle = try FileHandle(forWritingTo: url)
+    defer { try? handle.close() }  // every exit path releases
+
+    for entry in entries {
+        try handle.write(contentsOf: entry.encoded())
+    }
+}
+'''
+bad = '''
+func exportLog(to url: URL) throws {
+    let handle = try FileHandle(forWritingTo: url)
+    for entry in entries {
+        // a throw here leaks the handle: close is unreachable
+        try handle.write(contentsOf: entry.encoded())
+    }
+    try handle.close()
+}
+'''
+
+[examples.typescript]
+good = '''
+export async function withConnection<T>(
+  work: (conn: Connection) => Promise<T>,
+): Promise<T> {
+  const conn = await pool.acquire();
+  try {
+    return await work(conn);
+  } finally {
+    await pool.release(conn); // every exit path releases once
+  }
+}
+'''
+bad = '''
+export async function loadReport(
+  id: string,
+): Promise<Report> {
+  const conn = await pool.acquire();
+  const rows = await conn.query(reportSql, [id]);
+  if (rows.length === 0) {
+    throw new NotFoundError(id); // conn leaks on this path
+  }
+  await pool.release(conn); // never runs if query throws
+  return toReport(rows);
+}
+'''

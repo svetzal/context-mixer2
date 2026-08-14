@@ -1,0 +1,39 @@
+{
+  "acceptance_check_count": 10,
+  "check_config": {
+    "blocking_symbols": [
+      "time.sleep",
+      "requests.get",
+      "requests.post",
+      "requests.put",
+      "requests.delete",
+      "requests.request",
+      "urllib.request.urlopen",
+      "socket.create_connection",
+      "subprocess.run",
+      "subprocess.check_output"
+    ],
+    "bounded_operations": [
+      "client.get",
+      "client.request",
+      "session.get",
+      "httpx.get"
+    ],
+    "package": "probefan",
+    "resource_symbols": [
+      "httpx.AsyncClient",
+      "aiohttp.ClientSession"
+    ]
+  },
+  "knowledge_base_intent_count": 12,
+  "scored_intents": [
+    "craftsperson/python/deterministic-resource-cleanup",
+    "craftsperson/python/graceful-async-timeouts-and-cancellation",
+    "craftsperson/python/interface-checked-mocks",
+    "craftsperson/python/isolated-async-tests",
+    "craftsperson/python/no-shared-mutable-defaults",
+    "craftsperson/python/nonblocking-async-io",
+    "craftsperson/python/parametrized-behavior-cases",
+    "craftsperson/python/structured-concurrent-lifetimes"
+  ]
+}

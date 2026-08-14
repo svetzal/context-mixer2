@@ -1,0 +1,17 @@
+id = "guidelines.intent.nonblocking-async-io"
+title = "Keep blocking work off the asynchronous event loop"
+category = "reliability"
+tags = ["python", "concurrency", "structured-concurrency", "cancellation"]
+relations = [
+  { type = "specializes", target = "craftsperson/structure-concurrent-lifetimes" },
+]
+status = "hypothesized"
+confidence = 1.0
+capability = "An asynchronous service remains responsive while multiple I/O operations are in flight."
+threat = "Blocking I/O inside coroutines stalls the event loop and serializes unrelated work."
+expectation = "The service will handle concurrent I/O-bound workloads and may need to integrate blocking libraries."
+strategy = "Use async functions for I/O-bound operations and move unavoidable blocking calls through an executor."
+evidence = [{ type = "test", description = "A concurrency test shows an unrelated coroutine continues to make progress while each I/O path waits, including paths backed by blocking libraries.", required = true }]
+tradeoff = "Executor boundaries add thread-management overhead and asynchronous APIs increase control-flow complexity."
+scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#asyncawait-best-practices", summary = "The source reserves async for I/O-bound work and forbids blocking I/O on the event loop without an executor.", confidence = 1.0 }]
