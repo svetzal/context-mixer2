@@ -51,6 +51,22 @@ done must hold. Do not ask for confirmation; complete the work."""
 
 PRINT_LOCK = threading.Lock()
 
+# Set when a provider says we are out of budget. Every remaining trial would
+# fail in about a second and bank nothing, so the run stops instead of burning
+# through the plan producing empty workspaces.
+EXHAUSTED = threading.Event()
+
+RATE_LIMITED = re.compile(
+    r"session limit|rate.?limit|usage limit|quota|429|too many requests", re.IGNORECASE
+)
+
+
+def looks_rate_limited(agent_run, stdout):
+    if (agent_run.get("telemetry") or {}).get("parsed"):
+        return False
+    haystack = f"{stdout[:4000]} {agent_run.get('stderr', '')[:2000]}"
+    return bool(RATE_LIMITED.search(haystack))
+
 
 def load_agents():
     return tomllib.loads((HERE / "agents.toml").read_text(encoding="utf-8"))["agents"]
@@ -420,6 +436,9 @@ def run_trial(job):
     }
     environment = os.environ | home_env | declared
 
+    if EXHAUSTED.is_set():
+        raise RuntimeError("provider budget exhausted earlier in this run; trial not attempted")
+
     if job["kind"] == "calibration":
         agent_run = {"skipped": True}
     else:
@@ -430,6 +449,9 @@ def run_trial(job):
         agent_run = run(command, cwd=workspace, env=environment, timeout=job["timeout"])
         stdout = agent_run.pop("stdout")
         agent_run["telemetry"] = parse_telemetry(agent, command, stdout)
+        if looks_rate_limited(agent_run, stdout):
+            EXHAUSTED.set()
+            announce("provider reports the budget is exhausted — stopping the run")
         (run_directory / "agent-stdout.txt").write_text(stdout, encoding="utf-8")
         (run_directory / "agent-stderr.txt").write_text(agent_run.pop("stderr"), encoding="utf-8")
 
@@ -474,9 +496,16 @@ def run_trial(job):
         staged.mkdir(exist_ok=True)
         for path in sorted((scenario / "acceptance").glob("*.rs")):
             shutil.copy2(path, staged / path.name)
+        # The suite varies the rate card's contents rather than the environment,
+        # so the path is supplied from out here. A crate that forbids unsafe —
+        # which the lint-policy intent encourages — cannot then be broken by the
+        # harness needing `set_var`.
+        card = run_directory / "rate-card.tsv"
+        card.write_text("", encoding="utf-8")
         acceptance = run(
             ["cargo", "test", "--quiet", "--test", "acceptance", "--", "--test-threads=1"],
             cwd=workspace,
+            env=os.environ | {"RATECARD_PATH": str(card)},
             timeout=1800,
         )
         acceptance_results = parse_cargo_test(acceptance["stdout"] + acceptance["stderr"]) | {
@@ -548,7 +577,7 @@ def run_trial(job):
     # on disk before anything deletes any part of it. Calibration runs are
     # excluded: they cost no agent invocation and regenerate for free, so
     # banking them would only add noise to a store meant for the irreplaceable.
-    if job["kind"] == "agent":
+    if job["kind"] == "agent" and metrics["valid"]:
         archive_trial(job, run_directory)
     if not job["keep_workspace"]:
         prune_workspace(workspace)
@@ -643,11 +672,18 @@ def completed_trials(*bases):
         if not base or not base.is_dir():
             continue
         for path in base.glob("trial-*"):
-            if (path / "metrics.json").is_file():
-                try:
-                    finished.add(int(path.name.split("-")[1]))
-                except (IndexError, ValueError):
+            record = path / "metrics.json"
+            if not record.is_file():
+                continue
+            # A trial whose invocation failed holds no measurement and must not
+            # hold its slot either, or a rate-limited sweep can never be resumed
+            # — it would see 10 files and conclude there was nothing to do.
+            try:
+                if json.loads(record.read_text(encoding="utf-8")).get("valid") is False:
                     continue
+                finished.add(int(path.name.split("-")[1]))
+            except (IndexError, ValueError, json.JSONDecodeError, OSError):
+                continue
     return finished
 
 
@@ -809,6 +845,12 @@ def main():
                 f"/{metrics['adherence']['applicable_count']} applicable"
             )
 
+    if EXHAUSTED.is_set():
+        announce(
+            "\nSTOPPED EARLY: the provider reported its budget exhausted. Completed trials "
+            "are archived; re-run the same command after the limit resets and it will "
+            "continue from where it stopped."
+        )
     announce(
         f"\n{len(completed)}/{len(jobs)} trial(s) completed. "
         f"Aggregate with: python3 aggregate.py --scenario {arguments.scenario}"

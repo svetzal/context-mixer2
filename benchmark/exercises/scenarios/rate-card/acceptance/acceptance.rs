@@ -4,21 +4,25 @@
 //! integration test has to live inside the crate to run at all and would
 //! otherwise count as the agent's own test layer.
 //!
-//! Uses nothing but `std`, so it cannot be broken by whatever the agent did or
-//! did not put in `[dev-dependencies]`. The runner passes `--test-threads=1`
-//! because `RATECARD_PATH` is process-global state.
-
-// The crate under test may deny `unsafe_code`, and `set_var` is unsafe from
-// edition 2024 on. An in-source allow overrides a command-line `-D`, so the
-// hidden suite stays runnable whatever lint policy the agent adopted.
-#![allow(unsafe_code, unused_unsafe)]
+//! Uses nothing but `std`, and contains no `unsafe`. Both matter: the crate
+//! under test may put anything in `[dev-dependencies]`, and a crate following
+//! `centralize-curated-lint-policy` may `forbid(unsafe_code)` — which no
+//! in-source `allow` can override. An earlier version called `set_var` inside an
+//! `unsafe` block and failed to compile in exactly the arm that followed the
+//! guidance, turning a harness bug into an apparent finding that guidance breaks
+//! the software.
+//!
+//! So the environment is never mutated here. The runner points `RATECARD_PATH`
+//! at a scratch file before invoking cargo, and these checks vary the file's
+//! *contents*. `--test-threads=1` keeps that sound.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ratecard::{quote, Parcel, QuoteError};
 
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
+fn card_path() -> PathBuf {
+    PathBuf::from(std::env::var("RATECARD_PATH").expect("the runner sets RATECARD_PATH"))
+}
 
 const CARD: &str = "# zone\tband_max_grams\tcents\n\
 domestic\t500\t599\n\
@@ -27,23 +31,16 @@ domestic\t20000\t1799\n\
 international\t500\t1499\n\
 international\t20000\t4999\n";
 
-// `set_var` is safe in edition 2021 and unsafe in 2024. The `unsafe` block
-// compiles under both; the allow keeps the 2021 warning from tripping a crate
-// that denies warnings.
 fn install(contents: &str) -> PathBuf {
-    let mut path = std::env::temp_dir();
-    path.push(format!(
-        "ratecard-acceptance-{}-{}.tsv",
-        std::process::id(),
-        COUNTER.fetch_add(1, Ordering::SeqCst)
-    ));
+    let path = card_path();
     std::fs::write(&path, contents).expect("write the rate card");
-    unsafe { std::env::set_var("RATECARD_PATH", &path) };
     path
 }
 
+/// Remove the card so the path names nothing, which the contract treats the
+/// same as an unset variable: `RateCardUnavailable`.
 fn clear_rate_card() {
-    unsafe { std::env::remove_var("RATECARD_PATH") };
+    let _ = std::fs::remove_file(card_path());
 }
 
 /// Take the error without requiring `Quote` to implement `Debug`.

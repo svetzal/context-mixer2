@@ -1,0 +1,402 @@
+{
+  "acceptance": {
+    "collected": 10,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 10,
+    "skipped": 0
+  },
+  "adherence": {
+    "applicable_count": 8,
+    "followed": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/prefer-fakes-at-boundaries",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ],
+    "followed_count": 8,
+    "not_applicable": [],
+    "rate": 1.0,
+    "scored_count": 8,
+    "violated": []
+  },
+  "agent": {
+    "description": "Claude Code, Opus 5",
+    "name": "claude-opus-5"
+  },
+  "agent_run": {
+    "command": [
+      "claude",
+      "--print",
+      "--output-format",
+      "json",
+      "--model",
+      "claude-opus-5",
+      "--permission-mode",
+      "bypassPermissions",
+      "--setting-sources",
+      "project",
+      "--no-session-persistence",
+      "--disable-slash-commands",
+      "Read TASK.md in this directory and implement it.\n\nWork directly in this project. When you are finished the task's definition of\ndone must hold. Do not ask for confirmation; complete the work."
+    ],
+    "exit_code": 0,
+    "seconds": 392.08,
+    "telemetry": {
+      "cache_read_tokens": 1095863,
+      "cost_usd": 1.9485465000000002,
+      "duration_ms": 391774,
+      "input_tokens": 50,
+      "models": {
+        "claude-opus-5": {
+          "cost_usd": 1.9485465000000002,
+          "input_tokens": 50,
+          "output_tokens": 31327
+        }
+      },
+      "output_tokens": 31327,
+      "parsed": true,
+      "primary_model": "claude-opus-5",
+      "requested_model": "claude-opus-5",
+      "served_requested": true,
+      "stop_reason": "end_turn",
+      "turns": 28
+    },
+    "timed_out": false
+  },
+  "arm": "guided",
+  "documentation_build": {
+    "exit_code": 0
+  },
+  "environment_sync": {
+    "exit_code": 0
+  },
+  "guidance": {
+    "approximate_tokens": 1336,
+    "bytes": 5341,
+    "files": [
+      "AGENTS.md",
+      "CLAUDE.md"
+    ],
+    "present": true,
+    "selected_intents": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/prefer-fakes-at-boundaries",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ]
+  },
+  "implementation": null,
+  "isolation": [
+    "--setting-sources project excludes user and local settings files",
+    "--disable-slash-commands excludes installed skills",
+    "ambient user configuration was NOT isolated; it is constant across arms and can only understate guided-arm lift"
+  ],
+  "kind": "agent",
+  "language": "rust",
+  "own_tests": {
+    "collected": 47,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 47,
+    "skipped": 0
+  },
+  "principles": {
+    "craftsperson/rust/centralize-curated-lint-policy": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "cargo_lint_tables": [
+          "clippy",
+          "rust"
+        ],
+        "cargo_lints": {
+          "clippy": [
+            "all",
+            "expect_used",
+            "indexing_slicing",
+            "panic",
+            "pedantic",
+            "unwrap_used"
+          ],
+          "rust": [
+            "missing_docs",
+            "unsafe_code"
+          ]
+        },
+        "crate_level_lint_attributes": [
+          "allow (unsafe_code , unused_unsafe)",
+          "allow (clippy :: unwrap_used , clippy :: expect_used , clippy :: panic , clippy :: indexing_slicing)",
+          "allow (clippy :: unwrap_used , clippy :: expect_used , clippy :: panic , clippy :: indexing_slicing)"
+        ]
+      }
+    },
+    "craftsperson/rust/compile-public-documentation": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "crate_documented_files": [
+          "src/card.rs",
+          "src/error.rs",
+          "src/lib.rs",
+          "src/parcel.rs",
+          "src/pricing.rs",
+          "src/source.rs",
+          "src/zones.rs"
+        ],
+        "inherited_from_skeleton": [
+          "src/lib.rs::zones",
+          "src/zones.rs::zone_label"
+        ],
+        "public_items": [
+          "src/card.rs::Band",
+          "src/card.rs::RateCard",
+          "src/card.rs::parse",
+          "src/card.rs::zone_count",
+          "src/card.rs::band_for",
+          "src/error.rs::QuoteError",
+          "src/lib.rs::quote",
+          "src/lib.rs::quote_with",
+          "src/parcel.rs::Parcel",
+          "src/parcel.rs::new",
+          "src/parcel.rs::Quote",
+          "src/source.rs::RateCardSource",
+          "src/source.rs::FileRateCardSource",
+          "src/source.rs::new",
+          "src/source.rs::path",
+          "src/source.rs::EnvRateCardSource",
+          "src/source.rs::new",
+          "src/source.rs::StaticRateCardSource",
+          "src/source.rs::new",
+          "src/source.rs::UnavailableRateCardSource"
+        ],
+        "undocumented_public_items": []
+      }
+    },
+    "craftsperson/rust/isolate-functional-core-from-effects": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "effectful_modules": [
+          "src/source.rs"
+        ],
+        "modules_mixing_rules_and_io": [],
+        "pure_modules": [
+          "src/card.rs",
+          "src/error.rs",
+          "src/lib.rs",
+          "src/parcel.rs",
+          "src/pricing.rs",
+          "src/zones.rs"
+        ],
+        "rule_bearing_modules": [
+          "src/pricing.rs"
+        ]
+      }
+    },
+    "craftsperson/rust/prefer-fakes-at-boundaries": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "owned_traits": [
+          "RateCardSource"
+        ],
+        "test_fakes": [
+          {
+            "in_test_scope": false,
+            "trait": "RateCardSource",
+            "type": "StaticRateCardSource",
+            "where": "src/source.rs:107"
+          }
+        ]
+      }
+    },
+    "craftsperson/rust/put-gateways-at-effect-boundaries": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "declared_traits": {
+          "RateCardSource": "src/source.rs"
+        },
+        "effect_free_consumers": {
+          "RateCardSource": [
+            "src/lib.rs"
+          ]
+        },
+        "effectful_modules": [
+          "src/source.rs"
+        ],
+        "trait_implementations": [
+          {
+            "at_effect_boundary": true,
+            "trait": "RateCardSource",
+            "type": "FileRateCardSource",
+            "where": "src/source.rs:44"
+          },
+          {
+            "at_effect_boundary": true,
+            "trait": "RateCardSource",
+            "type": "EnvRateCardSource",
+            "where": "src/source.rs:70"
+          },
+          {
+            "at_effect_boundary": true,
+            "trait": "RateCardSource",
+            "type": "StaticRateCardSource",
+            "where": "src/source.rs:107"
+          },
+          {
+            "at_effect_boundary": true,
+            "trait": "RateCardSource",
+            "type": "UnavailableRateCardSource",
+            "where": "src/source.rs:117"
+          }
+        ]
+      }
+    },
+    "craftsperson/rust/use-purpose-specific-test-layers": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "documented_examples": [
+          "src/card.rs::parse",
+          "src/parcel.rs::new",
+          "src/source.rs::StaticRateCardSource",
+          "src/zones.rs::zone_label"
+        ],
+        "inline_unit_modules": [
+          "src/card.rs",
+          "src/error.rs",
+          "src/lib.rs",
+          "src/pricing.rs",
+          "src/source.rs"
+        ],
+        "integration_test_files": [
+          "tests/acceptance.rs",
+          "tests/env_wiring.rs",
+          "tests/observability.rs"
+        ]
+      }
+    },
+    "craftsperson/rust/use-results-for-recoverable-library-errors": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "panicking_macros_in_production": [],
+        "public_fallible_functions": [
+          "src/card.rs::parse",
+          "src/card.rs::band_for",
+          "src/lib.rs::quote",
+          "src/lib.rs::quote_with",
+          "src/pricing.rs::price"
+        ],
+        "unwrap_or_expect_in_production": []
+      }
+    },
+    "craftsperson/rust/use-structured-tracing": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "instrumented_functions": [],
+        "print_macros": [],
+        "structured_emissions": [
+          {
+            "arguments": "\"quote\" , zone = % parcel . zone , weight_grams = parcel . weight_grams , total_cents = tracing :: field :: Empty , outcome = tracing :: field :: Empty ,",
+            "macro": "info_span",
+            "where": "src/lib.rs:76"
+          },
+          {
+            "arguments": "zone = % parcel . zone , weight_grams = parcel . weight_grams , total_cents = priced . total_cents , base_cents = priced . base_cents , surcharge_cents = priced . surcharge_cents , band_max_grams = priced . band_max_grams , \"parcel priced\"",
+            "macro": "info",
+            "where": "src/lib.rs:94"
+          },
+          {
+            "arguments": "zone = % parcel . zone , weight_grams = parcel . weight_grams , error = % error , \"parcel not priced\"",
+            "macro": "warn",
+            "where": "src/lib.rs:106"
+          },
+          {
+            "arguments": "path = % self . path . display () , reason = % error , \"rate card could not be read\"",
+            "macro": "warn",
+            "where": "src/source.rs:47"
+          },
+          {
+            "arguments": "variable = RATECARD_PATH_VAR , \"rate card path is unset or not readable as text\"",
+            "macro": "warn",
+            "where": "src/source.rs:73"
+          }
+        ],
+        "tracing_declared": true,
+        "tracing_emissions": [
+          {
+            "arguments": "\"quote\" , zone = % parcel . zone , weight_grams = parcel . weight_grams , total_cents = tracing :: field :: Empty , outcome = tracing :: field :: Empty ,",
+            "macro": "info_span",
+            "where": "src/lib.rs:76"
+          },
+          {
+            "arguments": "zone = % parcel . zone , weight_grams = parcel . weight_grams , total_cents = priced . total_cents , base_cents = priced . base_cents , surcharge_cents = priced . surcharge_cents , band_max_grams = priced . band_max_grams , \"parcel priced\"",
+            "macro": "info",
+            "where": "src/lib.rs:94"
+          },
+          {
+            "arguments": "zone = % parcel . zone , weight_grams = parcel . weight_grams , error = % error , \"parcel not priced\"",
+            "macro": "warn",
+            "where": "src/lib.rs:106"
+          },
+          {
+            "arguments": "path = % self . path . display () , reason = % error , \"rate card could not be read\"",
+            "macro": "warn",
+            "where": "src/source.rs:47"
+          },
+          {
+            "arguments": "variable = RATECARD_PATH_VAR , \"rate card path is unset or not readable as text\"",
+            "macro": "warn",
+            "where": "src/source.rs:73"
+          }
+        ]
+      }
+    }
+  },
+  "rescored": true,
+  "scenario": "rate-card",
+  "task_complete": true,
+  "trial": 4,
+  "valid": true,
+  "workspace": {
+    "parse_errors": [],
+    "production_modules": [
+      "src/card.rs",
+      "src/error.rs",
+      "src/lib.rs",
+      "src/parcel.rs",
+      "src/pricing.rs",
+      "src/source.rs",
+      "src/zones.rs"
+    ],
+    "test_modules": [
+      "tests/acceptance.rs",
+      "tests/env_wiring.rs",
+      "tests/observability.rs"
+    ]
+  }
+}
