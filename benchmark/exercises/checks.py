@@ -1285,7 +1285,10 @@ def check_rust_public_docs(workspace, config):
         for item in module.production_items():
             if item["kind"] not in DOCUMENTED_KINDS:
                 continue
-            if not item["visibility"].startswith("pub"):
+            # Externally visible only. `missing_docs` does not fire on
+            # `pub(crate)` and rustdoc does not emit it, so demanding a doc
+            # comment there is stricter than the gate the intent names.
+            if item["visibility"] != "pub":
                 continue
             label = f"{module.relative}::{item['name']}"
             if label in inherited:

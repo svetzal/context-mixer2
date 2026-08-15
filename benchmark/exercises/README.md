@@ -79,9 +79,11 @@ agent's configuration home at an empty scratch directory.
 Three honest limitations. Model output is stochastic, so a single trial per arm
 is an anecdote — run enough trials that the per-intent rates mean something.
 Adherence checks recognize the shapes they were written to recognize; a
-defensible design they do not anticipate scores as a violation, and every
-scenario so far has had at least one such check corrected by its first real run.
-Read the `signals` before believing a low score.
+defensible design they do not anticipate scores as a violation. Every scenario
+so far has had checks corrected by its first real run — six corrections across
+three scenarios, and every one of them went the same way: the check was stricter
+than the intent and the agent was right. Treat a violation as a claim to verify
+against the `signals`, not as a finding.
 
 And do not re-score a finished workspace by hand without accounting for staging.
 The Rust hidden suite is copied into `workspace/tests/` after adherence has run;

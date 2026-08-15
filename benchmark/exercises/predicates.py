@@ -589,5 +589,5 @@ def baseline_public_items(config):
         f"{module.relative}::{item['name']}"
         for module in modules
         for item in module.items
-        if item["visibility"].startswith("pub")
+        if item["visibility"] == "pub"
     }

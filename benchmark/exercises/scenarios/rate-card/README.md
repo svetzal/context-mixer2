@@ -51,10 +51,11 @@ the intents':
   than a string argument to `patch`.
 
 One check has no Python analogue at all. `put-gateways-at-effect-boundaries`
-asks where a trait is *declared* relative to where it is *implemented*: the
-contract belongs with the core and the concrete gateway belongs at the edge. A
-trait declared in the same module that performs the I/O has not moved the
-boundary anywhere, and the check says so.
+relates three things: a trait declared in production, a concrete type
+implementing it, and a module that performs no I/O yet names the trait. That
+third condition is the intent — the core depends on the contract rather than on
+a vendor client — and it is a relationship between definitions, which Python's
+patch-a-name idiom never made anyone express.
 
 ## What the first calibration run corrected
 
@@ -73,6 +74,27 @@ not a hidden suite — the Python scenarios pin `pytest.ini` for exactly this
 reason and the Rust one had no equivalent. It now carries
 `#![allow(unsafe_code, unused_unsafe)]`, which an in-source attribute can assert
 over a command-line `-D`.
+
+## What the first agent run corrected
+
+Three more, and all three read a defensible design as a violation.
+
+The gateway check tested which *file* declared the trait, on the theory that the
+contract belongs with the core and the concrete type at the edge. The intent
+asks only that the core depend on the contract; a trait beside its
+implementation is ordinary Rust. It now asks whether any effect-free module
+names the trait.
+
+The fakes check required a fake to sit in test scope, which failed a crate that
+ships an in-memory implementation as a testing affordance — a normal and good
+thing to do. A fake is now recognized by what it is.
+
+The documentation check scored every item whose visibility began with `pub`,
+which includes `pub(crate)`. `missing_docs` does not fire on crate-private items
+and rustdoc does not emit them, so the check was demanding more than the gate the
+intent names. Verified against a scratch crate with `missing_docs = "deny"`:
+undocumented `pub(crate)` items build and document cleanly. Scoring
+externally-visible items only took the guided arm from 7/8 to 8/8.
 
 ## Known gaps
 
