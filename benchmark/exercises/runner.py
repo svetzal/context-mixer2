@@ -535,8 +535,11 @@ def run_trial(job):
     )
 
     # Archive first, prune second. A trial that cannot be recreated must be safe
-    # on disk before anything deletes any part of it.
-    archive_trial(job, run_directory)
+    # on disk before anything deletes any part of it. Calibration runs are
+    # excluded: they cost no agent invocation and regenerate for free, so
+    # banking them would only add noise to a store meant for the irreplaceable.
+    if job["kind"] == "agent":
+        archive_trial(job, run_directory)
     if not job["keep_workspace"]:
         prune_workspace(workspace)
 
