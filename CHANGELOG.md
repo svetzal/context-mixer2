@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A Rust behavioural exercise, and a fact extractor to make it possible.**
+  `rate-card` prices parcels against a rate card read from the filesystem, and
+  scores eight Rust intents disjoint from both Python exercises. Python's `ast`
+  does not reach Rust, so `benchmark/exercises/rustfacts/` — a standalone `syn`
+  binary, excluded from the cmx workspace — emits the same facts as JSON. The
+  four question forms survived the language change intact, as did the check
+  signature, the three-state verdict, the `check_config` split, and the
+  calibration discipline. The traversals did not survive at all, and three
+  assumptions turned out to be Python's rather than the intents': test scope is
+  an attribute in Rust rather than a directory, so the production/test partition
+  is per item; panicking is a macro rather than a call; and substituting a
+  collaborator is implementing a trait rather than patching a name.
 - **A second behavioural exercise, and the check library that generalizing
   produced.** `probe-fanout` scores eight concurrency, cancellation, and
   resource-lifetime intents, disjoint from `fx-settlement`'s eight. Where the

@@ -18,6 +18,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -101,6 +102,45 @@ def assemble_guidance(scenario, destination):
     return outcome["stdout"], outcome["stderr"]
 
 
+RUSTFACTS = HERE / "rustfacts"
+
+
+def build_rustfacts():
+    """Build the syn-based fact extractor the Rust checks read from."""
+    binary = RUSTFACTS / "target" / "release" / "rustfacts"
+    outcome = run(
+        ["cargo", "build", "--release", "--quiet", "--manifest-path", str(RUSTFACTS / "Cargo.toml")],
+        cwd=RUSTFACTS,
+        timeout=900,
+    )
+    if outcome["exit_code"] != 0:
+        raise SystemExit(f"could not build rustfacts:\n{outcome['stderr']}")
+    return binary
+
+
+def parse_cargo_test(output):
+    """Read libtest's summary lines, which are the only machine-stable output.
+
+    `cargo test` has no JUnit writer on stable, and one invocation prints one
+    summary per test binary, so the counts are summed rather than taken from the
+    last line.
+    """
+    totals = {"collected": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0, "failures": []}
+    for match in re.finditer(
+        r"test result: \w+\. (\d+) passed; (\d+) failed; (\d+) ignored", output
+    ):
+        passed, failed, ignored = (int(group) for group in match.groups())
+        totals["passed"] += passed
+        totals["failed"] += failed
+        totals["skipped"] += ignored
+        totals["collected"] += passed + failed + ignored
+    totals["failures"] = [
+        {"name": name.strip(), "kind": "failure"}
+        for name in re.findall(r"^\s{4}(\S+)$", output, re.MULTILINE)
+    ]
+    return totals
+
+
 def selected_from_explain(explanation):
     keys = []
     capturing = False
@@ -179,6 +219,7 @@ def run_trial(
     skip_agent,
     implementation,
     isolate_home,
+    rustfacts,
 ):
     run_directory = out_root / agent_name / arm / f"trial-{trial:02d}"
     if run_directory.exists():
@@ -217,41 +258,78 @@ def run_trial(
         (run_directory / "agent-stdout.txt").write_text(agent_run.pop("stdout"), encoding="utf-8")
         (run_directory / "agent-stderr.txt").write_text(agent_run.pop("stderr"), encoding="utf-8")
 
-    sync = run(["uv", "sync", "--quiet"], cwd=workspace, timeout=600)
+    expected = json.loads((scenario / "expected.json").read_text(encoding="utf-8"))
+    language = expected.get("language", "python")
 
-    own_junit = run_directory / "own-tests.xml"
-    own = run(
-        ["uv", "run", "--project", str(workspace), "pytest", "-q", f"--junit-xml={own_junit}"],
-        cwd=workspace,
-        timeout=600,
-    )
-    own_results = parse_junit(own_junit) | {"exit_code": own["exit_code"]}
+    extra = {}
+    if language == "rust":
+        sync = run(["cargo", "fetch", "--quiet"], cwd=workspace, timeout=900)
+        own = run(["cargo", "test", "--quiet"], cwd=workspace, timeout=900)
+        own_results = parse_cargo_test(own["stdout"] + own["stderr"]) | {
+            "exit_code": own["exit_code"]
+        }
+        documentation = run(["cargo", "doc", "--no-deps", "--quiet"], cwd=workspace, timeout=900)
+        extra["documentation_build"] = {"exit_code": documentation["exit_code"]}
+    else:
+        sync = run(["uv", "sync", "--quiet"], cwd=workspace, timeout=600)
+        own_junit = run_directory / "own-tests.xml"
+        own = run(
+            ["uv", "run", "--project", str(workspace), "pytest", "-q", f"--junit-xml={own_junit}"],
+            cwd=workspace,
+            timeout=600,
+        )
+        own_results = parse_junit(own_junit) | {"exit_code": own["exit_code"]}
 
-    acceptance_directory = run_directory / "acceptance"
-    shutil.copytree(scenario / "acceptance", acceptance_directory)
-    acceptance_junit = run_directory / "acceptance.xml"
-    acceptance = run(
-        [
-            "uv",
-            "run",
-            "--project",
-            str(workspace),
-            "pytest",
-            str(acceptance_directory),
-            "-q",
-            f"--junit-xml={acceptance_junit}",
-        ],
-        cwd=acceptance_directory,
-        timeout=600,
+    # Adherence is scored before acceptance is staged. A Rust integration test
+    # has to live inside the crate to run at all, so copying the hidden suite in
+    # first would let it count as the agent's own test layer.
+    check_config = dict(expected.get("check_config", {}))
+    check_config["baseline_root"] = str(scenario / "input" / "skeleton")
+    if rustfacts:
+        check_config["rustfacts_binary"] = str(rustfacts)
+    report = adherence.score(
+        workspace,
+        expected["scored_intents"],
+        check_config,
+        language=language,
+        rustfacts=rustfacts,
     )
-    acceptance_results = parse_junit(acceptance_junit) | {"exit_code": acceptance["exit_code"]}
+
+    if language == "rust":
+        staged = workspace / "tests"
+        staged.mkdir(exist_ok=True)
+        for source in sorted((scenario / "acceptance").glob("*.rs")):
+            shutil.copy2(source, staged / source.name)
+        acceptance = run(
+            ["cargo", "test", "--quiet", "--test", "acceptance", "--", "--test-threads=1"],
+            cwd=workspace,
+            timeout=900,
+        )
+        acceptance_results = parse_cargo_test(acceptance["stdout"] + acceptance["stderr"]) | {
+            "exit_code": acceptance["exit_code"]
+        }
+    else:
+        acceptance_directory = run_directory / "acceptance"
+        shutil.copytree(scenario / "acceptance", acceptance_directory)
+        acceptance_junit = run_directory / "acceptance.xml"
+        acceptance = run(
+            [
+                "uv",
+                "run",
+                "--project",
+                str(workspace),
+                "pytest",
+                str(acceptance_directory),
+                "-q",
+                f"--junit-xml={acceptance_junit}",
+            ],
+            cwd=acceptance_directory,
+            timeout=600,
+        )
+        acceptance_results = parse_junit(acceptance_junit) | {"exit_code": acceptance["exit_code"]}
+
     (run_directory / "acceptance-output.txt").write_text(
         acceptance["stdout"] + acceptance["stderr"], encoding="utf-8"
-    )
-
-    expected = json.loads((scenario / "expected.json").read_text(encoding="utf-8"))
-    report = adherence.score(
-        workspace, expected["scored_intents"], expected.get("check_config", {})
     )
 
     metrics = {
@@ -261,6 +339,7 @@ def run_trial(
         "agent_run": agent_run,
         "arm": arm,
         "environment_sync": {"exit_code": sync["exit_code"]},
+        "language": language,
         "guidance": guidance,
         "implementation": implementation,
         "isolation": isolation,
@@ -272,6 +351,7 @@ def run_trial(
         and acceptance_results["collected"] == expected["acceptance_check_count"],
         "trial": trial,
         "workspace": report["workspace"],
+        **extra,
     }
     (run_directory / "metrics.json").write_text(
         json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -374,6 +454,9 @@ def main():
         raise SystemExit(f"unknown agent: {arguments.agent}. known: {', '.join(sorted(agents))}")
     agent = agents[arguments.agent]
 
+    expected = json.loads((scenario / "expected.json").read_text(encoding="utf-8"))
+    rustfacts = build_rustfacts() if expected.get("language") == "rust" else None
+
     arms = ["control", "guided"] if arguments.arm == "both" else [arguments.arm]
     out_root = HERE / "results" / arguments.scenario
     runs = []
@@ -391,6 +474,7 @@ def main():
                 arguments.skip_agent,
                 arguments.implementation,
                 arguments.isolate_agent_home,
+                rustfacts,
             )
             runs.append(metrics)
             print(

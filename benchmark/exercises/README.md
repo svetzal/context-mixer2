@@ -76,15 +76,22 @@ control arm's floor and *understate* lift. When a guided-arm number needs to
 stand on its own rather than as a delta, `--isolate-agent-home` points the
 agent's configuration home at an empty scratch directory.
 
-Two honest limitations. Model output is stochastic, so a single trial per arm
+Three honest limitations. Model output is stochastic, so a single trial per arm
 is an anecdote — run enough trials that the per-intent rates mean something.
-And adherence checks recognize the shapes they were written to recognize; a
-defensible design they do not anticipate scores as a violation. Read the
-`signals` before believing a low score.
+Adherence checks recognize the shapes they were written to recognize; a
+defensible design they do not anticipate scores as a violation, and every
+scenario so far has had at least one such check corrected by its first real run.
+Read the `signals` before believing a low score.
+
+And do not re-score a finished workspace by hand without accounting for staging.
+The Rust hidden suite is copied into `workspace/tests/` after adherence has run;
+re-running `adherence.py` over that directory afterwards counts the harness's own
+file as the agent's integration test layer. Delete the staged file first, or
+trust the `metrics.json` the run wrote.
 
 ## How the checks are built
 
-Three modules, split along the line between what generalizes and what does not.
+Four modules, split along the line between what generalizes and what does not.
 
 `predicates.py` holds the traversals. They are question forms, not answers:
 *is a symbol used at all* (`calls_to`, `references`, `imported_roots`), *is it
@@ -109,6 +116,28 @@ scenario, where three questions the first had never asked — containment,
 syntactic context, and argument shape — would otherwise have grown three more
 bespoke walks.
 
+`rustfacts/` is a small `syn` binary that emits the same facts for Rust as JSON,
+because Python's `ast` does not reach that far. The runner builds it on demand
+and only for Rust scenarios.
+
+### What a language change does and does not cost
+
+The Rust exercise was built to find out. The four question forms survived, as
+did every structural decision: the check signature, the three-state verdict, the
+`check_config` split, and the calibration discipline. The traversals did not
+survive at all.
+
+Three assumptions turned out to belong to Python rather than to the intents.
+Test scope is a directory in Python and an attribute in Rust, so the
+production/test partition is per module there and per *item* here. Panicking is
+a call in Python and a macro in Rust, invisible to anything that only walks call
+expressions. Substituting a collaborator is patching a name in Python and
+implementing a trait in Rust — a relationship between two definitions rather
+than a string argument.
+
+The lesson for a fourth language: budget for a fact extractor and for the
+partition rule, not for redesigning the checks.
+
 ## Scenario contract
 
 Each directory under `scenarios/` contains:
@@ -128,10 +157,19 @@ Each directory under `scenarios/` contains:
   `check_config` block carrying anything scenario-specific the checks need.
 - `provenance.json` — where the intent snapshot came from.
 
-Two scenarios exist. `fx-settlement` scores eight intents about structure,
-naming, and typing; `probe-fanout` scores eight about concurrency, cancellation,
-and resource lifetime. The sets are disjoint on purpose — two exercises scoring
-the same intents would measure the harness twice and the guidance once.
+Three scenarios exist, with disjoint intent sets — two exercises scoring the
+same intents would measure the harness twice and the guidance once.
+
+| Scenario | Language | Scores |
+| --- | --- | --- |
+| `fx-settlement` | Python | structure, naming, typing |
+| `probe-fanout` | Python | concurrency, cancellation, resource lifetime |
+| `rate-card` | Rust | errors, effect boundaries, test layers, lint policy |
+
+A scenario declares its `language` in `expected.json`. Python scenarios build
+with `uv` and run pytest; Rust scenarios build with `cargo` and run its hidden
+suite as an integration test staged into the crate *after* adherence has been
+scored, since a Rust integration test has to live inside the crate to run.
 
 ## Adding a scenario
 

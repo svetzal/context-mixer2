@@ -20,17 +20,29 @@ import pathlib
 import sys
 
 from checks import CHECKS
-from predicates import collect, result
+from predicates import collect, collect_rust, result
 
 
 class Workspace:
-    """A finished workspace, partitioned into production and test modules."""
+    """A finished workspace, partitioned into production and test modules.
 
-    def __init__(self, root):
+    The partition is per module for Python and per module *and item* for Rust,
+    where `#[cfg(test)]` puts unit tests inside the file they exercise. Rust
+    checks therefore work from `modules` and ask each item about its own scope,
+    rather than trusting a directory split that does not exist there.
+    """
+
+    def __init__(self, root, language="python", rustfacts=None):
         self.root = root
-        self.modules = collect(root)
-        self.production = [module for module in self.modules if not module.is_test]
-        self.tests = [module for module in self.modules if module.is_test]
+        self.language = language
+        if language == "rust":
+            self.modules = collect_rust(root, rustfacts)
+            self.production = [module for module in self.modules if module.is_source]
+            self.tests = [module for module in self.modules if module.is_test]
+        else:
+            self.modules = collect(root)
+            self.production = [module for module in self.modules if not module.is_test]
+            self.tests = [module for module in self.modules if module.is_test]
 
     def inventory(self):
         return {
@@ -40,9 +52,9 @@ class Workspace:
         }
 
 
-def score(root, scored_intents, config=None):
+def score(root, scored_intents, config=None, language="python", rustfacts=None):
     """Run every scored intent's check against a finished workspace."""
-    workspace = Workspace(root)
+    workspace = Workspace(root, language=language, rustfacts=rustfacts)
     config = config or {}
 
     principles = {}
@@ -80,6 +92,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", required=True, type=pathlib.Path)
     parser.add_argument("--expected", required=True, type=pathlib.Path)
+    parser.add_argument("--rustfacts", type=pathlib.Path)
     arguments = parser.parse_args()
 
     expected = json.loads(arguments.expected.read_text(encoding="utf-8"))
@@ -87,6 +100,8 @@ def main():
         arguments.workspace,
         expected["scored_intents"],
         expected.get("check_config", {}),
+        language=expected.get("language", "python"),
+        rustfacts=arguments.rustfacts,
     )
     json.dump(report, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")

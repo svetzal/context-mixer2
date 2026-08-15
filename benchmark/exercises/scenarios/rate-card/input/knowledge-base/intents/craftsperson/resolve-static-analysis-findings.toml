@@ -1,0 +1,290 @@
+id = "guidelines.intent.resolve-static-analysis-findings"
+title = "Resolve static-analysis findings"
+category = "quality"
+tags = ["static-analysis", "warnings", "automation"]
+status = "hypothesized"
+confidence = 0.98
+capability = "Cheap mechanically detectable defects and policy violations are removed before delivery."
+threat = "Warnings accumulate until they hide new defects and normalize bypassing automated feedback."
+expectation = "Compilers, linters, and analyzers will detect classes of defects more consistently than manual review."
+strategy = "Run the project's configured static analysis, resolve every finding, and document only narrow justified suppressions."
+evidence = [{ type = "analysis_gate", description = "Configured analyzers complete without unaddressed findings and each suppression carries a specific rationale.", required = true }]
+tradeoff = "Strict analysis can produce false positives and consume time on low-risk style findings."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/go-ecosystem/agents/go-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-gates-mandatory", summary = "Makes static analysis a zero-warning completion gate.", confidence = 1.0 }, { type = "document", ref = "plugins/go-ecosystem/agents/go-craftsperson.md#quality-assurance", summary = "Requires an aggregate warning-free analysis gate and explained suppressions.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#mandatory-quality-gates", summary = "Resolves static-analysis warnings and audits exceptions before completion.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; clj-kondo: 0 warnings, 0 errors across src and test
+
+;; the one suppression — narrow, with a specific rationale:
+#_{:clj-kondo/ignore [:deprecated-var]}
+(legacy/checksum payload)
+; the vendor requires their deprecated checksum until API v3
+; ships; removal tracked in PAY-311
+'''
+bad = '''
+;; .clj-kondo/config.edn
+{:linters {:unused-binding     {:level :off}
+           :deprecated-var    {:level :off}
+           :unresolved-symbol {:level :off}
+           :type-mismatch     {:level :off}}}
+
+; 212 findings silenced wholesale in one commit so the build
+; would go green; every future real defect of these kinds
+; now arrives pre-hidden
+'''
+
+[examples.cpp]
+good = '''
+// clang-tidy flagged a real use-after-move — fixed:
+auto session = std::move(pending);
+registry.add(session);        // was: registry.add(pending)
+
+// One narrow suppression, with its specific rationale:
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+// -- HW register map mandated by vendor errata #114
+regs.ctrl.raw = 0x8001;
+
+// $ clang-tidy -p build src/*.cpp  ->  0 warnings
+'''
+bad = '''
+// NOLINTBEGIN  -- whole file, no rationale, since forever
+auto session = std::move(pending);
+registry.add(pending);    // real use-after-move, now buried
+// NOLINTEND
+
+# .gitlab-ci.yml
+clang-tidy:
+  allow_failure: true     # "temporary", added 2024
+  # current count: 341 warnings (212 in March) — new defects
+  # scroll past unread in a wall of normalized noise
+'''
+
+[examples.csharp]
+good = '''
+$ dotnet build -warnaserror
+  0 Warning(s), 0 Error(s)
+
+// the one suppression is narrow and explains itself
+#pragma warning disable CA2000 // ownership moves to
+var stream = OpenUpload();     // Response; framework
+return Results.Stream(stream); // disposes it
+#pragma warning restore CA2000
+'''
+bad = '''
+App.csproj:
+  <NoWarn>$(NoWarn);CS8600;CS8602;CS8604;
+    CA2000;CA1062;CA2007;CS0618</NoWarn>
+  <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+<!-- 340 findings silenced repo-wide "to get CI
+     green"; every new null-deref warning is now
+     invisible along with the old ones -->
+'''
+
+[examples.elixir]
+good = '''
+$ mix credo --strict
+  0 issues
+
+# the one suppression is narrow and carries its reason:
+# credo:disable-for-next-line Credo.Check.Warning.IoInspect
+# rationale: intentional operator-facing console output
+# in this release task; revisit if it becomes a lib call
+IO.inspect(summary, label: "release summary")
+'''
+bad = '''
+$ mix credo --strict
+  47 issues (12 refactoring, 35 warnings)
+
+# .credo.exs — silenced wholesale to get CI green
+checks: [
+  {Credo.Check.Warning.UnusedEnumOperation, false},
+  {Credo.Check.Warning.IoInspect, false},
+  {Credo.Check.Refactor.Nesting, false}
+]
+# new defects now hide in a category nobody reads
+'''
+
+[examples.go]
+good = '''
+$ golangci-lint run
+0 issues.
+
+// the one suppression in the diff is narrow and justified:
+//nolint:gosec // G404: math/rand is fine here — shuffling a
+// demo color palette, not generating security material
+'''
+bad = '''
+//nolint:all // TODO: clean up lint findings someday
+package payments
+
+// under the blanket suppression, real findings ship too
+func charge(ctx context.Context, amt int) {
+	result, _ := gateway.Charge(ctx, amt) // error unchecked
+	log.Printf("charged %s", amt) // %s verb on an int
+	_ = result
+}
+'''
+
+[examples.java]
+good = '''
+// finding fixed at the source, not silenced:
+// [NullAway] discounts.forCustomer(id) may be empty
+var discount = discounts.forCustomer(id)
+    .orElse(Discount.NONE);
+
+// the one remaining suppression is narrow and justified
+@SuppressWarnings("resource") // socket is owned and closed
+Socket lease() {              // by Pool — PoolLifecycleTest
+    return pool.acquire();    // proves release on all paths
+}
+'''
+bad = '''
+@SuppressWarnings("all")  // blanket mute, whole class
+class PaymentProcessor {
+    void process(Order o) throws Exception {
+        // 61 findings hidden below: unclosed streams,
+        // unchecked casts, dead branches
+        var in = new FileInputStream("/tmp/batch");
+        List<Payment> p = (List) legacy.load(in);
+        if (false) audit(p);
+    }
+}
+// the next real defect's warning is muted before it fires
+'''
+
+[examples.kotlin]
+good = '''
+// detekt: MagicNumber -> resolved by naming the rule
+private const val MAX_LOGIN_ATTEMPTS = 5
+
+// the one suppression is narrow and carries its reason
+@Suppress("TooGenericExceptionCaught") // JNI layer throws
+// undeclared RuntimeExceptions; a narrow catch would crash
+// the render loop. Tracked in ISSUE-482.
+fun renderFrame(scene: Scene) = native.render(scene)
+'''
+bad = '''
+@Suppress("all") // silence the linter wholesale
+class LoginService {
+    fun check(user: String, pass: String): Boolean {
+        if (attempts > 5) lock(user) // finding hidden
+        return verify(user, pass)
+    }
+}
+// the detekt baseline grew by 40 findings this quarter;
+// new warnings drown in old noise and nobody reads them
+'''
+
+[examples.python]
+good = '''
+$ ruff check .
+All checks passed!
+
+# the one suppression is narrow and carries its reason
+proc = subprocess.run(
+    ["git", "rev-parse", "HEAD"],
+    check=True, capture_output=True,
+)  # noqa: S603 — fixed argv, no shell, nothing here is
+   # user-controlled input
+'''
+bad = '''
+$ ruff check . | tail -1
+Found 217 errors.
+
+# pyproject.toml
+[tool.ruff.lint]
+ignore = ["E", "F", "S", "B"]   # too noisy, silence it all
+# among the muted findings: an unused import masking a
+# name collision and a mutable default argument
+'''
+
+[examples.ruby]
+good = '''
+# rubocop flagged Lint/UselessAssignment — fixed, not silenced
+def summary(orders:)
+  total = orders.sum(&:cents) # now actually used below
+  format("%d orders, %d cents", orders.size, total)
+end
+
+# the one suppression is narrow and carries its rationale:
+# rubocop:disable Metrics/MethodLength -- state machine table;
+# splitting it hides the transition matrix (see #341)
+'''
+bad = '''
+# .rubocop.yml
+# AllCops:
+#   DisabledByDefault: true  # 300 warnings? disable the tool
+
+def summary(orders:)
+  total = orders.sum(&:cents) # flagged unused for 8 months
+  fromat("%d orders", orders.size) # typo hiding in the noise
+end
+'''
+
+[examples.rust]
+good = '''
+$ cargo clippy --workspace --all-targets -- -D warnings
+    Finished `dev` profile — zero warnings
+
+// the one suppression is narrow and carries its reason
+#[allow(clippy::too_many_arguments)] // mirrors the fixed
+// 8-argument signature of libextern_render_v2; wrapping
+// it would copy four buffers per frame
+fn render_raw(/* ffi-mandated args */) { /* ... */ }
+'''
+bad = '''
+$ cargo clippy --workspace
+warning: 47 warnings emitted    # 12 more than last month
+
+// blanket silence at the crate root instead of fixes
+#![allow(clippy::all)]
+#![allow(dead_code, unused_variables)]
+
+// the analyzer still runs in CI, green and meaningless;
+// real defects now land unseen in the noise
+'''
+
+[examples.swift]
+good = '''
+$ swiftlint --strict
+Done linting! Found 0 violations in 214 files.
+
+// the one suppression is narrow and carries its reason:
+// swiftlint:disable:next force_cast — cell registered two
+// lines above; a cast failure here is a programmer error
+let cell = table.dequeue(id) as! BadgeCell
+'''
+bad = '''
+$ swiftlint | tail -1
+Found 217 violations, 31 serious.   # "mostly noise, ship it"
+
+// swiftlint:disable all
+// blanket file-wide silence, no rationale — the next real
+// defect the analyzer catches will be invisible too
+'''
+
+[examples.typescript]
+good = '''
+// The finding is resolved by fixing what it pointed at.
+const user = users.find((u) => u.id === id);
+if (!user) throw new UserNotFoundError(id);
+return user.email; // no non-null assertion needed
+
+// The one remaining suppression is narrow and explained:
+// eslint-disable-next-line no-await-in-loop -- migration
+// steps are sequential by design; see #341
+'''
+bad = '''
+/* eslint-disable */
+// 47 warnings silenced file-wide to quiet the build; the
+// same commit adds @ts-nocheck to three neighbours.
+const user = users.find((u) => u.id === id)!;
+return (user as any).email;
+
+// Tomorrow's genuine defect will surface as warning #48 —
+// invisible in a file nobody reads warnings from anymore.
+'''

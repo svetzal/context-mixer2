@@ -1,0 +1,25 @@
+id = "rust-craftsperson-shipping"
+name = "AGENTS"
+version = "0.1.0"
+description = "Rust engineering guidance for the rate-card behavioural exercise."
+surface = "agent"
+budget_tokens = 4000
+
+# Explicit keys. Eight Rust intents, disjoint from both Python exercises.
+[select]
+keys = [
+  "craftsperson/rust/centralize-curated-lint-policy",
+  "craftsperson/rust/compile-public-documentation",
+  "craftsperson/rust/isolate-functional-core-from-effects",
+  "craftsperson/rust/prefer-fakes-at-boundaries",
+  "craftsperson/rust/put-gateways-at-effect-boundaries",
+  "craftsperson/rust/use-purpose-specific-test-layers",
+  "craftsperson/rust/use-results-for-recoverable-library-errors",
+  "craftsperson/rust/use-structured-tracing",
+]
+
+[graph]
+follow = []
+
+[content]
+include = ["guidance", "rationale", "evidence"]

@@ -1,0 +1,320 @@
+id = "guidelines.intent.use-purpose-specific-test-layers"
+title = "Use purpose-specific test layers"
+category = "testing"
+tags = ["test-strategy", "test-pyramid", "risk-based-testing"]
+status = "hypothesized"
+confidence = 0.96
+capability = "The test suite provides fast local feedback and credible evidence across real system boundaries."
+threat = "One test style is stretched across every risk, producing either slow fragile feedback or unrealistic isolation."
+expectation = "Different defects require evidence at different scopes, from pure decisions to external integration."
+strategy = "Use fast focused tests for core behavior and add integration, contract, system, or property tests where their distinct evidence is needed."
+evidence = [{ type = "test_strategy_review", description = "Each test layer has a stated risk to cover and avoids duplicating evidence already provided more cheaply elsewhere.", required = true }]
+tradeoff = "Multiple layers require separate fixtures, tooling, and decisions about where each behavior belongs."
+scope = { project = "guidelines", paths = ["plugins/elixir-ecosystem/agents/elixir-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-bun-cli-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#quality-assurance-process", summary = "Uses purpose-specific test layers rather than one undifferentiated suite.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/java-craftsperson.md#testing-philosophy", summary = "Separates unit, integration, contract, and higher-level evidence.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#testing-strategy", summary = "Uses purpose-specific Rust test layers based on risk.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+;; fast core tests (hundreds, milliseconds): the decisions
+(deftest bulk-discount-applies-at-ten-units
+  (is (= 90.0 (line-total {:price 10.0 :qty 10}))))
+
+;; one contract test per boundary — the risk units can't see:
+(deftest ^:integration orders-roundtrip-through-postgres
+  (with-tmp-db [db]
+    (save-order db sample-order)
+    (is (= sample-order (load-order db (:id sample-order))))))
+
+;; plus one system smoke over real HTTP for wiring
+'''
+bad = '''
+;; every pricing rule tested by booting the whole stack:
+(deftest bulk-discount-applies-at-ten-units
+  (with-system [sys (start-full-system!)]   ; ~40s per test
+    (let [resp (http/post (str (:url sys) "/checkout")
+                          {:body (json/write-str
+                                  ten-unit-cart)})]
+      (is (= 90.0 (-> resp :body parse-body :total))))))
+; 300 rules x full HTTP + Postgres boot = a suite nobody
+; runs locally; a one-line discount bug takes an hour to find
+'''
+
+[examples.cpp]
+good = '''
+tests/
+  unit/pricing_test.cpp      # core rules; ms-fast, no I/O
+  contract/crm_contract.cpp  # our gateway vs recorded CRM API
+  integration/store_it.cpp   # real Postgres in a container
+  system/checkout_smoke.cpp  # one end-to-end happy path
+
+# Each layer's README names the risk it uniquely covers;
+# pricing rules are NOT re-proven at system level, and the
+# smoke test doesn't re-check rounding.
+'''
+bad = '''
+tests/
+  e2e/        # 412 Selenium tests, 96 minutes, flaky
+
+# Every rule — rounding, VAT, coupon stacking — is asserted
+# only by driving the full UI against a shared staging DB.
+# A one-line pricing change reruns the world and fails
+# randomly on login timeouts; developers stopped running
+# the suite locally in March.
+'''
+
+[examples.csharp]
+good = '''
+tests/
+  Domain.Tests/         # pure core rules, ms-fast
+  Api.ContractTests/    # gateway contracts, WireMock
+  App.IntegrationTests/ # real Postgres, Testcontainers
+  Smoke/                # 3 end-to-end journeys
+
+# tests/README.md names each layer's charter: the
+# risk it covers and what it deliberately leaves
+# to the cheaper layer below it
+'''
+bad = '''
+tests/
+  E2E/    # 1,400 Selenium tests — the only layer
+
+# every rule, edge case, and validation message is
+# exercised through login plus twelve page loads;
+# the suite takes 4h20m, flakes daily, and a tax-
+# rounding defect needs a browser to reproduce
+'''
+
+[examples.elixir]
+good = '''
+# pricing rules: fast core tests, one per rule, ms each
+test "premium discount is 8%" do
+  assert Pricing.discount(:premium, 100) == 8
+end
+
+# the risk that needs realism gets its own layer:
+@tag :integration
+test "checkout persists a priced order via the repo" do
+  cart = build(:cart, tier: :premium, total: 100)
+  {:ok, order} = Checkout.run(cart)
+  assert Repo.get!(Order, order.id).total == 92
+end
+'''
+bad = '''
+# every pricing rule priced through the full stack,
+# ~40s per case — one layer stretched over every risk
+@tag :browser
+test "premium discount is 8%" do
+  {:ok, session} = Wallaby.start_session()
+
+  session
+  |> visit("/signup")
+  |> fill_in_all_forms()
+  |> create_order(total: 100)
+  |> assert_text("Total: $92.00")
+  # 30 more rules queued behind this same browser
+end
+'''
+
+[examples.go]
+good = '''
+// fast core test for the decision itself: milliseconds, no I/O
+func TestVolumeDiscountAppliesAt100Units(t *testing.T) {
+	got := Price(order(100, unit(200)))
+	if got != 18000 {
+		t.Fatalf("want 10%% discount, got %d", got)
+	}
+}
+
+// one integration test where the distinct risk lives: the SQL
+// mapping (build-tagged, run in CI against real postgres)
+func TestOrderRepoRoundTrip(t *testing.T) {
+	db := startPostgres(t)
+	requireRoundTrip(t, NewOrderRepo(db), sampleOrder())
+}
+'''
+bad = '''
+// one style stretched over every risk: each pricing rule
+// boots the world, so the suite takes 40 minutes and flakes
+func TestVolumeDiscount(t *testing.T) {
+	db := startPostgres(t)
+	api := startAPIServer(t, db)
+	browser := startHeadlessChrome(t, api.URL)
+
+	loginAs(t, browser, "buyer@example.com")
+	addToCart(t, browser, "sku-1", 100)
+	assertCheckoutShows(t, browser, "$180.00")
+}
+'''
+
+[examples.java]
+good = '''
+src/test/java   (unit, ~2 s) — pricing, refund, tax rules
+    runs on every save; no containers, no network
+src/it/java     (integration) — OrderGateway vs Postgres
+    covers SQL, mapping, and transaction boundaries only
+src/contract    — provider contract for /api/v2/orders
+    pins the JSON shape the mobile clients depend on
+
+# each layer names the risk it covers; none re-proves
+# what a cheaper layer already demonstrates
+'''
+bad = '''
+// every rule tested end-to-end: HTTP + real DB + queue
+@SpringBootTest(webEnvironment = RANDOM_PORT)
+class AllBehaviorTest {  // 40 min, flaky on queue timing
+
+    @Test
+    void vatRoundsHalfUp() {    // a pure function, tested
+        var response = rest.postForEntity(  // through the
+            "/api/checkout", cartJson(), String.class);
+        assertThat(response.getBody()).contains("10.05");
+    }
+    // 312 more rules queued behind the same slow harness
+}
+'''
+
+[examples.kotlin]
+good = '''
+// fast core test: the pricing decision, no infrastructure
+@Test fun `100 units prices at tier 2`() {
+    assertThat(price(order(units = 100))).isEqualTo(TIER_2)
+}
+
+// one contract test where the wire shape is the real risk
+@Test fun `gateway parses a declined charge`() =
+    assertThat(gateway.parse(declinedJson))
+        .isEqualTo(Charge.Declined("card_declined"))
+// plus a single HTTP smoke test for end-to-end wiring
+'''
+bad = '''
+// every pricing rule tested through full HTTP + Postgres
+@Test fun `tier 1`() = fullStack { post("/orders", tiny) }
+@Test fun `tier 2`() = fullStack { post("/orders", medium) }
+@Test fun `tier 3`() = fullStack { post("/orders", large) }
+@Test fun `rounding`() = fullStack { post("/orders", odd) }
+// forty minutes, flaky containers, and when tier 2 breaks
+// the failure points at an HTTP 500, not the pricing rule
+'''
+
+[examples.python]
+good = '''
+def test_gold_tier_gets_ten_percent():   # fast core check
+    assert discount(tier="gold") == Decimal("0.10")
+
+@pytest.mark.integration                 # real-boundary risk
+def test_orders_survive_postgres_round_trip():
+    repo = PgOrderRepo(pg_url)
+    repo.save(order := an_order())
+    assert repo.get(order.id) == order
+
+@pytest.mark.system                      # one journey, not 40
+def test_checkout_happy_path_end_to_end(): ...
+'''
+bad = '''
+@pytest.mark.parametrize("tier", ALL_TIERS)   # 40 variants
+def test_discount_via_full_stack(tier, live_server, browser):
+    # every pricing rule driven through browser + database
+    # + payment sandbox: ~6 min each, flaky, and a tier bug
+    # takes an afternoon to localize
+    browser.get(f"{live_server}/checkout?tier={tier}")
+    browser.find("#pay").click()
+    assert "10%" in browser.find("#summary").text
+'''
+
+[examples.ruby]
+good = '''
+spec/
+  unit/pricing_spec.rb     # fast pure core rules (runs in ms)
+  contract/stripe_spec.rb  # our gateway vs the test-mode API
+  system/checkout_spec.rb  # one happy path through the stack
+
+Each layer names the risk it covers: unit = decision logic,
+contract = boundary drift, system = wiring. No layer re-proves
+what a cheaper layer already demonstrates.
+'''
+bad = '''
+# every behavior tested as a full-stack browser test
+it "applies 13% tax", :js do
+  visit "/signup" # 90 seconds of UI to check arithmetic
+  fill_in_thirty_form_fields
+  click_button "Buy"
+  expect(page).to have_text("$1.13")
+end
+
+# suite: 4 hours, flaky; tax rounding has no fast tests at all
+'''
+
+[examples.rust]
+good = '''
+# each layer names the risk only it can cover
+tests/
+  unit/       pricing decisions, pure, runs in <1s
+  contract/   PgOrderStore against a real Postgres schema
+  system/     one checkout smoke through the HTTP API
+
+# the pricing matrix is NOT re-run over HTTP — that
+# evidence already exists cheaply at the unit layer
+'''
+bad = '''
+# one layer stretched across every risk
+$ cargo test --test e2e
+running 214 tests ... finished in 41m 12s
+
+# every pricing rule runs only through HTTP + Postgres +
+# a headless browser; a one-line rule change costs 41
+# minutes, yet nothing exercises the real schema mapping
+# in isolation — slow AND unrealistic at once
+'''
+
+[examples.swift]
+good = '''
+Tests/
+  CoreTests/      pure pricing rules, in-memory — 2 s, on
+                  every save (risk: decision logic)
+  ContractTests/  PaymentGateway contract run against the
+                  fake AND sandbox Stripe (risk: drift)
+  SystemTests/    one checkout journey through the real
+                  stack, nightly (risk: wiring)
+
+Each layer names the risk it covers; pricing math is never
+re-proven through the UI.
+'''
+bad = '''
+Tests/
+  UITests/   all 214 tests drive the simulator UI —
+             pricing edge cases, validation, and
+             error mapping included
+
+Suite: 96 minutes, ~7% flaky. Reproducing a rounding bug
+requires a full checkout journey; no fast layer exists, so
+nobody runs tests before pushing.
+'''
+
+[examples.typescript]
+good = '''
+Test layout — each layer names the risk it covers:
+
+  tests/unit/pricing.spec.ts   decision logic, ms-fast
+  tests/contract/rates-api.ts  provider payload shape
+  tests/integration/repo.ts    real Postgres: SQL + txns
+  tests/e2e/checkout.e2e.ts    one happy-path smoke
+
+Pricing edge cases live only in the unit layer — never
+repeated through slower layers that already trust it.
+'''
+bad = '''
+tests/e2e/  (412 specs, 48 minutes, retries: 2)
+
+// Every rule is tested through the browser + live backend:
+test("discount rounds half-cents down", async ({ page }) => {
+  await page.goto("/admin/login");
+  await login(page); await seedCatalog(page);
+  await addItem(page, "SKU-1", 3); // ...six more UI steps
+  await expect(page.locator("#total")).toHaveText("$8.98");
+});
+// One arithmetic decision, verifiable in 3 ms by a unit
+// test, costs 40 flaky seconds — and nothing anywhere
+// exercises the real database layer.
+'''

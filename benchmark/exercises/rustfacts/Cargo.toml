@@ -1,0 +1,18 @@
+[package]
+name = "rustfacts"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Emit a language-neutral fact document for a Rust source tree, for the cmf behavioural exercises."
+
+# Detached from the cmx workspace on purpose. This is harness tooling, not
+# product code: it must not enter `cargo clippy --all-targets`, the rustdoc
+# gate, or `cargo deny` for the crates cmx actually ships.
+[workspace]
+
+[dependencies]
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syn = { version = "2", features = ["full", "visit", "parsing", "printing", "extra-traits"] }

@@ -1,0 +1,10 @@
+[package]
+name = "ratecard"
+version = "0.1.0"
+edition = "2021"
+description = "Shipping rate quotes from a zone rate card."
+
+[dependencies]
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,23 @@
+{
+  "copied_paths": [
+    "intents/craftsperson/rust/centralize-curated-lint-policy.toml",
+    "intents/craftsperson/rust/compile-public-documentation.toml",
+    "intents/craftsperson/rust/isolate-functional-core-from-effects.toml",
+    "intents/craftsperson/rust/prefer-fakes-at-boundaries.toml",
+    "intents/craftsperson/rust/put-gateways-at-effect-boundaries.toml",
+    "intents/craftsperson/rust/use-purpose-specific-test-layers.toml",
+    "intents/craftsperson/rust/use-results-for-recoverable-library-errors.toml",
+    "intents/craftsperson/rust/use-structured-tracing.toml",
+    "intents/craftsperson/honor-the-project-quality-gate.toml",
+    "intents/craftsperson/isolate-functional-core-from-effects.toml",
+    "intents/craftsperson/mock-only-owned-boundaries.toml",
+    "intents/craftsperson/model-recoverable-errors-explicitly.toml",
+    "intents/craftsperson/protect-persistent-data-integrity.toml",
+    "intents/craftsperson/resolve-static-analysis-findings.toml",
+    "intents/craftsperson/use-language-and-ecosystem-idioms.toml",
+    "intents/craftsperson/use-purpose-specific-test-layers.toml"
+  ],
+  "note": "Copied from the elixir-phoenix-craftsperson scenario's catalogue snapshot. The eight rust records are the scored slice and are disjoint from both python exercises; the eight universal records are their specialization parents.",
+  "source_scenario": "benchmark/scenarios/elixir-phoenix-craftsperson/input/knowledge-base",
+  "skeleton_origin": "written for this exercise; not derived from any existing project"
+}

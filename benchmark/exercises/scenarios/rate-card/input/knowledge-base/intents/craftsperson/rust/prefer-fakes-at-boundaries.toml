@@ -1,0 +1,17 @@
+id = "guidelines.intent.prefer-fakes-at-boundaries"
+title = "Prefer fakes and mock only boundaries"
+category = "testing"
+tags = ["rust", "testing", "test-doubles", "boundaries", "contracts"]
+relations = [
+  { type = "specializes", target = "craftsperson/mock-only-owned-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Tests remain deterministic while exercising meaningful behavior through stable project-owned contracts."
+threat = "Mocks of internal or third-party implementation details make tests brittle and reward the current structure rather than behavior."
+expectation = "Core behavior will need controlled substitutes for databases, networks, clocks, and external services."
+strategy = "Prefer in-memory fakes; when mocking is necessary, mock only gateway traits after wrapping third-party crates."
+evidence = [{ type = "test_review", description = "Test doubles implement project-owned edge contracts and do not intercept library internals.", required = true }]
+tradeoff = "Maintaining realistic fakes can require substantial code and behavioral alignment with production adapters."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#testing-strategy", summary = "Prefers fakes and restricts mocks to gateway traits at the edges.", confidence = 1.0 }]

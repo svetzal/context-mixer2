@@ -1,0 +1,18 @@
+id = "guidelines.intent.protect-persistent-data-integrity"
+title = "Protect persistent data integrity"
+category = "reliability"
+tags = ["data-integrity", "transactions", "database-constraints"]
+relations = [
+  { type = "related-to", target = "craftsperson/make-invalid-states-explicit" },
+  { type = "related-to", target = "craftsperson/validate-untrusted-input-at-boundaries" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Persistent state remains valid across concurrent writes, retries, partial failures, and multiple application entry points."
+threat = "Application-only checks and multi-step writes allow invalid, duplicated, or partially committed state."
+expectation = "Databases and durable stores will be accessed concurrently and may outlive any one application implementation."
+strategy = "Encode durable invariants in the persistence layer and use transactions or atomic operations for changes that must succeed together."
+evidence = [{ type = "integration_test", description = "Persistence tests exercise conflicting, partial, and retried writes and demonstrate that durable invariants still hold.", required = true }]
+tradeoff = "Database constraints and transactions add schema complexity, contention, and storage-specific coupling."
+scope = { project = "guidelines", paths = ["plugins"] }
+sources = [{ type = "synthesis", ref = "intents", summary = "Generalizes recurring transaction, uniqueness, migration, and database-constraint guidance.", confidence = 0.97 }]

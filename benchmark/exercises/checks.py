@@ -16,6 +16,7 @@ import re
 
 from predicates import (
     as_patterns,
+    baseline_public_items,
     call_name,
     calls_to,
     class_shape,
@@ -28,10 +29,13 @@ from predicates import (
     in_async_context,
     is_function,
     is_mutable_default,
+    cargo_manifest,
     keyword_map,
     not_applicable,
     references,
     result,
+    rust_calls,
+    rust_macros,
     tool_config,
     unparse,
     within,
@@ -960,3 +964,371 @@ CHECKS = {
     "craftsperson/python/specific-domain-errors": check_domain_errors,
     "craftsperson/python/structured-concurrent-lifetimes": check_structured_concurrency,
 }
+
+
+# --------------------------------------------------------------------------
+# rate-card: Rust
+#
+# Same question forms, different substrate. Rust moves several of them: test
+# scope is an attribute rather than a directory, so production and test code
+# share a file; panicking is a macro, not a call; and substituting a
+# collaborator is implementing a trait, not patching a name.
+# --------------------------------------------------------------------------
+
+PANIC_MACROS = {"panic", "unreachable", "todo", "unimplemented"}
+
+FALLIBLE_SHORTCUTS = {"unwrap", "expect"}
+
+PRINT_MACROS = {"println", "print", "eprintln", "eprint", "dbg"}
+
+TRACING_MACROS = {"trace", "debug", "info", "warn", "error", "event", "span", "info_span"}
+
+DOCUMENTED_KINDS = {"fn", "struct", "enum", "trait", "mod", "type", "const"}
+
+
+def check_rust_result_errors(workspace, config):
+    production = [module for module in workspace.modules if module.is_source]
+
+    shortcuts = rust_calls(production, FALLIBLE_SHORTCUTS, in_test=False)
+    panics = rust_macros(production, PANIC_MACROS, in_test=False)
+    fallible_api = [
+        f"{module.relative}::{item['name']}"
+        for module in production
+        for item in module.production_items("fn")
+        if item["visibility"].startswith("pub") and "Result" in (item.get("return_type") or "")
+    ]
+
+    evidence = []
+    if not fallible_api:
+        evidence.append("no public function returns a Result")
+    if shortcuts:
+        evidence.append(f"{len(shortcuts)} unwrap/expect outside test code")
+    if panics:
+        evidence.append(f"{len(panics)} panicking macro(s) outside test code")
+
+    return result(
+        fallible_api and not shortcuts and not panics,
+        {
+            "public_fallible_functions": fallible_api,
+            "unwrap_or_expect_in_production": shortcuts,
+            "panicking_macros_in_production": panics,
+        },
+        evidence,
+    )
+
+
+def check_rust_gateway_traits(workspace, config):
+    production = [module for module in workspace.modules if module.is_source]
+    effectful = {module.relative for module in production if module.performs_io()}
+
+    declared = {}
+    for module in production:
+        for item in module.production_items("trait"):
+            declared[item["name"]] = module.relative
+
+    boundary_impls = []
+    for module in production:
+        for item in module.production_items("impl"):
+            implemented = item.get("impl_trait")
+            if implemented and implemented in declared:
+                boundary_impls.append(
+                    {
+                        "where": module.label(item),
+                        "trait": implemented,
+                        "type": item.get("impl_type"),
+                        "at_effect_boundary": module.relative in effectful,
+                    }
+                )
+
+    # What the intent asks is that the core depend on the contract rather than on
+    # a concrete client. Which file the trait is declared in is not that
+    # question: a trait and its implementation living together is ordinary Rust.
+    # So the test is whether some module that performs no I/O names the trait.
+    consumers = {
+        name: [
+            module.relative
+            for module in production
+            if module.relative not in effectful
+            and module.relative != where
+            and name in module.source
+        ]
+        for name, where in declared.items()
+    }
+    depended_upon = {name: where for name, where in consumers.items() if where}
+
+    evidence = []
+    if not declared:
+        evidence.append("no gateway trait is declared")
+    if not boundary_impls:
+        evidence.append("no concrete type implements a declared gateway trait")
+    elif not depended_upon:
+        evidence.append("no effect-free module depends on a gateway trait")
+
+    return result(
+        bool(boundary_impls and depended_upon),
+        {
+            "declared_traits": declared,
+            "effect_free_consumers": consumers,
+            "effectful_modules": sorted(effectful),
+            "trait_implementations": boundary_impls,
+        },
+        evidence,
+    )
+
+
+def check_rust_fakes(workspace, config):
+    production = [module for module in workspace.modules if module.is_source]
+    declared = {
+        item["name"]
+        for module in production
+        for item in module.production_items("trait")
+    }
+
+    # An in-memory implementation of an owned contract is a fake wherever it
+    # lives. Requiring it to sit in test scope would fail a crate that ships one
+    # as a testing affordance, which is a normal and good thing to do.
+    fakes = []
+    for module in workspace.modules:
+        for item in module.items:
+            if item["kind"] != "impl" or item.get("impl_trait") not in declared:
+                continue
+            in_tests = item["in_test_scope"] or module.is_test
+            named_as_double = bool(FAKE_NAME.match(item.get("impl_type") or ""))
+            if not (in_tests or named_as_double):
+                continue
+            fakes.append(
+                {
+                    "where": module.label(item),
+                    "trait": item["impl_trait"],
+                    "type": item.get("impl_type"),
+                    "in_test_scope": in_tests,
+                }
+            )
+
+    has_tests = any(module.is_test for module in workspace.modules) or any(
+        module.has_inline_test_module() for module in production
+    )
+
+    signals = {"owned_traits": sorted(declared), "test_fakes": fakes}
+
+    if not has_tests:
+        return not_applicable(signals, ["no tests, so nothing was substituted either way"])
+    if not declared:
+        return not_applicable(
+            signals, ["no owned trait to substitute; the gateway intent covers that"]
+        )
+
+    evidence = []
+    if not fakes:
+        evidence.append("tests substitute nothing that implements an owned trait")
+
+    return result(bool(fakes), signals, evidence)
+
+
+def check_rust_test_layers(workspace, config):
+    production = [module for module in workspace.modules if module.is_source]
+
+    inline = [module.relative for module in production if module.has_inline_test_module()]
+    integration = [module.relative for module in workspace.modules if module.is_test]
+    doctests = [
+        f"{module.relative}::{item['name']}"
+        for module in production
+        for item in module.items
+        if "```" in item.get("doc", "")
+    ]
+
+    evidence = []
+    if not inline:
+        evidence.append("no inline #[cfg(test)] module for unit-level behaviour")
+    if not integration:
+        evidence.append("no tests/*.rs for wiring and cross-module behaviour")
+
+    return result(
+        inline and integration,
+        {
+            "inline_unit_modules": inline,
+            "integration_test_files": integration,
+            "documented_examples": doctests,
+        },
+        evidence,
+    )
+
+
+def check_rust_lint_policy(workspace, config):
+    manifest = cargo_manifest(workspace.root)
+    lints = manifest.get("lints", {})
+    declared = sorted(lints.keys())
+
+    crate_level = [
+        attribute
+        for module in workspace.modules
+        for attribute in module.crate_attrs
+        if attribute.startswith(("deny", "warn", "allow", "forbid"))
+    ]
+
+    evidence = []
+    if not lints:
+        evidence.append("Cargo.toml declares no [lints] policy")
+        if crate_level:
+            evidence.append(
+                f"{len(crate_level)} crate-level lint attribute(s) instead of a central policy"
+            )
+
+    return result(
+        bool(lints),
+        {
+            "cargo_lint_tables": declared,
+            "cargo_lints": {key: sorted(value) for key, value in lints.items() if isinstance(value, dict)},
+            "crate_level_lint_attributes": crate_level,
+        },
+        evidence,
+    )
+
+
+def check_rust_functional_core(workspace, config):
+    rule_pattern = re.compile(config["business_rule_pattern"])
+    minimum = config.get("business_rule_minimum_matches", 2)
+    production = [module for module in workspace.modules if module.is_source]
+
+    pure = []
+    effectful = []
+    rule_bearing = []
+    mixed = []
+    for module in production:
+        does_io = module.performs_io()
+        carries_rules = len(set(rule_pattern.findall(module.source))) >= minimum
+        (effectful if does_io else pure).append(module.relative)
+        if carries_rules:
+            rule_bearing.append(module.relative)
+        if carries_rules and does_io:
+            mixed.append(module.relative)
+
+    isolated = [name for name in rule_bearing if name not in mixed]
+
+    evidence = []
+    if not rule_bearing:
+        evidence.append("the scenario's business rules were not found in any module")
+    if mixed:
+        evidence.append(f"{len(mixed)} module(s) hold both the business rules and I/O")
+    if not effectful:
+        evidence.append("no module performs the external read")
+
+    return result(
+        isolated and not mixed and effectful,
+        {
+            "pure_modules": pure,
+            "effectful_modules": effectful,
+            "rule_bearing_modules": rule_bearing,
+            "modules_mixing_rules_and_io": mixed,
+        },
+        evidence,
+    )
+
+
+def check_rust_tracing(workspace, config):
+    production = [module for module in workspace.modules if module.is_source]
+
+    prints = rust_macros(production, PRINT_MACROS, in_test=False)
+    tracing_declared = any(
+        any(use.startswith("tracing") for use in module.uses) for module in production
+    ) or "tracing" in cargo_manifest(workspace.root).get("dependencies", {})
+    emissions = rust_macros(production, TRACING_MACROS, in_test=False) if tracing_declared else []
+    structured = [item for item in emissions if "=" in item["arguments"]]
+    instrumented = [
+        f"{module.relative}::{item['name']}"
+        for module in production
+        for item in module.production_items()
+        if any("instrument" in attribute for attribute in item.get("attrs", []))
+    ]
+
+    evidence = []
+    if not tracing_declared:
+        evidence.append("the tracing ecosystem is not used")
+    if prints:
+        evidence.append(f"{len(prints)} print macro(s) in production code")
+    if tracing_declared and not structured:
+        evidence.append("tracing emits interpolated strings rather than named fields")
+
+    return result(
+        tracing_declared and structured and not prints,
+        {
+            "print_macros": prints,
+            "tracing_declared": tracing_declared,
+            "tracing_emissions": emissions,
+            "structured_emissions": structured,
+            "instrumented_functions": instrumented,
+        },
+        evidence,
+    )
+
+
+def check_rust_public_docs(workspace, config):
+    production = [module for module in workspace.modules if module.is_source]
+
+    # `pub mod card;` carries no doc comment of its own; rustdoc takes the
+    # module's documentation from the `//!` at the top of `card.rs`. Treating the
+    # declaration as undocumented would fail idiomatic Rust.
+    documented_modules = {
+        module.relative.rsplit("/", 1)[-1].removesuffix(".rs")
+        for module in production
+        if module.crate_doc.strip()
+    }
+
+    # The skeleton is stripped of doc comments so it carries no precedent, which
+    # would otherwise make every arm inherit its undocumented items as
+    # violations. Score what the agent produced, not what it was handed.
+    inherited = baseline_public_items(config)
+
+    public = []
+    undocumented = []
+    for module in production:
+        for item in module.production_items():
+            if item["kind"] not in DOCUMENTED_KINDS:
+                continue
+            if not item["visibility"].startswith("pub"):
+                continue
+            label = f"{module.relative}::{item['name']}"
+            if label in inherited:
+                continue
+            public.append(label)
+            if item.get("doc", "").strip():
+                continue
+            if item["kind"] == "mod" and item["name"] in documented_modules:
+                continue
+            undocumented.append(label)
+
+    crate_docs = [module.relative for module in production if module.crate_doc.strip()]
+    signals_inherited = sorted(inherited)
+
+    evidence = []
+    if not public:
+        evidence.append("the crate exposes no public items")
+    if undocumented:
+        evidence.append(f"{len(undocumented)} public item(s) carry no doc comment")
+    if not crate_docs:
+        evidence.append("no crate-level documentation")
+
+    return result(
+        public and not undocumented,
+        {
+            "public_items": public,
+            "undocumented_public_items": undocumented,
+            "crate_documented_files": crate_docs,
+            "inherited_from_skeleton": signals_inherited,
+        },
+        evidence,
+    )
+
+
+CHECKS.update(
+    {
+        "craftsperson/rust/centralize-curated-lint-policy": check_rust_lint_policy,
+        "craftsperson/rust/compile-public-documentation": check_rust_public_docs,
+        "craftsperson/rust/isolate-functional-core-from-effects": check_rust_functional_core,
+        "craftsperson/rust/prefer-fakes-at-boundaries": check_rust_fakes,
+        "craftsperson/rust/put-gateways-at-effect-boundaries": check_rust_gateway_traits,
+        "craftsperson/rust/use-purpose-specific-test-layers": check_rust_test_layers,
+        "craftsperson/rust/use-results-for-recoverable-library-errors": check_rust_result_errors,
+        "craftsperson/rust/use-structured-tracing": check_rust_tracing,
+    }
+)

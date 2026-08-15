@@ -23,6 +23,7 @@ Everything scenario-specific stays in the check that needs it. A constant like
 
 import ast
 import configparser
+import pathlib
 import tomllib
 
 SKIP_DIRECTORIES = {
@@ -401,4 +402,192 @@ def not_applicable(signals, evidence):
         "followed": None,
         "signals": signals,
         "evidence": evidence,
+    }
+
+
+# --------------------------------------------------------------------------
+# Rust
+#
+# Python's `ast` has no counterpart here, so `rustfacts/` — a small syn-based
+# binary — supplies the same facts as JSON. What survives the change of parser
+# is the *question forms*, not the traversals: "is a symbol used", "is it used
+# there", "what shape does this construct have", "what did the project declare"
+# all still apply, and each needs a different implementation underneath.
+#
+# The differences are real and worth naming. Rust's test scope is an attribute
+# (`#[cfg(test)]`) rather than a directory, so production and test code
+# interleave inside one file and the partition is per item, not per module.
+# Panicking is a macro, not a call. Substitution is a trait impl, not a patch.
+# --------------------------------------------------------------------------
+
+RUST_IO_SYMBOLS = {
+    "std::fs",
+    "std::net",
+    "std::process",
+    "std::env",
+    "reqwest",
+    "ureq",
+    "tokio::fs",
+    "tokio::net",
+}
+
+RUST_IO_CALLS = {
+    "read_to_string",
+    "write",
+    "create",
+    "open",
+    "remove_file",
+    "var",
+    "var_os",
+    "connect",
+}
+
+
+class RustModule:
+    """One Rust source file, as facts rather than as a tree."""
+
+    def __init__(self, facts):
+        self.facts = facts
+        self.relative = facts["path"]
+        self.parts = tuple(self.relative.split("/"))
+        self.parse_error = (
+            f"{self.relative}: {facts['parse_error']}" if facts.get("parse_error") else None
+        )
+        self.crate_doc = facts.get("crate_doc", "")
+        self.crate_attrs = facts.get("crate_attrs", [])
+        self.uses = facts.get("uses", [])
+        self.items = facts.get("items", [])
+        self.calls = facts.get("calls", [])
+        self.macros = facts.get("macros", [])
+
+    @property
+    def is_test(self):
+        """File-level only. Inline `#[cfg(test)]` items are handled per item."""
+        return self.parts[0] in {"tests", "benches"}
+
+    @property
+    def is_source(self):
+        return self.parts[0] == "src"
+
+    def label(self, record):
+        return f"{self.relative}:{record.get('line', 0)}"
+
+    def production_items(self, kind=None):
+        return [
+            item
+            for item in self.items
+            if not item["in_test_scope"]
+            and not self.is_test
+            and (kind is None or item["kind"] == kind)
+        ]
+
+    def test_items(self, kind=None):
+        return [
+            item
+            for item in self.items
+            if (item["in_test_scope"] or self.is_test)
+            and (kind is None or item["kind"] == kind)
+        ]
+
+    def has_inline_test_module(self):
+        return any(
+            item["kind"] == "mod" and item["in_test_scope"] for item in self.items
+        )
+
+    def performs_io(self):
+        """Does this file reach outside the process?"""
+        if any(any(symbol in use for symbol in RUST_IO_SYMBOLS) for use in self.uses):
+            return True
+        return any(
+            call["name"] in RUST_IO_CALLS and not call["in_test_scope"] for call in self.calls
+        )
+
+
+def collect_rust(root, binary):
+    """Run the fact extractor over a workspace and wrap the result."""
+    import json
+    import subprocess
+
+    completed = subprocess.run(
+        [str(binary), str(root)], capture_output=True, text=True, check=False
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"rustfacts failed: {completed.stderr.strip()}")
+    document = json.loads(completed.stdout)
+    modules = []
+    for facts in document["files"]:
+        module = RustModule(facts)
+        source = root / module.relative
+        module.source = source.read_text(encoding="utf-8", errors="replace") if source.is_file() else ""
+        modules.append(module)
+    return modules
+
+
+def rust_calls(modules, names, in_test=None):
+    """Every call whose method or final path segment is one of `names`."""
+    found = []
+    for module in modules:
+        for call in module.calls:
+            if call["name"] not in names:
+                continue
+            if in_test is not None and call["in_test_scope"] != in_test:
+                continue
+            found.append({"where": module.label(call), "call": call["full"]})
+    return found
+
+
+def rust_macros(modules, names, in_test=None):
+    """Every macro invocation named one of `names`. Rust panics are macros."""
+    found = []
+    for module in modules:
+        for invocation in module.macros:
+            if invocation["name"] not in names:
+                continue
+            if in_test is not None and invocation["in_test_scope"] != in_test:
+                continue
+            found.append(
+                {
+                    "where": module.label(invocation),
+                    "macro": invocation["name"],
+                    "arguments": invocation["arguments"],
+                }
+            )
+    return found
+
+
+def cargo_manifest(root):
+    """The parsed Cargo.toml, or an empty mapping when there is none."""
+    manifest = root / "Cargo.toml"
+    if not manifest.is_file():
+        return {}
+    try:
+        return tomllib.loads(manifest.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError:
+        return {}
+
+
+def baseline_public_items(config):
+    """Public items the skeleton already had, so a check can score only new work.
+
+    The runner puts the skeleton path in `check_config["baseline_root"]`. A
+    scenario skeleton is deliberately stripped of the conventions under test, and
+    without this a check would read that stripping as the agent's failure. Every
+    scored intent should be about what the agent produced.
+    """
+    root = config.get("baseline_root")
+    binary = config.get("rustfacts_binary")
+    if not root or not binary:
+        return set()
+    root = pathlib.Path(root)
+    if not root.is_dir():
+        return set()
+    try:
+        modules = collect_rust(root, binary)
+    except (RuntimeError, OSError):
+        return set()
+    return {
+        f"{module.relative}::{item['name']}"
+        for module in modules
+        for item in module.items
+        if item["visibility"].startswith("pub")
     }

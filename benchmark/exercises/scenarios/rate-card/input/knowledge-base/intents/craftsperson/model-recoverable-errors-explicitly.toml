@@ -1,0 +1,382 @@
+id = "guidelines.intent.model-recoverable-errors-explicitly"
+title = "Model recoverable errors explicitly"
+category = "reliability"
+tags = ["error-modeling", "recoverability", "contracts"]
+status = "hypothesized"
+confidence = 0.98
+capability = "Callers can distinguish, handle, and test expected failure outcomes without parsing incidental diagnostics."
+threat = "Recoverable failures escape as unchecked exceptions, panics, ambiguous sentinel values, or unstructured strings."
+expectation = "Invalid input, unavailable dependencies, and ordinary domain rejection will occur during normal operation."
+strategy = "Represent expected failures as explicit domain outcomes with stable identity and preserve unexpected failures for exceptional handling."
+evidence = [{ type = "contract_test", description = "Public operations expose stable distinguishable failure outcomes and tests cover caller handling.", required = true }]
+tradeoff = "Explicit failure types and mappings add branches and maintenance when the failure vocabulary changes."
+scope = { project = "guidelines", paths = ["plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md", "plugins/elixir-ecosystem/agents/elixir-craftsperson.md", "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md", "plugins/typescript-ecosystem/agents/typescript-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/cpp-qt-ecosystem/agents/cpp-qt-craftsperson.md#error-handling", summary = "Models recoverable errors as explicit values.", confidence = 1.0 }, { type = "document", ref = "plugins/elixir-ecosystem/agents/elixir-craftsperson.md#code-structure--patterns", summary = "Models recoverable errors explicitly and reserves exceptional failure mechanisms.", confidence = 1.0 }, { type = "document", ref = "plugins/jvm-ecosystem/agents/kotlin-craftsperson.md#error-prevention", summary = "Uses exhaustive result values for recoverable outcomes.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+(defn withdraw [account amount]
+  (cond
+    (neg? amount)
+    {:error :withdraw/invalid-amount}
+
+    (< (:balance account) amount)
+    {:error :withdraw/insufficient
+     :short (- amount (:balance account))}
+
+    :else {:ok (update account :balance - amount)}))
+
+(deftest caller-branches-on-stable-failure-identity
+  (is (= :withdraw/insufficient
+         (:error (withdraw {:balance 10} 50)))))
+'''
+bad = '''
+(defn withdraw [account amount]
+  (when (< (:balance account) amount)
+    ; recoverable outcome escapes as a generic throwable
+    (throw (Exception. (str "cannot withdraw " amount))))
+  (update account :balance - amount))
+
+;; caller, forced to parse prose:
+(try (withdraw acct 50)
+     (catch Exception e
+       (when (str/starts-with? (.getMessage e) "cannot with")
+         :retry-with-less)))
+'''
+
+[examples.cpp]
+good = '''
+enum class ChargeError { CardExpired, InsufficientFunds,
+                         GatewayUnavailable };
+
+std::expected<Receipt, ChargeError>
+charge(const Card& card, Money amount);
+
+// Callers branch on stable identity — and tests cover it:
+if (auto r = charge(card, amount); !r) {
+  if (r.error() == ChargeError::GatewayUnavailable)
+    scheduleRetry();
+}
+'''
+bad = '''
+Receipt charge(const Card& card, Money amount) {
+  if (card.expired())
+    throw std::runtime_error("something went wrong");
+  if (funds(card) < amount)
+    throw std::runtime_error("something went wrong: funds");
+  return gateway_.submit(card, amount);
+}
+// callers are reduced to parsing message text:
+//   if (std::string(e.what()).find("funds") != npos) ...
+// and one rewording breaks every handler in the codebase
+'''
+
+[examples.csharp]
+good = '''
+public abstract record TransferResult
+{
+    public sealed record Completed(Guid Receipt)
+        : TransferResult;
+    public sealed record InsufficientFunds(Money Short)
+        : TransferResult;
+    public sealed record AccountFrozen : TransferResult;
+}
+// callers branch on stable identity, not prose
+return await bank.Transfer(from, to, amount) switch
+{
+    TransferResult.Completed c => Results.Ok(c.Receipt),
+    TransferResult.InsufficientFunds f =>
+        Results.UnprocessableEntity(f.Short),
+    TransferResult.AccountFrozen =>
+        Results.Conflict("frozen"),
+};
+'''
+bad = '''
+public async Task Transfer(Account a, Account b,
+    decimal amt)
+{
+    if (a.Balance < amt)
+        throw new Exception("insufficient"); // untyped
+    if (a.Frozen)
+        throw new Exception("frozen acct");  // untyped
+}
+
+try { await bank.Transfer(from, to, amount); }
+catch (Exception ex)
+    when (ex.Message.Contains("insuf")) // parsing prose
+{ return Results.UnprocessableEntity(ex.Message); }
+'''
+
+[examples.elixir]
+good = '''
+@spec withdraw(Account.t(), Money.t()) ::
+        {:ok, Account.t()} | {:error, :insufficient_funds}
+def withdraw(%Account{balance: b}, amount)
+    when b < amount,
+    do: {:error, :insufficient_funds}
+
+def withdraw(account, amount),
+  do: {:ok, debit(account, amount)}
+
+# callers match a stable identity, and tests pin it:
+# assert {:error, :insufficient_funds} = ...
+'''
+bad = '''
+def withdraw(account, amount) do
+  if account.balance < amount do
+    # an expected outcome escapes as a crash with prose
+    raise "problem with withdrawal: #{inspect(amount)}"
+  else
+    debit(account, amount)
+  end
+end
+
+# the caller, reduced to parsing diagnostics:
+# rescue e -> String.contains?(e.message, "problem")
+'''
+
+[examples.go]
+good = '''
+var ErrInsufficientFunds = errors.New("insufficient funds")
+
+func (a *Account) Withdraw(amt Money) error {
+	if amt.GreaterThan(a.balance) {
+		return fmt.Errorf("withdraw %v: %w",
+			amt, ErrInsufficientFunds)
+	}
+	a.balance = a.balance.Sub(amt)
+	return nil
+}
+
+// callers branch on identity, not prose:
+// if errors.Is(err, ErrInsufficientFunds) { offerTopUp() }
+'''
+bad = '''
+func (a *Account) Withdraw(amt Money) error {
+	if amt.GreaterThan(a.balance) {
+		return errors.New("bad amount") // which failure is this?
+	}
+	if a.frozen {
+		return errors.New("bad amount") // same words, new meaning
+	}
+	a.balance = a.balance.Sub(amt)
+	return nil
+}
+
+// the only handling option left to callers:
+// if strings.Contains(err.Error(), "bad amount") { ... }
+'''
+
+[examples.java]
+good = '''
+sealed interface TransferResult
+        permits Transferred, InsufficientFunds, Frozen {}
+record Transferred(TxnId id) implements TransferResult {}
+record InsufficientFunds(Money shortfall)
+        implements TransferResult {}
+record Frozen(AccountId account) implements TransferResult {}
+
+// each expected outcome is distinguishable and testable
+var message = switch (bank.transfer(from, to, amount)) {
+    case Transferred t       -> "Sent: " + t.id();
+    case InsufficientFunds f -> "Short by " + f.shortfall();
+    case Frozen f            -> "Account frozen; contact us";
+};
+'''
+bad = '''
+void transfer(Account from, Account to, Money amount) {
+    if (from.balance().lessThan(amount)) {
+        // caller must parse prose to react to an EXPECTED case
+        throw new RuntimeException(
+            "transfer failed: " + amount + " over balance");
+    }
+    if (from.frozen()) {
+        throw new RuntimeException("transfer failed: frozen");
+    }
+    ledger.move(from, to, amount);
+}
+// catch (RuntimeException e)
+//     if (e.getMessage().contains("frozen")) ...
+'''
+
+[examples.kotlin]
+good = '''
+sealed interface TransferResult {
+    data class Done(val receipt: Receipt) : TransferResult
+    data object InsufficientFunds : TransferResult
+    data class LimitExceeded(val limit: Money) : TransferResult
+}
+
+interface Ledger {
+    fun transfer(from: Account, to: Account, amt: Money):
+        TransferResult // callers must handle each outcome
+}
+'''
+bad = '''
+fun transfer(from: Account, to: Account, amt: Money): Receipt {
+    if (from.balance < amt)
+        throw RuntimeException("low funds") // unchecked, vague
+    return ledger.move(from, to, amt)
+}
+
+// the caller's only option is string-matching a message
+try { transfer(a, b, amount) } catch (e: RuntimeException) {
+    if (e.message == "low funds") showTopUpPrompt()
+}
+'''
+
+[examples.python]
+good = '''
+@dataclass(frozen=True)
+class Withdrawn:
+    new_balance: Money
+
+@dataclass(frozen=True)
+class InsufficientFunds:
+    shortfall: Money
+
+def withdraw(acct: Account,
+             amt: Money) -> Withdrawn | InsufficientFunds:
+    # expected failure is a stable, testable outcome
+    if amt > acct.balance:
+        return InsufficientFunds(shortfall=amt - acct.balance)
+    return Withdrawn(new_balance=acct.balance - amt)
+'''
+bad = '''
+def withdraw(acct: Account, amt: Money) -> Money:
+    if amt > acct.balance:
+        raise Exception(f"error: bad amount {amt}")
+    return acct.balance - amt
+
+try:
+    balance = withdraw(acct, amt)
+except Exception as e:
+    # callers parse prose to learn what happened; any
+    # rewording of the message breaks this branch
+    if "bad amount" in str(e):
+        show_topup_prompt()
+'''
+
+[examples.ruby]
+good = '''
+Charge = Data.define(:ok, :receipt, :error)
+
+def charge(amount_cents:)
+  unless card.authorize(amount_cents)
+    return Charge.new(ok: false, receipt: nil,
+                      error: :card_declined) # stable identity
+  end
+  Charge.new(ok: true, receipt: receipt, error: nil)
+end
+
+case charge(amount_cents: 500)
+in { ok: true, receipt: } then fulfill(receipt)
+in { error: :card_declined } then prompt_new_card
+end
+'''
+bad = '''
+def charge(amount_cents:)
+  card.authorize(amount_cents) or raise "declined!" # prose only
+  receipt
+end
+
+begin
+  charge(amount_cents: 500)
+rescue RuntimeError => e
+  retry if e.message.include?("decl") # parsing prose to branch
+end
+'''
+
+[examples.rust]
+good = '''
+#[derive(Debug, thiserror::Error)]
+pub enum TransferError {
+    #[error("insufficient funds: short {0}")]
+    InsufficientFunds(Cents),
+    #[error("account {0} is frozen")]
+    AccountFrozen(AccountId),
+}
+// callers match on stable, distinguishable outcomes
+pub fn withdraw(acct: &Account, amt: Cents)
+    -> Result<(), TransferError> {
+    if acct.frozen {
+        return Err(TransferError::AccountFrozen(acct.id));
+    }
+    Ok(())
+}
+'''
+bad = '''
+pub fn withdraw(acct: &Account, amt: Cents)
+    -> Result<(), String> {
+    if acct.frozen {
+        // caller must parse prose to tell outcomes apart
+        return Err(format!("cannot withdraw: {:?}", acct.id));
+    }
+    if acct.balance < amt {
+        panic!("insufficient funds"); // recoverable, but fatal
+    }
+    Ok(())
+}
+'''
+
+[examples.swift]
+good = '''
+enum TransferError: Error, Equatable {
+    case insufficientFunds(shortfall: Decimal)
+    case accountFrozen
+}
+
+func transfer(_ amount: Decimal,
+              to target: Account) throws(TransferError) {
+    guard !target.isFrozen else { throw .accountFrozen }
+    guard balance >= amount else {
+        throw .insufficientFunds(shortfall: amount - balance)
+    }
+    post(amount, to: target)
+}
+'''
+bad = '''
+func transfer(_ amount: Decimal, to target: Account) -> String {
+    if target.isFrozen { return "ERROR: frozen" }
+    if balance < amount { return "ERROR: low funds" }
+    post(amount, to: target)
+    return "ok"
+}
+
+// callers parse prose to distinguish outcomes:
+if transfer(50, to: savings).hasPrefix("ERROR") { retry() }
+'''
+
+[examples.typescript]
+good = '''
+type TransferResult =
+  | { ok: true; confirmation: string }
+  | { ok: false; error: "insufficient-funds" | "frozen" };
+
+export async function transfer(
+  from: Account, to: Account, amount: number,
+): Promise<TransferResult> {
+  if (from.frozen) return { ok: false, error: "frozen" };
+  if (from.balance < amount)
+    return { ok: false, error: "insufficient-funds" };
+  const confirmation = await ledger.post(from, to, amount);
+  return { ok: true, confirmation };
+}
+'''
+bad = '''
+export async function transfer(
+  from: Account, to: Account, amount: number,
+): Promise<string> {
+  if (from.frozen) throw new Error("account frozen");
+  if (from.balance < amount)
+    throw new Error("insufficient funds");
+  return ledger.post(from, to, amount);
+}
+
+// Callers must parse prose to react to expected outcomes:
+try { await transfer(a, b, 50); } catch (e) {
+  if ((e as Error).message.includes("frozen")) notify(a);
+}
+'''

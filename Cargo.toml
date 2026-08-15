@@ -1,5 +1,10 @@
 [workspace]
 members = ["cmx", "cmx-core", "cmf"]
+# Behavioural-exercise material: the fact extractor, the Rust scenario skeleton,
+# its reference solution, and every generated run workspace. These are fixtures
+# and harness tooling, not crates cmx ships, and they must stay out of
+# `--workspace` builds, the rustdoc gate, and `cargo deny`.
+exclude = ["benchmark/exercises"]
 resolver = "3"
 
 [workspace.package]

@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-results-for-recoverable-library-errors"
+title = "Use Result for recoverable library failures"
+category = "reliability"
+tags = ["rust", "concurrency", "testing", "error-handling", "error-modeling", "recoverability"]
+relations = [
+  { type = "specializes", target = "craftsperson/model-recoverable-errors-explicitly" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Library callers can handle expected failure modes without process termination."
+threat = "Recoverable conditions are expressed through unwrap, expect, or panic and become uncontrolled crashes."
+expectation = "Libraries will be embedded in applications with differing recovery and reliability policies."
+strategy = "Return Result<T, E> for recoverable failures and avoid unwrap, expect, and panic outside tests for those conditions."
+evidence = [{ type = "static_analysis", description = "Non-test library code contains no unjustified unwrap, expect, or panic for recoverable paths.", required = true }]
+tradeoff = "Fallible APIs require propagation and handling code at call sites."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#error-handling", summary = "Requires Result for recoverable library errors and rejects unwrap, expect, and panic outside tests.", confidence = 1.0 }]

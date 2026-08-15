@@ -417,6 +417,7 @@ overlap say nothing about whether guidance changes work; these do.
 - `benchmark/exercises/adherence.py` — workspace partitioning and orchestration; never asks a model, never reads the agent transcript
 - `benchmark/exercises/checks.py` — one check per intent, taking `(workspace, config)`
 - `benchmark/exercises/predicates.py` — the traversals checks share: symbol use, syntactic containment, construct shape, declared tool config
+- `benchmark/exercises/rustfacts/` — standalone `syn` binary emitting the same facts for Rust as JSON; built on demand, excluded from the cmx workspace
 - `benchmark/exercises/agents.toml` — argv, guidance file locations, and isolation flags per agent CLI
 - `benchmark/exercises/scenarios/<name>/` — `TASK.md`, neutral `input/skeleton/`, intent snapshot and profile, hidden `acceptance/`, and a `reference/` solution that proves the targets are jointly reachable
 
@@ -425,9 +426,19 @@ in `checks.py`. A constant that would have to change per scenario — which
 literals mark the business rules, which symbols count as blocking — belongs to
 the exercise that knows it.
 
-Validate harness changes against both ends before trusting a run:
-`--implementation reference` must score full marks and `--skip-agent` must
-score zero. A check that cannot fail is not measuring anything.
+Validate harness changes against both ends of *every* scenario before trusting
+a run: `--implementation reference` must score full marks and `--skip-agent`
+must score zero. A check that cannot fail is not measuring anything.
+
+Three scenarios: `fx-settlement` (Python; structure, naming, typing),
+`probe-fanout` (Python; concurrency and resource lifetime), and `rate-card`
+(Rust; errors, effect boundaries, test layers, lint policy). Intent sets are
+disjoint. A scenario names its `language` in `expected.json`.
+
+`benchmark/exercises` is in the root `workspace.exclude` list. The Rust scenario
+skeleton, its reference solution, every generated run workspace, and the fact
+extractor are fixtures and tooling — they must stay out of `--workspace` builds,
+the rustdoc gate, and `cargo deny`.
 
 ## Spec
 

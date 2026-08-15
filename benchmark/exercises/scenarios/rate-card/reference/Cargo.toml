@@ -1,0 +1,20 @@
+[package]
+name = "ratecard"
+version = "0.1.0"
+edition = "2021"
+description = "Shipping rate quotes from a zone rate card."
+
+[dependencies]
+tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"

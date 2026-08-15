@@ -1,0 +1,17 @@
+id = "guidelines.intent.use-purpose-specific-test-layers"
+title = "Use purpose-specific Rust test layers"
+category = "testing"
+tags = ["rust", "testing", "documentation", "dependencies", "test-strategy", "test-pyramid"]
+relations = [
+  { type = "specializes", target = "craftsperson/use-purpose-specific-test-layers" },
+]
+status = "hypothesized"
+confidence = 0.97
+capability = "Pure behavior, boundary wiring, cross-module flows, and published examples are each verified at the cheapest useful layer."
+threat = "One test style is used for everything, producing either slow suites or gaps in integration and documentation behavior."
+expectation = "Rust projects will contain both pure logic and system boundaries plus examples consumed as documentation."
+strategy = "Use inline unit tests for pure logic, tests/*.rs for wiring and cross-module behavior, and doctests for compilable examples."
+evidence = [{ type = "test_inventory", description = "Behavior is covered at the appropriate unit, integration, or doctest layer without redundant implementation coupling.", required = true }]
+tradeoff = "Multiple test layers create more harness structure and can duplicate setup."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#testing-strategy", summary = "Assigns unit, integration, and doctest responsibilities by purpose.", confidence = 1.0 }]

@@ -1,0 +1,20 @@
+{
+  "acceptance_check_count": 10,
+  "check_config": {
+    "business_rule_minimum_matches": 2,
+    "business_rule_pattern": "\\b10_?000\\b|\\b500\\b|\\b20\\b",
+    "package": "ratecard"
+  },
+  "knowledge_base_intent_count": 16,
+  "language": "rust",
+  "scored_intents": [
+    "craftsperson/rust/centralize-curated-lint-policy",
+    "craftsperson/rust/compile-public-documentation",
+    "craftsperson/rust/isolate-functional-core-from-effects",
+    "craftsperson/rust/prefer-fakes-at-boundaries",
+    "craftsperson/rust/put-gateways-at-effect-boundaries",
+    "craftsperson/rust/use-purpose-specific-test-layers",
+    "craftsperson/rust/use-results-for-recoverable-library-errors",
+    "craftsperson/rust/use-structured-tracing"
+  ]
+}

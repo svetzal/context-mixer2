@@ -1,0 +1,292 @@
+id = "guidelines.intent.honor-the-project-quality-gate"
+title = "Honor the project quality gate"
+category = "quality"
+tags = ["quality-gates", "project-conventions", "completion"]
+relations = [
+  { type = "related-to", target = "craftsperson/require-passing-tests-before-completion" },
+  { type = "related-to", target = "craftsperson/require-canonical-formatting" },
+  { type = "related-to", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.99
+capability = "Completed changes satisfy the repository's agreed automated definition of technical readiness."
+threat = "A contributor runs a convenient subset, ignores failures, or substitutes personal judgment for the shared gate."
+expectation = "The quality gate will encode project-specific risks that are not obvious from the edited files alone."
+strategy = "Discover and run the complete project-defined gate, remediate failures, and report any check that could not run."
+evidence = [{ type = "quality_gate", description = "Every project-defined completion check passes, or an unavailable check is disclosed with its exact limitation.", required = true }]
+tradeoff = "Complete gates can be slow and may block work because of unrelated infrastructure or flaky checks."
+scope = { project = "guidelines", paths = ["plugins/clojure-ecosystem/agents/clojure-craftsperson.md", "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md", "plugins/jvm-ecosystem/agents/java-craftsperson.md", "plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/clojure-ecosystem/agents/clojure-craftsperson.md#quality-gates-mandatory", summary = "Defines a mandatory complete project quality gate.", confidence = 1.0 }, { type = "document", ref = "plugins/dotnet-ecosystem/agents/csharp-craftsperson.md#quality-gates-mandatory", summary = "Treats the repository-wide quality gate as non-negotiable completion evidence.", confidence = 1.0 }, { type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#mandatory-quality-gates-default-set-if-repo-doesnt-specify-its-own", summary = "Defers to the repository gate and supplies a complete default when absent.", confidence = 1.0 }]
+
+# --- code examples (rendered by the intent atlas; managed by site/merge_examples.py) ---
+
+[examples.clojure]
+good = '''
+$ clojure -T:build ci          ; the repo's documented gate
+Running cljfmt check...  OK
+Running clj-kondo...     OK (0 findings)
+Running kaocha...        211 tests, 604 assertions, 0 failures
+Running cljdoc check...  SKIPPED (no network in this sandbox)
+
+Report: full gate green except the cljdoc check, which needs
+network access I don't have — flagged explicitly for CI.
+'''
+bad = '''
+$ clojure -M:test --focus app.checkout-test  ; convenient subset
+2 tests, 5 assertions, 0 failures.
+
+"Done — checkout tests pass."
+
+; the repo gate is `clojure -T:build ci` (fmt + kondo + full
+; suite); kondo has 14 new findings and two other namespaces
+; fail — none of it was run, none of it was disclosed
+'''
+
+[examples.cpp]
+good = '''
+$ cmake --preset ci && ctest --preset ci
+  100% tests passed, 214/214
+$ clang-tidy -p build $(git diff --name-only main -- '*.cpp')
+  0 warnings
+$ pre-commit run --all-files
+  all hooks passed
+
+Completion note: the ASan job needs the Linux runner and
+could not run locally — disclosed as unrun; CI covers it.
+'''
+bad = '''
+$ ctest -R MyNewFeature        # ran a convenient subset only
+  2/2 tests passed
+# clang-tidy: skipped — "it always complains anyway"
+# pre-commit: bypassed with --no-verify
+# ASan job: not mentioned anywhere
+
+Marked task Done: "everything passes".
+# CI, an hour later: 7 failures in suites the change touched
+'''
+
+[examples.csharp]
+good = '''
+$ grep -A1 "quality gate" CONTRIBUTING.md
+  Run ./build.sh check before calling any change done.
+
+$ ./build.sh check
+  format ....... ok
+  analyzers .... ok
+  tests ........ 214 passed
+  coverage ..... 87% (floor 85%)
+
+# mutation step needs network, unavailable offline —
+# disclosed as-is in the completion note
+'''
+bad = '''
+$ ./build.sh check
+  analyzers .... 3 errors
+  tests ........ 2 failed
+
+# substitute a convenient personal subset for the gate
+$ dotnet test --filter Category=Fast
+  Passed! 41 tests
+
+$ echo "done — fast tests green, the rest is noise"
+'''
+
+[examples.elixir]
+good = '''
+$ mix check     # the project-defined gate: format,
+                # credo, dialyzer, test --cover
+  ...all checks passed
+
+Report: dialyzer PLT rebuild was unavailable offline.
+Ran everything else; flagging dialyzer explicitly as
+NOT verified in this run rather than claiming a pass.
+'''
+bad = '''
+$ mix test test/my_feature_test.exs    # just my file
+  1 test, 0 failures
+
+"Done — tests pass."
+
+# mix check (format, credo, dialyzer, full suite) never
+# ran; this diff's credo failures land on the next
+# contributor, who inherits a red gate they didn't cause
+'''
+
+[examples.go]
+good = '''
+$ make check      # the gate the repo defines, run in full
+gofmt -l .
+go vet ./...
+golangci-lint run
+go test -race ./...
+ok      example.com/svc/...   (all packages)
+
+# the docker-based contract suite cannot run on this machine;
+# the completion note discloses exactly that, nothing hidden
+'''
+bad = '''
+$ grep -A1 '^check:' Makefile
+check:
+	go vet ./... && golangci-lint run && go test -race ./...
+
+$ go test ./internal/parser    # convenient subset instead
+ok      example.com/svc/internal/parser
+$ git push    # vet, lint, race, and every other package:
+              # never ran, never mentioned
+'''
+
+[examples.java]
+good = '''
+$ make check            # the gate named in CONTRIBUTING.md
+spotless ......... OK
+unit tests ....... OK (412)
+integration ...... OK (38)
+errorprone ....... OK
+
+Completion note: full `make check` green locally.
+Contract tests require the vendor VPN and could not run —
+disclosed here explicitly, not skipped silently.
+'''
+bad = '''
+$ mvn test -Dtest=InvoiceTest   # the gate is `make check`
+[INFO] Tests run: 5, Failures: 0
+BUILD SUCCESS
+
+Status update: "All checks pass, ready to merge."
+
+# formatter, errorprone, and the integration suite never
+# ran — two of them fail on this branch; a convenient
+# subset was substituted for the shared definition of done
+'''
+
+[examples.kotlin]
+good = '''
+$ ./gradlew check     # the gate the project defines
+> test, ktlintCheck, detekt, koverVerify
+BUILD SUCCESSFUL
+
+Completion note: "gradlew check green. integrationTest not
+run — requires Docker, unavailable on this host; flagging
+so it runs in CI before release."
+'''
+bad = '''
+$ ./gradlew test --tests "InvoiceCalculatorTest"  # subset
+BUILD SUCCESSFUL
+
+Completion note: "all checks pass"
+# ktlint, detekt, kover, and the rest of the suite never
+# ran; the shared gate was replaced by personal judgment
+'''
+
+[examples.python]
+good = '''
+$ make check          # the repo's full agreed gate
+ruff format --check   ok
+ruff check .          ok
+mypy src/             ok
+pytest -q             214 passed
+docs build            ok
+
+Reporting: `make check-license` needs a network token this
+environment lacks — not run, flagged for the reviewer.
+'''
+bad = '''
+$ pytest tests/test_pricing.py    # just the file I touched
+3 passed
+
+$ git commit -m "Done, pricing tests pass"
+
+# the gate is `make check`; mypy and the full suite never
+# ran, and two modules importing the renamed function are
+# now broken on main
+'''
+
+[examples.ruby]
+good = '''
+$ bin/check      # the project-defined gate
+rubocop ........ no offenses
+rspec .......... 412 examples, 0 failures
+brakeman ....... 0 warnings
+
+Report: full gate green. license_finder could not run
+(no network in this sandbox) — disclosed with its exact
+limitation, not skipped silently.
+'''
+bad = '''
+$ bundle exec rspec spec/models/user_spec.rb  # convenient subset
+12 examples, 0 failures
+
+# bin/check exists: rubocop + brakeman + the full suite.
+# dev: "lint failures are just style, shipping anyway"
+
+Report: "All checks pass."
+'''
+
+[examples.rust]
+good = '''
+$ grep -A2 '^check:' Makefile
+check:
+	cargo fmt --all --check
+	cargo clippy --workspace -- -D warnings && cargo test
+
+$ make check
+...                        # all three stages pass
+
+Report: the project's own gate (`make check`) is green.
+'''
+bad = '''
+$ make check
+error: clippy: `unwrap` may panic (2 warnings)
+test orders::rounds_half_up ... FAILED
+
+$ cargo test my_new_module   # convenient subset instead
+test result: ok. 4 passed
+
+Report: "Done — tests pass."  # the shared gate never ran
+'''
+
+[examples.swift]
+good = '''
+$ make check     # the project-defined gate, all of it
+  swiftformat --lint  OK
+  swiftlint --strict  OK
+  swift test          412 passed
+
+Note: snapshot suite could not run — this runner has no
+iOS 18 simulator. Disclosed in the report rather than
+silently skipped; CI will exercise it.
+'''
+bad = '''
+$ swift test --filter CartTests   # convenient subset
+  14 passed
+
+"Done — tests pass."
+
+# lint and the full suite never ran; the two known UI-test
+# failures are left for whoever notices CI go red
+'''
+
+[examples.typescript]
+good = '''
+$ jq -r .scripts.verify package.json
+tsc --noEmit && eslint . && vitest run && knip
+
+$ npm run verify
+tsc: clean   eslint: clean   vitest: 214 passed   knip: clean
+
+Report: full project gate run as defined. knip required a
+network-restricted cache and was re-run offline — noted in
+the completion summary.
+'''
+bad = '''
+$ npm run verify
+eslint: 3 errors   vitest: 2 failed
+
+$ npx vitest run tests/my-feature.spec.ts   # just mine
+ ✓ tests/my-feature.spec.ts (1 passed)
+
+"Done — tests pass."
+
+# The shared gate was replaced by a convenient subset and
+# the two known failures went unmentioned.
+'''

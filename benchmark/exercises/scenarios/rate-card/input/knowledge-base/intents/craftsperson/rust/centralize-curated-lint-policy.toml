@@ -1,0 +1,17 @@
+id = "guidelines.intent.centralize-curated-lint-policy"
+title = "Centralize a curated lint policy"
+category = "quality"
+tags = ["rust", "static-analysis", "warnings", "automation"]
+relations = [
+  { type = "specializes", target = "craftsperson/resolve-static-analysis-findings" },
+]
+status = "hypothesized"
+confidence = 0.98
+capability = "All workspace members apply one visible, intentional static-analysis standard."
+threat = "Lint flags scattered through source and environment settings drift, while broad groups impose noisy or contradictory rules."
+expectation = "Workspaces will add crates, contributors, and CI entry points that need consistent lint behavior."
+strategy = "Declare lint policy in Cargo.toml through lints and workspace.lints and curate groups instead of enabling clippy::restriction wholesale."
+evidence = [{ type = "manifest_review", description = "Workspace lint configuration is centralized and every enabled restriction lint has an intentional rationale.", required = true }]
+tradeoff = "A curated policy requires ongoing maintenance as Clippy adds or changes lints."
+scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#lint-configuration", summary = "Recommends Cargo-based centralized lints and rejects wholesale clippy::restriction enablement.", confidence = 1.0 }]
