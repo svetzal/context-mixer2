@@ -87,6 +87,7 @@ def load_trials(roots, scenario=None):
     is counted once, keyed by where it came from rather than by file path.
     """
     trials = []
+    invalid = []
     seen = set()
     paths = []
     for root in roots:
@@ -113,6 +114,11 @@ def load_trials(roots, scenario=None):
             )
         if kind != "agent":
             continue
+        # An invocation that failed did not measure the model. Counted and
+        # reported, never averaged.
+        if metrics.get("valid") is False:
+            invalid.append(metrics)
+            continue
         identity = (
             metrics.get("scenario"),
             metrics.get("agent", {}).get("name"),
@@ -124,6 +130,11 @@ def load_trials(roots, scenario=None):
         seen.add(identity)
         metrics["_path"] = str(path)
         trials.append(metrics)
+    if invalid:
+        print(
+            f"warning: {len(invalid)} trial(s) excluded — the agent invocation failed",
+            file=sys.stderr,
+        )
     return trials
 
 

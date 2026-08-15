@@ -527,6 +527,16 @@ def run_trial(job):
         and acceptance_results["errors"] == 0
         and acceptance_results["collected"] == expected["acceptance_check_count"],
         "trial": job["trial"],
+        # A trial only measures a model if the model actually ran. A rate limit,
+        # a crash, or a timeout produces an empty workspace that scores like a
+        # model doing badly — the one failure mode that silently corrupts a rate
+        # over a long unattended sweep.
+        "valid": job["kind"] == "calibration"
+        or bool(
+            agent_run.get("exit_code") == 0
+            and not agent_run.get("timed_out")
+            and (agent_run.get("telemetry") or {}).get("parsed")
+        ),
         "workspace": report["workspace"],
         **extra,
     }
