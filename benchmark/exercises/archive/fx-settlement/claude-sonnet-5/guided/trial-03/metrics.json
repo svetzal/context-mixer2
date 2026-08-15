@@ -1,0 +1,344 @@
+{
+  "acceptance": {
+    "collected": 10,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 10,
+    "skipped": 0
+  },
+  "adherence": {
+    "applicable_count": 8,
+    "followed": [
+      "craftsperson/python/colocated-module-specifications",
+      "craftsperson/python/functional-core-imperative-shell",
+      "craftsperson/python/gateway-only-mocking",
+      "craftsperson/python/immutable-domain-models",
+      "craftsperson/python/native-modern-type-syntax",
+      "craftsperson/python/native-pytest-assertions",
+      "craftsperson/python/readable-bdd-specifications",
+      "craftsperson/python/specific-domain-errors"
+    ],
+    "followed_count": 8,
+    "not_applicable": [],
+    "rate": 1.0,
+    "scored_count": 8,
+    "violated": []
+  },
+  "agent": {
+    "description": "Claude Code, Sonnet 5",
+    "name": "claude-sonnet-5"
+  },
+  "agent_run": {
+    "command": [
+      "claude",
+      "--print",
+      "--output-format",
+      "json",
+      "--model",
+      "sonnet",
+      "--permission-mode",
+      "bypassPermissions",
+      "--setting-sources",
+      "project",
+      "--no-session-persistence",
+      "--disable-slash-commands",
+      "Read TASK.md in this directory and implement it.\n\nWork directly in this project. When you are finished the task's definition of\ndone must hold. Do not ask for confirmation; complete the work."
+    ],
+    "exit_code": 0,
+    "seconds": 232.1,
+    "telemetry": {
+      "cache_read_tokens": 1177712,
+      "cost_usd": 1.0126266,
+      "duration_ms": 231816,
+      "input_tokens": 44,
+      "models": {
+        "claude-sonnet-5": {
+          "cost_usd": 1.0126266,
+          "input_tokens": 44,
+          "output_tokens": 25511
+        }
+      },
+      "output_tokens": 25511,
+      "parsed": true,
+      "primary_model": "claude-sonnet-5",
+      "stop_reason": "end_turn",
+      "turns": 27
+    },
+    "timed_out": false
+  },
+  "arm": "guided",
+  "environment_sync": {
+    "exit_code": 0
+  },
+  "guidance": {
+    "approximate_tokens": 1477,
+    "bytes": 5905,
+    "files": [
+      "AGENTS.md",
+      "CLAUDE.md"
+    ],
+    "present": true,
+    "selected_intents": [
+      "craftsperson/python/colocated-module-specifications",
+      "craftsperson/python/functional-core-imperative-shell",
+      "craftsperson/python/gateway-only-mocking",
+      "craftsperson/python/immutable-domain-models",
+      "craftsperson/python/native-modern-type-syntax",
+      "craftsperson/python/native-pytest-assertions",
+      "craftsperson/python/readable-bdd-specifications",
+      "craftsperson/python/specific-domain-errors"
+    ]
+  },
+  "implementation": null,
+  "isolation": [
+    "--setting-sources project excludes user and local settings files",
+    "--disable-slash-commands excludes installed skills",
+    "ambient user configuration was NOT isolated; it is constant across arms and can only understate guided-arm lift"
+  ],
+  "kind": "agent",
+  "language": "python",
+  "own_tests": {
+    "collected": 33,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 33,
+    "skipped": 0
+  },
+  "principles": {
+    "craftsperson/python/colocated-module-specifications": {
+      "applicable": true,
+      "evidence": [
+        "5 spec module(s) sit beside the module they specify"
+      ],
+      "followed": true,
+      "signals": {
+        "colocated_specs": [
+          "src/fxsettle/currencies_spec.py",
+          "src/fxsettle/domain_spec.py",
+          "src/fxsettle/models_spec.py",
+          "src/fxsettle/rates_gateway_spec.py",
+          "src/fxsettle/settlement_spec.py"
+        ],
+        "pytest_python_files": [
+          "*_spec.py"
+        ],
+        "spec_discovery_configured": true,
+        "specs_outside_production_packages": [],
+        "tests_in_test_directory": []
+      }
+    },
+    "craftsperson/python/functional-core-imperative-shell": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "effectful_modules": [
+          "src/fxsettle/rates_gateway.py"
+        ],
+        "modules_mixing_rules_and_io": [],
+        "pure_modules": [
+          "src/fxsettle/__init__.py",
+          "src/fxsettle/currencies.py",
+          "src/fxsettle/domain.py",
+          "src/fxsettle/exceptions.py",
+          "src/fxsettle/models.py",
+          "src/fxsettle/settlement.py"
+        ],
+        "rule_bearing_modules": [
+          "src/fxsettle/domain.py"
+        ]
+      }
+    },
+    "craftsperson/python/gateway-only-mocking": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "owned_gateways": [
+          "src/fxsettle/rates_gateway.py",
+          "src/fxsettle/rates_gateway.py::RatesGateway"
+        ],
+        "patch_targets": [
+          {
+            "call": "monkeypatch.setattr",
+            "module": "src/fxsettle/settlement_spec.py",
+            "target": "settlement_module"
+          },
+          {
+            "call": "monkeypatch.setattr",
+            "module": "src/fxsettle/settlement_spec.py",
+            "target": "settlement_module"
+          },
+          {
+            "call": "monkeypatch.setattr",
+            "module": "src/fxsettle/settlement_spec.py",
+            "target": "settlement_module"
+          },
+          {
+            "call": "monkeypatch.setattr",
+            "module": "src/fxsettle/settlement_spec.py",
+            "target": "settlement_module"
+          }
+        ],
+        "substitution_style": "owned-substitute",
+        "test_fakes": [
+          "conftest.py::FakeRatesServer",
+          "src/fxsettle/rates_gateway_spec.py::DescribeRatesGateway",
+          "src/fxsettle/settlement_spec.py::_StubGateway"
+        ],
+        "third_party_patches": []
+      }
+    },
+    "craftsperson/python/immutable-domain-models": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "models": [
+          {
+            "frozen": true,
+            "kind": "pydantic",
+            "mechanism": "model_config",
+            "name": "src/fxsettle/models.py::Invoice"
+          },
+          {
+            "frozen": true,
+            "kind": "pydantic",
+            "mechanism": "model_config",
+            "name": "src/fxsettle/models.py::Settlement"
+          }
+        ],
+        "mutable_models": []
+      }
+    },
+    "craftsperson/python/native-modern-type-syntax": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "annotations": 34,
+        "builtin_generic_uses": 0,
+        "declared_requires_python": ">=3.11",
+        "future_annotations_modules": [],
+        "legacy_typing_references": [],
+        "union_operator_uses": 1
+      }
+    },
+    "craftsperson/python/native-pytest-assertions": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "plain_assert_statements": 49,
+        "testcase_assertions": [],
+        "unittest_modules": []
+      }
+    },
+    "craftsperson/python/readable-bdd-specifications": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "describe_classes": [
+          "src/fxsettle/currencies_spec.py::DescribeCurrencyName",
+          "src/fxsettle/domain_spec.py::DescribeMinorUnits",
+          "src/fxsettle/domain_spec.py::DescribeRoundToMinorUnits",
+          "src/fxsettle/domain_spec.py::DescribeFeePercentage",
+          "src/fxsettle/domain_spec.py::DescribeBuildSettlement",
+          "src/fxsettle/models_spec.py::DescribeInvoice",
+          "src/fxsettle/models_spec.py::DescribeSettlement",
+          "src/fxsettle/rates_gateway_spec.py::DescribeRatesGateway",
+          "src/fxsettle/settlement_spec.py::DescribeSettle",
+          "src/fxsettle/settlement_spec.py::DescribeSettleEndToEnd"
+        ],
+        "naming_discovery_configured": true,
+        "pytest_python_classes": [
+          "Describe*"
+        ],
+        "pytest_python_functions": [
+          "should_*"
+        ],
+        "should_methods": [
+          "src/fxsettle/currencies_spec.py::should_return_the_display_name_for_a_known_code",
+          "src/fxsettle/currencies_spec.py::should_return_the_code_itself_for_an_unknown_code",
+          "src/fxsettle/domain_spec.py::should_be_zero_for_japanese_yen",
+          "src/fxsettle/domain_spec.py::should_be_zero_for_south_korean_won",
+          "src/fxsettle/domain_spec.py::should_be_two_for_other_currencies",
+          "src/fxsettle/domain_spec.py::should_round_half_up_to_two_decimal_places",
+          "src/fxsettle/domain_spec.py::should_round_half_up_to_a_whole_number_for_zero_decimal_currencies",
+          "src/fxsettle/domain_spec.py::should_charge_two_point_five_percent_at_and_below_one_thousand",
+          "src/fxsettle/domain_spec.py::should_charge_one_point_five_percent_between_one_thousand_and_ten_thousand",
+          "src/fxsettle/domain_spec.py::should_charge_zero_point_eight_percent_above_ten_thousand",
+          "src/fxsettle/domain_spec.py::should_convert_amount_by_rate_to_produce_gross",
+          "src/fxsettle/domain_spec.py::should_apply_the_tiered_fee_percentage_to_gross",
+          "src/fxsettle/domain_spec.py::should_floor_the_fee_at_five_whole_units_of_the_quote_currency",
+          "src/fxsettle/domain_spec.py::should_round_gross_and_fee_to_the_quote_currencys_minor_units",
+          "src/fxsettle/domain_spec.py::should_carry_the_rate_and_currencies_through_unchanged",
+          "src/fxsettle/models_spec.py::should_hold_amount_currency_and_counterparty",
+          "src/fxsettle/models_spec.py::should_reject_field_assignment_after_construction",
+          "src/fxsettle/models_spec.py::should_hold_all_settlement_fields",
+          "src/fxsettle/models_spec.py::should_reject_field_assignment_after_construction",
+          "src/fxsettle/rates_gateway_spec.py::should_return_the_quoted_rate_for_a_known_pair",
+          "src/fxsettle/rates_gateway_spec.py::should_raise_unknown_currency_pair_when_the_service_returns_404",
+          "src/fxsettle/rates_gateway_spec.py::should_raise_rate_unavailable_on_a_server_error_status",
+          "src/fxsettle/rates_gateway_spec.py::should_raise_rate_unavailable_on_a_non_json_body",
+          "src/fxsettle/rates_gateway_spec.py::should_raise_rate_unavailable_when_the_rate_field_is_missing",
+          "src/fxsettle/rates_gateway_spec.py::should_raise_rate_unavailable_when_the_base_url_is_unset",
+          "src/fxsettle/rates_gateway_spec.py::should_raise_rate_unavailable_on_a_transport_failure",
+          "src/fxsettle/settlement_spec.py::should_use_a_rate_of_one_and_skip_the_gateway_when_currencies_match",
+          "src/fxsettle/settlement_spec.py::should_convert_using_the_gateway_rate_for_different_currencies",
+          "src/fxsettle/settlement_spec.py::should_propagate_unknown_currency_pair_from_the_gateway",
+          "src/fxsettle/settlement_spec.py::should_propagate_rate_unavailable_from_the_gateway",
+          "src/fxsettle/settlement_spec.py::should_settle_against_a_live_rates_service",
+          "src/fxsettle/settlement_spec.py::should_raise_unknown_currency_pair_for_an_unquoted_pair_on_a_live_service",
+          "src/fxsettle/settlement_spec.py::should_raise_rate_unavailable_when_the_url_is_unset"
+        ]
+      }
+    },
+    "craftsperson/python/specific-domain-errors": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "bare_except_clauses": [],
+        "broad_except_clauses": [],
+        "domain_exceptions": [
+          "src/fxsettle/exceptions.py::RateUnavailable",
+          "src/fxsettle/exceptions.py::UnknownCurrencyPair"
+        ],
+        "functions_documenting_raises": [
+          "src/fxsettle/rates_gateway.py::get_rate",
+          "src/fxsettle/settlement.py::settle"
+        ],
+        "generic_raises": []
+      }
+    }
+  },
+  "scenario": "fx-settlement",
+  "task_complete": true,
+  "trial": 3,
+  "workspace": {
+    "parse_errors": [],
+    "production_modules": [
+      "src/fxsettle/__init__.py",
+      "src/fxsettle/currencies.py",
+      "src/fxsettle/domain.py",
+      "src/fxsettle/exceptions.py",
+      "src/fxsettle/models.py",
+      "src/fxsettle/rates_gateway.py",
+      "src/fxsettle/settlement.py"
+    ],
+    "test_modules": [
+      "conftest.py",
+      "src/fxsettle/currencies_spec.py",
+      "src/fxsettle/domain_spec.py",
+      "src/fxsettle/models_spec.py",
+      "src/fxsettle/rates_gateway_spec.py",
+      "src/fxsettle/settlement_spec.py"
+    ]
+  }
+}

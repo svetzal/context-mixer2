@@ -33,6 +33,7 @@ import subprocess
 import sys
 import threading
 import time
+import tarfile
 import tomllib
 import xml.etree.ElementTree as ElementTree
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -532,6 +533,13 @@ def run_trial(job):
     (run_directory / "metrics.json").write_text(
         json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+
+    # Archive first, prune second. A trial that cannot be recreated must be safe
+    # on disk before anything deletes any part of it.
+    archive_trial(job, run_directory)
+    if not job["keep_workspace"]:
+        prune_workspace(workspace)
+
     return metrics
 
 
@@ -540,28 +548,104 @@ def run_trial(job):
 # --------------------------------------------------------------------------
 
 
-def completed_trials(base):
-    """Trial numbers that finished. An incomplete directory is not one."""
-    if not base.is_dir():
-        return set()
+# --------------------------------------------------------------------------
+# Durability
+#
+# A trial costs a real agent invocation and cannot be recreated — the model is
+# stochastic, and the one that produced a given result may not be served next
+# month. The evidence is therefore treated as the valuable artifact and the
+# workspace as scaffolding.
+#
+# Of a finished trial, 99.5% of the bytes are `.venv` or `target/`, which are
+# regenerable and worthless. What matters — metrics, the guidance given, the
+# transcript, and the source the verdicts were computed from — is a few tens of
+# kilobytes, and every check correction in this project's history came from
+# reading that source after the fact.
+# --------------------------------------------------------------------------
+
+DISPOSABLE = {".venv", "venv", "target", "__pycache__", "node_modules", ".pytest_cache", ".ruff_cache"}
+
+ARCHIVE = HERE / "archive"
+
+
+def archive_trial(job, run_directory):
+    """Copy a trial's evidence somewhere Git tracks, before anything prunes it."""
+    destination = (
+        ARCHIVE
+        / job["scenario_name"]
+        / job["agent_name"].replace(":", "-")
+        / job["arm"]
+        / f"trial-{job['trial']:02d}"
+    )
+    destination.mkdir(parents=True, exist_ok=True)
+
+    # Plain, so it stays greppable and diffable without unpacking anything.
+    shutil.copy2(run_directory / "metrics.json", destination / "metrics.json")
+
+    bundle = destination / "evidence.tar.gz"
+    with tarfile.open(bundle, "w:gz") as archive:
+        for name in (
+            "guidance.md",
+            "explain.txt",
+            "agent-stdout.txt",
+            "agent-stderr.txt",
+            "acceptance-output.txt",
+            "own-tests.xml",
+            "acceptance.xml",
+        ):
+            path = run_directory / name
+            if path.is_file():
+                archive.add(path, arcname=name)
+        workspace = run_directory / "workspace"
+        if workspace.is_dir():
+            archive.add(
+                workspace,
+                arcname="workspace",
+                filter=lambda entry: None
+                if any(part in DISPOSABLE for part in pathlib.PurePath(entry.name).parts)
+                else entry,
+            )
+    return destination
+
+
+def prune_workspace(workspace):
+    """Delete regenerable build output once the evidence is safely archived."""
+    freed = 0
+    for path in sorted(workspace.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+        if path.is_dir() and path.name in DISPOSABLE:
+            freed += sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+            shutil.rmtree(path, ignore_errors=True)
+    return freed
+
+
+def completed_trials(*bases):
+    """Trial numbers that finished, across the working tree and the archive.
+
+    The archive counts. If `results/` is cleared — which is safe to do, and which
+    this project has already done by accident once — a resume must not re-run
+    trials whose evidence is already banked.
+    """
     finished = set()
-    for path in base.glob("trial-*"):
-        if (path / "metrics.json").is_file():
-            try:
-                finished.add(int(path.name.split("-")[1]))
-            except (IndexError, ValueError):
-                continue
+    for base in bases:
+        if not base or not base.is_dir():
+            continue
+        for path in base.glob("trial-*"):
+            if (path / "metrics.json").is_file():
+                try:
+                    finished.add(int(path.name.split("-")[1]))
+                except (IndexError, ValueError):
+                    continue
     return finished
 
 
-def plan_trials(base, target):
+def plan_trials(target, *bases):
     """Which trial numbers are missing to reach `target`.
 
     Trials accumulate. Asking for 10 when 6 exist runs 4, and asking again runs
     none — so a crashed sweep resumes by repeating the same command, and a
     sample can be deepened without discarding what it already cost.
     """
-    done = completed_trials(base)
+    done = completed_trials(*bases)
     return [index for index in range(1, target + 1) if index not in done]
 
 
@@ -608,6 +692,11 @@ def main():
         help="calibration: score a checked-in directory, e.g. 'reference' (the ceiling)",
     )
     parser.add_argument(
+        "--keep-workspace",
+        action="store_true",
+        help="keep .venv/target after scoring; the source is archived either way",
+    )
+    parser.add_argument(
         "--isolate-agent-home",
         action="store_true",
         help="point the agent's config home at an empty scratch directory; removes ambient "
@@ -632,9 +721,11 @@ def main():
     out_root = HERE / "results" / arguments.scenario
     if calibration:
         label = arguments.implementation or "skeleton"
+        agent_label = f"_calibration:{label}"
         agent_root = out_root / "_calibration" / label
         target = 1
     else:
+        agent_label = arguments.agent
         agent_root = out_root / arguments.agent
         target = arguments.trials
 
@@ -647,16 +738,18 @@ def main():
 
     jobs = []
     for arm in arms:
-        for index in plan_trials(agent_root / arm, target):
+        archived_arm = ARCHIVE / arguments.scenario / agent_label.replace(":", "-") / arm
+        for index in plan_trials(target, agent_root / arm, archived_arm):
             jobs.append(
                 {
                     "agent": agent,
-                    "agent_name": arguments.agent if not calibration else f"_calibration:{label}",
+                    "agent_name": agent_label,
                     "arm": arm,
                     "expected": expected,
                     "guidance": guidance,
                     "implementation": arguments.implementation,
                     "isolate_home": arguments.isolate_agent_home,
+                    "keep_workspace": arguments.keep_workspace,
                     "kind": kind,
                     "run_directory": agent_root / arm / f"trial-{index:02d}",
                     "rustfacts": rustfacts,

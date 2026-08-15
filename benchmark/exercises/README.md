@@ -47,6 +47,37 @@ Validate the harness itself without spending an agent invocation:
 ./benchmark/exercises/run.sh --skip-agent --arm guided
 ```
 
+## Durability
+
+A trial costs a real agent invocation and cannot be recreated — models are
+stochastic, and the one that produced a result may not be served next month. So
+the evidence is the artifact and the workspace is scaffolding.
+
+Every completed trial is archived to `benchmark/exercises/archive/`, which Git
+**tracks**, as a plain `metrics.json` plus an `evidence.tar.gz` holding the
+guidance given, the transcript, the test output, and the workspace source. About
+46 KB per trial. `results/` stays ignored and disposable.
+
+Build output is pruned once the archive is written — `.venv`, `target/`,
+`__pycache__` and friends. That is 99.5% of a finished trial: a Python trial goes
+from 23 MB to 200 KB and a Rust one from 67 MB to about the same, with the source
+kept because every check correction in this project came from reading it
+afterwards. `--keep-workspace` opts out for debugging.
+
+Three properties follow, each verified:
+
+- **Analysis survives a wiped `results/`.** `aggregate.py` reads the archive
+  first and the working tree second, deduplicating by
+  scenario/agent/arm/trial.
+- **Resume counts archived trials.** Clearing `results/` does not cause a sweep
+  to re-run work whose evidence is already banked.
+- **A 300-trial sweep costs ~14 MB archived** instead of 10–20 GB of
+  regenerable build output.
+
+This was not hypothetical. Earlier in this project's history a `rm -rf results`
+during a refactor destroyed six completed agent trials, because the only copy
+was in an ignored directory.
+
 Calibration runs land under `results/<scenario>/_calibration/` and are marked
 `kind: "calibration"`, so they cannot leak into a rate. Agent trials land under
 `results/<scenario>/<agent>/<arm>/trial-NN/`, keyed by agent so one model's

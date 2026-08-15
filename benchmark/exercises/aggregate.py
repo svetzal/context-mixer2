@@ -79,10 +79,20 @@ def newcombe(successes_a, total_a, successes_b, total_b, z):
     }
 
 
-def load_trials(results_root, scenario=None):
-    """Every completed trial under a results tree, newest layout only."""
+def load_trials(roots, scenario=None):
+    """Every completed trial across the archive and the working tree.
+
+    The archive is the durable copy and is read first; `results/` may have been
+    pruned, cleared, or never existed on this machine. A trial appearing in both
+    is counted once, keyed by where it came from rather than by file path.
+    """
     trials = []
-    for path in sorted(results_root.rglob("metrics.json")):
+    seen = set()
+    paths = []
+    for root in roots:
+        if root and root.is_dir():
+            paths.extend(sorted(root.rglob("metrics.json")))
+    for path in paths:
         try:
             metrics = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
@@ -103,6 +113,15 @@ def load_trials(results_root, scenario=None):
             )
         if kind != "agent":
             continue
+        identity = (
+            metrics.get("scenario"),
+            metrics.get("agent", {}).get("name"),
+            metrics["arm"],
+            metrics.get("trial"),
+        )
+        if identity in seen:
+            continue
+        seen.add(identity)
         metrics["_path"] = str(path)
         trials.append(metrics)
     return trials
@@ -200,9 +219,9 @@ def describe_models(trials):
     }
 
 
-def build(results_root, scenario, confidence):
+def build(roots, scenario, confidence):
     z = Z_SCORES[confidence]
-    trials = load_trials(results_root, scenario)
+    trials = load_trials(roots, scenario)
 
     grouped = {}
     for metrics in trials:
@@ -273,18 +292,22 @@ def render(report):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--results", type=pathlib.Path, default=pathlib.Path(__file__).resolve().parent / "results")
+    here = pathlib.Path(__file__).resolve().parent
+    parser.add_argument("--archive", type=pathlib.Path, default=here / "archive")
+    parser.add_argument("--results", type=pathlib.Path, default=here / "results")
     parser.add_argument("--scenario")
     parser.add_argument("--confidence", type=float, default=0.95, choices=sorted(Z_SCORES))
     parser.add_argument("--out", type=pathlib.Path)
     parser.add_argument("--quiet", action="store_true", help="emit JSON only")
     arguments = parser.parse_args()
 
-    if not arguments.results.is_dir():
-        raise SystemExit(f"no results directory at {arguments.results}")
+    roots = [arguments.archive, arguments.results]
+    if not any(root.is_dir() for root in roots):
+        raise SystemExit(f"nothing to read at {arguments.archive} or {arguments.results}")
 
-    report = build(arguments.results, arguments.scenario, arguments.confidence)
-    destination = arguments.out or arguments.results / "comparison.json"
+    report = build(roots, arguments.scenario, arguments.confidence)
+    destination = arguments.out or arguments.archive / "comparison.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     if not arguments.quiet:

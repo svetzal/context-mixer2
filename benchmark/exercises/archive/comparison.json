@@ -1,0 +1,204 @@
+{
+  "confidence": 0.95,
+  "scenarios": {
+    "fx-settlement": {
+      "agents": {
+        "claude-sonnet-5": {
+          "arms": {
+            "guided": {
+              "adherence": {
+                "high": 1.0,
+                "low": 0.862,
+                "rate": 1.0,
+                "successes": 24,
+                "trials": 24
+              },
+              "by_intent": {
+                "craftsperson/python/colocated-module-specifications": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/functional-core-imperative-shell": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/gateway-only-mocking": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/immutable-domain-models": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/native-modern-type-syntax": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/native-pytest-assertions": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/readable-bdd-specifications": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/specific-domain-errors": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                }
+              },
+              "not_applicable_trials": {},
+              "task_completion": {
+                "high": 1.0,
+                "low": 0.4385,
+                "rate": 1.0,
+                "successes": 3,
+                "trials": 3
+              },
+              "trials": 3
+            }
+          },
+          "telemetry": {
+            "guided": {
+              "resolved_models": {
+                "claude-sonnet-5": {
+                  "cost_usd": 3.4169,
+                  "output_tokens": 73881,
+                  "trials": 3
+                }
+              },
+              "total_agent_seconds": 665.4,
+              "total_cost_usd": 3.4168,
+              "total_tokens": {
+                "input": 156,
+                "output": 73881
+              }
+            }
+          }
+        },
+        "opencode-qwen3_6-27b": {
+          "arms": {
+            "guided": {
+              "adherence": {
+                "high": 0.8632,
+                "low": 0.3057,
+                "rate": 0.625,
+                "successes": 5,
+                "trials": 8
+              },
+              "by_intent": {
+                "craftsperson/python/colocated-module-specifications": {
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
+                },
+                "craftsperson/python/functional-core-imperative-shell": {
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
+                },
+                "craftsperson/python/gateway-only-mocking": {
+                  "high": 0.7935,
+                  "low": 0.0,
+                  "rate": 0.0,
+                  "successes": 0,
+                  "trials": 1
+                },
+                "craftsperson/python/immutable-domain-models": {
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
+                },
+                "craftsperson/python/native-modern-type-syntax": {
+                  "high": 0.7935,
+                  "low": 0.0,
+                  "rate": 0.0,
+                  "successes": 0,
+                  "trials": 1
+                },
+                "craftsperson/python/native-pytest-assertions": {
+                  "high": 0.7935,
+                  "low": 0.0,
+                  "rate": 0.0,
+                  "successes": 0,
+                  "trials": 1
+                },
+                "craftsperson/python/readable-bdd-specifications": {
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
+                },
+                "craftsperson/python/specific-domain-errors": {
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
+                }
+              },
+              "not_applicable_trials": {},
+              "task_completion": {
+                "high": 1.0,
+                "low": 0.2065,
+                "rate": 1.0,
+                "successes": 1,
+                "trials": 1
+              },
+              "trials": 1
+            }
+          },
+          "telemetry": {
+            "guided": {
+              "resolved_models": {
+                "ollama/qwen3.6:27b-coding-mxfp8": {
+                  "cost_usd": 0.0,
+                  "output_tokens": 8813,
+                  "trials": 1
+                }
+              },
+              "total_agent_seconds": 1396.5,
+              "total_cost_usd": 0.0,
+              "total_tokens": {
+                "input": 523465,
+                "output": 8813
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "trials_read": 4
+}
