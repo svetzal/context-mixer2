@@ -81,6 +81,19 @@ recorded as unknown rather than zero.
 Adding a model is one entry in `agents.toml`, and the aggregator groups by agent
 automatically. Comparing six models is six collect commands and one analyse.
 
+### Which driver runs which model
+
+Anthropic models run under Claude Code and OpenAI models under Codex, because
+both authenticate against a subscription rather than metered API keys. opencode
+is used only for local ollama weights. Routing a hosted model through a
+third-party client would move the same work onto per-token billing, so nothing
+here does that.
+
+One consequence for reading results: the `cost_usd` a hosted trial records is
+*notional* — the API-equivalent price of those tokens, not money billed. On a
+subscription the binding constraint for a large sweep is rate limits, not
+dollars.
+
 ### Local models
 
 Three adapters drive local weights through `opencode run` against ollama. They

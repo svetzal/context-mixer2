@@ -3,197 +3,204 @@
 # `command` is argv. `{prompt}` is replaced with the task prompt and `{workspace}`
 # with the absolute workspace path. `guidance_files` names where this agent reads
 # project guidance from; the assembled cmf artifact is written to each of them.
-# `env` is layered onto the inherited environment.
+# `env` is layered onto the inherited environment, with `{here}` resolving to
+# this directory.
 #
-# Ambient configuration is the main threat to interpreting these numbers. A
-# globally installed CLAUDE.md, a user-level AGENTS.md, or an installed skill can
+# ## Each model runs on the driver that bills it correctly
+#
+# Anthropic models run under Claude Code and OpenAI models under Codex, because
+# both authenticate against a subscription rather than per-token API keys
+# (`~/.codex/auth.json` reports `auth_mode: chatgpt`; Claude Code uses its own
+# OAuth, and no API key is set in the environment). Routing either family
+# through a third-party client would move the same work onto metered API
+# billing. opencode is used *only* for local ollama weights, which are free at
+# the margin.
+#
+# The `cost_usd` a trial records is therefore notional for the hosted models —
+# the API-equivalent price of those tokens, not money billed. The real
+# constraint on a large sweep is subscription rate limits, not dollars.
+#
+# ## Ambient configuration
+#
+# A globally installed CLAUDE.md, a user AGENTS.md, or an installed skill can
 # carry the same advice the exercise is trying to attribute to the assembled
 # slice. It is present in both arms, so it cannot invent a difference between
 # them — but it does raise the control arm's floor and so understates lift.
+# `home_env` names the variable that relocates an agent's configuration home;
+# the runner only sets it under `--isolate-agent-home`, because an empty home
+# also drops credentials that live there rather than in the system keychain.
 #
-# `home_env` names the environment variable that relocates an agent's
-# configuration home. The runner only sets it under `--isolate-agent-home`,
-# because an empty home also drops any credentials that live there rather than
-# in the system keychain. Run isolated when a number needs to stand alone; run
-# unisolated when the guided-versus-control delta is what matters.
+# ## Local models
+#
+# `max_concurrency` clamps `--concurrency`. One ollama instance cannot serve
+# parallel trials against 18-81 GB weights; two trials wanting different models
+# would measure eviction rather than the models. `warmup` sends one throwaway
+# request first, because a cold model takes minutes to load and would otherwise
+# consume trial one's timeout before inference starts.
+
+# --------------------------------------------------------------------------
+# Anthropic — Claude Code (subscription)
+#
+# Every id below was probed live and confirmed served rather than silently
+# rerouted; `served_requested` in each trial's telemetry re-checks that per run.
+# --------------------------------------------------------------------------
 
 [agents.claude-opus-5]
 description = "Claude Code, Opus 5"
-command = [
-    "claude",
-    "--print",
-    "--output-format", "json",
-    "--model", "opus",
-    "--permission-mode", "bypassPermissions",
-    "--setting-sources", "project",
-    "--no-session-persistence",
-    "--disable-slash-commands",
-    "{prompt}",
-]
+command = ["claude", "--print", "--output-format", "json", "--model", "claude-opus-5", "--permission-mode", "bypassPermissions", "--setting-sources", "project", "--no-session-persistence", "--disable-slash-commands", "{prompt}"]
 guidance_files = ["AGENTS.md", "CLAUDE.md"]
 home_env = "CLAUDE_CONFIG_DIR"
 telemetry = "claude-json"
-isolation_notes = [
-    "--setting-sources project excludes user and local settings files",
-    "--disable-slash-commands excludes installed skills",
-]
+isolation_notes = ["--setting-sources project excludes user and local settings files", "--disable-slash-commands excludes installed skills"]
 [agents.claude-opus-5.env]
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
+
+[agents.claude-opus-4-8]
+description = "Claude Code, Opus 4.8"
+command = ["claude", "--print", "--output-format", "json", "--model", "claude-opus-4-8", "--permission-mode", "bypassPermissions", "--setting-sources", "project", "--no-session-persistence", "--disable-slash-commands", "{prompt}"]
+guidance_files = ["AGENTS.md", "CLAUDE.md"]
+home_env = "CLAUDE_CONFIG_DIR"
+telemetry = "claude-json"
+isolation_notes = ["--setting-sources project excludes user and local settings files", "--disable-slash-commands excludes installed skills"]
+[agents.claude-opus-4-8.env]
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
+
+[agents.claude-opus-4-7]
+description = "Claude Code, Opus 4.7"
+command = ["claude", "--print", "--output-format", "json", "--model", "claude-opus-4-7", "--permission-mode", "bypassPermissions", "--setting-sources", "project", "--no-session-persistence", "--disable-slash-commands", "{prompt}"]
+guidance_files = ["AGENTS.md", "CLAUDE.md"]
+home_env = "CLAUDE_CONFIG_DIR"
+telemetry = "claude-json"
+isolation_notes = ["--setting-sources project excludes user and local settings files", "--disable-slash-commands excludes installed skills"]
+[agents.claude-opus-4-7.env]
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
+
+[agents.claude-opus-4-6]
+description = "Claude Code, Opus 4.6"
+command = ["claude", "--print", "--output-format", "json", "--model", "claude-opus-4-6", "--permission-mode", "bypassPermissions", "--setting-sources", "project", "--no-session-persistence", "--disable-slash-commands", "{prompt}"]
+guidance_files = ["AGENTS.md", "CLAUDE.md"]
+home_env = "CLAUDE_CONFIG_DIR"
+telemetry = "claude-json"
+isolation_notes = ["--setting-sources project excludes user and local settings files", "--disable-slash-commands excludes installed skills"]
+[agents.claude-opus-4-6.env]
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
 
 [agents.claude-sonnet-5]
 description = "Claude Code, Sonnet 5"
-command = [
-    "claude",
-    "--print",
-    "--output-format", "json",
-    "--model", "sonnet",
-    "--permission-mode", "bypassPermissions",
-    "--setting-sources", "project",
-    "--no-session-persistence",
-    "--disable-slash-commands",
-    "{prompt}",
-]
+command = ["claude", "--print", "--output-format", "json", "--model", "claude-sonnet-5", "--permission-mode", "bypassPermissions", "--setting-sources", "project", "--no-session-persistence", "--disable-slash-commands", "{prompt}"]
 guidance_files = ["AGENTS.md", "CLAUDE.md"]
 home_env = "CLAUDE_CONFIG_DIR"
 telemetry = "claude-json"
-isolation_notes = [
-    "--setting-sources project excludes user and local settings files",
-    "--disable-slash-commands excludes installed skills",
-]
+isolation_notes = ["--setting-sources project excludes user and local settings files", "--disable-slash-commands excludes installed skills"]
 [agents.claude-sonnet-5.env]
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
 
-[agents.codex-gpt-5-6]
-description = "Codex CLI, GPT-5.6"
-command = [
-    "codex",
-    "exec",
-    "--json",
-    "--model", "gpt-5.6",
-    "--cd", "{workspace}",
-    "--sandbox", "workspace-write",
-    "--skip-git-repo-check",
-    "--ignore-user-config",
-    "--ignore-rules",
-    "--ephemeral",
-    "{prompt}",
-]
+[agents.claude-sonnet-4-6]
+description = "Claude Code, Sonnet 4.6"
+command = ["claude", "--print", "--output-format", "json", "--model", "claude-sonnet-4-6", "--permission-mode", "bypassPermissions", "--setting-sources", "project", "--no-session-persistence", "--disable-slash-commands", "{prompt}"]
+guidance_files = ["AGENTS.md", "CLAUDE.md"]
+home_env = "CLAUDE_CONFIG_DIR"
+telemetry = "claude-json"
+isolation_notes = ["--setting-sources project excludes user and local settings files", "--disable-slash-commands excludes installed skills"]
+[agents.claude-sonnet-4-6.env]
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
+
+[agents.claude-haiku-4-5]
+description = "Claude Code, Haiku 4.5"
+command = ["claude", "--print", "--output-format", "json", "--model", "claude-haiku-4-5", "--permission-mode", "bypassPermissions", "--setting-sources", "project", "--no-session-persistence", "--disable-slash-commands", "{prompt}"]
+guidance_files = ["AGENTS.md", "CLAUDE.md"]
+home_env = "CLAUDE_CONFIG_DIR"
+telemetry = "claude-json"
+isolation_notes = ["--setting-sources project excludes user and local settings files", "--disable-slash-commands excludes installed skills"]
+[agents.claude-haiku-4-5.env]
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
+
+# --------------------------------------------------------------------------
+# OpenAI — Codex (ChatGPT subscription)
+#
+# Model ids come from `~/.codex/models_cache.json`. There is no bare `gpt-5.6`:
+# sol, terra, and luna are the 5.6 variants, and an earlier `--model gpt-5.6`
+# entry here would have failed on first use.
+# --------------------------------------------------------------------------
+
+[agents.codex-gpt-5-6-sol]
+description = "Codex CLI, GPT-5.6 sol"
+command = ["codex", "exec", "--json", "--model", "gpt-5.6-sol", "--cd", "{workspace}", "--sandbox", "workspace-write", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral", "{prompt}"]
 guidance_files = ["AGENTS.md"]
 home_env = "CODEX_HOME"
 telemetry = "codex-jsonl"
-isolation_notes = [
-    "--ignore-user-config skips $CODEX_HOME/config.toml",
-    "--ignore-rules skips user and project execpolicy rules",
-    "--ephemeral keeps session files off disk",
-]
+isolation_notes = ["--ignore-user-config skips $CODEX_HOME/config.toml", "--ignore-rules skips user and project execpolicy rules", "--ephemeral keeps session files off disk"]
+
+[agents.codex-gpt-5-6-terra]
+description = "Codex CLI, GPT-5.6 terra"
+command = ["codex", "exec", "--json", "--model", "gpt-5.6-terra", "--cd", "{workspace}", "--sandbox", "workspace-write", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral", "{prompt}"]
+guidance_files = ["AGENTS.md"]
+home_env = "CODEX_HOME"
+telemetry = "codex-jsonl"
+isolation_notes = ["--ignore-user-config skips $CODEX_HOME/config.toml", "--ignore-rules skips user and project execpolicy rules", "--ephemeral keeps session files off disk"]
+
+[agents.codex-gpt-5-6-luna]
+description = "Codex CLI, GPT-5.6 luna"
+command = ["codex", "exec", "--json", "--model", "gpt-5.6-luna", "--cd", "{workspace}", "--sandbox", "workspace-write", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral", "{prompt}"]
+guidance_files = ["AGENTS.md"]
+home_env = "CODEX_HOME"
+telemetry = "codex-jsonl"
+isolation_notes = ["--ignore-user-config skips $CODEX_HOME/config.toml", "--ignore-rules skips user and project execpolicy rules", "--ephemeral keeps session files off disk"]
+
+[agents.codex-gpt-5-5]
+description = "Codex CLI, GPT-5.5"
+command = ["codex", "exec", "--json", "--model", "gpt-5.5", "--cd", "{workspace}", "--sandbox", "workspace-write", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral", "{prompt}"]
+guidance_files = ["AGENTS.md"]
+home_env = "CODEX_HOME"
+telemetry = "codex-jsonl"
+isolation_notes = ["--ignore-user-config skips $CODEX_HOME/config.toml", "--ignore-rules skips user and project execpolicy rules", "--ephemeral keeps session files off disk"]
+
+[agents.codex-gpt-5-4]
+description = "Codex CLI, GPT-5.4"
+command = ["codex", "exec", "--json", "--model", "gpt-5.4", "--cd", "{workspace}", "--sandbox", "workspace-write", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral", "{prompt}"]
+guidance_files = ["AGENTS.md"]
+home_env = "CODEX_HOME"
+telemetry = "codex-jsonl"
+isolation_notes = ["--ignore-user-config skips $CODEX_HOME/config.toml", "--ignore-rules skips user and project execpolicy rules", "--ephemeral keeps session files off disk"]
 
 # --------------------------------------------------------------------------
-# opencode, driving local models through ollama.
+# Local weights — opencode against ollama (free at the margin)
 #
-# `max_concurrency` is a per-agent clamp on `--concurrency`. Hosted APIs take
-# parallel trials happily; one ollama instance does not. These models are 18–81
-# GB, and two trials asking for different ones would thrash the loader,
-# measuring eviction rather than the model.
-#
-# The first trial against a cold model pays its load time — minutes for the
-# larger weights — so give local sweeps a generous `--timeout` or warm the model
-# first. `warmup = true` makes the runner send one throwaway request before the
-# sweep so trial 1 is not the outlier.
-#
-# OPENCODE_CONFIG points at this directory's own provider declaration, so the
-# harness names the models it needs and the operator's global opencode config is
-# neither read nor modified.
+# opencode is used here and nowhere else. OPENCODE_CONFIG points at this
+# directory's provider declaration, so the harness names the models it needs and
+# the operator's global opencode config is neither read nor modified — which is
+# also the only way to reach a model opencode's own catalog does not list.
 # --------------------------------------------------------------------------
 
 [agents.opencode-qwen3_6-27b]
 description = "opencode, local Qwen3.6 27B Coder (mxfp8) via ollama"
-command = [
-    "opencode", "run",
-    "--pure",
-    "--auto",
-    "--format", "json",
-    "--model", "ollama/qwen3.6:27b-coding-mxfp8",
-    "--dir", "{workspace}",
-    "{prompt}",
-]
+command = ["opencode", "run", "--pure", "--auto", "--format", "json", "--model", "ollama/qwen3.6:27b-coding-mxfp8", "--dir", "{workspace}", "{prompt}"]
 guidance_files = ["AGENTS.md"]
 telemetry = "opencode-jsonl"
 max_concurrency = 1
 warmup = true
-isolation_notes = [
-    "--pure runs without external plugins",
-    "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config",
-]
+isolation_notes = ["--pure runs without external plugins", "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config"]
 [agents.opencode-qwen3_6-27b.env]
 OPENCODE_CONFIG = "{here}/opencode-config.json"
 
 [agents.opencode-qwen3_5-122b]
 description = "opencode, local Qwen3.5 122B via ollama"
-command = [
-    "opencode", "run",
-    "--pure",
-    "--auto",
-    "--format", "json",
-    "--model", "ollama/qwen3.5:122b",
-    "--dir", "{workspace}",
-    "{prompt}",
-]
+command = ["opencode", "run", "--pure", "--auto", "--format", "json", "--model", "ollama/qwen3.5:122b", "--dir", "{workspace}", "{prompt}"]
 guidance_files = ["AGENTS.md"]
 telemetry = "opencode-jsonl"
 max_concurrency = 1
 warmup = true
-isolation_notes = [
-    "--pure runs without external plugins",
-    "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config",
-]
+isolation_notes = ["--pure runs without external plugins", "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config"]
 [agents.opencode-qwen3_5-122b.env]
 OPENCODE_CONFIG = "{here}/opencode-config.json"
 
 [agents.opencode-gemma4-31b]
 description = "opencode, local Gemma4 31B (mlx) via ollama"
-command = [
-    "opencode", "run",
-    "--pure",
-    "--auto",
-    "--format", "json",
-    "--model", "ollama/gemma4:31b-mlx",
-    "--dir", "{workspace}",
-    "{prompt}",
-]
+command = ["opencode", "run", "--pure", "--auto", "--format", "json", "--model", "ollama/gemma4:31b-mlx", "--dir", "{workspace}", "{prompt}"]
 guidance_files = ["AGENTS.md"]
 telemetry = "opencode-jsonl"
 max_concurrency = 1
 warmup = true
-isolation_notes = [
-    "--pure runs without external plugins",
-    "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config",
-]
+isolation_notes = ["--pure runs without external plugins", "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config"]
 [agents.opencode-gemma4-31b.env]
-OPENCODE_CONFIG = "{here}/opencode-config.json"
-
-# The cross-driver control. Going wide over models changes the driver too —
-# Claude Code, codex, and opencode differ in system prompt, tool set, and loop
-# behaviour — so a gap between `claude-sonnet-5` and `opencode-qwen3_6-27b`
-# confounds the model with the harness driving it. Running a hosted model
-# through opencode holds the driver constant, which is what makes the local
-# comparison a claim about models.
-[agents.opencode-claude-sonnet-5]
-description = "opencode, Claude Sonnet 5 (cross-driver control for the local models)"
-command = [
-    "opencode", "run",
-    "--pure",
-    "--auto",
-    "--format", "json",
-    "--model", "anthropic/claude-sonnet-5",
-    "--dir", "{workspace}",
-    "{prompt}",
-]
-guidance_files = ["AGENTS.md"]
-telemetry = "opencode-jsonl"
-isolation_notes = [
-    "--pure runs without external plugins",
-    "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config",
-    "same driver as the local-model agents, so a difference against them is the model",
-]
-[agents.opencode-claude-sonnet-5.env]
 OPENCODE_CONFIG = "{here}/opencode-config.json"

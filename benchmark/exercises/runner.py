@@ -121,10 +121,27 @@ def parse_telemetry(agent, command, stdout):
             }
             for name, item in (payload.get("modelUsage") or {}).items()
         }
-        primary = max(models, key=lambda name: models[name]["output_tokens"], default=None)
+        # Prefer the model we asked for. Claude Code runs small background tasks
+        # on another model, and on a short session those can out-emit the one
+        # doing the work — so "most output tokens" mislabels the run. Matching
+        # the request also makes a silent fallback visible instead of invisible.
+        requested = flag_value(command, "--model")
+        served = next(
+            (
+                name
+                for name, item in (payload.get("modelUsage") or {}).items()
+                if requested and (name == requested or item.get("canonicalModel") == requested)
+            ),
+            None,
+        )
+        primary = served or max(
+            models, key=lambda name: models[name]["output_tokens"], default=None
+        )
         return {
             "parsed": True,
             "primary_model": primary,
+            "requested_model": requested,
+            "served_requested": bool(served) if requested else None,
             "models": models,
             "cost_usd": payload.get("total_cost_usd"),
             "input_tokens": usage.get("input_tokens"),
