@@ -1,0 +1,30 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "anthropic": {
+      "models": {
+        "claude-sonnet-5": {
+          "name": "Claude Sonnet 5"
+        }
+      }
+    },
+    "ollama": {
+      "models": {
+        "gemma4:31b-mlx": {
+          "name": "Gemma4 31B (mlx)"
+        },
+        "qwen3.5:122b": {
+          "name": "Qwen3.5 122B"
+        },
+        "qwen3.6:27b-coding-mxfp8": {
+          "name": "Qwen3.6 27B Coder (mxfp8)"
+        }
+      },
+      "name": "Ollama (local, harness-declared)",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:11434/v1"
+      }
+    }
+  }
+}

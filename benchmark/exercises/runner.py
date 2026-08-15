@@ -159,6 +159,42 @@ def parse_telemetry(agent, command, stdout):
             "cache_read_tokens": usage.get("cached_input_tokens"),
         }
 
+    if kind == "opencode-jsonl":
+        requested = flag_value(command, "--model", "-m")
+        totals = {"input": 0, "output": 0, "reasoning": 0, "cache_read": 0}
+        cost = 0.0
+        steps = 0
+        for line in stdout.splitlines():
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("type") != "step_finish":
+                continue
+            part = event.get("part") or {}
+            tokens = part.get("tokens") or {}
+            steps += 1
+            totals["input"] += tokens.get("input", 0)
+            totals["output"] += tokens.get("output", 0)
+            totals["reasoning"] += tokens.get("reasoning", 0)
+            totals["cache_read"] += (tokens.get("cache") or {}).get("read", 0)
+            cost += part.get("cost") or 0.0
+        return {
+            "parsed": steps > 0,
+            "primary_model": requested,
+            "models": {requested: {"output_tokens": totals["output"], "cost_usd": cost}}
+            if requested
+            else {},
+            # Local inference reports zero, which is true at the margin and not
+            # the same as the unknown a CLI that reports nothing would give.
+            "cost_usd": cost,
+            "input_tokens": totals["input"],
+            "output_tokens": totals["output"],
+            "reasoning_tokens": totals["reasoning"],
+            "cache_read_tokens": totals["cache_read"],
+            "steps": steps,
+        }
+
     return {"parsed": False, "reason": "agent declares no telemetry format"}
 
 
@@ -209,6 +245,26 @@ def assemble_guidance(scenario):
     if outcome["exit_code"] != 0:
         raise SystemExit(f"cmf assemble failed:\n{outcome['stderr']}")
     return outcome["stdout"], outcome["stderr"]
+
+
+def warm_up(agent, agent_name):
+    """Send one throwaway request so trial 1 is not paying a cold model load.
+
+    A local 18-81 GB model takes minutes to load the first time. Without this the
+    first trial's duration measures the loader, and a per-trial timeout sized for
+    inference will fire before the weights are even resident.
+    """
+    command = [
+        part.replace("{prompt}", "Reply with exactly: OK").replace("{workspace}", str(HERE))
+        for part in agent["command"]
+    ]
+    declared = {
+        key: value.replace("{here}", str(HERE)).replace("{workspace}", str(HERE))
+        for key, value in agent.get("env", {}).items()
+    }
+    announce(f"warming {agent_name} (a cold local model can take minutes)")
+    outcome = run(command, cwd=HERE, env=os.environ | declared, timeout=1800)
+    announce(f"warm-up finished in {outcome['seconds']}s (exit {outcome['exit_code']})")
 
 
 def selected_from_explain(explanation):
@@ -340,7 +396,11 @@ def run_trial(job):
         }
 
     home_env, isolation = isolation_for(agent, run_directory, job["isolate_home"])
-    environment = os.environ | home_env | agent.get("env", {})
+    declared = {
+        key: value.replace("{here}", str(HERE)).replace("{workspace}", str(workspace))
+        for key, value in agent.get("env", {}).items()
+    }
+    environment = os.environ | home_env | declared
 
     if job["kind"] == "calibration":
         agent_run = {"skipped": True}
@@ -594,13 +654,22 @@ def main():
         announce(f"nothing to run: {target} trial(s) per arm already complete")
         return 0
 
-    announce(
-        f"{len(jobs)} trial(s) to run at concurrency {arguments.concurrency}"
-        f" ({', '.join(arms)})"
-    )
+    # A hosted API takes parallel trials; one ollama instance serving 18-81 GB
+    # weights does not, and two trials wanting different models would measure
+    # eviction rather than the models.
+    ceiling = agent.get("max_concurrency")
+    concurrency = max(1, arguments.concurrency)
+    if ceiling and concurrency > ceiling:
+        announce(f"clamping concurrency {concurrency} -> {ceiling} ({arguments.agent} declares a limit)")
+        concurrency = ceiling
+
+    if agent.get("warmup") and not calibration:
+        warm_up(agent, arguments.agent)
+
+    announce(f"{len(jobs)} trial(s) to run at concurrency {concurrency} ({', '.join(arms)})")
 
     completed = []
-    with ThreadPoolExecutor(max_workers=max(1, arguments.concurrency)) as pool:
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
         futures = {pool.submit(run_trial, job): job for job in jobs}
         for future in as_completed(futures):
             job = futures[future]

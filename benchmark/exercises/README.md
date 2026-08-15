@@ -79,7 +79,32 @@ reports tokens but no model or cost, so the model is taken from argv and cost is
 recorded as unknown rather than zero.
 
 Adding a model is one entry in `agents.toml`, and the aggregator groups by agent
-automatically. Comparing four models is four collect commands and one analyse.
+automatically. Comparing six models is six collect commands and one analyse.
+
+### Local models
+
+Three adapters drive local weights through `opencode run` against ollama. They
+need care that hosted APIs do not:
+
+- **`max_concurrency`** is a per-agent clamp the runner applies over
+  `--concurrency`. One ollama instance holding 18–81 GB of weights cannot serve
+  parallel trials, and two trials wanting different models would measure
+  eviction rather than the models. The local adapters declare `1`.
+- **`warmup`** sends one throwaway request before the sweep. A cold model takes
+  minutes to load — long enough that the first trial otherwise times out
+  measuring the loader rather than inference.
+- **`OPENCODE_CONFIG`** points at `opencode-config.json` in this directory, so
+  the harness declares the provider and models it needs. The operator's global
+  opencode config is neither read nor modified, which is both isolation and the
+  only way to reach a model opencode's catalog does not list.
+- **Cost is zero, not unknown.** Local inference reports `cost: 0` per step,
+  which is true at the margin. That is different from codex, which reports no
+  cost at all and is recorded as `null`.
+
+Verify a model can actually be driven before adding it. All three here emit
+proper tool calls through the OpenAI-compatible endpoint, which is the
+capability the harness depends on — a model that cannot call tools cannot edit
+files, and would score zero for a reason that has nothing to do with guidance.
 
 **Concurrency.** Trials are independent and workspace-isolated, so
 `--concurrency N` runs N at once; two trials complete in roughly the time of
