@@ -8,10 +8,19 @@ The harness takes three inputs:
    public contract
 3. an AGENTS.md that cmf assembled from a slice of the intent corpus
 
-It produces two things that the assembly benchmark cannot: whether the finished
-code satisfies a hidden acceptance suite, and whether it exhibits each named
-intent. Running the same scenario with and without the guidance is what turns
-those into a measurement of the guidance rather than of the model.
+It produces two things the assembly benchmark cannot: whether the finished code
+satisfies a hidden acceptance suite, and whether it exhibits each named intent.
+Running the same scenario with and without the guidance is what turns those into
+a measurement of the guidance rather than of the model.
+
+This module only *collects*. Turning trials into rates, intervals, and
+model-to-model comparisons is `aggregate.py`'s job, so re-analysis never needs a
+re-run — which matters, because the scoring rules change more often than the
+evidence does.
+
+    ./run.sh --scenario rate-card --agent claude-opus-5 --trials 10 --concurrency 4
+    ./run.sh --scenario rate-card --agent codex-gpt-5-6 --trials 10
+    python3 aggregate.py --scenario rate-card
 """
 
 import argparse
@@ -22,26 +31,31 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import tomllib
 import xml.etree.ElementTree as ElementTree
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import adherence
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent.parent
+RUSTFACTS = HERE / "rustfacts"
 
 PROMPT = """Read TASK.md in this directory and implement it.
 
 Work directly in this project. When you are finished the task's definition of
 done must hold. Do not ask for confirmation; complete the work."""
 
+PRINT_LOCK = threading.Lock()
+
 
 def load_agents():
     return tomllib.loads((HERE / "agents.toml").read_text(encoding="utf-8"))["agents"]
 
 
-def run(command, cwd, env=None, timeout=None, stdin_devnull=True):
+def run(command, cwd, env=None, timeout=None):
     started = time.monotonic()
     try:
         completed = subprocess.run(
@@ -51,7 +65,7 @@ def run(command, cwd, env=None, timeout=None, stdin_devnull=True):
             capture_output=True,
             text=True,
             timeout=timeout,
-            stdin=subprocess.DEVNULL if stdin_devnull else None,
+            stdin=subprocess.DEVNULL,
             check=False,
         )
         return {
@@ -73,36 +87,84 @@ def run(command, cwd, env=None, timeout=None, stdin_devnull=True):
         }
 
 
-def assemble_guidance(scenario, destination):
-    """Input three: the cmf-assembled slice under test."""
-    knowledge_base = scenario / "input" / "knowledge-base"
-    profile = scenario / "input" / "profile.toml"
-    outcome = run(
-        [
-            "cargo",
-            "run",
-            "--quiet",
-            "--manifest-path",
-            str(REPO_ROOT / "Cargo.toml"),
-            "-p",
-            "cmf",
-            "--",
-            "--root",
-            str(knowledge_base),
-            "assemble",
-            str(profile),
-            "--explain",
-        ],
-        cwd=REPO_ROOT,
-    )
-    if outcome["exit_code"] != 0:
-        raise SystemExit(f"cmf assemble failed:\n{outcome['stderr']}")
-    (destination / "explain.txt").write_text(outcome["stderr"], encoding="utf-8")
-    (destination / "guidance.md").write_text(outcome["stdout"], encoding="utf-8")
-    return outcome["stdout"], outcome["stderr"]
+# --------------------------------------------------------------------------
+# Telemetry: what actually answered
+# --------------------------------------------------------------------------
 
 
-RUSTFACTS = HERE / "rustfacts"
+def flag_value(command, *names):
+    for index, part in enumerate(command[:-1]):
+        if part in names:
+            return command[index + 1]
+    return None
+
+
+def parse_telemetry(agent, command, stdout):
+    """Resolved model, tokens, and cost, so a comparison names what it compared.
+
+    An agent key is not a model. `--model sonnet` is an alias whose target moves,
+    and a session can silently route part of its work to another model. Recording
+    the argv is not enough; this reads what the CLI reports it actually used.
+    """
+    kind = agent.get("telemetry")
+    if kind == "claude-json":
+        try:
+            payload = json.loads(stdout)
+        except json.JSONDecodeError:
+            return {"parsed": False, "reason": "stdout was not the expected JSON"}
+        usage = payload.get("usage") or {}
+        models = {
+            name: {
+                "input_tokens": item.get("inputTokens", 0),
+                "output_tokens": item.get("outputTokens", 0),
+                "cost_usd": item.get("costUSD", 0.0),
+            }
+            for name, item in (payload.get("modelUsage") or {}).items()
+        }
+        primary = max(models, key=lambda name: models[name]["output_tokens"], default=None)
+        return {
+            "parsed": True,
+            "primary_model": primary,
+            "models": models,
+            "cost_usd": payload.get("total_cost_usd"),
+            "input_tokens": usage.get("input_tokens"),
+            "output_tokens": usage.get("output_tokens"),
+            "cache_read_tokens": usage.get("cache_read_input_tokens"),
+            "duration_ms": payload.get("duration_ms"),
+            "turns": payload.get("num_turns"),
+            "stop_reason": payload.get("stop_reason"),
+        }
+
+    if kind == "codex-jsonl":
+        # Codex reports usage but not the model or a cost, so the model is the
+        # one we asked for and the cost is unknown rather than zero.
+        requested = flag_value(command, "--model", "-m")
+        usage = {}
+        for line in stdout.splitlines():
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("type") == "turn.completed" and "usage" in event:
+                usage = event["usage"]
+        return {
+            "parsed": bool(usage),
+            "primary_model": requested,
+            "models": {requested: {"output_tokens": usage.get("output_tokens", 0), "cost_usd": 0.0}}
+            if requested
+            else {},
+            "cost_usd": None,
+            "input_tokens": usage.get("input_tokens"),
+            "output_tokens": usage.get("output_tokens"),
+            "cache_read_tokens": usage.get("cached_input_tokens"),
+        }
+
+    return {"parsed": False, "reason": "agent declares no telemetry format"}
+
+
+# --------------------------------------------------------------------------
+# Inputs
+# --------------------------------------------------------------------------
 
 
 def build_rustfacts():
@@ -118,27 +180,35 @@ def build_rustfacts():
     return binary
 
 
-def parse_cargo_test(output):
-    """Read libtest's summary lines, which are the only machine-stable output.
+def assemble_guidance(scenario):
+    """Input three, assembled once per invocation rather than once per trial.
 
-    `cargo test` has no JUnit writer on stable, and one invocation prints one
-    summary per test binary, so the counts are summed rather than taken from the
-    last line.
+    The artifact is deterministic for a scenario, and running cargo inside the
+    repo contends on one target-directory lock — so N concurrent trials
+    assembling the same bytes would serialize on it for no reason.
     """
-    totals = {"collected": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0, "failures": []}
-    for match in re.finditer(
-        r"test result: \w+\. (\d+) passed; (\d+) failed; (\d+) ignored", output
-    ):
-        passed, failed, ignored = (int(group) for group in match.groups())
-        totals["passed"] += passed
-        totals["failed"] += failed
-        totals["skipped"] += ignored
-        totals["collected"] += passed + failed + ignored
-    totals["failures"] = [
-        {"name": name.strip(), "kind": "failure"}
-        for name in re.findall(r"^\s{4}(\S+)$", output, re.MULTILINE)
-    ]
-    return totals
+    outcome = run(
+        [
+            "cargo",
+            "run",
+            "--quiet",
+            "--manifest-path",
+            str(REPO_ROOT / "Cargo.toml"),
+            "-p",
+            "cmf",
+            "--",
+            "--root",
+            str(scenario / "input" / "knowledge-base"),
+            "assemble",
+            str(scenario / "input" / "profile.toml"),
+            "--explain",
+        ],
+        cwd=REPO_ROOT,
+        timeout=900,
+    )
+    if outcome["exit_code"] != 0:
+        raise SystemExit(f"cmf assemble failed:\n{outcome['stderr']}")
+    return outcome["stdout"], outcome["stderr"]
 
 
 def selected_from_explain(explanation):
@@ -180,6 +250,11 @@ def isolation_for(agent, run_directory, isolate_home):
     return {variable: str(scratch)}, notes
 
 
+# --------------------------------------------------------------------------
+# Test result parsing
+# --------------------------------------------------------------------------
+
+
 def parse_junit(path):
     if not path.is_file():
         return {"collected": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0, "failures": []}
@@ -207,35 +282,55 @@ def parse_junit(path):
     }
 
 
-def run_trial(
-    scenario,
-    scenario_name,
-    agent_name,
-    agent,
-    arm,
-    trial,
-    out_root,
-    timeout,
-    skip_agent,
-    implementation,
-    isolate_home,
-    rustfacts,
-):
-    run_directory = out_root / agent_name / arm / f"trial-{trial:02d}"
+def parse_cargo_test(output):
+    """Read libtest's summary lines, which are the only machine-stable output.
+
+    `cargo test` has no JUnit writer on stable, and one invocation prints one
+    summary per test binary, so the counts are summed rather than taken from the
+    last line.
+    """
+    totals = {"collected": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0, "failures": []}
+    for match in re.finditer(
+        r"test result: \w+\. (\d+) passed; (\d+) failed; (\d+) ignored", output
+    ):
+        passed, failed, ignored = (int(group) for group in match.groups())
+        totals["passed"] += passed
+        totals["failed"] += failed
+        totals["skipped"] += ignored
+        totals["collected"] += passed + failed + ignored
+    totals["failures"] = [
+        {"name": name.strip(), "kind": "failure"}
+        for name in re.findall(r"^\s{4}(\S+)$", output, re.MULTILINE)
+    ]
+    return totals
+
+
+# --------------------------------------------------------------------------
+# One trial
+# --------------------------------------------------------------------------
+
+
+def run_trial(job):
+    """Materialize a workspace, let the agent work, then score it."""
+    scenario = job["scenario"]
+    run_directory = job["run_directory"]
     if run_directory.exists():
         shutil.rmtree(run_directory)
     run_directory.mkdir(parents=True)
 
     workspace = run_directory / "workspace"
-    source = scenario / implementation if implementation else scenario / "input" / "skeleton"
+    source = scenario / job["implementation"] if job["implementation"] else scenario / "input" / "skeleton"
     shutil.copytree(source, workspace)
     shutil.copy2(scenario / "TASK.md", workspace / "TASK.md")
 
+    agent = job["agent"]
     guidance = {"present": False}
-    if arm == "guided":
-        content, explanation = assemble_guidance(scenario, run_directory)
+    if job["arm"] == "guided":
+        content, explanation = job["guidance"]
         for name in agent.get("guidance_files", ["AGENTS.md"]):
             (workspace / name).write_text(content, encoding="utf-8")
+        (run_directory / "guidance.md").write_text(content, encoding="utf-8")
+        (run_directory / "explain.txt").write_text(explanation, encoding="utf-8")
         guidance = {
             "present": True,
             "files": agent.get("guidance_files", ["AGENTS.md"]),
@@ -244,39 +339,40 @@ def run_trial(
             "selected_intents": selected_from_explain(explanation),
         }
 
-    home_env, isolation = isolation_for(agent, run_directory, isolate_home)
+    home_env, isolation = isolation_for(agent, run_directory, job["isolate_home"])
     environment = os.environ | home_env | agent.get("env", {})
 
-    if skip_agent or implementation:
+    if job["kind"] == "calibration":
         agent_run = {"skipped": True}
     else:
         command = [
             part.replace("{prompt}", PROMPT).replace("{workspace}", str(workspace))
             for part in agent["command"]
         ]
-        agent_run = run(command, cwd=workspace, env=environment, timeout=timeout)
-        (run_directory / "agent-stdout.txt").write_text(agent_run.pop("stdout"), encoding="utf-8")
+        agent_run = run(command, cwd=workspace, env=environment, timeout=job["timeout"])
+        stdout = agent_run.pop("stdout")
+        agent_run["telemetry"] = parse_telemetry(agent, command, stdout)
+        (run_directory / "agent-stdout.txt").write_text(stdout, encoding="utf-8")
         (run_directory / "agent-stderr.txt").write_text(agent_run.pop("stderr"), encoding="utf-8")
 
-    expected = json.loads((scenario / "expected.json").read_text(encoding="utf-8"))
+    expected = job["expected"]
     language = expected.get("language", "python")
+    rustfacts = job["rustfacts"]
 
     extra = {}
     if language == "rust":
-        sync = run(["cargo", "fetch", "--quiet"], cwd=workspace, timeout=900)
-        own = run(["cargo", "test", "--quiet"], cwd=workspace, timeout=900)
-        own_results = parse_cargo_test(own["stdout"] + own["stderr"]) | {
-            "exit_code": own["exit_code"]
-        }
-        documentation = run(["cargo", "doc", "--no-deps", "--quiet"], cwd=workspace, timeout=900)
+        sync = run(["cargo", "fetch", "--quiet"], cwd=workspace, timeout=1800)
+        own = run(["cargo", "test", "--quiet"], cwd=workspace, timeout=1800)
+        own_results = parse_cargo_test(own["stdout"] + own["stderr"]) | {"exit_code": own["exit_code"]}
+        documentation = run(["cargo", "doc", "--no-deps", "--quiet"], cwd=workspace, timeout=1800)
         extra["documentation_build"] = {"exit_code": documentation["exit_code"]}
     else:
-        sync = run(["uv", "sync", "--quiet"], cwd=workspace, timeout=600)
+        sync = run(["uv", "sync", "--quiet"], cwd=workspace, timeout=1200)
         own_junit = run_directory / "own-tests.xml"
         own = run(
             ["uv", "run", "--project", str(workspace), "pytest", "-q", f"--junit-xml={own_junit}"],
             cwd=workspace,
-            timeout=600,
+            timeout=1200,
         )
         own_results = parse_junit(own_junit) | {"exit_code": own["exit_code"]}
 
@@ -298,12 +394,12 @@ def run_trial(
     if language == "rust":
         staged = workspace / "tests"
         staged.mkdir(exist_ok=True)
-        for source in sorted((scenario / "acceptance").glob("*.rs")):
-            shutil.copy2(source, staged / source.name)
+        for path in sorted((scenario / "acceptance").glob("*.rs")):
+            shutil.copy2(path, staged / path.name)
         acceptance = run(
             ["cargo", "test", "--quiet", "--test", "acceptance", "--", "--test-threads=1"],
             cwd=workspace,
-            timeout=900,
+            timeout=1800,
         )
         acceptance_results = parse_cargo_test(acceptance["stdout"] + acceptance["stderr"]) | {
             "exit_code": acceptance["exit_code"]
@@ -324,7 +420,7 @@ def run_trial(
                 f"--junit-xml={acceptance_junit}",
             ],
             cwd=acceptance_directory,
-            timeout=600,
+            timeout=1200,
         )
         acceptance_results = parse_junit(acceptance_junit) | {"exit_code": acceptance["exit_code"]}
 
@@ -335,21 +431,24 @@ def run_trial(
     metrics = {
         "acceptance": acceptance_results,
         "adherence": report["adherence"],
-        "agent": {"name": agent_name, "description": agent.get("description", "")},
+        "agent": {"name": job["agent_name"], "description": agent.get("description", "")},
         "agent_run": agent_run,
-        "arm": arm,
+        "arm": job["arm"],
         "environment_sync": {"exit_code": sync["exit_code"]},
-        "language": language,
         "guidance": guidance,
-        "implementation": implementation,
+        "implementation": job["implementation"],
         "isolation": isolation,
+        # Calibration runs are not observations of an agent and must never enter
+        # a rate. `aggregate.py` filters on this.
+        "kind": job["kind"],
+        "language": language,
         "own_tests": own_results,
         "principles": report["principles"],
-        "scenario": scenario_name,
+        "scenario": job["scenario_name"],
         "task_complete": acceptance_results["failed"] == 0
         and acceptance_results["errors"] == 0
         and acceptance_results["collected"] == expected["acceptance_check_count"],
-        "trial": trial,
+        "trial": job["trial"],
         "workspace": report["workspace"],
         **extra,
     }
@@ -359,61 +458,39 @@ def run_trial(
     return metrics
 
 
-def summarize(runs):
-    by_arm = {}
-    for metrics in runs:
-        bucket = by_arm.setdefault(
-            metrics["arm"], {"trials": 0, "complete": 0, "followed": {}, "applicable": {}}
-        )
-        bucket["trials"] += 1
-        bucket["complete"] += int(metrics["task_complete"])
-        for key, item in metrics["principles"].items():
-            counts = int(item.get("applicable", True))
-            bucket["applicable"][key] = bucket["applicable"].get(key, 0) + counts
-            bucket["followed"][key] = bucket["followed"].get(key, 0) + int(bool(item["followed"]))
+# --------------------------------------------------------------------------
+# Planning and dispatch
+# --------------------------------------------------------------------------
 
-    summary = {}
-    for arm, bucket in by_arm.items():
-        trials = bucket["trials"]
-        applicable_total = sum(bucket["applicable"].values())
-        summary[arm] = {
-            "trials": trials,
-            "task_completion_rate": round(bucket["complete"] / trials, 4),
-            # Rates are per intent over the trials where that intent applied, so
-            # a conditional intent never leaves the denominator inflated.
-            "adherence_rate": round(sum(bucket["followed"].values()) / applicable_total, 4)
-            if applicable_total
-            else 0,
-            "followed_by_intent": {
-                key: round(count / bucket["applicable"][key], 4)
-                if bucket["applicable"][key]
-                else None
-                for key, count in sorted(bucket["followed"].items())
-            },
-            "not_applicable_trials": {
-                key: trials - applied
-                for key, applied in sorted(bucket["applicable"].items())
-                if applied < trials
-            },
-        }
 
-    if "guided" in summary and "control" in summary:
-        summary["lift"] = {
-            "task_completion_rate": round(
-                summary["guided"]["task_completion_rate"]
-                - summary["control"]["task_completion_rate"],
-                4,
-            ),
-            "adherence_rate": round(
-                summary["guided"]["adherence_rate"] - summary["control"]["adherence_rate"], 4
-            ),
-            "by_intent": {
-                key: round(value - (summary["control"]["followed_by_intent"].get(key) or 0), 4)
-                for key, value in summary["guided"]["followed_by_intent"].items()
-                if value is not None
-            },
-        }
-    return summary
+def completed_trials(base):
+    """Trial numbers that finished. An incomplete directory is not one."""
+    if not base.is_dir():
+        return set()
+    finished = set()
+    for path in base.glob("trial-*"):
+        if (path / "metrics.json").is_file():
+            try:
+                finished.add(int(path.name.split("-")[1]))
+            except (IndexError, ValueError):
+                continue
+    return finished
+
+
+def plan_trials(base, target):
+    """Which trial numbers are missing to reach `target`.
+
+    Trials accumulate. Asking for 10 when 6 exist runs 4, and asking again runs
+    none — so a crashed sweep resumes by repeating the same command, and a
+    sample can be deepened without discarding what it already cost.
+    """
+    done = completed_trials(base)
+    return [index for index in range(1, target + 1) if index not in done]
+
+
+def announce(message):
+    with PRINT_LOCK:
+        print(message, file=sys.stderr, flush=True)
 
 
 def main():
@@ -426,16 +503,32 @@ def main():
         choices=["guided", "control", "both"],
         help="guided installs the cmf-assembled AGENTS.md; control withholds it",
     )
-    parser.add_argument("--trials", type=int, default=1)
+    parser.add_argument(
+        "--trials",
+        type=int,
+        default=1,
+        help="target trials per arm; only the missing ones run",
+    )
+    parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="discard this agent's existing trials for the scenario first",
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        help="trials in flight at once; they are independent and workspace-isolated",
+    )
     parser.add_argument("--timeout", type=int, default=1800, help="per-trial agent timeout")
     parser.add_argument(
         "--skip-agent",
         action="store_true",
-        help="prepare and score without invoking the agent; validates the harness",
+        help="calibration: prepare and score without invoking the agent (the floor)",
     )
     parser.add_argument(
         "--implementation",
-        help="score a checked-in directory instead of running an agent, e.g. 'reference'",
+        help="calibration: score a checked-in directory, e.g. 'reference' (the ceiling)",
     )
     parser.add_argument(
         "--isolate-agent-home",
@@ -457,41 +550,80 @@ def main():
     expected = json.loads((scenario / "expected.json").read_text(encoding="utf-8"))
     rustfacts = build_rustfacts() if expected.get("language") == "rust" else None
 
-    arms = ["control", "guided"] if arguments.arm == "both" else [arguments.arm]
+    calibration = arguments.skip_agent or arguments.implementation
+    kind = "calibration" if calibration else "agent"
     out_root = HERE / "results" / arguments.scenario
-    runs = []
+    if calibration:
+        label = arguments.implementation or "skeleton"
+        agent_root = out_root / "_calibration" / label
+        target = 1
+    else:
+        agent_root = out_root / arguments.agent
+        target = arguments.trials
+
+    arms = ["control", "guided"] if arguments.arm == "both" else [arguments.arm]
+
+    if arguments.fresh and agent_root.exists():
+        shutil.rmtree(agent_root)
+
+    guidance = assemble_guidance(scenario) if "guided" in arms else None
+
+    jobs = []
     for arm in arms:
-        for trial in range(1, arguments.trials + 1):
-            metrics = run_trial(
-                scenario,
-                arguments.scenario,
-                arguments.agent,
-                agent,
-                arm,
-                trial,
-                out_root,
-                arguments.timeout,
-                arguments.skip_agent,
-                arguments.implementation,
-                arguments.isolate_agent_home,
-                rustfacts,
-            )
-            runs.append(metrics)
-            print(
-                f"{arm} trial {trial}: "
-                f"acceptance {metrics['acceptance']['passed']}/{metrics['acceptance']['collected']}, "
-                f"adherence {metrics['adherence']['followed_count']}"
-                f"/{metrics['adherence']['applicable_count']} applicable",
-                file=sys.stderr,
+        for index in plan_trials(agent_root / arm, target):
+            jobs.append(
+                {
+                    "agent": agent,
+                    "agent_name": arguments.agent if not calibration else f"_calibration:{label}",
+                    "arm": arm,
+                    "expected": expected,
+                    "guidance": guidance,
+                    "implementation": arguments.implementation,
+                    "isolate_home": arguments.isolate_agent_home,
+                    "kind": kind,
+                    "run_directory": agent_root / arm / f"trial-{index:02d}",
+                    "rustfacts": rustfacts,
+                    "scenario": scenario,
+                    "scenario_name": arguments.scenario,
+                    "timeout": arguments.timeout,
+                    "trial": index,
+                }
             )
 
-    summary = summarize(runs)
-    (out_root / "summary.json").write_text(
-        json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    if not jobs:
+        announce(f"nothing to run: {target} trial(s) per arm already complete")
+        return 0
+
+    announce(
+        f"{len(jobs)} trial(s) to run at concurrency {arguments.concurrency}"
+        f" ({', '.join(arms)})"
     )
-    json.dump(summary, sys.stdout, indent=2, sort_keys=True)
+
+    completed = []
+    with ThreadPoolExecutor(max_workers=max(1, arguments.concurrency)) as pool:
+        futures = {pool.submit(run_trial, job): job for job in jobs}
+        for future in as_completed(futures):
+            job = futures[future]
+            try:
+                metrics = future.result()
+            except Exception as error:  # a failed trial must not sink the sweep
+                announce(f"{job['arm']} trial {job['trial']}: FAILED — {error}")
+                continue
+            completed.append(metrics)
+            announce(
+                f"{metrics['arm']} trial {metrics['trial']}: "
+                f"acceptance {metrics['acceptance']['passed']}/{metrics['acceptance']['collected']}, "
+                f"adherence {metrics['adherence']['followed_count']}"
+                f"/{metrics['adherence']['applicable_count']} applicable"
+            )
+
+    announce(
+        f"\n{len(completed)}/{len(jobs)} trial(s) completed. "
+        f"Aggregate with: python3 aggregate.py --scenario {arguments.scenario}"
+    )
+    json.dump({"completed": len(completed), "attempted": len(jobs)}, sys.stdout, indent=2)
     sys.stdout.write("\n")
-    return 0
+    return 0 if len(completed) == len(jobs) else 1
 
 
 if __name__ == "__main__":

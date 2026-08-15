@@ -16,6 +16,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Behavioural exercises now measure distributions, and compare models.**
+  Collecting and analysing split apart: `runner.py` only gathers trials, and the
+  new `aggregate.py` reads every `metrics.json` under `results/` and reports
+  rates with Wilson score intervals, lift as a Newcombe interval on the
+  difference of two proportions, and per-model cost — so re-analysis never costs
+  another agent invocation, which matters because the scoring rules have changed
+  more often than the evidence has. Trials now accumulate rather than overwrite,
+  so a sweep resumes by repeating its command and a sample can be deepened;
+  `--concurrency` runs independent trials in parallel; results are keyed by agent
+  so one model's sweep no longer overwrites another's; calibration runs are
+  marked and filtered out of every rate; and each trial records the model the CLI
+  says it actually served, with tokens and cost, because `--model sonnet` is an
+  alias whose target moves. Applied to the runs already collected, the aggregator
+  reports what one trial per arm was always worth: every lift measured so far has
+  a confidence interval that includes zero.
 - **A Rust behavioural exercise, and a fact extractor to make it possible.**
   `rate-card` prices parcels against a rate card read from the filesystem, and
   scores eight Rust intents disjoint from both Python exercises. Python's `ast`

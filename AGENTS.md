@@ -413,6 +413,7 @@ and without the guidance, and the difference is the result. Size and lexical
 overlap say nothing about whether guidance changes work; these do.
 
 - `benchmark/exercises/run.sh` — wrapper over `runner.py`
+- `benchmark/exercises/aggregate.py` — reads every `metrics.json` and reports rates with Wilson intervals, lift with Newcombe intervals, and per-model cost; analysis never re-runs an agent
 - `benchmark/exercises/runner.py` — takes agent parameters, a scenario skeleton, and a cmf-assembled AGENTS.md; runs both arms and reports per-intent lift
 - `benchmark/exercises/adherence.py` — workspace partitioning and orchestration; never asks a model, never reads the agent transcript
 - `benchmark/exercises/checks.py` — one check per intent, taking `(workspace, config)`

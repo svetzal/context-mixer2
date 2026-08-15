@@ -22,6 +22,7 @@ description = "Claude Code, Opus 5"
 command = [
     "claude",
     "--print",
+    "--output-format", "json",
     "--model", "opus",
     "--permission-mode", "bypassPermissions",
     "--setting-sources", "project",
@@ -31,6 +32,7 @@ command = [
 ]
 guidance_files = ["AGENTS.md", "CLAUDE.md"]
 home_env = "CLAUDE_CONFIG_DIR"
+telemetry = "claude-json"
 isolation_notes = [
     "--setting-sources project excludes user and local settings files",
     "--disable-slash-commands excludes installed skills",
@@ -43,6 +45,7 @@ description = "Claude Code, Sonnet 5"
 command = [
     "claude",
     "--print",
+    "--output-format", "json",
     "--model", "sonnet",
     "--permission-mode", "bypassPermissions",
     "--setting-sources", "project",
@@ -52,6 +55,7 @@ command = [
 ]
 guidance_files = ["AGENTS.md", "CLAUDE.md"]
 home_env = "CLAUDE_CONFIG_DIR"
+telemetry = "claude-json"
 isolation_notes = [
     "--setting-sources project excludes user and local settings files",
     "--disable-slash-commands excludes installed skills",
@@ -64,6 +68,7 @@ description = "Codex CLI, GPT-5.6"
 command = [
     "codex",
     "exec",
+    "--json",
     "--model", "gpt-5.6",
     "--cd", "{workspace}",
     "--sandbox", "workspace-write",
@@ -75,6 +80,7 @@ command = [
 ]
 guidance_files = ["AGENTS.md"]
 home_env = "CODEX_HOME"
+telemetry = "codex-jsonl"
 isolation_notes = [
     "--ignore-user-config skips $CODEX_HOME/config.toml",
     "--ignore-rules skips user and project execpolicy rules",

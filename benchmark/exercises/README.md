@@ -21,9 +21,20 @@ between the two runs is the measurement.
 
 ## Run
 
+Collecting and analysing are separate commands, on purpose. The scoring rules
+have changed repeatedly; re-analysis must never cost another agent invocation.
+
 ```bash
-./benchmark/exercises/run.sh --agent claude-opus-5 --arm both --trials 3
-./benchmark/exercises/run.sh --agent codex-gpt-5-6 --arm guided --trials 5
+# Collect. Trials accumulate — asking for 10 when 6 exist runs 4.
+./benchmark/exercises/run.sh --scenario rate-card --agent claude-opus-5 \
+    --arm both --trials 10 --concurrency 4
+
+# Same command again after a crash resumes; --fresh discards and restarts.
+./benchmark/exercises/run.sh --scenario rate-card --agent codex-gpt-5-6 \
+    --arm both --trials 10 --concurrency 4
+
+# Analyse. Reads every metrics.json under results/, no re-running.
+python3 benchmark/exercises/aggregate.py --scenario rate-card
 ```
 
 Validate the harness itself without spending an agent invocation:
@@ -36,9 +47,45 @@ Validate the harness itself without spending an agent invocation:
 ./benchmark/exercises/run.sh --skip-agent --arm guided
 ```
 
-Results land under `benchmark/exercises/results/`, which Git ignores. Each
-trial keeps its own workspace, the guidance it was given, the agent's
-transcript, both pytest runs, and `metrics.json`.
+Calibration runs land under `results/<scenario>/_calibration/` and are marked
+`kind: "calibration"`, so they cannot leak into a rate. Agent trials land under
+`results/<scenario>/<agent>/<arm>/trial-NN/`, keyed by agent so one model's
+sweep never overwrites another's. Each trial keeps its own workspace, the
+guidance it was given, the agent's transcript, both test runs, and
+`metrics.json`. All of it is Git-ignored.
+
+## Distributions, and comparing models
+
+A single trial per arm is an anecdote, and a bare rate hides which one you are
+looking at. `aggregate.py` reports every rate with its `n` and a Wilson score
+interval, and every lift as a Newcombe interval on the difference of two
+proportions — so "the guidance helped" is a claim with a width.
+
+```text
+  claude-sonnet-5  [served: claude-sonnet-5]  cost $3.42
+    control  n=10  adherence 0.14 [0.05, 0.36]  complete 1.0
+    guided   n=10  adherence 0.88 [0.66, 0.96]  complete 1.0
+    lift     0.74 [0.42, 0.89] at 95% — excludes 0
+```
+
+`excludes_zero` is the honest headline. Every lift reported earlier in this
+project's history was measured at n=1, and all of them include zero.
+
+**Model identity is recorded, not assumed.** `--model sonnet` is an alias whose
+target moves, and a session can route part of its work elsewhere. Each trial
+stores what the CLI says it actually used — resolved model ids, per-model token
+counts, and cost where the CLI reports one. Claude Code reports all three; codex
+reports tokens but no model or cost, so the model is taken from argv and cost is
+recorded as unknown rather than zero.
+
+Adding a model is one entry in `agents.toml`, and the aggregator groups by agent
+automatically. Comparing four models is four collect commands and one analyse.
+
+**Concurrency.** Trials are independent and workspace-isolated, so
+`--concurrency N` runs N at once; two trials complete in roughly the time of
+one. The cmf assembly runs once per invocation rather than per trial, because
+concurrent `cargo run` in the repo would serialize on a single target-directory
+lock for bytes that are identical anyway.
 
 ## What each trial measures
 
