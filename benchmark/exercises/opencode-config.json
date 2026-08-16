@@ -11,6 +11,9 @@
         },
         "qwen3.6:27b-coding-mxfp8": {
           "name": "Qwen3.6 27B Coder (mxfp8)"
+        },
+        "qwen3.8:27b-mxfp8": {
+          "name": "Qwen3.8 27B (mxfp8)"
         }
       },
       "name": "Ollama (local, harness-declared)",
