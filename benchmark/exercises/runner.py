@@ -34,6 +34,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import tarfile
 import tomllib
 import xml.etree.ElementTree as ElementTree
@@ -115,12 +116,21 @@ def run(command, cwd, env=None, timeout=None):
             "timed_out": False,
         }
     except subprocess.TimeoutExpired as expired:
+        # `TimeoutExpired` carries raw bytes even when the call sets text=True.
+        # Writing that straight to a text file raises "data must be str, not
+        # bytes", which is how six hours of local inference were lost: every
+        # trial timed out, and the crash on the timeout path hid the timeout.
+        def as_text(value):
+            if isinstance(value, bytes):
+                return value.decode("utf-8", errors="replace")
+            return value or ""
+
         return {
             "command": list(command),
             "exit_code": None,
             "seconds": round(time.monotonic() - started, 2),
-            "stdout": expired.stdout or "",
-            "stderr": expired.stderr or "",
+            "stdout": as_text(expired.stdout),
+            "stderr": as_text(expired.stderr),
             "timed_out": True,
         }
 
@@ -907,7 +917,13 @@ def main():
             try:
                 metrics = future.result()
             except Exception as error:  # a failed trial must not sink the sweep
-                announce(f"{job['arm']} trial {job['trial']}: FAILED — {error}")
+                # With the traceback suppressed, a harness bug is indistinguishable
+                # from a provider problem, and six hours of local inference were
+                # thrown away before anyone could see which it was.
+                announce(
+                    f"{job['arm']} trial {job['trial']}: FAILED — {error}\n"
+                    + "".join(traceback.format_exception(error)).rstrip()
+                )
                 continue
             completed.append(metrics)
             announce(

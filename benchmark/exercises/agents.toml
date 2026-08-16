@@ -218,3 +218,11 @@ warmup = true
 isolation_notes = ["--pure runs without external plugins", "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config"]
 [agents.opencode-qwen3_8-27b.env]
 OPENCODE_CONFIG = "{here}/opencode-config.json"
+
+# A harness-only agent: does nothing, instantly. Exercises the full agent code
+# path — telemetry, archiving, pruning, scoring — without an inference bill, so
+# a plumbing bug is found in seconds rather than after six hours of local work.
+[agents.noop-harness-test]
+description = "no-op agent for exercising the harness itself"
+command = ["true", "{prompt}", "{workspace}"]
+guidance_files = ["AGENTS.md"]
