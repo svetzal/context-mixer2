@@ -1,0 +1,261 @@
+{
+  "acceptance": {
+    "collected": 10,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 10,
+    "skipped": 0
+  },
+  "adherence": {
+    "applicable_count": 7,
+    "followed": [],
+    "followed_count": 0,
+    "not_applicable": [
+      "craftsperson/rust/prefer-fakes-at-boundaries"
+    ],
+    "rate": 0.0,
+    "scored_count": 8,
+    "violated": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ]
+  },
+  "agent": {
+    "description": "Codex CLI, GPT-5.5",
+    "name": "codex-gpt-5-5"
+  },
+  "agent_run": {
+    "command": [
+      "codex",
+      "exec",
+      "--json",
+      "--model",
+      "gpt-5.5",
+      "--cd",
+      "/Users/svetzal/Work/Projects/Personal/context-mixer2/benchmark/exercises/results/rate-card/codex-gpt-5-5/control/trial-05/workspace",
+      "--sandbox",
+      "workspace-write",
+      "--skip-git-repo-check",
+      "--ignore-user-config",
+      "--ignore-rules",
+      "--ephemeral",
+      "Read TASK.md in this directory and implement it.\n\nWork directly in this project. When you are finished the task's definition of\ndone must hold. Do not ask for confirmation; complete the work."
+    ],
+    "exit_code": 0,
+    "seconds": 106.95,
+    "telemetry": {
+      "cache_read_tokens": 201728,
+      "cost_usd": null,
+      "input_tokens": 233245,
+      "models": {
+        "gpt-5.5": {
+          "cost_usd": 0.0,
+          "output_tokens": 4838
+        }
+      },
+      "output_tokens": 4838,
+      "parsed": true,
+      "primary_model": "gpt-5.5"
+    },
+    "timed_out": false
+  },
+  "arm": "control",
+  "documentation_build": {
+    "exit_code": 0
+  },
+  "environment_sync": {
+    "exit_code": 0
+  },
+  "guidance": {
+    "present": false
+  },
+  "implementation": null,
+  "isolation": [
+    "--ignore-user-config skips $CODEX_HOME/config.toml",
+    "--ignore-rules skips user and project execpolicy rules",
+    "--ephemeral keeps session files off disk",
+    "ambient user configuration was NOT isolated; it is constant across arms and can only understate guided-arm lift"
+  ],
+  "kind": "agent",
+  "language": "rust",
+  "own_tests": {
+    "collected": 9,
+    "errors": 0,
+    "exit_code": 101,
+    "failed": 2,
+    "failures": [
+      {
+        "kind": "failure",
+        "name": "tests::malformed_line_reports_one_based_physical_line"
+      },
+      {
+        "kind": "failure",
+        "name": "tests::sorts_bands_before_matching"
+      }
+    ],
+    "passed": 7,
+    "skipped": 0
+  },
+  "principles": {
+    "craftsperson/rust/centralize-curated-lint-policy": {
+      "applicable": true,
+      "evidence": [
+        "Cargo.toml declares no [lints] policy"
+      ],
+      "followed": false,
+      "signals": {
+        "cargo_lint_tables": [],
+        "cargo_lints": {},
+        "crate_level_lint_attributes": []
+      }
+    },
+    "craftsperson/rust/compile-public-documentation": {
+      "applicable": true,
+      "evidence": [
+        "4 public item(s) carry no doc comment",
+        "no crate-level documentation"
+      ],
+      "followed": false,
+      "signals": {
+        "crate_documented_files": [],
+        "inherited_from_skeleton": [
+          "src/lib.rs::zones",
+          "src/zones.rs::zone_label"
+        ],
+        "public_items": [
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote"
+        ],
+        "undocumented_public_items": [
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote"
+        ]
+      }
+    },
+    "craftsperson/rust/isolate-functional-core-from-effects": {
+      "applicable": true,
+      "evidence": [
+        "1 module(s) hold both the business rules and I/O"
+      ],
+      "followed": false,
+      "signals": {
+        "effectful_modules": [
+          "src/lib.rs"
+        ],
+        "modules_mixing_rules_and_io": [
+          "src/lib.rs"
+        ],
+        "pure_modules": [
+          "src/zones.rs"
+        ],
+        "rule_bearing_modules": [
+          "src/lib.rs"
+        ]
+      }
+    },
+    "craftsperson/rust/prefer-fakes-at-boundaries": {
+      "applicable": false,
+      "evidence": [
+        "no owned trait to substitute; the gateway intent covers that"
+      ],
+      "followed": null,
+      "signals": {
+        "owned_traits": [],
+        "test_fakes": []
+      }
+    },
+    "craftsperson/rust/put-gateways-at-effect-boundaries": {
+      "applicable": true,
+      "evidence": [
+        "no gateway trait is declared",
+        "no concrete type implements a declared gateway trait"
+      ],
+      "followed": false,
+      "signals": {
+        "declared_traits": {},
+        "effect_free_consumers": {},
+        "effectful_modules": [
+          "src/lib.rs"
+        ],
+        "trait_implementations": []
+      }
+    },
+    "craftsperson/rust/use-purpose-specific-test-layers": {
+      "applicable": true,
+      "evidence": [
+        "no tests/*.rs for wiring and cross-module behaviour"
+      ],
+      "followed": false,
+      "signals": {
+        "documented_examples": [],
+        "inline_unit_modules": [
+          "src/lib.rs"
+        ],
+        "integration_test_files": []
+      }
+    },
+    "craftsperson/rust/use-results-for-recoverable-library-errors": {
+      "applicable": true,
+      "evidence": [
+        "1 unwrap/expect outside test code"
+      ],
+      "followed": false,
+      "signals": {
+        "panicking_macros_in_production": [],
+        "public_fallible_functions": [
+          "src/lib.rs::quote"
+        ],
+        "unwrap_or_expect_in_production": [
+          {
+            "call": "bands.last().expect",
+            "where": "src/lib.rs:67"
+          }
+        ]
+      }
+    },
+    "craftsperson/rust/use-structured-tracing": {
+      "applicable": true,
+      "evidence": [
+        "the tracing ecosystem is not used",
+        "1 print macro(s) in production code"
+      ],
+      "followed": false,
+      "signals": {
+        "instrumented_functions": [],
+        "print_macros": [
+          {
+            "arguments": "\"ratecard_quote zone={} weight_grams={} total_cents={}\" , parcel . zone , parcel . weight_grams , total_cents",
+            "macro": "eprintln",
+            "where": "src/lib.rs:75"
+          }
+        ],
+        "structured_emissions": [],
+        "tracing_declared": false,
+        "tracing_emissions": []
+      }
+    }
+  },
+  "scenario": "rate-card",
+  "task_complete": true,
+  "trial": 5,
+  "valid": true,
+  "workspace": {
+    "parse_errors": [],
+    "production_modules": [
+      "src/lib.rs",
+      "src/zones.rs"
+    ],
+    "test_modules": []
+  }
+}
