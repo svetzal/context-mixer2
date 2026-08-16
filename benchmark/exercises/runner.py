@@ -30,6 +30,7 @@ import os
 import pathlib
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -94,45 +95,74 @@ def load_agents():
     return tomllib.loads((HERE / "agents.toml").read_text(encoding="utf-8"))["agents"]
 
 
+def terminate_group(process):
+    """Kill the whole process group, not just the child we spawned.
+
+    An agent CLI spawns its own children. Killing only the direct child leaves
+    those running — and a local model's server request keeps its weights
+    resident, so the next agent in a sweep contends with an inference job nobody
+    is waiting for. That is how two models ended up loaded at once, 79 GB
+    between them, turning a sequential sweep into a measurement of eviction.
+    """
+    try:
+        group = os.getpgid(process.pid)
+    except (ProcessLookupError, PermissionError):
+        return
+    for signal_number in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(group, signal_number)
+        except (ProcessLookupError, PermissionError):
+            return
+        try:
+            process.wait(timeout=10)
+            return
+        except subprocess.TimeoutExpired:
+            continue
+
+
 def run(command, cwd, env=None, timeout=None):
     started = time.monotonic()
+    # `start_new_session` puts the child in its own process group so the whole
+    # tree can be signalled together.
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        stdin=subprocess.DEVNULL,
+        text=True,
+        start_new_session=True,
+    )
+    timed_out = False
     try:
-        completed = subprocess.run(
-            command,
-            cwd=cwd,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            stdin=subprocess.DEVNULL,
-            check=False,
-        )
-        return {
-            "command": list(command),
-            "exit_code": completed.returncode,
-            "seconds": round(time.monotonic() - started, 2),
-            "stdout": completed.stdout,
-            "stderr": completed.stderr,
-            "timed_out": False,
-        }
-    except subprocess.TimeoutExpired as expired:
-        # `TimeoutExpired` carries raw bytes even when the call sets text=True.
-        # Writing that straight to a text file raises "data must be str, not
-        # bytes", which is how six hours of local inference were lost: every
-        # trial timed out, and the crash on the timeout path hid the timeout.
-        def as_text(value):
-            if isinstance(value, bytes):
-                return value.decode("utf-8", errors="replace")
-            return value or ""
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        terminate_group(process)
+        try:
+            stdout, stderr = process.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = "", ""
+    except BaseException:
+        # Ctrl-C, or the sweep being killed. Take the tree down with us rather
+        # than orphaning an inference job.
+        terminate_group(process)
+        raise
 
-        return {
-            "command": list(command),
-            "exit_code": None,
-            "seconds": round(time.monotonic() - started, 2),
-            "stdout": as_text(expired.stdout),
-            "stderr": as_text(expired.stderr),
-            "timed_out": True,
-        }
+    def as_text(value):
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        return value or ""
+
+    return {
+        "command": list(command),
+        "exit_code": None if timed_out else process.returncode,
+        "seconds": round(time.monotonic() - started, 2),
+        "stdout": as_text(stdout),
+        "stderr": as_text(stderr),
+        "timed_out": timed_out,
+    }
 
 
 # --------------------------------------------------------------------------
