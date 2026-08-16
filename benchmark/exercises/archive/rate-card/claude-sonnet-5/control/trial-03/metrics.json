@@ -1,0 +1,256 @@
+{
+  "acceptance": {
+    "collected": 10,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 10,
+    "skipped": 0
+  },
+  "adherence": {
+    "applicable_count": 7,
+    "followed": [],
+    "followed_count": 0,
+    "not_applicable": [
+      "craftsperson/rust/prefer-fakes-at-boundaries"
+    ],
+    "rate": 0.0,
+    "scored_count": 8,
+    "violated": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ]
+  },
+  "agent": {
+    "description": "Claude Code, Sonnet 5",
+    "name": "claude-sonnet-5"
+  },
+  "agent_run": {
+    "command": [
+      "claude",
+      "--print",
+      "--output-format",
+      "json",
+      "--model",
+      "claude-sonnet-5",
+      "--permission-mode",
+      "bypassPermissions",
+      "--setting-sources",
+      "project",
+      "--no-session-persistence",
+      "--disable-slash-commands",
+      "Read TASK.md in this directory and implement it.\n\nWork directly in this project. When you are finished the task's definition of\ndone must hold. Do not ask for confirmation; complete the work."
+    ],
+    "exit_code": 0,
+    "seconds": 276.64,
+    "telemetry": {
+      "cache_read_tokens": 293184,
+      "cost_usd": 0.6129762000000001,
+      "duration_ms": 276303,
+      "input_tokens": 16,
+      "models": {
+        "claude-sonnet-5": {
+          "cost_usd": 0.6129762000000001,
+          "input_tokens": 16,
+          "output_tokens": 14811
+        }
+      },
+      "output_tokens": 14811,
+      "parsed": true,
+      "primary_model": "claude-sonnet-5",
+      "requested_model": "claude-sonnet-5",
+      "served_requested": true,
+      "stop_reason": "end_turn",
+      "turns": 12
+    },
+    "timed_out": false
+  },
+  "arm": "control",
+  "documentation_build": {
+    "exit_code": 0
+  },
+  "environment_sync": {
+    "exit_code": 0
+  },
+  "guidance": {
+    "present": false
+  },
+  "implementation": null,
+  "isolation": [
+    "--setting-sources project excludes user and local settings files",
+    "--disable-slash-commands excludes installed skills",
+    "ambient user configuration was NOT isolated; it is constant across arms and can only understate guided-arm lift"
+  ],
+  "kind": "agent",
+  "language": "rust",
+  "own_tests": {
+    "collected": 12,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 12,
+    "skipped": 0
+  },
+  "principles": {
+    "craftsperson/rust/centralize-curated-lint-policy": {
+      "applicable": true,
+      "evidence": [
+        "Cargo.toml declares no [lints] policy"
+      ],
+      "followed": false,
+      "signals": {
+        "cargo_lint_tables": [],
+        "cargo_lints": {},
+        "crate_level_lint_attributes": []
+      }
+    },
+    "craftsperson/rust/compile-public-documentation": {
+      "applicable": true,
+      "evidence": [
+        "4 public item(s) carry no doc comment",
+        "no crate-level documentation"
+      ],
+      "followed": false,
+      "signals": {
+        "crate_documented_files": [],
+        "inherited_from_skeleton": [
+          "src/lib.rs::zones",
+          "src/zones.rs::zone_label"
+        ],
+        "public_items": [
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote"
+        ],
+        "undocumented_public_items": [
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote"
+        ]
+      }
+    },
+    "craftsperson/rust/isolate-functional-core-from-effects": {
+      "applicable": true,
+      "evidence": [
+        "1 module(s) hold both the business rules and I/O"
+      ],
+      "followed": false,
+      "signals": {
+        "effectful_modules": [
+          "src/lib.rs"
+        ],
+        "modules_mixing_rules_and_io": [
+          "src/lib.rs"
+        ],
+        "pure_modules": [
+          "src/zones.rs"
+        ],
+        "rule_bearing_modules": [
+          "src/lib.rs"
+        ]
+      }
+    },
+    "craftsperson/rust/prefer-fakes-at-boundaries": {
+      "applicable": false,
+      "evidence": [
+        "no owned trait to substitute; the gateway intent covers that"
+      ],
+      "followed": null,
+      "signals": {
+        "owned_traits": [],
+        "test_fakes": []
+      }
+    },
+    "craftsperson/rust/put-gateways-at-effect-boundaries": {
+      "applicable": true,
+      "evidence": [
+        "no gateway trait is declared",
+        "no concrete type implements a declared gateway trait"
+      ],
+      "followed": false,
+      "signals": {
+        "declared_traits": {},
+        "effect_free_consumers": {},
+        "effectful_modules": [
+          "src/lib.rs"
+        ],
+        "trait_implementations": []
+      }
+    },
+    "craftsperson/rust/use-purpose-specific-test-layers": {
+      "applicable": true,
+      "evidence": [
+        "no tests/*.rs for wiring and cross-module behaviour"
+      ],
+      "followed": false,
+      "signals": {
+        "documented_examples": [],
+        "inline_unit_modules": [
+          "src/lib.rs"
+        ],
+        "integration_test_files": []
+      }
+    },
+    "craftsperson/rust/use-results-for-recoverable-library-errors": {
+      "applicable": true,
+      "evidence": [
+        "1 unwrap/expect outside test code"
+      ],
+      "followed": false,
+      "signals": {
+        "panicking_macros_in_production": [],
+        "public_fallible_functions": [
+          "src/lib.rs::quote"
+        ],
+        "unwrap_or_expect_in_production": [
+          {
+            "call": "bands.last().unwrap",
+            "where": "src/lib.rs:107"
+          }
+        ]
+      }
+    },
+    "craftsperson/rust/use-structured-tracing": {
+      "applicable": true,
+      "evidence": [
+        "the tracing ecosystem is not used",
+        "1 print macro(s) in production code"
+      ],
+      "followed": false,
+      "signals": {
+        "instrumented_functions": [],
+        "print_macros": [
+          {
+            "arguments": "\"ratecard.quote zone={} weight_grams={} total_cents={}\" , parcel . zone , parcel . weight_grams , total_cents",
+            "macro": "eprintln",
+            "where": "src/lib.rs:128"
+          }
+        ],
+        "structured_emissions": [],
+        "tracing_declared": false,
+        "tracing_emissions": []
+      }
+    }
+  },
+  "scenario": "rate-card",
+  "task_complete": true,
+  "trial": 3,
+  "valid": true,
+  "workspace": {
+    "parse_errors": [],
+    "production_modules": [
+      "src/lib.rs",
+      "src/zones.rs"
+    ],
+    "test_modules": []
+  }
+}

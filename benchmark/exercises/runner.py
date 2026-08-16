@@ -62,8 +62,18 @@ RATE_LIMITED = re.compile(
 
 
 def looks_rate_limited(agent_run, stdout):
-    if (agent_run.get("telemetry") or {}).get("parsed"):
+    """Did the provider refuse for budget reasons rather than the model failing?
+
+    An earlier version returned early when telemetry parsed, on the theory that
+    a parseable response meant a real run. It does not: a 429 payload is valid
+    JSON with `is_error` set and zero tokens used, so the guard never fired and
+    a sweep burned 120 trials discovering the same limit over and over.
+    """
+    if agent_run.get("exit_code") == 0:
         return False
+    telemetry = agent_run.get("telemetry") or {}
+    if telemetry.get("api_error_status") == 429:
+        return True
     haystack = f"{stdout[:4000]} {agent_run.get('stderr', '')[:2000]}"
     return bool(RATE_LIMITED.search(haystack))
 
@@ -167,6 +177,9 @@ def parse_telemetry(agent, command, stdout):
             "duration_ms": payload.get("duration_ms"),
             "turns": payload.get("num_turns"),
             "stop_reason": payload.get("stop_reason"),
+            "is_error": payload.get("is_error"),
+            "api_error_status": payload.get("api_error_status"),
+            "error_message": payload.get("result") if payload.get("is_error") else None,
         }
 
     if kind == "codex-jsonl":
@@ -857,7 +870,10 @@ def main():
     )
     json.dump({"completed": len(completed), "attempted": len(jobs)}, sys.stdout, indent=2)
     sys.stdout.write("\n")
-    return 0 if len(completed) == len(jobs) else 1
+    measured = [metrics for metrics in completed if metrics.get("valid")]
+    if len(measured) < len(jobs):
+        announce(f"{len(completed) - len(measured)} trial(s) ran but measured nothing")
+    return 0 if len(measured) == len(jobs) else 1
 
 
 if __name__ == "__main__":
