@@ -812,7 +812,12 @@ def main():
         default=1,
         help="trials in flight at once; they are independent and workspace-isolated",
     )
-    parser.add_argument("--timeout", type=int, default=1800, help="per-trial agent timeout")
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=1800,
+        help="per-trial agent timeout in seconds; 0 removes the cap entirely",
+    )
     parser.add_argument(
         "--skip-agent",
         action="store_true",
@@ -886,7 +891,10 @@ def main():
                     "rustfacts": rustfacts,
                     "scenario": scenario,
                     "scenario_name": arguments.scenario,
-                    "timeout": arguments.timeout,
+                    # A local model that needs longer than the cap produces no
+                    # measurement at all, only a discarded hour. Uncapped is the
+                    # honest setting when the runtime is what is being found out.
+                    "timeout": arguments.timeout or None,
                     "trial": index,
                 }
             )
