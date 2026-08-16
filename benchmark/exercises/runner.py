@@ -24,6 +24,7 @@ evidence does.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import pathlib
@@ -43,6 +44,16 @@ import adherence
 HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent.parent
 RUSTFACTS = HERE / "rustfacts"
+
+# Workspaces live OUTSIDE the repository. Some agent CLIs resolve a project root
+# by walking up to the enclosing git repository, which put this repo's own
+# AGENTS.md — and, far worse, each scenario's reference solution — within reach
+# of a trial. A local model found the reference and copied it verbatim into a
+# control trial, scoring 8/8 unguided. Nothing in the workspace was wrong; the
+# workspace was simply in the wrong place.
+WORKSPACE_ROOT = pathlib.Path(
+    os.environ.get("CMF_EXERCISE_WORKSPACES", pathlib.Path.home() / ".cache" / "cmf-exercises")
+)
 
 PROMPT = """Read TASK.md in this directory and implement it.
 
@@ -472,6 +483,13 @@ def run_trial(job):
     language = expected.get("language", "python")
     rustfacts = job["rustfacts"]
 
+    copied = copied_reference(workspace, reference_fingerprints(scenario))
+    if copied and job["kind"] == "agent":
+        announce(
+            f"{job['arm']} trial {job['trial']}: DISCARDED — reproduced "
+            f"{len(copied)} reference file(s) verbatim"
+        )
+
     extra = {}
     if language == "rust":
         sync = run(["cargo", "fetch", "--quiet"], cwd=workspace, timeout=1800)
@@ -573,9 +591,13 @@ def run_trial(job):
         # a crash, or a timeout produces an empty workspace that scores like a
         # model doing badly — the one failure mode that silently corrupts a rate
         # over a long unattended sweep.
+        # A trial that reproduced the reference measured the filesystem, not the
+        # model. It is not a low score to be reported; it is not an observation.
+        "copied_reference": copied,
         "valid": job["kind"] == "calibration"
         or bool(
-            agent_run.get("exit_code") == 0
+            not copied
+            and agent_run.get("exit_code") == 0
             and not agent_run.get("timed_out")
             and (agent_run.get("telemetry") or {}).get("parsed")
         ),
@@ -671,6 +693,43 @@ def prune_workspace(workspace):
             freed += sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
             shutil.rmtree(path, ignore_errors=True)
     return freed
+
+
+def reference_fingerprints(scenario):
+    """Content hashes of the scenario's reference solution."""
+    reference = scenario / "reference"
+    prints = {}
+    if not reference.is_dir():
+        return prints
+    for path in reference.rglob("*"):
+        if path.is_file() and path.suffix in {".rs", ".py", ".toml"}:
+            prints[hashlib.sha256(path.read_bytes()).hexdigest()] = path.name
+    return prints
+
+
+def copied_reference(workspace, prints):
+    """Files in a finished workspace that are byte-identical to the reference.
+
+    Defence in depth. Workspaces now sit outside the repository so the reference
+    should be unreachable, but "should be unreachable" is what was believed
+    before, and a contaminated trial is indistinguishable from a brilliant one by
+    every other measure the harness has.
+    """
+    if not prints:
+        return []
+    found = []
+    for path in workspace.rglob("*"):
+        if not path.is_file() or path.suffix not in {".rs", ".py", ".toml"}:
+            continue
+        if any(part in DISPOSABLE for part in path.parts):
+            continue
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            continue
+        if digest in prints:
+            found.append(path.name)
+    return found
 
 
 def completed_trials(*bases):
@@ -780,7 +839,7 @@ def main():
 
     calibration = arguments.skip_agent or arguments.implementation
     kind = "calibration" if calibration else "agent"
-    out_root = HERE / "results" / arguments.scenario
+    out_root = WORKSPACE_ROOT / arguments.scenario
     if calibration:
         label = arguments.implementation or "skeleton"
         agent_label = f"_calibration:{label}"
