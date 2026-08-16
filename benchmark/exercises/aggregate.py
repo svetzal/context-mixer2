@@ -205,12 +205,23 @@ def describe_lift(guided, control, z):
     }
 
 
+def median(values):
+    ordered = sorted(values)
+    if not ordered:
+        return None
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
 def describe_models(trials):
-    """What actually answered, which an agent key alone does not tell you."""
+    """What actually answered, and what it cost in money and in time."""
     models = {}
     cost = 0.0
     tokens = {"input": 0, "output": 0}
     seconds = 0.0
+    durations = []
     for metrics in trials:
         telemetry = metrics.get("agent_run", {}).get("telemetry") or {}
         for name, usage in (telemetry.get("models") or {}).items():
@@ -221,12 +232,19 @@ def describe_models(trials):
         cost += telemetry.get("cost_usd") or 0.0
         tokens["input"] += telemetry.get("input_tokens") or 0
         tokens["output"] += telemetry.get("output_tokens") or 0
-        seconds += metrics.get("agent_run", {}).get("seconds") or 0.0
+        elapsed = metrics.get("agent_run", {}).get("seconds") or 0.0
+        seconds += elapsed
+        if elapsed:
+            durations.append(elapsed)
     return {
         "resolved_models": models,
         "total_cost_usd": round(cost, 4),
         "total_tokens": tokens,
         "total_agent_seconds": round(seconds, 1),
+        # Median rather than mean: a single cold start or a retry skews the
+        # average, and the typical trial is what a sweep should be planned on.
+        "median_agent_seconds": round(median(durations), 1) if durations else None,
+        "slowest_agent_seconds": round(max(durations), 1) if durations else None,
     }
 
 
@@ -273,13 +291,20 @@ def render(report):
                 models.update(arm["resolved_models"])
             served = ", ".join(sorted(models)) or "not recorded"
             cost = sum(arm["total_cost_usd"] for arm in entry["telemetry"].values())
-            lines.append(f"\n  {agent}  [served: {served}]  cost ${cost:.2f}")
+            wall = sum(arm["total_agent_seconds"] for arm in entry["telemetry"].values())
+            lines.append(
+                f"\n  {agent}  [served: {served}]  cost ${cost:.2f}  "
+                f"agent time {wall / 3600:.1f}h"
+            )
             for arm, data in sorted(entry["arms"].items()):
                 rate = data["adherence"]
+                timing = entry["telemetry"].get(arm, {})
+                pace = timing.get("median_agent_seconds")
+                pace_text = f"  {pace:.0f}s/trial" if pace else ""
                 lines.append(
                     f"    {arm:<8} n={data['trials']:<3} "
                     f"adherence {rate['rate']} [{rate['low']}, {rate['high']}]  "
-                    f"complete {data['task_completion']['rate']}"
+                    f"complete {data['task_completion']['rate']}{pace_text}"
                 )
             lift = entry.get("lift")
             if not lift:
