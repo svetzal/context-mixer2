@@ -1,0 +1,272 @@
+{
+  "acceptance": {
+    "collected": 10,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 10,
+    "skipped": 0
+  },
+  "adherence": {
+    "applicable_count": 7,
+    "followed": [
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ],
+    "followed_count": 2,
+    "not_applicable": [
+      "craftsperson/rust/prefer-fakes-at-boundaries"
+    ],
+    "rate": 0.2857,
+    "scored_count": 8,
+    "violated": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers"
+    ]
+  },
+  "agent": {
+    "description": "Claude Code, Haiku 4.5",
+    "name": "claude-haiku-4-5"
+  },
+  "agent_run": {
+    "command": [
+      "claude",
+      "--print",
+      "--output-format",
+      "json",
+      "--model",
+      "claude-haiku-4-5",
+      "--permission-mode",
+      "bypassPermissions",
+      "--setting-sources",
+      "project",
+      "--no-session-persistence",
+      "--disable-slash-commands",
+      "Read TASK.md in this directory and implement it.\n\nWork directly in this project. When you are finished the task's definition of\ndone must hold. Do not ask for confirmation; complete the work."
+    ],
+    "exit_code": 0,
+    "seconds": 200.9,
+    "telemetry": {
+      "api_error_status": null,
+      "cache_read_tokens": 1554026,
+      "cost_usd": 0.3204676000000001,
+      "duration_ms": 200595,
+      "error_message": null,
+      "input_tokens": 330,
+      "is_error": false,
+      "models": {
+        "claude-haiku-4-5": {
+          "cost_usd": 0.3204676000000001,
+          "input_tokens": 330,
+          "output_tokens": 19041
+        }
+      },
+      "output_tokens": 19041,
+      "parsed": true,
+      "primary_model": "claude-haiku-4-5",
+      "requested_model": "claude-haiku-4-5",
+      "served_requested": true,
+      "stop_reason": "end_turn",
+      "turns": 41
+    },
+    "timed_out": false
+  },
+  "arm": "guided",
+  "documentation_build": {
+    "exit_code": 0
+  },
+  "environment_sync": {
+    "exit_code": 0
+  },
+  "guidance": {
+    "approximate_tokens": 1336,
+    "bytes": 5341,
+    "files": [
+      "AGENTS.md",
+      "CLAUDE.md"
+    ],
+    "present": true,
+    "selected_intents": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/prefer-fakes-at-boundaries",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ]
+  },
+  "implementation": null,
+  "isolation": [
+    "--setting-sources project excludes user and local settings files",
+    "--disable-slash-commands excludes installed skills",
+    "ambient user configuration was NOT isolated; it is constant across arms and can only understate guided-arm lift"
+  ],
+  "kind": "agent",
+  "language": "rust",
+  "own_tests": {
+    "collected": 19,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 19,
+    "skipped": 0
+  },
+  "principles": {
+    "craftsperson/rust/centralize-curated-lint-policy": {
+      "applicable": true,
+      "evidence": [
+        "Cargo.toml declares no [lints] policy"
+      ],
+      "followed": false,
+      "signals": {
+        "cargo_lint_tables": [],
+        "cargo_lints": {},
+        "crate_level_lint_attributes": []
+      }
+    },
+    "craftsperson/rust/compile-public-documentation": {
+      "applicable": true,
+      "evidence": [
+        "4 public item(s) carry no doc comment",
+        "no crate-level documentation"
+      ],
+      "followed": false,
+      "signals": {
+        "crate_documented_files": [],
+        "inherited_from_skeleton": [
+          "src/lib.rs::zones",
+          "src/zones.rs::zone_label"
+        ],
+        "public_items": [
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote"
+        ],
+        "undocumented_public_items": [
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote"
+        ]
+      }
+    },
+    "craftsperson/rust/isolate-functional-core-from-effects": {
+      "applicable": true,
+      "evidence": [
+        "1 module(s) hold both the business rules and I/O"
+      ],
+      "followed": false,
+      "signals": {
+        "effectful_modules": [
+          "src/lib.rs"
+        ],
+        "modules_mixing_rules_and_io": [
+          "src/lib.rs"
+        ],
+        "pure_modules": [
+          "src/zones.rs"
+        ],
+        "rule_bearing_modules": [
+          "src/lib.rs"
+        ]
+      }
+    },
+    "craftsperson/rust/prefer-fakes-at-boundaries": {
+      "applicable": false,
+      "evidence": [
+        "no owned trait to substitute; the gateway intent covers that"
+      ],
+      "followed": null,
+      "signals": {
+        "owned_traits": [],
+        "test_fakes": []
+      }
+    },
+    "craftsperson/rust/put-gateways-at-effect-boundaries": {
+      "applicable": true,
+      "evidence": [
+        "no gateway trait is declared",
+        "no concrete type implements a declared gateway trait"
+      ],
+      "followed": false,
+      "signals": {
+        "declared_traits": {},
+        "effect_free_consumers": {},
+        "effectful_modules": [
+          "src/lib.rs"
+        ],
+        "trait_implementations": []
+      }
+    },
+    "craftsperson/rust/use-purpose-specific-test-layers": {
+      "applicable": true,
+      "evidence": [
+        "no tests/*.rs for wiring and cross-module behaviour"
+      ],
+      "followed": false,
+      "signals": {
+        "documented_examples": [],
+        "inline_unit_modules": [
+          "src/lib.rs"
+        ],
+        "integration_test_files": []
+      }
+    },
+    "craftsperson/rust/use-results-for-recoverable-library-errors": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "panicking_macros_in_production": [],
+        "public_fallible_functions": [
+          "src/lib.rs::quote"
+        ],
+        "unwrap_or_expect_in_production": []
+      }
+    },
+    "craftsperson/rust/use-structured-tracing": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "instrumented_functions": [],
+        "print_macros": [],
+        "structured_emissions": [
+          {
+            "arguments": "zone = % parcel . zone , weight_grams = parcel . weight_grams , total_cents = total_cents , \"quote calculated\"",
+            "macro": "info",
+            "where": "src/lib.rs:119"
+          }
+        ],
+        "tracing_declared": true,
+        "tracing_emissions": [
+          {
+            "arguments": "zone = % parcel . zone , weight_grams = parcel . weight_grams , total_cents = total_cents , \"quote calculated\"",
+            "macro": "info",
+            "where": "src/lib.rs:119"
+          }
+        ]
+      }
+    }
+  },
+  "scenario": "rate-card",
+  "task_complete": true,
+  "trial": 7,
+  "valid": true,
+  "workspace": {
+    "parse_errors": [],
+    "production_modules": [
+      "src/lib.rs",
+      "src/zones.rs"
+    ],
+    "test_modules": []
+  }
+}
