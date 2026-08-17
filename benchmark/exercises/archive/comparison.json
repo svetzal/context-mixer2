@@ -1,6 +1,208 @@
 {
   "confidence": 0.95,
   "scenarios": {
+    "fx-settlement": {
+      "agents": {
+        "claude-sonnet-5": {
+          "arms": {
+            "guided": {
+              "adherence": {
+                "high": 1.0,
+                "low": 0.862,
+                "rate": 1.0,
+                "successes": 24,
+                "trials": 24
+              },
+              "by_intent": {
+                "craftsperson/python/colocated-module-specifications": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/functional-core-imperative-shell": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/gateway-only-mocking": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/immutable-domain-models": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/native-modern-type-syntax": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/native-pytest-assertions": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/readable-bdd-specifications": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                },
+                "craftsperson/python/specific-domain-errors": {
+                  "high": 1.0,
+                  "low": 0.4385,
+                  "rate": 1.0,
+                  "successes": 3,
+                  "trials": 3
+                }
+              },
+              "not_applicable_trials": {},
+              "task_completion": {
+                "high": 1.0,
+                "low": 0.4385,
+                "rate": 1.0,
+                "successes": 3,
+                "trials": 3
+              },
+              "trials": 3
+            }
+          },
+          "telemetry": {
+            "guided": {
+              "median_agent_seconds": 232.1,
+              "resolved_models": {
+                "claude-sonnet-5": {
+                  "cost_usd": 3.4169,
+                  "output_tokens": 73881,
+                  "trials": 3
+                }
+              },
+              "slowest_agent_seconds": 234.2,
+              "total_agent_seconds": 665.4,
+              "total_cost_usd": 3.4168,
+              "total_tokens": {
+                "input": 156,
+                "output": 73881
+              }
+            }
+          }
+        },
+        "opencode-qwen3_6-27b": {
+          "arms": {
+            "guided": {
+              "adherence": {
+                "high": 0.8632,
+                "low": 0.3057,
+                "rate": 0.625,
+                "successes": 5,
+                "trials": 8
+              },
+              "by_intent": {
+                "craftsperson/python/colocated-module-specifications": {
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
+                },
+                "craftsperson/python/functional-core-imperative-shell": {
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
+                },
+                "craftsperson/python/gateway-only-mocking": {
+                  "high": 0.7935,
+                  "low": 0.0,
+                  "rate": 0.0,
+                  "successes": 0,
+                  "trials": 1
+                },
+                "craftsperson/python/immutable-domain-models": {
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
+                },
+                "craftsperson/python/native-modern-type-syntax": {
+                  "high": 0.7935,
+                  "low": 0.0,
+                  "rate": 0.0,
+                  "successes": 0,
+                  "trials": 1
+                },
+                "craftsperson/python/native-pytest-assertions": {
+                  "high": 0.7935,
+                  "low": 0.0,
+                  "rate": 0.0,
+                  "successes": 0,
+                  "trials": 1
+                },
+                "craftsperson/python/readable-bdd-specifications": {
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
+                },
+                "craftsperson/python/specific-domain-errors": {
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
+                }
+              },
+              "not_applicable_trials": {},
+              "task_completion": {
+                "high": 1.0,
+                "low": 0.2065,
+                "rate": 1.0,
+                "successes": 1,
+                "trials": 1
+              },
+              "trials": 1
+            }
+          },
+          "telemetry": {
+            "guided": {
+              "median_agent_seconds": 1396.5,
+              "resolved_models": {
+                "ollama/qwen3.6:27b-coding-mxfp8": {
+                  "cost_usd": 0.0,
+                  "output_tokens": 8813,
+                  "trials": 1
+                }
+              },
+              "slowest_agent_seconds": 1396.5,
+              "total_agent_seconds": 1396.5,
+              "total_cost_usd": 0.0,
+              "total_tokens": {
+                "input": 523465,
+                "output": 8813
+              }
+            }
+          }
+        }
+      }
+    },
     "rate-card": {
       "agents": {
         "claude-haiku-4-5": {
@@ -3449,33 +3651,33 @@
           "arms": {
             "control": {
               "adherence": {
-                "high": 0.4,
-                "low": 0.0767,
-                "rate": 0.1905,
-                "successes": 4,
-                "trials": 21
+                "high": 0.2096,
+                "low": 0.0591,
+                "rate": 0.1143,
+                "successes": 8,
+                "trials": 70
               },
               "by_intent": {
                 "craftsperson/rust/centralize-curated-lint-policy": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/compile-public-documentation": {
-                  "high": 0.7923,
-                  "low": 0.0615,
-                  "rate": 0.3333,
-                  "successes": 1,
-                  "trials": 3
+                  "high": 0.6032,
+                  "low": 0.1078,
+                  "rate": 0.3,
+                  "successes": 3,
+                  "trials": 10
                 },
                 "craftsperson/rust/isolate-functional-core-from-effects": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/prefer-fakes-at-boundaries": {
                   "high": null,
@@ -3485,75 +3687,75 @@
                   "trials": 0
                 },
                 "craftsperson/rust/put-gateways-at-effect-boundaries": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-purpose-specific-test-layers": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                  "high": 1.0,
-                  "low": 0.4385,
-                  "rate": 1.0,
-                  "successes": 3,
-                  "trials": 3
+                  "high": 0.7634,
+                  "low": 0.2366,
+                  "rate": 0.5,
+                  "successes": 5,
+                  "trials": 10
                 },
                 "craftsperson/rust/use-structured-tracing": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 }
               },
               "not_applicable_trials": {
-                "craftsperson/rust/prefer-fakes-at-boundaries": 3
+                "craftsperson/rust/prefer-fakes-at-boundaries": 10
               },
               "task_completion": {
-                "high": 0.9385,
-                "low": 0.2077,
-                "rate": 0.6667,
-                "successes": 2,
-                "trials": 3
+                "high": 0.8922,
+                "low": 0.3968,
+                "rate": 0.7,
+                "successes": 7,
+                "trials": 10
               },
-              "trials": 3
+              "trials": 10
             },
             "guided": {
               "adherence": {
-                "high": 0.4,
-                "low": 0.0767,
-                "rate": 0.1905,
-                "successes": 4,
-                "trials": 21
+                "high": 0.2862,
+                "low": 0.1004,
+                "rate": 0.1746,
+                "successes": 11,
+                "trials": 63
               },
               "by_intent": {
                 "craftsperson/rust/centralize-curated-lint-policy": {
-                  "high": 0.5615,
+                  "high": 0.2992,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 9
                 },
                 "craftsperson/rust/compile-public-documentation": {
-                  "high": 0.9385,
-                  "low": 0.2077,
-                  "rate": 0.6667,
-                  "successes": 2,
-                  "trials": 3
+                  "high": 0.7334,
+                  "low": 0.1888,
+                  "rate": 0.4444,
+                  "successes": 4,
+                  "trials": 9
                 },
                 "craftsperson/rust/isolate-functional-core-from-effects": {
-                  "high": 0.5615,
+                  "high": 0.2992,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 9
                 },
                 "craftsperson/rust/prefer-fakes-at-boundaries": {
                   "high": null,
@@ -3563,72 +3765,72 @@
                   "trials": 0
                 },
                 "craftsperson/rust/put-gateways-at-effect-boundaries": {
-                  "high": 0.5615,
+                  "high": 0.2992,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 9
                 },
                 "craftsperson/rust/use-purpose-specific-test-layers": {
-                  "high": 0.5615,
+                  "high": 0.2992,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 9
                 },
                 "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                  "high": 0.9385,
-                  "low": 0.2077,
-                  "rate": 0.6667,
-                  "successes": 2,
-                  "trials": 3
+                  "high": 0.8112,
+                  "low": 0.2666,
+                  "rate": 0.5556,
+                  "successes": 5,
+                  "trials": 9
                 },
                 "craftsperson/rust/use-structured-tracing": {
-                  "high": 0.5615,
-                  "low": 0.0,
-                  "rate": 0.0,
-                  "successes": 0,
-                  "trials": 3
+                  "high": 0.5474,
+                  "low": 0.0632,
+                  "rate": 0.2222,
+                  "successes": 2,
+                  "trials": 9
                 }
               },
               "not_applicable_trials": {
-                "craftsperson/rust/prefer-fakes-at-boundaries": 3
+                "craftsperson/rust/prefer-fakes-at-boundaries": 9
               },
               "task_completion": {
-                "high": 1.0,
-                "low": 0.4385,
-                "rate": 1.0,
-                "successes": 3,
-                "trials": 3
+                "high": 0.9368,
+                "low": 0.4526,
+                "rate": 0.7778,
+                "successes": 7,
+                "trials": 9
               },
-              "trials": 3
+              "trials": 9
             }
           },
           "lift": {
             "adherence": {
-              "estimate": 0.0,
+              "estimate": 0.0603,
               "excludes_zero": false,
-              "high": 0.2384,
-              "low": -0.2384
+              "high": 0.1848,
+              "low": -0.0605
             },
             "by_intent": {
               "craftsperson/rust/centralize-curated-lint-policy": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2992,
+                "low": -0.2775
               },
               "craftsperson/rust/compile-public-documentation": {
-                "estimate": 0.3334,
+                "estimate": 0.1444,
                 "excludes_zero": false,
-                "high": 0.7178,
-                "low": -0.3157
+                "high": 0.4915,
+                "low": -0.2522
               },
               "craftsperson/rust/isolate-functional-core-from-effects": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2992,
+                "low": -0.2775
               },
               "craftsperson/rust/prefer-fakes-at-boundaries": {
                 "estimate": null,
@@ -3639,69 +3841,69 @@
               "craftsperson/rust/put-gateways-at-effect-boundaries": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2992,
+                "low": -0.2775
               },
               "craftsperson/rust/use-purpose-specific-test-layers": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2992,
+                "low": -0.2775
               },
               "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                "estimate": -0.3333,
+                "estimate": 0.0556,
                 "excludes_zero": false,
-                "high": 0.2905,
-                "low": -0.7923
+                "high": 0.4226,
+                "low": -0.3354
               },
               "craftsperson/rust/use-structured-tracing": {
-                "estimate": 0.0,
+                "estimate": 0.2222,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.5474,
+                "low": -0.0976
               }
             },
             "intents_with_evidence_of_lift": [],
             "task_completion": {
-              "estimate": 0.3333,
+              "estimate": 0.0778,
               "excludes_zero": false,
-              "high": 0.7923,
-              "low": -0.2905
+              "high": 0.4202,
+              "low": -0.3
             }
           },
           "telemetry": {
             "control": {
-              "median_agent_seconds": 315.2,
+              "median_agent_seconds": 450.5,
               "resolved_models": {
                 "ollama/qwen3.5:122b": {
                   "cost_usd": 0.0,
-                  "output_tokens": 13901,
-                  "trials": 3
+                  "output_tokens": 68557,
+                  "trials": 10
                 }
               },
-              "slowest_agent_seconds": 344.7,
-              "total_agent_seconds": 946.1,
+              "slowest_agent_seconds": 1545.7,
+              "total_agent_seconds": 6748.4,
               "total_cost_usd": 0.0,
               "total_tokens": {
-                "input": 602718,
-                "output": 13901
+                "input": 3322850,
+                "output": 68557
               }
             },
             "guided": {
-              "median_agent_seconds": 340.4,
+              "median_agent_seconds": 402.9,
               "resolved_models": {
                 "ollama/qwen3.5:122b": {
                   "cost_usd": 0.0,
-                  "output_tokens": 17408,
-                  "trials": 3
+                  "output_tokens": 50849,
+                  "trials": 9
                 }
               },
-              "slowest_agent_seconds": 402.9,
-              "total_agent_seconds": 1073.1,
+              "slowest_agent_seconds": 1183.6,
+              "total_agent_seconds": 4735.7,
               "total_cost_usd": 0.0,
               "total_tokens": {
-                "input": 752799,
-                "output": 17408
+                "input": 2998658,
+                "output": 50849
               }
             }
           }
@@ -4236,5 +4438,5 @@
       }
     }
   },
-  "trials_read": 264
+  "trials_read": 281
 }

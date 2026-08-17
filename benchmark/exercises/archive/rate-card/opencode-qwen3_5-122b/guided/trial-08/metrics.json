@@ -1,0 +1,295 @@
+{
+  "acceptance": {
+    "collected": 10,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 10,
+    "skipped": 0
+  },
+  "adherence": {
+    "applicable_count": 7,
+    "followed": [
+      "craftsperson/rust/use-structured-tracing"
+    ],
+    "followed_count": 1,
+    "not_applicable": [
+      "craftsperson/rust/prefer-fakes-at-boundaries"
+    ],
+    "rate": 0.1429,
+    "scored_count": 8,
+    "violated": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors"
+    ]
+  },
+  "agent": {
+    "description": "opencode, local Qwen3.5 122B via ollama",
+    "name": "opencode-qwen3_5-122b"
+  },
+  "agent_run": {
+    "command": [
+      "opencode",
+      "run",
+      "--pure",
+      "--auto",
+      "--format",
+      "json",
+      "--model",
+      "ollama/qwen3.5:122b",
+      "--dir",
+      "/Users/svetzal/.cache/cmf-exercises/rate-card/opencode-qwen3_5-122b/guided/trial-08/workspace",
+      "Read TASK.md in this directory and implement it.\n\nWork directly in this project. When you are finished the task's definition of\ndone must hold. Do not ask for confirmation; complete the work."
+    ],
+    "exit_code": 0,
+    "seconds": 860.24,
+    "telemetry": {
+      "cache_read_tokens": 0,
+      "cost_usd": 0.0,
+      "input_tokens": 535290,
+      "models": {
+        "ollama/qwen3.5:122b": {
+          "cost_usd": 0.0,
+          "output_tokens": 10484
+        }
+      },
+      "output_tokens": 10484,
+      "parsed": true,
+      "primary_model": "ollama/qwen3.5:122b",
+      "reasoning_tokens": 0,
+      "steps": 23
+    },
+    "timed_out": false
+  },
+  "arm": "guided",
+  "copied_reference": [],
+  "documentation_build": {
+    "exit_code": 0
+  },
+  "environment_sync": {
+    "exit_code": 0
+  },
+  "guidance": {
+    "approximate_tokens": 1336,
+    "bytes": 5341,
+    "files": [
+      "AGENTS.md"
+    ],
+    "present": true,
+    "selected_intents": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/prefer-fakes-at-boundaries",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ]
+  },
+  "implementation": null,
+  "isolation": [
+    "--pure runs without external plugins",
+    "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config",
+    "ambient user configuration was NOT isolated; it is constant across arms and can only understate guided-arm lift"
+  ],
+  "kind": "agent",
+  "language": "rust",
+  "own_tests": {
+    "collected": 12,
+    "errors": 0,
+    "exit_code": 101,
+    "failed": 1,
+    "failures": [
+      {
+        "kind": "failure",
+        "name": "rate_card::tests::test_international_500g"
+      }
+    ],
+    "passed": 11,
+    "skipped": 0
+  },
+  "principles": {
+    "craftsperson/rust/centralize-curated-lint-policy": {
+      "applicable": true,
+      "evidence": [
+        "Cargo.toml declares no [lints] policy"
+      ],
+      "followed": false,
+      "signals": {
+        "cargo_lint_tables": [],
+        "cargo_lints": {},
+        "crate_level_lint_attributes": []
+      }
+    },
+    "craftsperson/rust/compile-public-documentation": {
+      "applicable": true,
+      "evidence": [
+        "4 public item(s) carry no doc comment",
+        "no crate-level documentation"
+      ],
+      "followed": false,
+      "signals": {
+        "crate_documented_files": [],
+        "inherited_from_skeleton": [
+          "src/lib.rs::zones",
+          "src/zones.rs::zone_label"
+        ],
+        "public_items": [
+          "src/rate_card.rs::Parcel",
+          "src/rate_card.rs::Quote",
+          "src/rate_card.rs::QuoteError",
+          "src/rate_card.rs::quote"
+        ],
+        "undocumented_public_items": [
+          "src/rate_card.rs::Parcel",
+          "src/rate_card.rs::Quote",
+          "src/rate_card.rs::QuoteError",
+          "src/rate_card.rs::quote"
+        ]
+      }
+    },
+    "craftsperson/rust/isolate-functional-core-from-effects": {
+      "applicable": true,
+      "evidence": [
+        "1 module(s) hold both the business rules and I/O"
+      ],
+      "followed": false,
+      "signals": {
+        "effectful_modules": [
+          "src/rate_card.rs"
+        ],
+        "modules_mixing_rules_and_io": [
+          "src/rate_card.rs"
+        ],
+        "pure_modules": [
+          "src/lib.rs",
+          "src/zones.rs"
+        ],
+        "rule_bearing_modules": [
+          "src/rate_card.rs"
+        ]
+      }
+    },
+    "craftsperson/rust/prefer-fakes-at-boundaries": {
+      "applicable": false,
+      "evidence": [
+        "no owned trait to substitute; the gateway intent covers that"
+      ],
+      "followed": null,
+      "signals": {
+        "owned_traits": [],
+        "test_fakes": []
+      }
+    },
+    "craftsperson/rust/put-gateways-at-effect-boundaries": {
+      "applicable": true,
+      "evidence": [
+        "no gateway trait is declared",
+        "no concrete type implements a declared gateway trait"
+      ],
+      "followed": false,
+      "signals": {
+        "declared_traits": {},
+        "effect_free_consumers": {},
+        "effectful_modules": [
+          "src/rate_card.rs"
+        ],
+        "trait_implementations": []
+      }
+    },
+    "craftsperson/rust/use-purpose-specific-test-layers": {
+      "applicable": true,
+      "evidence": [
+        "no tests/*.rs for wiring and cross-module behaviour"
+      ],
+      "followed": false,
+      "signals": {
+        "documented_examples": [],
+        "inline_unit_modules": [
+          "src/rate_card.rs"
+        ],
+        "integration_test_files": []
+      }
+    },
+    "craftsperson/rust/use-results-for-recoverable-library-errors": {
+      "applicable": true,
+      "evidence": [
+        "3 unwrap/expect outside test code"
+      ],
+      "followed": false,
+      "signals": {
+        "panicking_macros_in_production": [],
+        "public_fallible_functions": [
+          "src/rate_card.rs::quote"
+        ],
+        "unwrap_or_expect_in_production": [
+          {
+            "call": "RATE_CARD_CACHE.read().unwrap",
+            "where": "src/rate_card.rs:104"
+          },
+          {
+            "call": "RATE_CARD_CACHE.write().unwrap",
+            "where": "src/rate_card.rs:118"
+          },
+          {
+            "call": "rates.last().unwrap",
+            "where": "src/rate_card.rs:155"
+          }
+        ]
+      }
+    },
+    "craftsperson/rust/use-structured-tracing": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "instrumented_functions": [],
+        "print_macros": [],
+        "structured_emissions": [
+          {
+            "arguments": "Level :: INFO , \"quote\" , zone = % parcel . zone , weight_grams = parcel . weight_grams",
+            "macro": "span",
+            "where": "src/rate_card.rs:130"
+          },
+          {
+            "arguments": "total_cents = quote . total_cents , \"quote calculated\"",
+            "macro": "info",
+            "where": "src/rate_card.rs:183"
+          }
+        ],
+        "tracing_declared": true,
+        "tracing_emissions": [
+          {
+            "arguments": "Level :: INFO , \"quote\" , zone = % parcel . zone , weight_grams = parcel . weight_grams",
+            "macro": "span",
+            "where": "src/rate_card.rs:130"
+          },
+          {
+            "arguments": "total_cents = quote . total_cents , \"quote calculated\"",
+            "macro": "info",
+            "where": "src/rate_card.rs:183"
+          }
+        ]
+      }
+    }
+  },
+  "scenario": "rate-card",
+  "task_complete": true,
+  "trial": 8,
+  "valid": true,
+  "workspace": {
+    "parse_errors": [],
+    "production_modules": [
+      "src/lib.rs",
+      "src/rate_card.rs",
+      "src/zones.rs"
+    ],
+    "test_modules": []
+  }
+}
