@@ -37,6 +37,14 @@ have changed repeatedly; re-analysis must never cost another agent invocation.
 python3 benchmark/exercises/aggregate.py --scenario rate-card
 ```
 
+A `--scenario` run rewrites only that scenario's block in `comparison.json` and
+leaves the others as they were, reporting what it kept. Without that,
+re-analysing one scenario deletes every other scenario's numbers from the file,
+and the loss is silent — afterwards it is indistinguishable from those trials
+never having been run. A run at a different `--confidence` replaces the file
+outright instead of merging, since intervals at two levels must not sit in one
+report claiming a single confidence.
+
 Validate the harness itself without spending an agent invocation:
 
 ```bash

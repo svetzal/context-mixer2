@@ -201,7 +201,8 @@
             }
           }
         }
-      }
+      },
+      "trials_read": 4
     },
     "rate-card": {
       "agents": {
@@ -3388,33 +3389,33 @@
           "arms": {
             "control": {
               "adherence": {
-                "high": 0.2891,
-                "low": 0.0265,
-                "rate": 0.0952,
-                "successes": 2,
-                "trials": 21
+                "high": 0.1747,
+                "low": 0.0399,
+                "rate": 0.0857,
+                "successes": 6,
+                "trials": 70
               },
               "by_intent": {
                 "craftsperson/rust/centralize-curated-lint-policy": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/compile-public-documentation": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/isolate-functional-core-from-effects": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/prefer-fakes-at-boundaries": {
                   "high": null,
@@ -3424,75 +3425,75 @@
                   "trials": 0
                 },
                 "craftsperson/rust/put-gateways-at-effect-boundaries": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-purpose-specific-test-layers": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                  "high": 0.9385,
-                  "low": 0.2077,
-                  "rate": 0.6667,
-                  "successes": 2,
-                  "trials": 3
+                  "high": 0.8318,
+                  "low": 0.3127,
+                  "rate": 0.6,
+                  "successes": 6,
+                  "trials": 10
                 },
                 "craftsperson/rust/use-structured-tracing": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 }
               },
               "not_applicable_trials": {
-                "craftsperson/rust/prefer-fakes-at-boundaries": 3
+                "craftsperson/rust/prefer-fakes-at-boundaries": 10
               },
               "task_completion": {
                 "high": 1.0,
-                "low": 0.4385,
+                "low": 0.7225,
                 "rate": 1.0,
-                "successes": 3,
-                "trials": 3
+                "successes": 10,
+                "trials": 10
               },
-              "trials": 3
+              "trials": 10
             },
             "guided": {
               "adherence": {
-                "high": 0.4996,
-                "low": 0.1381,
-                "rate": 0.2857,
-                "successes": 6,
-                "trials": 21
+                "high": 0.3703,
+                "low": 0.1693,
+                "rate": 0.2571,
+                "successes": 18,
+                "trials": 70
               },
               "by_intent": {
                 "craftsperson/rust/centralize-curated-lint-policy": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/compile-public-documentation": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/isolate-functional-core-from-effects": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/prefer-fakes-at-boundaries": {
                   "high": null,
@@ -3502,72 +3503,72 @@
                   "trials": 0
                 },
                 "craftsperson/rust/put-gateways-at-effect-boundaries": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-purpose-specific-test-layers": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                  "high": 1.0,
-                  "low": 0.4385,
-                  "rate": 1.0,
-                  "successes": 3,
-                  "trials": 3
+                  "high": 0.9433,
+                  "low": 0.4902,
+                  "rate": 0.8,
+                  "successes": 8,
+                  "trials": 10
                 },
                 "craftsperson/rust/use-structured-tracing": {
                   "high": 1.0,
-                  "low": 0.4385,
+                  "low": 0.7225,
                   "rate": 1.0,
-                  "successes": 3,
-                  "trials": 3
+                  "successes": 10,
+                  "trials": 10
                 }
               },
               "not_applicable_trials": {
-                "craftsperson/rust/prefer-fakes-at-boundaries": 3
+                "craftsperson/rust/prefer-fakes-at-boundaries": 10
               },
               "task_completion": {
                 "high": 1.0,
-                "low": 0.4385,
+                "low": 0.7225,
                 "rate": 1.0,
-                "successes": 3,
-                "trials": 3
+                "successes": 10,
+                "trials": 10
               },
-              "trials": 3
+              "trials": 10
             }
           },
           "lift": {
             "adherence": {
-              "estimate": 0.1905,
-              "excludes_zero": false,
-              "high": 0.4152,
-              "low": -0.0532
+              "estimate": 0.1714,
+              "excludes_zero": true,
+              "high": 0.2935,
+              "low": 0.0464
             },
             "by_intent": {
               "craftsperson/rust/centralize-curated-lint-policy": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2775,
+                "low": -0.2775
               },
               "craftsperson/rust/compile-public-documentation": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2775,
+                "low": -0.2775
               },
               "craftsperson/rust/isolate-functional-core-from-effects": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2775,
+                "low": -0.2775
               },
               "craftsperson/rust/prefer-fakes-at-boundaries": {
                 "estimate": null,
@@ -3578,26 +3579,26 @@
               "craftsperson/rust/put-gateways-at-effect-boundaries": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2775,
+                "low": -0.2775
               },
               "craftsperson/rust/use-purpose-specific-test-layers": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2775,
+                "low": -0.2775
               },
               "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                "estimate": 0.3333,
+                "estimate": 0.2,
                 "excludes_zero": false,
-                "high": 0.7923,
-                "low": -0.2905
+                "high": 0.5211,
+                "low": -0.1869
               },
               "craftsperson/rust/use-structured-tracing": {
                 "estimate": 1.0,
                 "excludes_zero": true,
                 "high": 1.0,
-                "low": 0.2059
+                "low": 0.6076
               }
             },
             "intents_with_evidence_of_lift": [
@@ -3606,43 +3607,43 @@
             "task_completion": {
               "estimate": 0.0,
               "excludes_zero": false,
-              "high": 0.5615,
-              "low": -0.5615
+              "high": 0.2775,
+              "low": -0.2775
             }
           },
           "telemetry": {
             "control": {
-              "median_agent_seconds": 792.5,
+              "median_agent_seconds": 885.3,
               "resolved_models": {
                 "ollama/gemma4:31b-mlx": {
                   "cost_usd": 0.0,
-                  "output_tokens": 49625,
-                  "trials": 3
+                  "output_tokens": 153090,
+                  "trials": 10
                 }
               },
               "slowest_agent_seconds": 1564.3,
-              "total_agent_seconds": 3026.2,
+              "total_agent_seconds": 9137.8,
               "total_cost_usd": 0.0,
               "total_tokens": {
-                "input": 1217724,
-                "output": 49625
+                "input": 3377189,
+                "output": 153090
               }
             },
             "guided": {
-              "median_agent_seconds": 493.9,
+              "median_agent_seconds": 581.6,
               "resolved_models": {
                 "ollama/gemma4:31b-mlx": {
                   "cost_usd": 0.0,
-                  "output_tokens": 23592,
-                  "trials": 3
+                  "output_tokens": 92176,
+                  "trials": 10
                 }
               },
-              "slowest_agent_seconds": 596.3,
-              "total_agent_seconds": 1546.2,
+              "slowest_agent_seconds": 940.6,
+              "total_agent_seconds": 6075.9,
               "total_cost_usd": 0.0,
               "total_tokens": {
-                "input": 765420,
-                "output": 23592
+                "input": 2611621,
+                "output": 92176
               }
             }
           }
@@ -3729,33 +3730,33 @@
             },
             "guided": {
               "adherence": {
-                "high": 0.2862,
-                "low": 0.1004,
-                "rate": 0.1746,
-                "successes": 11,
-                "trials": 63
+                "high": 0.2762,
+                "low": 0.1009,
+                "rate": 0.1714,
+                "successes": 12,
+                "trials": 70
               },
               "by_intent": {
                 "craftsperson/rust/centralize-curated-lint-policy": {
-                  "high": 0.2992,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 9
+                  "trials": 10
                 },
                 "craftsperson/rust/compile-public-documentation": {
-                  "high": 0.7334,
-                  "low": 0.1888,
-                  "rate": 0.4444,
+                  "high": 0.6873,
+                  "low": 0.1682,
+                  "rate": 0.4,
                   "successes": 4,
-                  "trials": 9
+                  "trials": 10
                 },
                 "craftsperson/rust/isolate-functional-core-from-effects": {
-                  "high": 0.2992,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 9
+                  "trials": 10
                 },
                 "craftsperson/rust/prefer-fakes-at-boundaries": {
                   "high": null,
@@ -3765,71 +3766,71 @@
                   "trials": 0
                 },
                 "craftsperson/rust/put-gateways-at-effect-boundaries": {
-                  "high": 0.2992,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 9
+                  "trials": 10
                 },
                 "craftsperson/rust/use-purpose-specific-test-layers": {
-                  "high": 0.2992,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 9
+                  "trials": 10
                 },
                 "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                  "high": 0.8112,
-                  "low": 0.2666,
-                  "rate": 0.5556,
-                  "successes": 5,
-                  "trials": 9
+                  "high": 0.8318,
+                  "low": 0.3127,
+                  "rate": 0.6,
+                  "successes": 6,
+                  "trials": 10
                 },
                 "craftsperson/rust/use-structured-tracing": {
-                  "high": 0.5474,
-                  "low": 0.0632,
-                  "rate": 0.2222,
+                  "high": 0.5098,
+                  "low": 0.0567,
+                  "rate": 0.2,
                   "successes": 2,
-                  "trials": 9
+                  "trials": 10
                 }
               },
               "not_applicable_trials": {
-                "craftsperson/rust/prefer-fakes-at-boundaries": 9
+                "craftsperson/rust/prefer-fakes-at-boundaries": 10
               },
               "task_completion": {
-                "high": 0.9368,
-                "low": 0.4526,
-                "rate": 0.7778,
-                "successes": 7,
-                "trials": 9
+                "high": 0.9433,
+                "low": 0.4902,
+                "rate": 0.8,
+                "successes": 8,
+                "trials": 10
               },
-              "trials": 9
+              "trials": 10
             }
           },
           "lift": {
             "adherence": {
-              "estimate": 0.0603,
+              "estimate": 0.0571,
               "excludes_zero": false,
-              "high": 0.1848,
-              "low": -0.0605
+              "high": 0.1755,
+              "low": -0.0614
             },
             "by_intent": {
               "craftsperson/rust/centralize-curated-lint-policy": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.2992,
+                "high": 0.2775,
                 "low": -0.2775
               },
               "craftsperson/rust/compile-public-documentation": {
-                "estimate": 0.1444,
+                "estimate": 0.1,
                 "excludes_zero": false,
-                "high": 0.4915,
-                "low": -0.2522
+                "high": 0.4457,
+                "low": -0.2817
               },
               "craftsperson/rust/isolate-functional-core-from-effects": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.2992,
+                "high": 0.2775,
                 "low": -0.2775
               },
               "craftsperson/rust/prefer-fakes-at-boundaries": {
@@ -3841,34 +3842,34 @@
               "craftsperson/rust/put-gateways-at-effect-boundaries": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.2992,
+                "high": 0.2775,
                 "low": -0.2775
               },
               "craftsperson/rust/use-purpose-specific-test-layers": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.2992,
+                "high": 0.2775,
                 "low": -0.2775
               },
               "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                "estimate": 0.0556,
+                "estimate": 0.1,
                 "excludes_zero": false,
-                "high": 0.4226,
-                "low": -0.3354
+                "high": 0.4509,
+                "low": -0.2898
               },
               "craftsperson/rust/use-structured-tracing": {
-                "estimate": 0.2222,
+                "estimate": 0.2,
                 "excludes_zero": false,
-                "high": 0.5474,
-                "low": -0.0976
+                "high": 0.5098,
+                "low": -0.1123
               }
             },
             "intents_with_evidence_of_lift": [],
             "task_completion": {
-              "estimate": 0.0778,
+              "estimate": 0.1,
               "excludes_zero": false,
-              "high": 0.4202,
-              "low": -0.3
+              "high": 0.4354,
+              "low": -0.2646
             }
           },
           "telemetry": {
@@ -3890,20 +3891,20 @@
               }
             },
             "guided": {
-              "median_agent_seconds": 402.9,
+              "median_agent_seconds": 434.8,
               "resolved_models": {
                 "ollama/qwen3.5:122b": {
                   "cost_usd": 0.0,
-                  "output_tokens": 50849,
-                  "trials": 9
+                  "output_tokens": 71909,
+                  "trials": 10
                 }
               },
-              "slowest_agent_seconds": 1183.6,
-              "total_agent_seconds": 4735.7,
+              "slowest_agent_seconds": 1754.0,
+              "total_agent_seconds": 6489.8,
               "total_cost_usd": 0.0,
               "total_tokens": {
-                "input": 2998658,
-                "output": 50849
+                "input": 4282189,
+                "output": 71909
               }
             }
           }
@@ -3912,33 +3913,33 @@
           "arms": {
             "control": {
               "adherence": {
-                "high": 0.2267,
-                "low": 0.0085,
-                "rate": 0.0476,
+                "high": 0.0766,
+                "low": 0.0025,
+                "rate": 0.0143,
                 "successes": 1,
-                "trials": 21
+                "trials": 70
               },
               "by_intent": {
                 "craftsperson/rust/centralize-curated-lint-policy": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/compile-public-documentation": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/isolate-functional-core-from-effects": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/prefer-fakes-at-boundaries": {
                   "high": null,
@@ -3948,150 +3949,150 @@
                   "trials": 0
                 },
                 "craftsperson/rust/put-gateways-at-effect-boundaries": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-purpose-specific-test-layers": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                  "high": 0.7923,
-                  "low": 0.0615,
-                  "rate": 0.3333,
+                  "high": 0.4042,
+                  "low": 0.0179,
+                  "rate": 0.1,
                   "successes": 1,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-structured-tracing": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 }
               },
               "not_applicable_trials": {
-                "craftsperson/rust/prefer-fakes-at-boundaries": 3
+                "craftsperson/rust/prefer-fakes-at-boundaries": 10
               },
               "task_completion": {
                 "high": 1.0,
-                "low": 0.4385,
+                "low": 0.7225,
                 "rate": 1.0,
-                "successes": 3,
-                "trials": 3
+                "successes": 10,
+                "trials": 10
               },
-              "trials": 3
+              "trials": 10
             },
             "guided": {
               "adherence": {
-                "high": 0.4996,
-                "low": 0.1381,
-                "rate": 0.2857,
-                "successes": 6,
-                "trials": 21
+                "high": 0.4538,
+                "low": 0.2388,
+                "rate": 0.338,
+                "successes": 24,
+                "trials": 71
               },
               "by_intent": {
                 "craftsperson/rust/centralize-curated-lint-policy": {
-                  "high": 0.9385,
-                  "low": 0.2077,
-                  "rate": 0.6667,
-                  "successes": 2,
-                  "trials": 3
+                  "high": 0.9433,
+                  "low": 0.4902,
+                  "rate": 0.8,
+                  "successes": 8,
+                  "trials": 10
                 },
                 "craftsperson/rust/compile-public-documentation": {
-                  "high": 0.7923,
-                  "low": 0.0615,
-                  "rate": 0.3333,
-                  "successes": 1,
-                  "trials": 3
+                  "high": 0.6032,
+                  "low": 0.1078,
+                  "rate": 0.3,
+                  "successes": 3,
+                  "trials": 10
                 },
                 "craftsperson/rust/isolate-functional-core-from-effects": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/prefer-fakes-at-boundaries": {
-                  "high": null,
-                  "low": null,
-                  "rate": null,
-                  "successes": 0,
-                  "trials": 0
+                  "high": 1.0,
+                  "low": 0.2065,
+                  "rate": 1.0,
+                  "successes": 1,
+                  "trials": 1
                 },
                 "craftsperson/rust/put-gateways-at-effect-boundaries": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-purpose-specific-test-layers": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                  "high": 0.5615,
-                  "low": 0.0,
-                  "rate": 0.0,
-                  "successes": 0,
-                  "trials": 3
+                  "high": 0.5098,
+                  "low": 0.0567,
+                  "rate": 0.2,
+                  "successes": 2,
+                  "trials": 10
                 },
                 "craftsperson/rust/use-structured-tracing": {
                   "high": 1.0,
-                  "low": 0.4385,
+                  "low": 0.7225,
                   "rate": 1.0,
-                  "successes": 3,
-                  "trials": 3
+                  "successes": 10,
+                  "trials": 10
                 }
               },
               "not_applicable_trials": {
-                "craftsperson/rust/prefer-fakes-at-boundaries": 3
+                "craftsperson/rust/prefer-fakes-at-boundaries": 9
               },
               "task_completion": {
-                "high": 1.0,
-                "low": 0.4385,
-                "rate": 1.0,
-                "successes": 3,
-                "trials": 3
+                "high": 0.9433,
+                "low": 0.4902,
+                "rate": 0.8,
+                "successes": 8,
+                "trials": 10
               },
-              "trials": 3
+              "trials": 10
             }
           },
           "lift": {
             "adherence": {
-              "estimate": 0.2381,
+              "estimate": 0.3237,
               "excludes_zero": true,
-              "high": 0.4555,
-              "low": 0.006
+              "high": 0.4401,
+              "low": 0.2066
             },
             "by_intent": {
               "craftsperson/rust/centralize-curated-lint-policy": {
-                "estimate": 0.6667,
-                "excludes_zero": false,
-                "high": 0.9385,
-                "low": -0.0585
+                "estimate": 0.8,
+                "excludes_zero": true,
+                "high": 0.9433,
+                "low": 0.3841
               },
               "craftsperson/rust/compile-public-documentation": {
-                "estimate": 0.3333,
+                "estimate": 0.3,
                 "excludes_zero": false,
-                "high": 0.7923,
-                "low": -0.2905
+                "high": 0.6032,
+                "low": -0.0376
               },
               "craftsperson/rust/isolate-functional-core-from-effects": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2775,
+                "low": -0.2775
               },
               "craftsperson/rust/prefer-fakes-at-boundaries": {
                 "estimate": null,
@@ -4102,71 +4103,72 @@
               "craftsperson/rust/put-gateways-at-effect-boundaries": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2775,
+                "low": -0.2775
               },
               "craftsperson/rust/use-purpose-specific-test-layers": {
                 "estimate": 0.0,
                 "excludes_zero": false,
-                "high": 0.5615,
-                "low": -0.5615
+                "high": 0.2775,
+                "low": -0.2775
               },
               "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                "estimate": -0.3333,
+                "estimate": 0.1,
                 "excludes_zero": false,
-                "high": 0.2905,
-                "low": -0.7923
+                "high": 0.4205,
+                "low": -0.2363
               },
               "craftsperson/rust/use-structured-tracing": {
                 "estimate": 1.0,
                 "excludes_zero": true,
                 "high": 1.0,
-                "low": 0.2059
+                "low": 0.6076
               }
             },
             "intents_with_evidence_of_lift": [
+              "craftsperson/rust/centralize-curated-lint-policy",
               "craftsperson/rust/use-structured-tracing"
             ],
             "task_completion": {
-              "estimate": 0.0,
+              "estimate": -0.2,
               "excludes_zero": false,
-              "high": 0.5615,
-              "low": -0.5615
+              "high": 0.1123,
+              "low": -0.5098
             }
           },
           "telemetry": {
             "control": {
-              "median_agent_seconds": 1675.6,
+              "median_agent_seconds": 1481.9,
               "resolved_models": {
                 "ollama/qwen3.6:27b-coding-mxfp8": {
                   "cost_usd": 0.0,
-                  "output_tokens": 39865,
-                  "trials": 3
+                  "output_tokens": 122669,
+                  "trials": 10
                 }
               },
-              "slowest_agent_seconds": 1731.7,
-              "total_agent_seconds": 5075.9,
+              "slowest_agent_seconds": 1744.3,
+              "total_agent_seconds": 12923.9,
               "total_cost_usd": 0.0,
               "total_tokens": {
-                "input": 1281328,
-                "output": 39865
+                "input": 3351166,
+                "output": 122669
               }
             },
             "guided": {
-              "median_agent_seconds": 860.3,
+              "median_agent_seconds": 917.6,
               "resolved_models": {
                 "ollama/qwen3.6:27b-coding-mxfp8": {
                   "cost_usd": 0.0,
-                  "output_tokens": 23197,
-                  "trials": 3
+                  "output_tokens": 98053,
+                  "trials": 10
                 }
               },
               "slowest_agent_seconds": 2195.1,
-              "total_agent_seconds": 3857.8,
+              "total_agent_seconds": 11569.6,
               "total_cost_usd": 0.0,
               "total_tokens": {
-                "input": 1223897,
-                "output": 23197
+                "input": 4588852,
+                "output": 98053
               }
             }
           }
@@ -4175,33 +4177,33 @@
           "arms": {
             "control": {
               "adherence": {
-                "high": 0.2891,
-                "low": 0.0265,
-                "rate": 0.0952,
-                "successes": 2,
-                "trials": 21
+                "high": 0.1747,
+                "low": 0.0399,
+                "rate": 0.0857,
+                "successes": 6,
+                "trials": 70
               },
               "by_intent": {
                 "craftsperson/rust/centralize-curated-lint-policy": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/compile-public-documentation": {
-                  "high": 0.7923,
-                  "low": 0.0615,
-                  "rate": 0.3333,
+                  "high": 0.4042,
+                  "low": 0.0179,
+                  "rate": 0.1,
                   "successes": 1,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/isolate-functional-core-from-effects": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/prefer-fakes-at-boundaries": {
                   "high": null,
@@ -4211,45 +4213,45 @@
                   "trials": 0
                 },
                 "craftsperson/rust/put-gateways-at-effect-boundaries": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-purpose-specific-test-layers": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 },
                 "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                  "high": 0.7923,
-                  "low": 0.0615,
-                  "rate": 0.3333,
-                  "successes": 1,
-                  "trials": 3
+                  "high": 0.7634,
+                  "low": 0.2366,
+                  "rate": 0.5,
+                  "successes": 5,
+                  "trials": 10
                 },
                 "craftsperson/rust/use-structured-tracing": {
-                  "high": 0.5615,
+                  "high": 0.2775,
                   "low": 0.0,
                   "rate": 0.0,
                   "successes": 0,
-                  "trials": 3
+                  "trials": 10
                 }
               },
               "not_applicable_trials": {
-                "craftsperson/rust/prefer-fakes-at-boundaries": 3
+                "craftsperson/rust/prefer-fakes-at-boundaries": 10
               },
               "task_completion": {
                 "high": 1.0,
-                "low": 0.4385,
+                "low": 0.7225,
                 "rate": 1.0,
-                "successes": 3,
-                "trials": 3
+                "successes": 10,
+                "trials": 10
               },
-              "trials": 3
+              "trials": 10
             },
             "guided": {
               "adherence": {
@@ -4332,29 +4334,29 @@
           },
           "lift": {
             "adherence": {
-              "estimate": 0.5412,
+              "estimate": 0.5507,
               "excludes_zero": true,
-              "high": 0.7211,
-              "low": 0.2576
+              "high": 0.7232,
+              "low": 0.3255
             },
             "by_intent": {
               "craftsperson/rust/centralize-curated-lint-policy": {
                 "estimate": 0.6667,
-                "excludes_zero": false,
+                "excludes_zero": true,
                 "high": 0.9385,
-                "low": -0.0585
+                "low": 0.1303
               },
               "craftsperson/rust/compile-public-documentation": {
-                "estimate": 0.0,
+                "estimate": 0.2333,
                 "excludes_zero": false,
-                "high": 0.5334,
-                "low": -0.5334
+                "high": 0.6996,
+                "low": -0.1746
               },
               "craftsperson/rust/isolate-functional-core-from-effects": {
                 "estimate": 1.0,
                 "excludes_zero": true,
                 "high": 1.0,
-                "low": 0.2059
+                "low": 0.3737
               },
               "craftsperson/rust/prefer-fakes-at-boundaries": {
                 "estimate": null,
@@ -4366,54 +4368,56 @@
                 "estimate": 0.0,
                 "excludes_zero": false,
                 "high": 0.5615,
-                "low": -0.5615
+                "low": -0.2775
               },
               "craftsperson/rust/use-purpose-specific-test-layers": {
                 "estimate": 0.6667,
-                "excludes_zero": false,
+                "excludes_zero": true,
                 "high": 0.9385,
-                "low": -0.0585
+                "low": 0.1303
               },
               "craftsperson/rust/use-results-for-recoverable-library-errors": {
-                "estimate": 0.6667,
+                "estimate": 0.5,
                 "excludes_zero": false,
-                "high": 0.9385,
-                "low": -0.0585
+                "high": 0.7634,
+                "low": -0.1202
               },
               "craftsperson/rust/use-structured-tracing": {
                 "estimate": 1.0,
                 "excludes_zero": true,
                 "high": 1.0,
-                "low": 0.2059
+                "low": 0.3737
               }
             },
             "intents_with_evidence_of_lift": [
+              "craftsperson/rust/centralize-curated-lint-policy",
               "craftsperson/rust/isolate-functional-core-from-effects",
+              "craftsperson/rust/use-purpose-specific-test-layers",
               "craftsperson/rust/use-structured-tracing"
             ],
             "task_completion": {
               "estimate": 0.0,
               "excludes_zero": false,
-              "high": 0.5615,
+              "high": 0.2775,
               "low": -0.5615
             }
           },
           "telemetry": {
             "control": {
-              "median_agent_seconds": 2274.8,
+              "median_agent_seconds": 1384.4,
               "resolved_models": {
                 "ollama/qwen3.8:27b-mxfp8": {
                   "cost_usd": 0.0,
-                  "output_tokens": 78590,
-                  "trials": 3
+                  "output_tokens": 215387,
+                  "trials": 10
                 }
               },
               "slowest_agent_seconds": 3445.3,
-              "total_agent_seconds": 7311.0,
+              "total_agent_seconds": 15041.5,
               "total_cost_usd": 0.0,
               "total_tokens": {
-                "input": 1155412,
-                "output": 78590
+                "input": 4500465,
+                "output": 215387
               }
             },
             "guided": {
@@ -4435,8 +4439,9 @@
             }
           }
         }
-      }
+      },
+      "trials_read": 313
     }
   },
-  "trials_read": 281
+  "trials_read": 317
 }

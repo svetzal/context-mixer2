@@ -12,8 +12,13 @@ means are different jobs, and the scoring rules have already changed six times.
 Re-analysis must never require re-running an agent.
 
     python3 aggregate.py                         # everything, all scenarios
-    python3 aggregate.py --scenario rate-card    # one scenario
+    python3 aggregate.py --scenario rate-card    # one scenario, merged into the rest
     python3 aggregate.py --confidence 0.90
+
+A `--scenario` run rewrites only its own scenario in the output file and leaves
+the others as they were. Without that, re-analysing one scenario silently
+deletes every other scenario's numbers from `comparison.json`, which afterwards
+is indistinguishable from those trials never having been run.
 """
 
 import argparse
@@ -272,11 +277,59 @@ def build(roots, scenario, confidence):
             if guided and control:
                 entry["lift"] = describe_lift(guided, control, z)
 
+    for scenario_name, block in scenarios.items():
+        block["trials_read"] = sum(
+            1 for metrics in trials if metrics.get("scenario", "unknown") == scenario_name
+        )
+
     return {
         "confidence": confidence,
         "scenarios": scenarios,
         "trials_read": len(trials),
     }
+
+
+def fold_into_existing(destination, report):
+    """Merge a scoped run into whatever the destination already holds.
+
+    `--scenario` computes one scenario. Writing that result straight out drops
+    every other scenario from the file, and the loss is silent: the next reader
+    sees a comparison.json with no fx-settlement in it and cannot tell whether
+    those trials were never run or were overwritten by a later rate-card sweep.
+
+    Returns the payload to write and a note for the operator, empty when there
+    was nothing to preserve.
+    """
+    if not destination.exists():
+        return report, ""
+
+    try:
+        existing = json.loads(destination.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return report, "existing file was unreadable and has been replaced"
+
+    # Intervals computed at different levels must not sit in one file claiming a
+    # single `confidence`. The new run wins rather than producing a mixed report.
+    if existing.get("confidence") != report["confidence"]:
+        return report, (
+            f"existing file was written at confidence {existing.get('confidence')}, "
+            f"not {report['confidence']} — replaced rather than mixing interval levels"
+        )
+
+    kept = {
+        name: block
+        for name, block in existing.get("scenarios", {}).items()
+        if name not in report["scenarios"]
+    }
+    if not kept:
+        return report, ""
+
+    merged = dict(existing)
+    merged["scenarios"] = {**kept, **report["scenarios"]}
+    merged["trials_read"] = sum(
+        block.get("trials_read", 0) for block in merged["scenarios"].values()
+    )
+    return merged, f"kept {len(kept)} scenario(s) already in the file: {', '.join(sorted(kept))}"
 
 
 def render(report):
@@ -344,11 +397,17 @@ def main():
     report = build(roots, arguments.scenario, arguments.confidence)
     destination = arguments.out or arguments.archive / "comparison.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    payload, note = (report, "")
+    if arguments.scenario:
+        payload, note = fold_into_existing(destination, report)
+    destination.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     if not arguments.quiet:
         print(render(report), file=sys.stderr)
         print(f"\nread {report['trials_read']} trial(s) -> {destination}", file=sys.stderr)
+        if note:
+            print(f"  {note}", file=sys.stderr)
     return 0
 
 
