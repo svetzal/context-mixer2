@@ -1,0 +1,417 @@
+{
+  "acceptance": {
+    "collected": 10,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 10,
+    "skipped": 0
+  },
+  "adherence": {
+    "applicable_count": 7,
+    "followed": [],
+    "followed_count": 0,
+    "not_applicable": [
+      "craftsperson/rust/prefer-fakes-at-boundaries"
+    ],
+    "rate": 0.0,
+    "scored_count": 8,
+    "violated": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ]
+  },
+  "agent": {
+    "description": "opencode, local Qwen3.8 27B (mxfp8) via ollama",
+    "name": "opencode-qwen3_8-27b"
+  },
+  "agent_run": {
+    "command": [
+      "opencode",
+      "run",
+      "--pure",
+      "--auto",
+      "--format",
+      "json",
+      "--model",
+      "ollama/qwen3.8:27b-mxfp8",
+      "--dir",
+      "/Users/svetzal/.cache/cmf-exercises/rate-card/opencode-qwen3_8-27b/control/trial-04/workspace",
+      "Read TASK.md in this directory and implement it.\n\nWork directly in this project. When you are finished the task's definition of\ndone must hold. Do not ask for confirmation; complete the work."
+    ],
+    "exit_code": 0,
+    "seconds": 1638.1,
+    "telemetry": {
+      "cache_read_tokens": 0,
+      "cost_usd": 0.0,
+      "input_tokens": 608507,
+      "models": {
+        "ollama/qwen3.8:27b-mxfp8": {
+          "cost_usd": 0.0,
+          "output_tokens": 31493
+        }
+      },
+      "output_tokens": 31493,
+      "parsed": true,
+      "primary_model": "ollama/qwen3.8:27b-mxfp8",
+      "reasoning_tokens": 0,
+      "steps": 28
+    },
+    "timed_out": false
+  },
+  "arm": "control",
+  "copied_reference": [],
+  "documentation_build": {
+    "exit_code": 0
+  },
+  "environment_sync": {
+    "exit_code": 0
+  },
+  "guidance": {
+    "present": false
+  },
+  "implementation": null,
+  "isolation": [
+    "--pure runs without external plugins",
+    "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config",
+    "ambient user configuration was NOT isolated; it is constant across arms and can only understate guided-arm lift"
+  ],
+  "kind": "agent",
+  "language": "rust",
+  "own_tests": {
+    "collected": 21,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 21,
+    "skipped": 0
+  },
+  "principles": {
+    "craftsperson/rust/centralize-curated-lint-policy": {
+      "applicable": true,
+      "evidence": [
+        "Cargo.toml declares no [lints] policy"
+      ],
+      "followed": false,
+      "signals": {
+        "cargo_lint_tables": [],
+        "cargo_lints": {},
+        "crate_level_lint_attributes": []
+      }
+    },
+    "craftsperson/rust/compile-public-documentation": {
+      "applicable": true,
+      "evidence": [
+        "8 public item(s) carry no doc comment",
+        "no crate-level documentation"
+      ],
+      "followed": false,
+      "signals": {
+        "crate_documented_files": [],
+        "inherited_from_skeleton": [
+          "src/lib.rs::zones",
+          "src/zones.rs::zone_label"
+        ],
+        "public_items": [
+          "src/cards.rs::Band",
+          "src/cards.rs::RateCard",
+          "src/cards.rs::load",
+          "src/cards.rs::parse",
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote"
+        ],
+        "undocumented_public_items": [
+          "src/cards.rs::Band",
+          "src/cards.rs::RateCard",
+          "src/cards.rs::load",
+          "src/cards.rs::parse",
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote"
+        ]
+      }
+    },
+    "craftsperson/rust/isolate-functional-core-from-effects": {
+      "applicable": true,
+      "evidence": [
+        "2 module(s) hold both the business rules and I/O"
+      ],
+      "followed": false,
+      "signals": {
+        "effectful_modules": [
+          "src/cards.rs",
+          "src/lib.rs",
+          "src/tests.rs"
+        ],
+        "modules_mixing_rules_and_io": [
+          "src/lib.rs",
+          "src/tests.rs"
+        ],
+        "pure_modules": [
+          "src/zones.rs"
+        ],
+        "rule_bearing_modules": [
+          "src/lib.rs",
+          "src/tests.rs"
+        ]
+      }
+    },
+    "craftsperson/rust/prefer-fakes-at-boundaries": {
+      "applicable": false,
+      "evidence": [
+        "no owned trait to substitute; the gateway intent covers that"
+      ],
+      "followed": null,
+      "signals": {
+        "owned_traits": [],
+        "test_fakes": []
+      }
+    },
+    "craftsperson/rust/put-gateways-at-effect-boundaries": {
+      "applicable": true,
+      "evidence": [
+        "no gateway trait is declared",
+        "no concrete type implements a declared gateway trait"
+      ],
+      "followed": false,
+      "signals": {
+        "declared_traits": {},
+        "effect_free_consumers": {},
+        "effectful_modules": [
+          "src/cards.rs",
+          "src/lib.rs",
+          "src/tests.rs"
+        ],
+        "trait_implementations": []
+      }
+    },
+    "craftsperson/rust/use-purpose-specific-test-layers": {
+      "applicable": true,
+      "evidence": [
+        "no tests/*.rs for wiring and cross-module behaviour"
+      ],
+      "followed": false,
+      "signals": {
+        "documented_examples": [],
+        "inline_unit_modules": [
+          "src/lib.rs"
+        ],
+        "integration_test_files": []
+      }
+    },
+    "craftsperson/rust/use-results-for-recoverable-library-errors": {
+      "applicable": true,
+      "evidence": [
+        "38 unwrap/expect outside test code"
+      ],
+      "followed": false,
+      "signals": {
+        "panicking_macros_in_production": [],
+        "public_fallible_functions": [
+          "src/cards.rs::load",
+          "src/cards.rs::parse",
+          "src/lib.rs::quote"
+        ],
+        "unwrap_or_expect_in_production": [
+          {
+            "call": "matched.unwrap",
+            "where": "src/lib.rs:79"
+          },
+          {
+            "call": "std::fs::write(&path,RATECARD).expect",
+            "where": "src/tests.rs:23"
+          },
+          {
+            "call": "COUNTER.lock().unwrap",
+            "where": "src/tests.rs:29"
+          },
+          {
+            "call": "quote_from_path(&parcel(100,\"domestic\"),p.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:37"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:37"
+          },
+          {
+            "call": "quote_from_path(&parcel(500,\"domestic\"),p.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:47"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:47"
+          },
+          {
+            "call": "quote_from_path(&parcel(501,\"domestic\"),p.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:55"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:55"
+          },
+          {
+            "call": "quote_from_path(&parcel(5000,\"domestic\"),p.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:63"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:63"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:71"
+          },
+          {
+            "call": "quote_from_path(&parcel(100,\"international\"),p.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:78"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:78"
+          },
+          {
+            "call": "quote_from_path(&parcel(500,\"international\"),p.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:88"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:88"
+          },
+          {
+            "call": "quote_from_path(&parcel(12000,\"domestic\"),p.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:97"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:97"
+          },
+          {
+            "call": "quote_from_path(&parcel(10000,\"domestic\"),p.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:107"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:107"
+          },
+          {
+            "call": "quote_from_path(&parcel(15000,\"international\"),p.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:114"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:114"
+          },
+          {
+            "call": "p.to_str().unwrap",
+            "where": "src/tests.rs:126"
+          },
+          {
+            "call": "std::fs::write(&path,\"domestic\\t500\\n\").unwrap",
+            "where": "src/tests.rs:139"
+          },
+          {
+            "call": "path.to_str().unwrap",
+            "where": "src/tests.rs:140"
+          },
+          {
+            "call": "std::fs::write(&path,\"#header\\ndomestic\\t500\\t599\\n\\ndomestic\\n\").unwrap",
+            "where": "src/tests.rs:147"
+          },
+          {
+            "call": "path.to_str().unwrap",
+            "where": "src/tests.rs:148"
+          },
+          {
+            "call": "std::fs::write(&path,\"domestic\\t500\\tnot-a-number\\n\").unwrap",
+            "where": "src/tests.rs:155"
+          },
+          {
+            "call": "path.to_str().unwrap",
+            "where": "src/tests.rs:156"
+          },
+          {
+            "call": "std::fs::write(&path,\"#zone\\tmax\\tcents\\n\\ndomestic\\t500\\t599\\n\\n#note\\ndomestic\\t2000\\t899\\n\").unwrap",
+            "where": "src/tests.rs:163"
+          },
+          {
+            "call": "quote_from_path(&parcel(100,\"domestic\"),path.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:164"
+          },
+          {
+            "call": "path.to_str().unwrap",
+            "where": "src/tests.rs:164"
+          },
+          {
+            "call": "std::fs::write(&path,\"domestic\\t2000\\t899\\ndomestic\\t500\\t599\\n\").unwrap",
+            "where": "src/tests.rs:171"
+          },
+          {
+            "call": "quote_from_path(&parcel(400,\"domestic\"),path.to_str().unwrap()).unwrap",
+            "where": "src/tests.rs:172"
+          },
+          {
+            "call": "path.to_str().unwrap",
+            "where": "src/tests.rs:172"
+          },
+          {
+            "call": "LOCK.lock().unwrap",
+            "where": "src/tests.rs:196"
+          },
+          {
+            "call": "quote(&parcel(100,\"domestic\")).unwrap",
+            "where": "src/tests.rs:198"
+          },
+          {
+            "call": "LOCK.lock().unwrap",
+            "where": "src/tests.rs:208"
+          }
+        ]
+      }
+    },
+    "craftsperson/rust/use-structured-tracing": {
+      "applicable": true,
+      "evidence": [
+        "the tracing ecosystem is not used",
+        "1 print macro(s) in production code"
+      ],
+      "followed": false,
+      "signals": {
+        "instrumented_functions": [],
+        "print_macros": [
+          {
+            "arguments": "\"[quote] zone={} weight_grams={} total_cents={}\" , zone , weight_grams , total_cents",
+            "macro": "eprintln",
+            "where": "src/lib.rs:108"
+          }
+        ],
+        "structured_emissions": [],
+        "tracing_declared": false,
+        "tracing_emissions": []
+      }
+    }
+  },
+  "scenario": "rate-card",
+  "task_complete": true,
+  "trial": 4,
+  "valid": true,
+  "workspace": {
+    "parse_errors": [],
+    "production_modules": [
+      "src/cards.rs",
+      "src/lib.rs",
+      "src/tests.rs",
+      "src/zones.rs"
+    ],
+    "test_modules": []
+  }
+}
