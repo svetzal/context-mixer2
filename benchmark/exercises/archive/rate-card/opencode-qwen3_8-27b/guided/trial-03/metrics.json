@@ -1,0 +1,313 @@
+{
+  "acceptance": {
+    "collected": 10,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 10,
+    "skipped": 0
+  },
+  "adherence": {
+    "applicable_count": 8,
+    "followed": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ],
+    "followed_count": 5,
+    "not_applicable": [],
+    "rate": 0.625,
+    "scored_count": 8,
+    "violated": [
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/prefer-fakes-at-boundaries",
+      "craftsperson/rust/put-gateways-at-effect-boundaries"
+    ]
+  },
+  "agent": {
+    "description": "opencode, local Qwen3.8 27B (mxfp8) via ollama",
+    "name": "opencode-qwen3_8-27b"
+  },
+  "agent_run": {
+    "command": [
+      "opencode",
+      "run",
+      "--pure",
+      "--auto",
+      "--format",
+      "json",
+      "--model",
+      "ollama/qwen3.8:27b-mxfp8",
+      "--dir",
+      "/Users/svetzal/.cache/cmf-exercises/rate-card/opencode-qwen3_8-27b/guided/trial-03/workspace",
+      "Read TASK.md in this directory and implement it.\n\nWork directly in this project. When you are finished the task's definition of\ndone must hold. Do not ask for confirmation; complete the work."
+    ],
+    "exit_code": 0,
+    "seconds": 4883.32,
+    "telemetry": {
+      "cache_read_tokens": 0,
+      "cost_usd": 0.0,
+      "input_tokens": 2158582,
+      "models": {
+        "ollama/qwen3.8:27b-mxfp8": {
+          "cost_usd": 0.0,
+          "output_tokens": 79138
+        }
+      },
+      "output_tokens": 79138,
+      "parsed": true,
+      "primary_model": "ollama/qwen3.8:27b-mxfp8",
+      "reasoning_tokens": 0,
+      "steps": 65
+    },
+    "timed_out": false
+  },
+  "arm": "guided",
+  "copied_reference": [],
+  "documentation_build": {
+    "exit_code": 0
+  },
+  "environment_sync": {
+    "exit_code": 0
+  },
+  "guidance": {
+    "approximate_tokens": 1336,
+    "bytes": 5341,
+    "files": [
+      "AGENTS.md"
+    ],
+    "present": true,
+    "selected_intents": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/prefer-fakes-at-boundaries",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ]
+  },
+  "implementation": null,
+  "isolation": [
+    "--pure runs without external plugins",
+    "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config",
+    "ambient user configuration was NOT isolated; it is constant across arms and can only understate guided-arm lift"
+  ],
+  "kind": "agent",
+  "language": "rust",
+  "own_tests": {
+    "collected": 26,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 26,
+    "skipped": 0
+  },
+  "principles": {
+    "craftsperson/rust/centralize-curated-lint-policy": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "cargo_lint_tables": [
+          "clippy"
+        ],
+        "cargo_lints": {
+          "clippy": [
+            "expect_used",
+            "panic",
+            "print_stderr",
+            "print_stdout",
+            "todo",
+            "unimplemented",
+            "unwrap_used"
+          ]
+        },
+        "crate_level_lint_attributes": []
+      }
+    },
+    "craftsperson/rust/compile-public-documentation": {
+      "applicable": true,
+      "evidence": [
+        "6 public item(s) carry no doc comment"
+      ],
+      "followed": false,
+      "signals": {
+        "crate_documented_files": [
+          "src/lib.rs"
+        ],
+        "inherited_from_skeleton": [
+          "src/lib.rs::zones",
+          "src/zones.rs::zone_label"
+        ],
+        "public_items": [
+          "src/diagnostic.rs::DiagnosticSink",
+          "src/diagnostic.rs::QuoteDiagnostic",
+          "src/diagnostic.rs::TracingSink",
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote",
+          "src/rate_card.rs::Band",
+          "src/rate_card.rs::RateCard",
+          "src/rate_card.rs::bands_for",
+          "src/rate_card.rs::parse",
+          "src/rate_card.rs::compute_quote"
+        ],
+        "undocumented_public_items": [
+          "src/diagnostic.rs::QuoteDiagnostic",
+          "src/rate_card.rs::Band",
+          "src/rate_card.rs::RateCard",
+          "src/rate_card.rs::bands_for",
+          "src/rate_card.rs::parse",
+          "src/rate_card.rs::compute_quote"
+        ]
+      }
+    },
+    "craftsperson/rust/isolate-functional-core-from-effects": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "effectful_modules": [
+          "src/lib.rs"
+        ],
+        "modules_mixing_rules_and_io": [],
+        "pure_modules": [
+          "src/diagnostic.rs",
+          "src/rate_card.rs",
+          "src/zones.rs"
+        ],
+        "rule_bearing_modules": [
+          "src/rate_card.rs"
+        ]
+      }
+    },
+    "craftsperson/rust/prefer-fakes-at-boundaries": {
+      "applicable": true,
+      "evidence": [
+        "tests substitute nothing that implements an owned trait"
+      ],
+      "followed": false,
+      "signals": {
+        "owned_traits": [
+          "DiagnosticSink"
+        ],
+        "test_fakes": []
+      }
+    },
+    "craftsperson/rust/put-gateways-at-effect-boundaries": {
+      "applicable": true,
+      "evidence": [
+        "no effect-free module depends on a gateway trait"
+      ],
+      "followed": false,
+      "signals": {
+        "declared_traits": {
+          "DiagnosticSink": "src/diagnostic.rs"
+        },
+        "effect_free_consumers": {
+          "DiagnosticSink": []
+        },
+        "effectful_modules": [
+          "src/lib.rs"
+        ],
+        "trait_implementations": [
+          {
+            "at_effect_boundary": false,
+            "trait": "DiagnosticSink",
+            "type": "TracingSink",
+            "where": "src/diagnostic.rs:25"
+          }
+        ]
+      }
+    },
+    "craftsperson/rust/use-purpose-specific-test-layers": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "documented_examples": [
+          "src/lib.rs::quote"
+        ],
+        "inline_unit_modules": [
+          "src/diagnostic.rs",
+          "src/lib.rs",
+          "src/rate_card.rs"
+        ],
+        "integration_test_files": [
+          "tests/quote.rs"
+        ]
+      }
+    },
+    "craftsperson/rust/use-results-for-recoverable-library-errors": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "panicking_macros_in_production": [],
+        "public_fallible_functions": [
+          "src/lib.rs::quote",
+          "src/rate_card.rs::parse",
+          "src/rate_card.rs::compute_quote"
+        ],
+        "unwrap_or_expect_in_production": []
+      }
+    },
+    "craftsperson/rust/use-structured-tracing": {
+      "applicable": true,
+      "evidence": [],
+      "followed": true,
+      "signals": {
+        "instrumented_functions": [],
+        "print_macros": [],
+        "structured_emissions": [
+          {
+            "arguments": "\"quote\" , zone = tracing :: field :: display (& event . zone) , weight_grams = event . weight_grams , total_cents = event . total_cents ,",
+            "macro": "info_span",
+            "where": "src/diagnostic.rs:38"
+          },
+          {
+            "arguments": "zone = tracing :: field :: display (& event . zone) , weight_grams = event . weight_grams , total_cents = event . total_cents , \"diagnostic\" ,",
+            "macro": "info",
+            "where": "src/diagnostic.rs:45"
+          }
+        ],
+        "tracing_declared": true,
+        "tracing_emissions": [
+          {
+            "arguments": "\"quote\" , zone = tracing :: field :: display (& event . zone) , weight_grams = event . weight_grams , total_cents = event . total_cents ,",
+            "macro": "info_span",
+            "where": "src/diagnostic.rs:38"
+          },
+          {
+            "arguments": "zone = tracing :: field :: display (& event . zone) , weight_grams = event . weight_grams , total_cents = event . total_cents , \"diagnostic\" ,",
+            "macro": "info",
+            "where": "src/diagnostic.rs:45"
+          }
+        ]
+      }
+    }
+  },
+  "scenario": "rate-card",
+  "task_complete": true,
+  "trial": 3,
+  "valid": true,
+  "workspace": {
+    "parse_errors": [],
+    "production_modules": [
+      "src/diagnostic.rs",
+      "src/lib.rs",
+      "src/rate_card.rs",
+      "src/zones.rs"
+    ],
+    "test_modules": [
+      "tests/quote.rs"
+    ]
+  }
+}

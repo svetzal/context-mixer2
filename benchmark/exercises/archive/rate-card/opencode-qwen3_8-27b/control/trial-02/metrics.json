@@ -1,0 +1,316 @@
+{
+  "acceptance": {
+    "collected": 10,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 10,
+    "skipped": 0
+  },
+  "adherence": {
+    "applicable_count": 7,
+    "followed": [],
+    "followed_count": 0,
+    "not_applicable": [
+      "craftsperson/rust/prefer-fakes-at-boundaries"
+    ],
+    "rate": 0.0,
+    "scored_count": 8,
+    "violated": [
+      "craftsperson/rust/centralize-curated-lint-policy",
+      "craftsperson/rust/compile-public-documentation",
+      "craftsperson/rust/isolate-functional-core-from-effects",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/use-purpose-specific-test-layers",
+      "craftsperson/rust/use-results-for-recoverable-library-errors",
+      "craftsperson/rust/use-structured-tracing"
+    ]
+  },
+  "agent": {
+    "description": "opencode, local Qwen3.8 27B (mxfp8) via ollama",
+    "name": "opencode-qwen3_8-27b"
+  },
+  "agent_run": {
+    "command": [
+      "opencode",
+      "run",
+      "--pure",
+      "--auto",
+      "--format",
+      "json",
+      "--model",
+      "ollama/qwen3.8:27b-mxfp8",
+      "--dir",
+      "/Users/svetzal/.cache/cmf-exercises/rate-card/opencode-qwen3_8-27b/control/trial-02/workspace",
+      "Read TASK.md in this directory and implement it.\n\nWork directly in this project. When you are finished the task's definition of\ndone must hold. Do not ask for confirmation; complete the work."
+    ],
+    "exit_code": 0,
+    "seconds": 3445.29,
+    "telemetry": {
+      "cache_read_tokens": 0,
+      "cost_usd": 0.0,
+      "input_tokens": 692853,
+      "models": {
+        "ollama/qwen3.8:27b-mxfp8": {
+          "cost_usd": 0.0,
+          "output_tokens": 37781
+        }
+      },
+      "output_tokens": 37781,
+      "parsed": true,
+      "primary_model": "ollama/qwen3.8:27b-mxfp8",
+      "reasoning_tokens": 0,
+      "steps": 30
+    },
+    "timed_out": false
+  },
+  "arm": "control",
+  "copied_reference": [],
+  "documentation_build": {
+    "exit_code": 0
+  },
+  "environment_sync": {
+    "exit_code": 0
+  },
+  "guidance": {
+    "present": false
+  },
+  "implementation": null,
+  "isolation": [
+    "--pure runs without external plugins",
+    "OPENCODE_CONFIG points at the harness provider declaration, not the operator's global config",
+    "ambient user configuration was NOT isolated; it is constant across arms and can only understate guided-arm lift"
+  ],
+  "kind": "agent",
+  "language": "rust",
+  "own_tests": {
+    "collected": 15,
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "failures": [],
+    "passed": 15,
+    "skipped": 0
+  },
+  "principles": {
+    "craftsperson/rust/centralize-curated-lint-policy": {
+      "applicable": true,
+      "evidence": [
+        "Cargo.toml declares no [lints] policy"
+      ],
+      "followed": false,
+      "signals": {
+        "cargo_lint_tables": [],
+        "cargo_lints": {},
+        "crate_level_lint_attributes": []
+      }
+    },
+    "craftsperson/rust/compile-public-documentation": {
+      "applicable": true,
+      "evidence": [
+        "4 public item(s) carry no doc comment",
+        "no crate-level documentation"
+      ],
+      "followed": false,
+      "signals": {
+        "crate_documented_files": [],
+        "inherited_from_skeleton": [
+          "src/lib.rs::zones",
+          "src/zones.rs::zone_label"
+        ],
+        "public_items": [
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote"
+        ],
+        "undocumented_public_items": [
+          "src/lib.rs::Parcel",
+          "src/lib.rs::Quote",
+          "src/lib.rs::QuoteError",
+          "src/lib.rs::quote"
+        ]
+      }
+    },
+    "craftsperson/rust/isolate-functional-core-from-effects": {
+      "applicable": true,
+      "evidence": [
+        "2 module(s) hold both the business rules and I/O"
+      ],
+      "followed": false,
+      "signals": {
+        "effectful_modules": [
+          "src/lib.rs",
+          "src/tests.rs"
+        ],
+        "modules_mixing_rules_and_io": [
+          "src/lib.rs",
+          "src/tests.rs"
+        ],
+        "pure_modules": [
+          "src/zones.rs"
+        ],
+        "rule_bearing_modules": [
+          "src/lib.rs",
+          "src/tests.rs"
+        ]
+      }
+    },
+    "craftsperson/rust/prefer-fakes-at-boundaries": {
+      "applicable": false,
+      "evidence": [
+        "no owned trait to substitute; the gateway intent covers that"
+      ],
+      "followed": null,
+      "signals": {
+        "owned_traits": [],
+        "test_fakes": []
+      }
+    },
+    "craftsperson/rust/put-gateways-at-effect-boundaries": {
+      "applicable": true,
+      "evidence": [
+        "no gateway trait is declared",
+        "no concrete type implements a declared gateway trait"
+      ],
+      "followed": false,
+      "signals": {
+        "declared_traits": {},
+        "effect_free_consumers": {},
+        "effectful_modules": [
+          "src/lib.rs",
+          "src/tests.rs"
+        ],
+        "trait_implementations": []
+      }
+    },
+    "craftsperson/rust/use-purpose-specific-test-layers": {
+      "applicable": true,
+      "evidence": [
+        "no tests/*.rs for wiring and cross-module behaviour"
+      ],
+      "followed": false,
+      "signals": {
+        "documented_examples": [],
+        "inline_unit_modules": [
+          "src/lib.rs"
+        ],
+        "integration_test_files": []
+      }
+    },
+    "craftsperson/rust/use-results-for-recoverable-library-errors": {
+      "applicable": true,
+      "evidence": [
+        "13 unwrap/expect outside test code",
+        "2 panicking macro(s) outside test code"
+      ],
+      "followed": false,
+      "signals": {
+        "panicking_macros_in_production": [
+          {
+            "arguments": "\"expected UnknownZone, got {other:?}\"",
+            "macro": "panic",
+            "where": "src/tests.rs:134"
+          },
+          {
+            "arguments": "\"expected Overweight, got {other:?}\"",
+            "macro": "panic",
+            "where": "src/tests.rs:148"
+          }
+        ],
+        "public_fallible_functions": [
+          "src/lib.rs::quote"
+        ],
+        "unwrap_or_expect_in_production": [
+          {
+            "call": "tempfile::tempdir().unwrap",
+            "where": "src/tests.rs:24"
+          },
+          {
+            "call": "std::fs::write(&path,contents).unwrap",
+            "where": "src/tests.rs:26"
+          },
+          {
+            "call": "path.to_str().unwrap",
+            "where": "src/tests.rs:28"
+          },
+          {
+            "call": "quote(&parcel(250,\"domestic\")).unwrap",
+            "where": "src/tests.rs:56"
+          },
+          {
+            "call": "quote(&parcel(1500,\"domestic\")).unwrap",
+            "where": "src/tests.rs:67"
+          },
+          {
+            "call": "quote(&parcel(12000,\"domestic\")).unwrap",
+            "where": "src/tests.rs:77"
+          },
+          {
+            "call": "quote(&parcel(10000,\"domestic\")).unwrap",
+            "where": "src/tests.rs:89"
+          },
+          {
+            "call": "quote(&parcel(10001,\"domestic\")).unwrap",
+            "where": "src/tests.rs:99"
+          },
+          {
+            "call": "quote(&parcel(250,\"international\")).unwrap",
+            "where": "src/tests.rs:109"
+          },
+          {
+            "call": "quote(&parcel(15000,\"international\")).unwrap",
+            "where": "src/tests.rs:120"
+          },
+          {
+            "call": "tempfile::tempdir().unwrap",
+            "where": "src/tests.rs:169"
+          },
+          {
+            "call": "missing.to_str().unwrap",
+            "where": "src/tests.rs:172"
+          },
+          {
+            "call": "quote(&parcel(200,\"domestic\")).unwrap",
+            "where": "src/tests.rs:223"
+          }
+        ]
+      }
+    },
+    "craftsperson/rust/use-structured-tracing": {
+      "applicable": true,
+      "evidence": [
+        "the tracing ecosystem is not used",
+        "1 print macro(s) in production code"
+      ],
+      "followed": false,
+      "signals": {
+        "instrumented_functions": [],
+        "print_macros": [
+          {
+            "arguments": "\"quote zone={zone} weight_grams={weight_grams} total_cents={total_cents}\"",
+            "macro": "eprintln",
+            "where": "src/lib.rs:119"
+          }
+        ],
+        "structured_emissions": [],
+        "tracing_declared": false,
+        "tracing_emissions": []
+      }
+    }
+  },
+  "scenario": "rate-card",
+  "task_complete": true,
+  "trial": 2,
+  "valid": true,
+  "workspace": {
+    "parse_errors": [],
+    "production_modules": [
+      "src/lib.rs",
+      "src/tests.rs",
+      "src/zones.rs"
+    ],
+    "test_modules": []
+  }
+}
