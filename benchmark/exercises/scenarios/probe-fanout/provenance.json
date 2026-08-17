@@ -15,5 +15,6 @@
   ],
   "note": "Copied from the elixir-phoenix-craftsperson scenario's catalogue snapshot. The eight python records are the scored slice and are disjoint from fx-settlement's; the four universal records are their specialization parents.",
   "source_scenario": "benchmark/scenarios/elixir-phoenix-craftsperson/input/knowledge-base",
-  "skeleton_origin": "written for this exercise; not derived from any existing project"
+  "skeleton_origin": "written for this exercise; not derived from any existing project",
+  "task_origin": "Scenario task seeded from the DeepSWE benchmark (https://deepswe.datacurve.ai), Datacurve's from-scratch SWE suite, chosen for recency: older suites are increasingly present in model pretraining data, which would measure recall rather than judgement. The task premise comes from DeepSWE; the skeleton does not, per skeleton_origin."
 }
