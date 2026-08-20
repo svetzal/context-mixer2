@@ -33,6 +33,13 @@ pub(super) fn change_counts(changes: &[FileChange]) -> (usize, usize, usize) {
 }
 
 /// Write one line per changed file into `f`, rooted at `target_root`.
+///
+/// `changes` must be plan-oriented (as [`crate::diff::file_changes_between`]
+/// returns them): `added` is what applying the plan adds to `target_root` and
+/// `removed` is what it takes away, so `+`/`−` here mean what they mean in
+/// `diff(1)`. These lines are what a user reads to decide whether to re-run with
+/// `--apply`, so an inverted count doesn't just misinform — it makes an additive
+/// plan look destructive.
 pub(super) fn write_change_lines(
     f: &mut fmt::Formatter<'_>,
     target_root: &std::path::Path,
@@ -41,8 +48,8 @@ pub(super) fn write_change_lines(
     for change in changes {
         let detail = match change.status {
             FileStatus::Modified => format!("modified (+{} -{})", change.added, change.removed),
-            FileStatus::OnlyInInstalled => format!("deleted (-{})", change.added),
-            FileStatus::OnlyInSource => format!("added (+{})", change.removed),
+            FileStatus::OnlyInInstalled => format!("deleted (-{})", change.removed),
+            FileStatus::OnlyInSource => format!("added (+{})", change.added),
         };
         writeln!(f, "    {}  {detail}", target_root.join(&change.path).display())?;
     }

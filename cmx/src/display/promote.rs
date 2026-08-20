@@ -82,23 +82,26 @@ mod tests {
             already_current: false,
             version: Some("1.2.0".to_string()),
             file_changes: vec![
+                // Plan-oriented counts: `added` is what applying adds to the
+                // home, `removed` is what it takes away. Deliberately
+                // asymmetric so a re-inversion can't pass by symmetry.
                 FileChange {
                     path: "SKILL.md".to_string(),
                     status: FileStatus::Modified,
-                    added: 1,
+                    added: 5,
                     removed: 1,
                 },
                 FileChange {
                     path: "obsolete.md".to_string(),
                     status: FileStatus::OnlyInInstalled,
-                    added: 2,
-                    removed: 0,
+                    added: 0,
+                    removed: 2,
                 },
                 FileChange {
                     path: "fresh.md".to_string(),
                     status: FileStatus::OnlyInSource,
-                    added: 0,
-                    removed: 4,
+                    added: 4,
+                    removed: 0,
                 },
             ],
             retracked: vec![Platform::Claude, Platform::Codex],
@@ -120,7 +123,10 @@ mod tests {
     fn promote_plan_ends_with_apply_hint_and_lists_files() {
         let out = base_result().to_string();
         assert!(out.contains("Plan to promote"), "got: {out}");
-        assert!(out.contains("/home/skills/personal-finance/SKILL.md"), "lists file path: {out}");
+        assert!(
+            out.contains("/home/skills/personal-finance/SKILL.md  modified (+5 -1)"),
+            "lists file path with plan-oriented counts: {out}"
+        );
         assert!(out.contains("files: 1 modified, 1 added, 1 deleted"), "got: {out}");
         assert!(
             out.contains("/home/skills/personal-finance/obsolete.md  deleted (-2)"),

@@ -86,23 +86,26 @@ mod tests {
                 artifact_path: PathBuf::from("/copilot/my-skill"),
                 from_version: Some("1.0.0".to_string()),
                 file_changes: vec![
+                    // Plan-oriented counts: `added` is what applying adds to
+                    // the target, `removed` is what it takes away. Deliberately
+                    // asymmetric so a re-inversion can't pass by symmetry.
                     FileChange {
                         path: "SKILL.md".to_string(),
                         status: FileStatus::Modified,
-                        added: 1,
-                        removed: 1,
+                        added: 6,
+                        removed: 2,
                     },
                     FileChange {
                         path: "extra.md".to_string(),
                         status: FileStatus::OnlyInInstalled,
-                        added: 2,
-                        removed: 0,
+                        added: 0,
+                        removed: 2,
                     },
                     FileChange {
                         path: "new.md".to_string(),
                         status: FileStatus::OnlyInSource,
-                        added: 0,
-                        removed: 3,
+                        added: 3,
+                        removed: 0,
                     },
                 ],
             }],
@@ -133,7 +136,10 @@ mod tests {
     fn plan_mode_ends_with_apply_hint() {
         let out = base_result().to_string();
         assert!(out.contains("Plan to reconcile"), "got: {out}");
-        assert!(out.contains("/copilot/my-skill/SKILL.md"), "lists changed file: {out}");
+        assert!(
+            out.contains("/copilot/my-skill/SKILL.md  modified (+6 -2)"),
+            "lists changed file with plan-oriented counts: {out}"
+        );
         assert!(out.contains("files: 1 modified, 1 added, 1 deleted"), "got: {out}");
         assert!(out.contains("/copilot/my-skill/extra.md  deleted (-2)"), "got: {out}");
         assert!(out.contains("/copilot/my-skill/new.md  added (+3)"), "got: {out}");

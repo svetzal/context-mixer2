@@ -107,6 +107,37 @@ fn promote_plan_mode_makes_no_changes() {
     );
 }
 
+/// Regression: a promote that only *adds* lines to the home copy must read as
+/// additive. This plan is the safety mechanism users are told to read before
+/// `--apply`, and it once rendered a purely additive change as `(+0 -44)` —
+/// indistinguishable from a plan about to delete 44 lines.
+#[test]
+fn promote_plan_reports_added_lines_as_plus() {
+    let t = TestContext::new();
+    let home_body = "---\ndescription: pf\n---\n# pf\nkept line\n";
+    t.fs.add_file(home_skill_md(&t, "pf"), home_body);
+    let pv = t.paths.with_platform(Platform::Claude);
+    let installed = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap().join("pf");
+    t.fs.add_file(
+        installed.join("SKILL.md"),
+        format!("{home_body}extra one\nextra two\nextra three\n"),
+    );
+    track_from_home(&t, Platform::Claude, "pf");
+
+    let r = promote("pf", ArtifactKind::Skill, None, RunMode::Plan, &t.ctx()).unwrap();
+
+    let change = r.file_changes.iter().find(|c| c.path == "SKILL.md").expect("SKILL.md change");
+    assert_eq!(
+        (change.added, change.removed),
+        (3, 0),
+        "three lines arrive from the installed copy, none leave the home"
+    );
+    assert!(
+        r.to_string().contains("SKILL.md  modified (+3 -0)"),
+        "plan reads additively: {r}"
+    );
+}
+
 #[test]
 fn promote_flags_other_platforms_that_still_differ() {
     let t = TestContext::new();

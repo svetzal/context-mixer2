@@ -108,17 +108,26 @@ pub enum FileStatus {
     OnlyInSource,
 }
 
-/// One file's change summary. `added` counts lines present only in the installed
-/// copy (`+`); `removed` counts lines present only in the source copy (`−`).
+/// One file's change summary, always read as "going from the `−` side to the
+/// `+` side": `added` counts lines gained and `removed` counts lines lost.
+///
+/// **Which copy is which depends on the producer**, and getting that backwards
+/// is how an additive plan came to render as `(+0 -44)`:
+///
+/// - `structural::diff_artifact` (behind `cmx diff`) describes the change that
+///   already happened locally — `−` is the source, `+` is the installed copy.
+/// - `structural::file_changes_between` (behind the `promote`/`sync` plans)
+///   describes a change that has not happened yet — `−` is the target as it
+///   stands, `+` is the target once the plan is applied.
 #[derive(Debug, Clone)]
 pub struct FileChange {
     /// Path of the file relative to the artifact root.
     pub path: String,
     /// How this file differs between the two copies.
     pub status: FileStatus,
-    /// Lines present only in the installed copy (`+`).
+    /// Lines the `+` side gained.
     pub added: usize,
-    /// Lines present only in the source copy (`−`).
+    /// Lines the `+` side lost.
     pub removed: usize,
 }
 

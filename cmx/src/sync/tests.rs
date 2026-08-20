@@ -236,6 +236,47 @@ fn sync_dry_run_changes_nothing_on_disk() {
     assert!(read_skill(&t, Platform::Codex, "s").contains("version: 1.0.3"));
 }
 
+/// Regression: a sync whose winner only *adds* lines to the target must read as
+/// additive. The plan is what a user checks before `--apply`, and it once
+/// rendered arriving lines under `-` and departing lines under `+`.
+#[test]
+fn sync_plan_reports_arriving_lines_as_plus() {
+    let t = TestContext::new();
+    let pv = t.paths.with_platform(Platform::Claude);
+    let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
+    let short = "---\ndescription: s\n---\n# s\nkept line\n";
+    t.fs.add_file(dir.join("s").join("SKILL.md"), format!("{short}extra one\nextra two\n"));
+    place_unversioned(&t, Platform::Codex, "s", "s");
+    let codex = t.paths.with_platform(Platform::Codex);
+    let codex_dir = codex.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
+    t.fs.add_file(codex_dir.join("s").join("SKILL.md"), short);
+
+    let r = sync(
+        "s",
+        ArtifactKind::Skill,
+        InstallScope::Global,
+        Some(Platform::Claude),
+        RunMode::Plan,
+        &t.ctx(),
+    )
+    .unwrap();
+
+    let change = r.targets[0]
+        .file_changes
+        .iter()
+        .find(|c| c.path == "SKILL.md")
+        .expect("SKILL.md change");
+    assert_eq!(
+        (change.added, change.removed),
+        (2, 0),
+        "two lines arrive from the winner, none leave the target"
+    );
+    assert!(
+        r.to_string().contains("SKILL.md  modified (+2 -0)"),
+        "plan reads additively: {r}"
+    );
+}
+
 #[test]
 fn sync_rejects_agents() {
     let t = TestContext::new();

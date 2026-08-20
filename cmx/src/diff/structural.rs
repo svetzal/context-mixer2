@@ -35,13 +35,23 @@ pub(super) fn diff_artifact(
     }
 }
 
+/// Per-file changes that bringing `current` into line with `desired` would
+/// make, in **plan orientation**: `added` counts lines the plan adds to the
+/// target and `removed` counts lines it takes away — the direction `diff(1)`
+/// and every package manager use.
+///
+/// The `diff_*` helpers below speak `cmx diff`'s orientation instead, where `+`
+/// is the installed copy (their first argument). Since a plan's first argument
+/// is the *before* side, every change is flipped on the way out. Skip that flip
+/// and a purely additive plan renders as `(+0 -44)`, which reads as a plan about
+/// to delete 44 lines — the opposite of what it will do.
 pub(crate) fn file_changes_between(
     kind: ArtifactKind,
     current: &Path,
     desired: &Path,
     ctx: &AppContext<'_>,
 ) -> Result<Vec<FileChange>> {
-    Ok(match kind {
+    let diff_oriented = match kind {
         ArtifactKind::Agent => {
             if ctx.fs.exists(current) && ctx.fs.exists(desired) {
                 diff_files(current, desired, "desired", ctx)?.changes
@@ -64,7 +74,19 @@ pub(crate) fn file_changes_between(
                 Vec::new()
             }
         }
-    })
+    };
+    Ok(diff_oriented.into_iter().map(flip_orientation).collect())
+}
+
+/// Reinterpret a change in the opposite direction by swapping its `+`/`−`
+/// counts. The status is unaffected: which side a file exists on doesn't change
+/// when you read the same difference the other way round.
+fn flip_orientation(change: FileChange) -> FileChange {
+    FileChange {
+        added: change.removed,
+        removed: change.added,
+        ..change
+    }
 }
 
 fn single_agent_changes(
@@ -368,6 +390,112 @@ mod tests {
         let gone = d.changes.iter().find(|c| c.path == "gone.md").expect("gone.md change");
         assert_eq!(gone.status, FileStatus::OnlyInSource);
         assert!(d.unified.contains("--- home/gone.md  (removed locally)"), "{}", d.unified);
+    }
+
+    // --- file_changes_between (plan orientation) ---
+
+    #[test]
+    fn file_changes_between_counts_arriving_lines_as_added() {
+        let t = TestContext::new();
+        t.fs.add_file("/current/my-skill/SKILL.md", "kept\n");
+        t.fs.add_file("/desired/my-skill/SKILL.md", "kept\none\ntwo\nthree\n");
+
+        let ctx = t.ctx();
+        let changes = file_changes_between(
+            ArtifactKind::Skill,
+            std::path::Path::new("/current/my-skill"),
+            std::path::Path::new("/desired/my-skill"),
+            &ctx,
+        )
+        .unwrap();
+
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].status, FileStatus::Modified);
+        assert_eq!(
+            (changes[0].added, changes[0].removed),
+            (3, 0),
+            "a purely additive plan must not read as a deletion"
+        );
+    }
+
+    #[test]
+    fn file_changes_between_counts_departing_lines_as_removed() {
+        let t = TestContext::new();
+        t.fs.add_file("/current/my-skill/SKILL.md", "kept\ngoing\naway\n");
+        t.fs.add_file("/desired/my-skill/SKILL.md", "kept\n");
+
+        let ctx = t.ctx();
+        let changes = file_changes_between(
+            ArtifactKind::Skill,
+            std::path::Path::new("/current/my-skill"),
+            std::path::Path::new("/desired/my-skill"),
+            &ctx,
+        )
+        .unwrap();
+
+        assert_eq!((changes[0].added, changes[0].removed), (0, 2));
+    }
+
+    #[test]
+    fn file_changes_between_counts_whole_files_on_the_side_that_gains_or_loses_them() {
+        let t = TestContext::new();
+        t.fs.add_file("/current/my-skill/SKILL.md", "kept\n");
+        t.fs.add_file("/current/my-skill/going.md", "one\ntwo\n");
+        t.fs.add_file("/desired/my-skill/SKILL.md", "kept\n");
+        t.fs.add_file("/desired/my-skill/arriving.md", "a\nb\nc\n");
+
+        let ctx = t.ctx();
+        let changes = file_changes_between(
+            ArtifactKind::Skill,
+            std::path::Path::new("/current/my-skill"),
+            std::path::Path::new("/desired/my-skill"),
+            &ctx,
+        )
+        .unwrap();
+
+        let arriving = changes.iter().find(|c| c.path == "arriving.md").expect("arriving.md");
+        assert_eq!(arriving.status, FileStatus::OnlyInSource, "only in the desired copy");
+        assert_eq!((arriving.added, arriving.removed), (3, 0), "the plan creates it");
+
+        let going = changes.iter().find(|c| c.path == "going.md").expect("going.md");
+        assert_eq!(going.status, FileStatus::OnlyInInstalled, "only in the current copy");
+        assert_eq!((going.added, going.removed), (0, 2), "the plan deletes it");
+    }
+
+    #[test]
+    fn file_changes_between_agent_counts_arriving_lines_as_added() {
+        let t = TestContext::new();
+        t.fs.add_file("/current/agent.md", "kept\n");
+        t.fs.add_file("/desired/agent.md", "kept\nextra\n");
+
+        let ctx = t.ctx();
+        let changes = file_changes_between(
+            ArtifactKind::Agent,
+            std::path::Path::new("/current/agent.md"),
+            std::path::Path::new("/desired/agent.md"),
+            &ctx,
+        )
+        .unwrap();
+
+        assert_eq!((changes[0].added, changes[0].removed), (1, 0));
+    }
+
+    #[test]
+    fn file_changes_between_uninstalled_current_counts_the_whole_artifact_as_added() {
+        let t = TestContext::new();
+        t.fs.add_file("/desired/my-skill/SKILL.md", "one\ntwo\n");
+
+        let ctx = t.ctx();
+        let changes = file_changes_between(
+            ArtifactKind::Skill,
+            std::path::Path::new("/current/my-skill"),
+            std::path::Path::new("/desired/my-skill"),
+            &ctx,
+        )
+        .unwrap();
+
+        assert_eq!(changes[0].status, FileStatus::OnlyInSource);
+        assert_eq!((changes[0].added, changes[0].removed), (2, 0));
     }
 
     // --- diff_artifact dispatch ---
