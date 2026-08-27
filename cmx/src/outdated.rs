@@ -9,6 +9,7 @@ use crate::config;
 use crate::config::InstalledWithSources;
 use crate::context::{AppContext, LoadedState};
 use crate::local_modification;
+use crate::scope_alias;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
 use crate::types::{ArtifactKind, InstallScope, LockFile};
@@ -79,6 +80,11 @@ pub fn outdated(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
 
     for (scope, lock) in loaded.scopes() {
         for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
+            if scope.is_local()
+                && scope_alias::local_install_dir_aliases_global(ctx.paths, kind, ctx.fs)
+            {
+                continue;
+            }
             collect_outdated_for_scope_with(kind, scope, lock, &source_artifacts, &mut rows, ctx)?;
         }
     }

@@ -32,15 +32,6 @@ pub fn save_to(lock: &LockFile, path: &Path, fs: &dyn Filesystem) -> Result<()> 
 /// Load the lock file for `scope` at its default location under `paths`.
 /// Returns a default (empty) lock file if it does not exist.
 pub fn load(scope: InstallScope, fs: &dyn Filesystem, paths: &ConfigPaths) -> Result<LockFile> {
-    if scope.is_local()
-        && paths.local_path_aliases_global(
-            &paths.lock_path(scope),
-            &paths.lock_path(InstallScope::Global),
-            fs,
-        )
-    {
-        return Ok(LockFile::default());
-    }
     let path = paths.lock_path(scope);
     load_from(&path, fs)
 }

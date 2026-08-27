@@ -225,6 +225,7 @@ Source management:
 - `cmx/src/source/browse.rs` — `cmx source browse` interactive browsing
 - `cmx/src/source_update.rs` — source update logic (git pull for registered sources)
 - `cmx/src/source_iter.rs` — iterator over configured sources
+- `cmx/src/scope_alias.rs` — cmx-local suppression of the `$HOME` local/global install-dir alias case for inventory/survey commands, keeping the physical-path dedupe decision out of `cmx-core`
 
 Artifact scanning:
 

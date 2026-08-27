@@ -218,6 +218,18 @@ fn list_and_outdated_from_home_do_not_duplicate_global_artifacts_as_local() {
     assert_eq!(outdated_artifacts.len(), 1, "outdated should report the global agent once");
     assert_eq!(outdated_artifacts[0]["name"], "rust-agent");
     assert_eq!(outdated_artifacts[0]["scope"], "global");
+
+    let doctor = fixture.run_json(&["doctor", "--local", "--all", "--json"]);
+    let doctor_artifacts = doctor["artifacts"].as_array().unwrap();
+    assert_eq!(
+        doctor_artifacts.len(),
+        2,
+        "doctor should report one global agent and one global skill"
+    );
+    assert!(
+        doctor_artifacts.iter().all(|artifact| artifact["scope"] == "global"),
+        "home cwd must not synthesize local-scope duplicates in doctor: {doctor_artifacts:?}"
+    );
 }
 
 #[test]

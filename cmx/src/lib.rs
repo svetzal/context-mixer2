@@ -53,6 +53,7 @@ pub mod plugin_types;
 pub mod promote;
 pub mod scan;
 pub(crate) mod scan_marketplace;
+pub(crate) mod scope_alias;
 pub mod search;
 pub mod sets;
 pub mod source;
