@@ -125,9 +125,32 @@ fn populated_fixture() -> Fixture {
     }
 }
 
+fn populated_fixture_from_home() -> Fixture {
+    let temp = TempDir::new().unwrap();
+    let paths = create_fixture_paths_with_project(temp.path(), Some("home"));
+    write_populated_artifacts(&paths);
+    let checksums = compute_fixture_checksums(&paths);
+    write_populated_config(&paths, &checksums);
+
+    Fixture {
+        temp,
+        home: paths.home,
+        project: paths.project,
+        config_dir: paths.config_dir,
+    }
+}
+
 fn create_fixture_paths(root: &Path) -> FixturePaths {
+    create_fixture_paths_with_project(root, None)
+}
+
+fn create_fixture_paths_with_project(root: &Path, project_override: Option<&str>) -> FixturePaths {
     let home = root.join("home");
-    let project = root.join("project");
+    let project = match project_override {
+        Some("home") => home.clone(),
+        Some(name) => root.join(name),
+        None => root.join("project"),
+    };
     let config_dir = home.join(".config").join("context-mixer");
     let source_root = root.join("guidelines");
     let source_agent_path = source_root.join("agents").join("rust-agent.md");
@@ -160,6 +183,87 @@ fn create_fixture_paths(root: &Path) -> FixturePaths {
         installed_skill_dir,
         installed_skill_path,
     }
+}
+
+#[test]
+fn list_and_outdated_from_home_do_not_duplicate_global_artifacts_as_local() {
+    let fixture = populated_fixture_from_home();
+
+    let agent_list = fixture.run_json(&["agent", "list", "--json"]);
+    let agent_artifacts = agent_list["artifacts"].as_array().unwrap();
+    assert_eq!(agent_artifacts.len(), 1, "global agent should not be duplicated as local");
+    assert_eq!(agent_artifacts[0]["name"], "rust-agent");
+    assert_eq!(agent_artifacts[0]["scope"], "global");
+
+    let skill_list = fixture.run_json(&["skill", "list", "--json"]);
+    let skill_artifacts = skill_list["artifacts"].as_array().unwrap();
+    assert_eq!(skill_artifacts.len(), 1, "global skill should not be duplicated as local");
+    assert_eq!(skill_artifacts[0]["name"], "focus-skill");
+    assert_eq!(skill_artifacts[0]["scope"], "global");
+
+    let list = fixture.run_json(&["list", "--json"]);
+    let artifacts = list["artifacts"].as_array().unwrap();
+    assert_eq!(
+        artifacts.len(),
+        2,
+        "combined list should contain one global agent and one global skill"
+    );
+    assert!(
+        artifacts.iter().all(|artifact| artifact["scope"] == "global"),
+        "home cwd must not synthesize local-scope duplicates: {artifacts:?}"
+    );
+
+    let outdated = fixture.run_json(&["outdated", "--json"]);
+    let outdated_artifacts = outdated["artifacts"].as_array().unwrap();
+    assert_eq!(outdated_artifacts.len(), 1, "outdated should report the global agent once");
+    assert_eq!(outdated_artifacts[0]["name"], "rust-agent");
+    assert_eq!(outdated_artifacts[0]["scope"], "global");
+}
+
+#[test]
+fn distinct_project_local_artifacts_still_appear_in_local_scope() {
+    let fixture = populated_fixture();
+    let local_agent_dir = fixture.project.join(".claude").join("agents");
+    let local_lock_path = fixture.project.join(".context-mixer").join("cmx-lock.json");
+    let local_agent_path = local_agent_dir.join("project-agent.md");
+    let source_agent_path = fixture
+        .home
+        .parent()
+        .unwrap()
+        .join("guidelines")
+        .join("agents")
+        .join("project-agent.md");
+
+    fs::create_dir_all(&local_agent_dir).unwrap();
+    fs::create_dir_all(local_lock_path.parent().unwrap()).unwrap();
+    fs::write(&source_agent_path, versioned_agent("1.0.0")).unwrap();
+    fs::write(&local_agent_path, versioned_agent("1.0.0")).unwrap();
+
+    let local_checksum = checksum_for(ArtifactKind::Agent, &local_agent_path);
+    write_json(
+        &local_lock_path,
+        &LockFile {
+            version: 1,
+            packages: BTreeMap::from([(
+                "project-agent".to_string(),
+                tracked_lock_entry(
+                    ArtifactKind::Agent,
+                    "agents/project-agent.md",
+                    local_checksum.clone(),
+                    local_checksum,
+                ),
+            )]),
+        },
+    );
+
+    let agent_list = fixture.run_json(&["agent", "list", "--json"]);
+    let agent_artifacts = agent_list["artifacts"].as_array().unwrap();
+    assert!(
+        agent_artifacts
+            .iter()
+            .any(|artifact| artifact["name"] == "project-agent" && artifact["scope"] == "local"),
+        "distinct project-local agent must remain visible in local scope: {agent_artifacts:?}"
+    );
 }
 
 fn write_populated_artifacts(paths: &FixturePaths) {

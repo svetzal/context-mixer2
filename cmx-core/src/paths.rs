@@ -246,6 +246,29 @@ impl ConfigPaths {
         self.installed_artifact_path(kind, name, scope)
             .ok_or_else(|| unsupported_artifact_error(self.platform, kind))
     }
+
+    /// Whether an existing local-scope path resolves to the same physical path
+    /// as its global counterpart.
+    ///
+    /// This guards the "running from `$HOME`" case where a local relative path
+    /// like `.claude/agents` canonicalizes to the same directory as the global
+    /// path `~/.claude/agents`, so surveying both scopes would double-count one
+    /// install location.
+    pub fn local_path_aliases_global(
+        &self,
+        local_path: &std::path::Path,
+        global_path: &std::path::Path,
+        fs: &dyn Filesystem,
+    ) -> bool {
+        if !fs.exists(local_path) || !fs.exists(global_path) {
+            return false;
+        }
+
+        match (fs.canonicalize(local_path), fs.canonicalize(global_path)) {
+            (Ok(local), Ok(global)) => local == global,
+            _ => false,
+        }
+    }
 }
 
 fn unsupported_artifact_error(platform: Platform, kind: ArtifactKind) -> CmxError {
@@ -312,6 +335,17 @@ mod tests {
             codex.install_dir(ArtifactKind::Agent, InstallScope::Global).unwrap(),
             PathBuf::from("/home/testuser/.codex/agents")
         );
+    }
+
+    #[test]
+    fn local_path_aliases_global_returns_false_when_either_path_missing() {
+        let paths = test_paths();
+        let fs = FakeFilesystem::new();
+        assert!(!paths.local_path_aliases_global(
+            std::path::Path::new(".claude/agents"),
+            std::path::Path::new("/home/testuser/.claude/agents"),
+            &fs,
+        ));
     }
 
     // --- Claude (default) ---

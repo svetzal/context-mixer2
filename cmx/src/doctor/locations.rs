@@ -49,6 +49,13 @@ pub(crate) fn build_locations(
                     continue;
                 }
                 let dir = pv.require_install_dir(kind, scope)?;
+                if scope.is_local()
+                    && pv
+                        .install_dir(kind, InstallScope::Global)
+                        .is_some_and(|global| pv.local_path_aliases_global(&dir, &global, ctx.fs))
+                {
+                    continue;
+                }
                 locations
                     .entry(dir)
                     .or_insert_with(|| LocationAgg {

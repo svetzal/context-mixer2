@@ -44,6 +44,13 @@ pub fn installed_names(
     let Some(dir) = paths.install_dir(kind, scope) else {
         return Ok(Vec::new());
     };
+    if scope.is_local()
+        && paths
+            .install_dir(kind, InstallScope::Global)
+            .is_some_and(|global| paths.local_path_aliases_global(&dir, &global, fs))
+    {
+        return Ok(Vec::new());
+    }
     if !fs.exists(&dir) {
         return Ok(Vec::new());
     }
