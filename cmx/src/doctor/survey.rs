@@ -17,7 +17,7 @@ use super::types::DoctorReport;
 /// Read-only: performs no writes. Surveys global scope always, and project
 /// (local) scope when `scope` includes local.
 pub fn survey(scope: SurveyScope, ctx: &AppContext<'_>) -> Result<DoctorReport> {
-    let scopes = survey_scopes(scope);
+    let scopes = survey_scopes(scope, ctx.paths, ctx.fs);
     let cfg = config::load_config(ctx.fs, ctx.paths)?;
     // When the user has declared a managed set, `doctor` surveys only those
     // platforms; otherwise it inspects every supported platform.
@@ -38,7 +38,7 @@ pub fn survey(scope: SurveyScope, ctx: &AppContext<'_>) -> Result<DoctorReport> 
         rows,
         artifacts,
         missing,
-        included_local: scope.includes_local(),
+        included_local: scopes.contains(&crate::types::InstallScope::Local),
         surveyed_platforms: platforms.len(),
         scoped_to_managed: !cfg.platforms.is_empty(),
         show_all: false,

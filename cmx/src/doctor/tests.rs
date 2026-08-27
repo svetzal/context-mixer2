@@ -139,13 +139,18 @@ fn counts_tally_tracked_and_drifted() {
 
 #[test]
 fn survey_scopes_global_only_by_default() {
-    assert_eq!(survey_scopes(SurveyScope::GlobalOnly), vec![InstallScope::Global]);
+    let t = TestContext::new();
+    assert_eq!(
+        survey_scopes(SurveyScope::GlobalOnly, &t.paths, &t.fs),
+        vec![InstallScope::Global]
+    );
 }
 
 #[test]
 fn survey_scopes_includes_local_when_requested() {
+    let t = TestContext::new();
     assert_eq!(
-        survey_scopes(SurveyScope::GlobalAndLocal),
+        survey_scopes(SurveyScope::GlobalAndLocal, &t.paths, &t.fs),
         vec![InstallScope::Global, InstallScope::Local]
     );
 }

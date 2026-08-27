@@ -18,8 +18,12 @@ use crate::source_iter;
 use crate::types::{ArtifactKind, InstallScope, LockFile};
 
 /// The scopes to survey: global always, plus local when `include_local`.
-pub(crate) fn survey_scopes(scope: SurveyScope) -> Vec<InstallScope> {
-    if scope.includes_local() {
+pub(crate) fn survey_scopes(
+    scope: SurveyScope,
+    paths: &crate::paths::ConfigPaths,
+    fs: &dyn crate::gateway::Filesystem,
+) -> Vec<InstallScope> {
+    if scope.includes_local() && !scope_alias::cwd_is_home(paths, fs) {
         vec![InstallScope::Global, InstallScope::Local]
     } else {
         vec![InstallScope::Global]
@@ -109,11 +113,11 @@ pub(crate) fn available_in_sources(
 
 #[cfg(test)]
 mod tests {
+    use super::{build_locations, survey_scopes};
+    use crate::flags::SurveyScope;
     use crate::platform::Platform;
     use crate::test_support::TestContext;
     use crate::types::{ArtifactKind, InstallScope};
-
-    use super::build_locations;
 
     #[test]
     fn build_locations_shared_dir_collapses_to_single_entry() {
@@ -145,5 +149,23 @@ mod tests {
         // No agent locations should appear for Pi
         let has_agent = locations.values().any(|a| a.kind == ArtifactKind::Agent);
         assert!(!has_agent, "Pi does not support agents — no agent location expected");
+    }
+
+    #[test]
+    fn survey_scopes_global_only_by_default() {
+        let t = TestContext::new();
+        assert_eq!(
+            survey_scopes(SurveyScope::GlobalOnly, &t.paths, &t.fs),
+            vec![InstallScope::Global]
+        );
+    }
+
+    #[test]
+    fn survey_scopes_includes_local_when_requested() {
+        let t = TestContext::new();
+        assert_eq!(
+            survey_scopes(SurveyScope::GlobalAndLocal, &t.paths, &t.fs),
+            vec![InstallScope::Global, InstallScope::Local]
+        );
     }
 }

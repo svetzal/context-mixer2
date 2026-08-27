@@ -188,6 +188,7 @@ fn create_fixture_paths_with_project(root: &Path, project_override: Option<&str>
 #[test]
 fn list_and_outdated_from_home_do_not_duplicate_global_artifacts_as_local() {
     let fixture = populated_fixture_from_home();
+    add_hermes_style_home_local_skill(&fixture);
 
     let agent_list = fixture.run_json(&["agent", "list", "--json"]);
     let agent_artifacts = agent_list["artifacts"].as_array().unwrap();
@@ -200,6 +201,10 @@ fn list_and_outdated_from_home_do_not_duplicate_global_artifacts_as_local() {
     assert_eq!(skill_artifacts.len(), 1, "global skill should not be duplicated as local");
     assert_eq!(skill_artifacts[0]["name"], "focus-skill");
     assert_eq!(skill_artifacts[0]["scope"], "global");
+    assert!(
+        skill_artifacts.iter().all(|artifact| artifact["name"] != "home-local-skill"),
+        "HOME cwd must disable Hermes-style local skills entirely: {skill_artifacts:?}"
+    );
 
     let list = fixture.run_json(&["list", "--json"]);
     let artifacts = list["artifacts"].as_array().unwrap();
@@ -218,6 +223,10 @@ fn list_and_outdated_from_home_do_not_duplicate_global_artifacts_as_local() {
     assert_eq!(outdated_artifacts.len(), 1, "outdated should report the global agent once");
     assert_eq!(outdated_artifacts[0]["name"], "rust-agent");
     assert_eq!(outdated_artifacts[0]["scope"], "global");
+    assert!(
+        outdated_artifacts.iter().all(|artifact| artifact["name"] != "home-local-skill"),
+        "HOME cwd must not report Hermes-style local rows in outdated: {outdated_artifacts:?}"
+    );
 
     let doctor = fixture.run_json(&["doctor", "--local", "--all", "--json"]);
     let doctor_artifacts = doctor["artifacts"].as_array().unwrap();
@@ -229,6 +238,10 @@ fn list_and_outdated_from_home_do_not_duplicate_global_artifacts_as_local() {
     assert!(
         doctor_artifacts.iter().all(|artifact| artifact["scope"] == "global"),
         "home cwd must not synthesize local-scope duplicates in doctor: {doctor_artifacts:?}"
+    );
+    assert!(
+        doctor_artifacts.iter().all(|artifact| artifact["name"] != "home-local-skill"),
+        "HOME cwd must disable Hermes-style local survey rows entirely: {doctor_artifacts:?}"
     );
 }
 
@@ -276,6 +289,40 @@ fn distinct_project_local_artifacts_still_appear_in_local_scope() {
             .any(|artifact| artifact["name"] == "project-agent" && artifact["scope"] == "local"),
         "distinct project-local agent must remain visible in local scope: {agent_artifacts:?}"
     );
+
+    let local_skill_dir = fixture.project.join(".agents").join("skills").join("project-skill");
+    let local_skill_path = local_skill_dir.join("SKILL.md");
+    let source_skill_dir = fixture.home.parent().unwrap().join("guidelines").join("project-skill");
+    let source_skill_path = source_skill_dir.join("SKILL.md");
+    let local_skill_lock_path = fixture.project.join(".context-mixer").join("cmx-lock.json");
+
+    fs::create_dir_all(&local_skill_dir).unwrap();
+    fs::create_dir_all(&source_skill_dir).unwrap();
+    fs::write(&source_skill_path, versioned_skill("Project-local skill", "1.0.0")).unwrap();
+    fs::write(&local_skill_path, versioned_skill("Project-local skill", "1.0.0")).unwrap();
+
+    let local_skill_checksum = checksum_for(ArtifactKind::Skill, &local_skill_dir);
+    let mut local_lock: LockFile =
+        serde_json::from_slice(&fs::read(&local_skill_lock_path).unwrap()).unwrap();
+    local_lock.packages.insert(
+        "project-skill".to_string(),
+        tracked_lock_entry(
+            ArtifactKind::Skill,
+            "project-skill",
+            local_skill_checksum.clone(),
+            local_skill_checksum,
+        ),
+    );
+    write_json(&local_skill_lock_path, &local_lock);
+
+    let skill_list = fixture.run_json(&["skill", "list", "--json"]);
+    let skill_artifacts = skill_list["artifacts"].as_array().unwrap();
+    assert!(
+        skill_artifacts
+            .iter()
+            .any(|artifact| artifact["name"] == "project-skill" && artifact["scope"] == "local"),
+        "distinct project-local Hermes-style skill must remain visible in local scope: {skill_artifacts:?}"
+    );
 }
 
 fn write_populated_artifacts(paths: &FixturePaths) {
@@ -322,6 +369,42 @@ fn write_populated_artifacts(paths: &FixturePaths) {
     )
     .unwrap();
     fs::write(paths.installed_skill_dir.join("notes.md"), "# Notes\n").unwrap();
+}
+
+fn add_hermes_style_home_local_skill(fixture: &Fixture) {
+    let config_path = fixture.config_dir.join("config.json");
+    let mut config: CmxConfig = serde_json::from_slice(&fs::read(&config_path).unwrap()).unwrap();
+    config.platforms = vec![Platform::Claude, Platform::Hermes];
+    write_json(&config_path, &config);
+
+    let source_skill_dir =
+        fixture.home.parent().unwrap().join("guidelines").join("home-local-skill");
+    let source_skill_path = source_skill_dir.join("SKILL.md");
+    let local_skill_dir = fixture.home.join(".agents").join("skills").join("home-local-skill");
+    let local_skill_path = local_skill_dir.join("SKILL.md");
+    let local_lock_path = fixture.home.join(".context-mixer").join("cmx-lock.json");
+
+    fs::create_dir_all(&source_skill_dir).unwrap();
+    fs::create_dir_all(&local_skill_dir).unwrap();
+    fs::write(&source_skill_path, versioned_skill("Hermes home-local skill", "1.0.0")).unwrap();
+    fs::write(&local_skill_path, versioned_skill("Hermes home-local skill", "1.0.0")).unwrap();
+
+    let local_checksum = checksum_for(ArtifactKind::Skill, &local_skill_dir);
+    write_json(
+        &local_lock_path,
+        &LockFile {
+            version: 1,
+            packages: BTreeMap::from([(
+                "home-local-skill".to_string(),
+                tracked_lock_entry(
+                    ArtifactKind::Skill,
+                    "home-local-skill",
+                    local_checksum.clone(),
+                    local_checksum,
+                ),
+            )]),
+        },
+    );
 }
 
 fn compute_fixture_checksums(paths: &FixturePaths) -> FixtureChecksums {

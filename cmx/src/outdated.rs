@@ -77,11 +77,13 @@ pub fn outdated(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
     let source_artifacts = source_iter::scan_all_with_checksums(&loaded.sources.sources, ctx.fs)?;
 
     let mut rows = Vec::new();
+    let cwd_is_home = scope_alias::cwd_is_home(ctx.paths, ctx.fs);
 
     for (scope, lock) in loaded.scopes() {
         for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
             if scope.is_local()
-                && scope_alias::local_install_dir_aliases_global(ctx.paths, kind, ctx.fs)
+                && (cwd_is_home
+                    || scope_alias::local_install_dir_aliases_global(ctx.paths, kind, ctx.fs))
             {
                 continue;
             }
