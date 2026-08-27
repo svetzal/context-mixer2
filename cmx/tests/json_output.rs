@@ -228,6 +228,13 @@ fn list_and_outdated_from_home_do_not_duplicate_global_artifacts_as_local() {
         "HOME cwd must not report Hermes-style local rows in outdated: {outdated_artifacts:?}"
     );
 
+    let hermes_outdated = fixture.run_json(&["--platform", "hermes", "outdated", "--json"]);
+    let hermes_outdated_artifacts = hermes_outdated["artifacts"].as_array().unwrap();
+    assert!(
+        hermes_outdated_artifacts.iter().all(|artifact| artifact["scope"] != "local"),
+        "HOME cwd must suppress outdated Hermes-local rows: {hermes_outdated_artifacts:?}"
+    );
+
     let doctor = fixture.run_json(&["doctor", "--local", "--all", "--json"]);
     let doctor_artifacts = doctor["artifacts"].as_array().unwrap();
     assert_eq!(
@@ -382,14 +389,14 @@ fn add_hermes_style_home_local_skill(fixture: &Fixture) {
     let source_skill_path = source_skill_dir.join("SKILL.md");
     let local_skill_dir = fixture.home.join(".agents").join("skills").join("home-local-skill");
     let local_skill_path = local_skill_dir.join("SKILL.md");
-    let local_lock_path = fixture.home.join(".context-mixer").join("cmx-lock.json");
 
     fs::create_dir_all(&source_skill_dir).unwrap();
     fs::create_dir_all(&local_skill_dir).unwrap();
-    fs::write(&source_skill_path, versioned_skill("Hermes home-local skill", "1.0.0")).unwrap();
+    fs::write(&source_skill_path, versioned_skill("Hermes home-local skill", "1.1.0")).unwrap();
     fs::write(&local_skill_path, versioned_skill("Hermes home-local skill", "1.0.0")).unwrap();
 
     let local_checksum = checksum_for(ArtifactKind::Skill, &local_skill_dir);
+    let local_lock_path = fixture.home.join(".context-mixer").join("cmx-lock-hermes.json");
     write_json(
         &local_lock_path,
         &LockFile {
