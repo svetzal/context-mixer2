@@ -540,6 +540,66 @@ mod tests {
     }
 
     #[test]
+    fn list_reads_codex_agent_version_from_preserved_frontmatter() {
+        use crate::platform::Platform;
+        use crate::test_support::metadata_versioned_agent_content;
+        use std::path::Path;
+
+        let t = TestContext::new();
+        setup_source(&t.fs, &t.paths, "guidelines", "/src");
+        let markdown = metadata_versioned_agent_content("reviewer", "Reviews code", "1.3.0");
+        t.fs.add_file("/src/agents/reviewer.md", markdown.clone());
+        let source_checksum = crate::checksum::checksum_artifact(
+            Path::new("/src/agents/reviewer.md"),
+            ArtifactKind::Agent,
+            &t.fs,
+        )
+        .unwrap();
+
+        // Claude gets the markdown verbatim; Codex gets the generated TOML,
+        // whose only trace of the version is the preserved comment block.
+        let codex_toml = cmx_core::agent::markdown_to_codex_toml(&markdown, "reviewer");
+        for (platform, content) in [(Platform::Claude, markdown), (Platform::Codex, codex_toml)] {
+            let pv = t.paths.with_platform(platform);
+            let path = pv
+                .require_installed_artifact_path(
+                    ArtifactKind::Agent,
+                    "reviewer",
+                    InstallScope::Global,
+                )
+                .unwrap();
+            t.fs.add_file(&path, content);
+            let installed_checksum =
+                crate::checksum::checksum_artifact(&path, ArtifactKind::Agent, &t.fs).unwrap();
+            let mut entry = crate::test_support::make_lock_entry_with_checksum(
+                ArtifactKind::Agent,
+                Some("1.3.0"),
+                "guidelines",
+                "agents/reviewer.md",
+                &source_checksum,
+            );
+            entry.installed_checksum = installed_checksum;
+            crate::lockfile::mutate(InstallScope::Global, &t.fs, &pv, |l| {
+                l.packages.insert("reviewer".to_string(), entry);
+            })
+            .unwrap();
+        }
+
+        let out = list_kind(ArtifactKind::Agent, false, &t.ctx()).unwrap();
+        let rows = &out.rows[&InstallScope::Global];
+        let row = rows.iter().find(|r| r.name == "reviewer").expect("listed");
+        assert!(
+            row.platforms.iter().any(|p| p == "claude")
+                && row.platforms.iter().any(|p| p == "codex"),
+            "platforms listed: {:?}",
+            row.platforms
+        );
+        assert_eq!(row.installed_version.as_deref(), Some("1.3.0"), "one agreed version");
+        assert_eq!(row.available_version.as_deref(), Some("1.3.0"));
+        assert_eq!(row.status, ListStatus::Ok);
+    }
+
+    #[test]
     fn list_reports_outdated_when_source_content_changes_without_version_bump() {
         use crate::platform::Platform;
 

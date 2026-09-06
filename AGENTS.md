@@ -143,7 +143,8 @@ MUST stay behaviorally synchronized and share a version number.
 
 **The conformance suite is the contract, not a suggestion.** `cmx-core/SPEC.md`
 plus the shared golden fixtures under `cmx-core/conformance/` (checksum,
-frontmatter, version-guard, paths, target-resolve, install-e2e) define the
+frontmatter, agent-transform, version-guard, paths, target-resolve, install-e2e)
+define the
 byte-for-byte behavior every port must satisfy. Both ports run these same
 fixtures — the Rust crate via `cargo test` (`conformance.rs`), the TS port via
 `bun test` (`cmx-core-ts/test/conformance.test.ts`, which reads
@@ -317,7 +318,7 @@ Re-exports from cmx-core:
 
 The embeddable library; a path-dependency of `cmx`, published to crates.io on the `cmx-core-v*` tag channel, and twinned with the TypeScript port `cmx-core-ts` (npm). Both ports share a version number and must satisfy the same conformance suite.
 
-**Behavioral contract:** `cmx-core/SPEC.md` and the shared golden fixtures under `cmx-core/conformance/` (categories: `checksum`, `frontmatter`, `version-guard`, `paths`, `target-resolve`, `install-e2e`) define byte-for-byte behavior every port must satisfy. The Rust port runs these via `cmx-core/src/conformance.rs` (`cargo test`); the TS port via `cmx-core-ts/test/conformance.test.ts` (`bun test`). A behavior change to one port is only complete when the shared SPEC/fixture is updated and both ports pass it.
+**Behavioral contract:** `cmx-core/SPEC.md` and the shared golden fixtures under `cmx-core/conformance/` (categories: `checksum`, `frontmatter`, `agent-transform`, `version-guard`, `paths`, `target-resolve`, `install-e2e`) define byte-for-byte behavior every port must satisfy. The Rust port runs these via `cmx-core/src/conformance.rs` (`cargo test`); the TS port via `cmx-core-ts/test/conformance.test.ts` (`bun test`). A behavior change to one port is only complete when the shared SPEC/fixture is updated and both ports pass it.
 
 ### cmx-core Architecture
 

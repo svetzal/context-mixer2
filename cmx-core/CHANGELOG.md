@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Codex agents preserve their frontmatter.** `agent::markdown_to_codex_toml`
+  now keeps every frontmatter entry Codex has no key for — `metadata.version`
+  above all — in a `# ---`-fenced comment block at the top of the generated
+  TOML, so the installed copy still declares its version. Codex parses its
+  agent files with `deny_unknown_fields` (an unknown key makes it skip the
+  whole agent), so comments are the only safe carrier. `model_reasoning_effort`
+  and `sandbox_mode` join `model` as pass-through keys, emitted when set.
+- **`agent::preserved_frontmatter(toml) -> Option<String>`** reads that block
+  back as frontmatter inner text, ready for a version reader.
+- The `agent-transform` conformance fixture gains a second case and an
+  `expected.preserved_frontmatter` field; both ports assert it.
 - **Generated artifact installation.** `artifact_install` adds a shared
   plan/apply API for in-memory agents and skills. Agent installs preserve the
   same target resolution, version guards, lock tracking, and managed-source
@@ -38,6 +49,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `classify_mojentic_error` calls the same predicates `error_summary` uses for
   CLI degradation notes, instead of maintaining byte-identical copies of both.
   No behavior change — same classification rules, one definition each.
+
+### Fixed
+
+- **Block-scalar descriptions no longer install as `description = "|"`.** The
+  Codex transform read only the text after `description:` on its own line, so
+  a `description: |` (or `>`) block — the common form in curated agent
+  repositories — lost its content. The transform now reads literal and folded
+  block scalars, double- and single-quoted scalars (across lines), and plain
+  scalars with trailing comments, with the folding rules pinned by the
+  `agent-transform` conformance fixture. Ports must match byte-for-byte.
 
 ### Documentation
 

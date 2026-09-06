@@ -50,8 +50,43 @@ from configured sources.
 The portable generated-agent source is Markdown with optional YAML
 frontmatter. Before checksumming, cmx-core reconciles `metadata.version` exactly
 as it does for `SKILL.md`. Markdown-agent platforms receive those reconciled
-bytes. Codex receives TOML with `name`, `description`, optional `model`, and
-`developer_instructions`; strings use escaped single-line TOML basic strings.
+bytes. Codex receives a subagent TOML document
+(`agent::markdown_to_codex_toml`); strings use escaped single-line TOML basic
+strings.
+
+Codex parses its agent files with `deny_unknown_fields`, so the TOML carries
+only keys Codex defines. Five frontmatter keys are **mapped** to TOML keys, in
+this order: `name` (falls back to the artifact name when absent or empty),
+`description` (defaults to `""`), then `model`, `model_reasoning_effort`, and
+`sandbox_mode` (each omitted when absent or empty). `developer_instructions` —
+the Markdown body with trailing newlines trimmed — is always last.
+
+Everything else in the frontmatter (`metadata.version` above all) is
+**preserved**: the frontmatter inner text with the mapped keys' top-level
+entries removed (an entry is a column-0 line plus its blank and indented
+continuation lines), then leading and trailing blank lines trimmed. When
+anything remains, the document opens with two fixed prose header lines,
+`# ---`, each preserved line prefixed with `# ` (a blank line becomes a bare
+`#`), and `# ---`. When nothing remains, or the source has no frontmatter,
+there is no header and no block — the document starts at `name =`. Frontmatter
+lines are split on `\n` with one trailing `\r` stripped; the output uses `\n`
+only.
+
+Mapped values are read by a dependency-free frontmatter *subset* reader, not a
+YAML parser: `|` literal and `>` folded block scalars (indentation taken from
+the first non-blank line, chomping indicators accepted and ignored, folded
+lines joined with a space, blank lines kept as newlines, more-indented lines
+keeping their breaks); double-quoted scalars (YAML escapes, line breaks
+folded, an escaped break joining with nothing); single-quoted scalars (`''` is
+the only escape); and plain scalars (a ` #` comment stripped per line,
+continuation lines folded). Every value is finally trimmed of surrounding
+whitespace. The `agent-transform` fixtures pin the exact bytes.
+
+`agent::preserved_frontmatter(toml)` reads the block back: the lines between
+the first `# ---` and the next, with `# ` (or a bare `#`) stripped, joined with
+`\n` plus a trailing `\n` — the frontmatter inner text, ready for a version
+reader. It yields nothing when there is no block, no closing `# ---`, or a
+non-comment line inside the block.
 
 Agent lock entries use `type = "agent"` and
 `source.path = "agents/<name>.md"`. `source_checksum` hashes the reconciled
@@ -392,6 +427,7 @@ oracle (`test-support` feature), re-run by each port:
 cmx-core/conformance/
   checksum/        # (files[]) → expected "sha256:…"  — pins §5 incl. filter+sort
   frontmatter/     # (skill_md_in, version) → skill_md_out  — byte-compared, §6
+  agent-transform/ # (markdown, version, name) → reconciled md, Codex TOML, checksums, read-back  — §1.1
   version-guard/   # (I, B, on_disk?, disk==source?, force) → action  — §7
   paths/           # (platform, kind, scope) → subpath + lockname  — §4, §3.2
   target-resolve/  # (config, existing locks) → [platforms]  — §8.1

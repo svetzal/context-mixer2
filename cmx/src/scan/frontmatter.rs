@@ -146,10 +146,17 @@ pub fn extract_version(frontmatter: &str) -> Option<String> {
 }
 
 /// Extract the version from an installed artifact's file content.
-/// For agents, pass the .md file content. For skills, pass the SKILL.md content.
+/// For agents, pass the .md file content (or the generated Codex `.toml`).
+/// For skills, pass the SKILL.md content.
+///
+/// A Codex agent has no YAML fence: cmx keeps the frontmatter Codex has no key
+/// for inside a `# ---` comment block, so when no fence is found the version is
+/// read from that preserved block instead
+/// ([`cmx_core::agent::preserved_frontmatter`]).
 pub fn extract_version_from_content(content: &str) -> Option<String> {
     let (fm_opt, _) = split_frontmatter_and_body(content);
-    extract_version(fm_opt.as_deref()?)
+    let frontmatter = fm_opt.or_else(|| cmx_core::agent::preserved_frontmatter(content))?;
+    extract_version(&frontmatter)
 }
 
 #[cfg(test)]
@@ -464,6 +471,29 @@ mod tests {
         let (fm, body) = split_frontmatter_and_body(content);
         assert!(fm.is_none());
         assert_eq!(body, content);
+    }
+
+    // --- extract_version_from_content ---
+
+    #[test]
+    fn extract_version_from_content_reads_markdown_frontmatter() {
+        let content = "---\nname: a\nmetadata:\n  version: \"1.3.0\"\n---\n# body\n";
+        assert_eq!(extract_version_from_content(content).as_deref(), Some("1.3.0"));
+    }
+
+    #[test]
+    fn extract_version_from_content_reads_codex_preserved_block() {
+        let markdown =
+            "---\nname: a\ndescription: d\nmetadata:\n  version: \"1.3.0\"\n---\n# body\n";
+        let toml = cmx_core::agent::markdown_to_codex_toml(markdown, "a");
+        assert!(!toml.starts_with("---"), "no YAML fence in the generated TOML");
+        assert_eq!(extract_version_from_content(&toml).as_deref(), Some("1.3.0"));
+    }
+
+    #[test]
+    fn extract_version_from_content_none_for_codex_toml_without_preserved_block() {
+        let toml = "name = \"a\"\ndescription = \"d\"\ndeveloper_instructions = \"x\"\n";
+        assert_eq!(extract_version_from_content(toml), None);
     }
 
     // --- parse_frontmatter_str ---

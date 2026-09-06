@@ -10,7 +10,7 @@
 
 use anyhow::{Context, Result, bail, ensure};
 use chrono::{DateTime, TimeZone, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -49,13 +49,13 @@ pub fn generate_conformance_fixtures(out: &Path) -> Result<()> {
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct AgentTransformManifest {
     schema_version: u32,
     cases: Vec<AgentTransformCase>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct AgentTransformCase {
     name: String,
     description: String,
@@ -63,43 +63,78 @@ struct AgentTransformCase {
     expected: AgentTransformExpected,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct AgentTransformInput {
     artifact_name: String,
     version: String,
     markdown: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 struct AgentTransformExpected {
     reconciled_markdown: String,
     codex_toml: String,
     source_checksum: String,
     codex_checksum: String,
+    /// `agent::preserved_frontmatter(codex_toml)`: the YAML the Codex document
+    /// carries in its comment block, or `null` when it carries none.
+    preserved_frontmatter: Option<String>,
+}
+
+/// The two inputs the agent-transform fixtures pin: a block-scalar description
+/// beside an existing `metadata:` block, and a plain description whose only
+/// preserved frontmatter is the reconciled version.
+fn agent_transform_inputs() -> Vec<(&'static str, &'static str, &'static str)> {
+    vec![
+        (
+            "block-description-with-metadata",
+            "A literal-block description (with a blank line and quotes) becomes one TOML string; the metadata block, with the reconciled version added, is preserved as comments.",
+            "---\nname: fixture-agent\ndescription: |\n  Reviews code.\n\n  Use when a \"why\" is needed.\nmodel: gpt-5\nmetadata:\n  author: Fixture Author\n---\nReview carefully.\nReport \"why\".\n",
+        ),
+        (
+            "plain-description-version-only",
+            "A plain single-line description; the only preserved frontmatter is the metadata block reconciliation appends.",
+            "---\nname: fixture-agent\ndescription: Reviews code\n---\nReview carefully.\n",
+        ),
+    ]
+}
+
+/// Run the agent-transform pipeline for one fixture input: reconcile the
+/// version, convert to Codex TOML, checksum both, and read the preserved
+/// frontmatter back.
+fn observe_agent_transform(input: &AgentTransformInput) -> AgentTransformExpected {
+    let reconciled = frontmatter::reconcile_document_version(&input.markdown, &input.version);
+    let codex = agent::markdown_to_codex_toml(&reconciled, &input.artifact_name);
+    AgentTransformExpected {
+        source_checksum: checksum::checksum_bytes(reconciled.as_bytes()),
+        codex_checksum: checksum::checksum_bytes(codex.as_bytes()),
+        preserved_frontmatter: agent::preserved_frontmatter(&codex),
+        reconciled_markdown: reconciled,
+        codex_toml: codex,
+    }
 }
 
 fn generate_agent_transform_fixtures(out: &Path) -> Result<()> {
     fs::create_dir_all(out).with_context(|| format!("create {}", out.display()))?;
-    let markdown = "---\nname: fixture-agent\ndescription: Reviews code\nmodel: gpt-5\n---\nReview carefully.\nReport \"why\".\n";
-    let reconciled = frontmatter::reconcile_document_version(markdown, FIXTURE_VERSION);
-    let codex = agent::markdown_to_codex_toml(&reconciled, "fixture-agent");
-    let manifest = AgentTransformManifest {
-        schema_version: 1,
-        cases: vec![AgentTransformCase {
-            name: "codex-agent".to_string(),
-            description: "Pins version reconciliation, Codex TOML conversion, and source-versus-installed checksums for a generated agent.".to_string(),
-            input: AgentTransformInput {
+    let cases = agent_transform_inputs()
+        .into_iter()
+        .map(|(name, description, markdown)| {
+            let input = AgentTransformInput {
                 artifact_name: "fixture-agent".to_string(),
                 version: FIXTURE_VERSION.to_string(),
                 markdown: markdown.to_string(),
-            },
-            expected: AgentTransformExpected {
-                source_checksum: checksum::checksum_bytes(reconciled.as_bytes()),
-                codex_checksum: checksum::checksum_bytes(codex.as_bytes()),
-                reconciled_markdown: reconciled,
-                codex_toml: codex,
-            },
-        }],
+            };
+            AgentTransformCase {
+                name: name.to_string(),
+                description: description.to_string(),
+                expected: observe_agent_transform(&input),
+                input,
+            }
+        })
+        .collect();
+    let manifest = AgentTransformManifest {
+        schema_version: 1,
+        cases,
     };
     write_json(&out.join("manifest.json"), &manifest)
 }
@@ -1436,8 +1471,41 @@ The `input/` and `expected/` files are real `SKILL.md` byte fixtures. Ports must
 ### `agent-transform/manifest.json`
 
 Pins the generated-agent path: version reconciliation in the source markdown,
-Codex TOML transformation, and separate checksums for the portable source and
-platform-specific installed bytes.
+Codex TOML transformation, separate checksums for the portable source and
+platform-specific installed bytes, and the frontmatter read back from the
+Codex document's preserved comment block.
+
+Schema:
+
+```json
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "plain-description-version-only",
+      "description": "human-readable note",
+      "input": {
+        "artifact_name": "fixture-agent",
+        "version": "2.4.6",
+        "markdown": "---\nname: fixture-agent\n..."
+      },
+      "expected": {
+        "reconciled_markdown": "---\nname: fixture-agent\n...",
+        "codex_toml": "name = \"fixture-agent\"\ndescription = \"Reviews code\"\n...",
+        "source_checksum": "sha256:...",
+        "codex_checksum": "sha256:...",
+        "preserved_frontmatter": "metadata:\n  version: \"2.4.6\"\n"
+      }
+    }
+  ]
+}
+```
+
+`reconciled_markdown` is `reconcile_document_version(markdown, version)`;
+`codex_toml` is `markdown_to_codex_toml(reconciled_markdown, artifact_name)`;
+the checksums hash those two strings' bytes; `preserved_frontmatter` is
+`preserved_frontmatter(codex_toml)` — a string, or `null` when the TOML has no
+`# ---` block. All five are compared exactly.
 
 ### `version-guard/manifest.json`
 
@@ -1651,6 +1719,24 @@ fn assert_fixture_tree_matches(expected_root: &Path, actual_root: &Path) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn agent_transform_cases_replay_against_the_committed_manifest() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("conformance/agent-transform/manifest.json");
+        let manifest: AgentTransformManifest =
+            serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(manifest.schema_version, 1);
+        assert_eq!(manifest.cases.len(), 2, "both fixture inputs are pinned");
+        for case in &manifest.cases {
+            assert_eq!(
+                observe_agent_transform(&case.input),
+                case.expected,
+                "case `{}` drifted from the committed expectation",
+                case.name
+            );
+        }
+    }
 
     #[test]
     fn committed_conformance_fixtures_match_regeneration() {

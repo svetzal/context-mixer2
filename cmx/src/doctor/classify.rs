@@ -117,6 +117,25 @@ pub(crate) fn read_installed_version(
     scan::extract_version_from_content(&content)
 }
 
+/// The version recorded for `name` in the first of the location's platform
+/// locks that has one.
+///
+/// The artifact's own content is the primary truth for its version; this is
+/// the backup for copies that carry none — a Codex agent written by an older
+/// cmx, before the transform preserved the source frontmatter.
+pub(crate) fn lock_recorded_version(
+    name: &str,
+    agg: &LocationAgg,
+    locks: &HashMap<(Platform, InstallScope), LockFile>,
+) -> Option<String> {
+    agg.platforms.iter().find_map(|p| {
+        locks
+            .get(&(*p, agg.scope))
+            .and_then(|l| l.packages.get(name))
+            .and_then(|e| e.version.clone())
+    })
+}
+
 /// Build one [`DoctorRow`] per installed artifact across all locations.
 pub(crate) fn build_rows(
     locations: &BTreeMap<PathBuf, LocationAgg>,
@@ -148,7 +167,8 @@ pub(crate) fn build_rows(
             {
                 state = ArtifactState::External;
             }
-            let version = read_installed_version(agg.kind, &path, ctx);
+            let version = read_installed_version(agg.kind, &path, ctx)
+                .or_else(|| lock_recorded_version(&name, agg, locks));
             // The platforms cmx actually tracks this for: those whose lock file
             // records it (a subset of the location's readers).
             let tracked_for: Vec<Platform> = agg
@@ -190,7 +210,7 @@ mod tests {
     use crate::platform::Platform;
     use crate::types::{ArtifactKind, InstallScope, LockEntry, LockFile, LockSource};
 
-    use super::{LocationAgg, classify_installed, source_of};
+    use super::{LocationAgg, classify_installed, lock_recorded_version, source_of};
     use crate::doctor::types::ArtifactState;
 
     fn make_lock(entries: &[(&str, &str, ArtifactKind)]) -> LockFile {
@@ -305,6 +325,36 @@ mod tests {
         let locks = HashMap::new();
         let result = classify_installed("my-skill", &agg, "sha256:abc", &locks, &no_sources());
         assert_eq!(result, ArtifactState::Orphaned);
+    }
+
+    // -----------------------------------------------------------------------
+    // lock_recorded_version
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn lock_recorded_version_takes_first_platform_with_a_version() {
+        let agg = simple_agg(ArtifactKind::Agent, vec![Platform::Codex, Platform::Claude]);
+        let mut locks = HashMap::new();
+        let mut unversioned = make_lock(&[("a", "sha256:abc", ArtifactKind::Agent)]);
+        unversioned.packages.get_mut("a").unwrap().version = None;
+        locks.insert((Platform::Codex, InstallScope::Global), unversioned);
+        let mut versioned = make_lock(&[("a", "sha256:abc", ArtifactKind::Agent)]);
+        versioned.packages.get_mut("a").unwrap().version = Some("1.3.0".to_string());
+        locks.insert((Platform::Claude, InstallScope::Global), versioned);
+
+        assert_eq!(lock_recorded_version("a", &agg, &locks).as_deref(), Some("1.3.0"));
+    }
+
+    #[test]
+    fn lock_recorded_version_none_without_entry_or_version() {
+        let agg = simple_agg(ArtifactKind::Agent, vec![Platform::Codex]);
+        let mut locks = HashMap::new();
+        locks.insert(
+            (Platform::Codex, InstallScope::Global),
+            make_lock(&[("a", "sha256:abc", ArtifactKind::Agent)]),
+        );
+        assert_eq!(lock_recorded_version("a", &agg, &locks), None, "entry without a version");
+        assert_eq!(lock_recorded_version("other", &agg, &locks), None, "no entry");
     }
 
     // -----------------------------------------------------------------------

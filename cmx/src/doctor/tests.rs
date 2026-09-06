@@ -444,6 +444,69 @@ fn shared_cohort_skill_lists_only_tools_it_is_tracked_for() {
     );
 }
 
+// --- agent version: artifact content first, lock entry as backup ---
+
+/// Write an installed agent file for `platform` and record a matching lock
+/// entry carrying `version`; returns nothing, the survey reads it back.
+fn track_agent(t: &TestContext, platform: Platform, name: &str, content: &str, version: &str) {
+    let pv = t.paths.with_platform(platform);
+    let path = pv
+        .require_installed_artifact_path(ArtifactKind::Agent, name, InstallScope::Global)
+        .unwrap();
+    t.fs.add_file(&path, content);
+    let cs = crate::checksum::checksum_artifact(&path, ArtifactKind::Agent, &t.fs).unwrap();
+    let entry =
+        make_lock_entry_with_checksum(ArtifactKind::Agent, Some(version), "home", name, &cs);
+    crate::lockfile::mutate(InstallScope::Global, &t.fs, &pv, |l| {
+        l.packages.insert(name.to_string(), entry);
+    })
+    .unwrap();
+}
+
+#[test]
+fn codex_agent_version_is_read_from_the_preserved_frontmatter_block() {
+    let t = TestContext::new();
+    let markdown =
+        crate::test_support::metadata_versioned_agent_content("reviewer", "Reviews", "1.3.0");
+    let codex_toml = cmx_core::agent::markdown_to_codex_toml(&markdown, "reviewer");
+    assert!(
+        codex_toml.contains("# ---\n"),
+        "fixture carries a preserved block: {codex_toml}"
+    );
+    track_agent(&t, Platform::Claude, "reviewer", &markdown, "1.3.0");
+    track_agent(&t, Platform::Codex, "reviewer", &codex_toml, "1.3.0");
+
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
+    let art = report.artifacts.iter().find(|a| a.name == "reviewer").expect("grouped");
+    assert_eq!(art.state, ArtifactState::Tracked);
+    assert_eq!(art.version.as_deref(), Some("1.3.0"), "markdown and TOML copies agree");
+    assert_eq!(art.versions, vec!["1.3.0".to_string()], "no version skew between copies");
+    let codex_row = report
+        .rows
+        .iter()
+        .find(|r| r.name == "reviewer" && r.platforms.contains(&Platform::Codex))
+        .expect("codex row");
+    assert_eq!(codex_row.version.as_deref(), Some("1.3.0"), "read from the TOML itself");
+}
+
+#[test]
+fn codex_agent_without_preserved_block_falls_back_to_the_lock_version() {
+    // A Codex agent written by an older cmx: bare TOML, no `# ---` block. The
+    // lock entry recorded the version at install time, so the survey still
+    // knows it.
+    let t = TestContext::new();
+    let old_toml =
+        "name = \"reviewer\"\ndescription = \"Reviews\"\ndeveloper_instructions = \"# reviewer\"\n";
+    track_agent(&t, Platform::Codex, "reviewer", old_toml, "1.3.0");
+
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
+    let art = report.artifacts.iter().find(|a| a.name == "reviewer").expect("grouped");
+    assert_eq!(art.state, ArtifactState::Tracked);
+    assert!(!art.diverged);
+    assert_eq!(art.version.as_deref(), Some("1.3.0"), "version comes from the lock entry");
+    assert!(!report.has_issues(), "a tracked, versioned copy is not a problem");
+}
+
 // --- divergence_details (pure, no gateway fakes needed) ---
 
 /// Build a minimal `DoctorRow`. Callers override only the fields under test.

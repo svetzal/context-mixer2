@@ -99,8 +99,41 @@ The `input/` and `expected/` files are real `SKILL.md` byte fixtures. Ports must
 ### `agent-transform/manifest.json`
 
 Pins the generated-agent path: version reconciliation in the source markdown,
-Codex TOML transformation, and separate checksums for the portable source and
-platform-specific installed bytes.
+Codex TOML transformation, separate checksums for the portable source and
+platform-specific installed bytes, and the frontmatter read back from the
+Codex document's preserved comment block.
+
+Schema:
+
+```json
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "plain-description-version-only",
+      "description": "human-readable note",
+      "input": {
+        "artifact_name": "fixture-agent",
+        "version": "2.4.6",
+        "markdown": "---\nname: fixture-agent\n..."
+      },
+      "expected": {
+        "reconciled_markdown": "---\nname: fixture-agent\n...",
+        "codex_toml": "name = \"fixture-agent\"\ndescription = \"Reviews code\"\n...",
+        "source_checksum": "sha256:...",
+        "codex_checksum": "sha256:...",
+        "preserved_frontmatter": "metadata:\n  version: \"2.4.6\"\n"
+      }
+    }
+  ]
+}
+```
+
+`reconciled_markdown` is `reconcile_document_version(markdown, version)`;
+`codex_toml` is `markdown_to_codex_toml(reconciled_markdown, artifact_name)`;
+the checksums hash those two strings' bytes; `preserved_frontmatter` is
+`preserved_frontmatter(codex_toml)` — a string, or `null` when the TOML has no
+`# ---` block. All five are compared exactly.
 
 ### `version-guard/manifest.json`
 

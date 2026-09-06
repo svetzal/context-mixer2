@@ -46,8 +46,13 @@ The `--platform` flag is global — it applies to all subcommands.
 ¹ **Codex agents are TOML, not markdown.** cmx agents are markdown files with
 YAML frontmatter; the Codex CLI defines subagents as standalone TOML files. When
 you install an agent with `--platform codex`, cmx transforms the source markdown
-into a Codex subagent document (`<name>.toml`) with `name`, `description`,
-`developer_instructions` (the markdown body), and an optional `model` field.
+into a Codex subagent document (`<name>.toml`): `name`, `description`,
+`developer_instructions` (the markdown body), and `model`,
+`model_reasoning_effort`, and `sandbox_mode` when the frontmatter sets them.
+Codex rejects any key it does not define, so every other frontmatter entry —
+including `metadata.version` — is kept at the top of the file as a
+`# ---`-fenced comment block; Codex ignores it, and `cmx agent list` and
+`cmx doctor` read the version back from it.
 
 ² **Skills-only platforms.** Pi, Crush, Amp, Zed, OpenHands, Hermes, and Devin
 have no file-droppable agent concept (their "agents" are tool-gating profiles,

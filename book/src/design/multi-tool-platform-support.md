@@ -125,9 +125,13 @@ Project paths are relative to the repo root; user paths to `$HOME`.
 Notes:
 
 - **Codex agents are transformed**, not copied: cmx parses the source markdown
-  frontmatter + body and emits a Codex subagent TOML
-  (`name`, `description`, `developer_instructions`, optional `model`). See
-  `cmx-core/src/agent.rs`.
+  frontmatter + body and emits a Codex subagent TOML (`name`, `description`,
+  `developer_instructions`, plus `model`, `model_reasoning_effort`, and
+  `sandbox_mode` when set). Codex parses its agent files with
+  `deny_unknown_fields`, so nothing else may be a key; the rest of the
+  frontmatter (`metadata.version` included) rides along as a `# ---`-fenced
+  comment block that `cmx_core::agent::preserved_frontmatter` reads back for
+  `list` and `doctor`. See `cmx-core/src/agent.rs`.
 - **Amp** resolves *user-scoped* skills under XDG (`~/.config/agents/skills/`),
   not `~/.agents/skills/`. Project skills use the shared path.
 - **Hermes** is global-centric: its auto-read source of truth is

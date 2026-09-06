@@ -10,6 +10,7 @@ import {
   lockFileName,
   markdownToCodexToml,
   platformInstallSubpath,
+  preservedFrontmatter,
   reconcileDocumentVersion,
   reconcileSkillVersion,
   resolveTargets,
@@ -63,6 +64,7 @@ const agentTransformManifest = await loadFixtureJson<{
     expected: {
       reconciled_markdown: string;
       codex_toml: string;
+      preserved_frontmatter: string | null;
       source_checksum: string;
       codex_checksum: string;
     };
@@ -188,6 +190,7 @@ describe("agent transform fixtures", () => {
       const codex = markdownToCodexToml(reconciled, fixture.input.artifact_name);
       expect(reconciled).toBe(fixture.expected.reconciled_markdown);
       expect(codex).toBe(fixture.expected.codex_toml);
+      expect(preservedFrontmatter(codex) ?? null).toBe(fixture.expected.preserved_frontmatter);
       expect(checksumBytes(new TextEncoder().encode(reconciled))).toBe(
         fixture.expected.source_checksum,
       );
