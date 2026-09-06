@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-06
+
 ### Added
 
 - **Codex agents preserve their frontmatter.** `agent::markdown_to_codex_toml`

@@ -1,6 +1,6 @@
 # EMBEDDING.md — cmx-core, the embeddable skill-installation library
 
-**Status: cmx-core published on crates.io (Rust, 0.1.0) and npm (TypeScript, 0.3.0). Four production consumers migrated — parite, foundry (Rust); hopper, mailctl (TS).** Remaining roadmap: the Python port (gilt, researcher, evt) and the last TS migration (hone). See "What remains" below.
+**Status: cmx-core published on crates.io (Rust, 0.4.0) and npm (TypeScript, 0.4.0). Four production consumers migrated — parite, foundry (Rust); hopper, mailctl (TS).** Remaining roadmap: the Python port (gilt, researcher, evt) and the last TS migration (hone). See "What remains" below.
 
 ## Why this exists
 

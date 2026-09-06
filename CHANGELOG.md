@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-09-06
+
 ### Removed
 
 - **Removed cmf's entire authoring and publishing surface.** `intent`, `plugin`,
@@ -171,6 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `artifact_install` API generalizes the embeddable plan/apply lifecycle and
   owns Markdown-to-Codex-TOML conversion, lock tracking, version guards, and
   managed-source registration for generated artifacts.
+- **Version guard in `cmx install`:** installing an older source over a newer-installed artifact now fails with a clear error (`InstalledNewerThanSource`) unless `--force` is passed. Matches the `RefuseNewer` behavior already present in `cmx-core`'s `SkillInstaller`.
 
 ### Fixed
 
@@ -182,6 +185,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Picks up `cmx-core` 0.4.0 (released in lockstep with its TypeScript port): the
+  Codex agent transform now preserves frontmatter and reads block-scalar
+  descriptions. See `cmx-core/CHANGELOG.md`.
 - **cmf now renders intents as compact semantic blocks.** Each selected intent
   keeps capability, threat, expectation, preferred strategy, evidence, and
   accepted trade-off together. Repeated section headings, per-section intent
@@ -195,9 +201,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `installed_is_newer(installed, source) -> bool` to `cmx-core/src/artifact_status.rs` (semver comparison, returns `false` for non-semver or absent versions).
   - Extracted `remove_artifact_across_platforms` shared primitive in `cmx-core/src/artifact_remove.rs`; `cmx/src/uninstall.rs::uninstall_one` and `cmx-core/src/skill_install/remove.rs::SkillInstaller::remove` both delegate to it.
 
-### Added
-
-- **Version guard in `cmx install`:** installing an older source over a newer-installed artifact now fails with a clear error (`InstalledNewerThanSource`) unless `--force` is passed. Matches the `RefuseNewer` behavior already present in `cmx-core`'s `SkillInstaller`.
 
 ## [3.1.3] - 2026-07-06
 
