@@ -8,6 +8,11 @@
 //! proving the `cmv.toml` block reached it), a record with no validator, a
 //! manifest entry with no record, and a dropped intent. The JSON and the human
 //! listing are pinned byte for byte.
+//!
+//! cmv runs with the fixtures directory as its working directory and
+//! `--knowledge-base kb`, so the `knowledge_base.path` it reports is the same
+//! relative path on every machine, and with `HOME` pointed at the temp dir so
+//! the developer's own cmx source registry never takes part.
 
 #![cfg(unix)]
 
@@ -46,8 +51,9 @@ fn cmv(args: &[&str], workspace: &Path) -> Output {
         .args(args)
         .arg("--root")
         .arg(workspace)
-        .arg("--knowledge-base")
-        .arg(fixtures().join("kb"))
+        .args(["--knowledge-base", "kb"])
+        .current_dir(fixtures())
+        .env("HOME", workspace)
         .output()
         .expect("cmv runs")
 }
@@ -113,11 +119,17 @@ fn status_reports_the_pin_languages_and_coverage_without_running_validators() {
     assert_eq!(output.status.code(), Some(0));
     let text = stdout(&output);
     assert!(text.contains("Profile: rust-shipping 0.3.0\n"), "{text}");
+    assert!(
+        text.contains("Knowledge base: kb (present, resolved by --knowledge-base)\n"),
+        "{text}"
+    );
     assert!(text.contains("Source: guidelines\n"), "{text}");
     assert!(
         text.contains("Pinned revision: a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\n"),
         "{text}"
     );
+    assert!(text.contains("HEAD revision: unavailable\n"), "{text}");
+    assert!(text.contains("Verified against: working tree (HEAD)\n"), "{text}");
     assert!(text.contains("Languages: rust\n"), "{text}");
     assert!(text.contains("Intents: 4 compiled, 1 dropped\n"), "{text}");
     assert!(
@@ -128,6 +140,69 @@ fn status_reports_the_pin_languages_and_coverage_without_running_validators() {
     );
     assert!(text.contains("Stale records: 1\n"), "{text}");
     assert!(text.contains("Missing records: 1\n"), "{text}");
+}
+
+#[test]
+fn explain_names_the_validators_and_the_argv_without_running_anything() {
+    let workspace = workspace_copy();
+    let output = cmv(&["explain", "craftsperson/rust/isolate-functional-core"], workspace.path());
+    assert_eq!(output.status.code(), Some(0), "{}", String::from_utf8_lossy(&output.stderr));
+    let text = stdout(&output);
+    assert!(
+        text.starts_with("Intent: craftsperson/rust/isolate-functional-core\n"),
+        "{text}"
+    );
+    assert!(text.contains("Record: resolved by id\n"), "{text}");
+    assert!(text.contains("Title: Isolate the functional core\n"), "{text}");
+    assert!(text.contains("Stale: yes"), "{text}");
+    assert!(
+        text.contains(
+            "Config: {\"business_rule_minimum_matches\":2,\"business_rule_pattern\":\"\\\\b500\\\\b\"}\n"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains("  rust  checks/rust/isolate_functional_core.sh  (required)  would run\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("  python  checks/python/isolate_functional_core.py  (required)  skipped: language python is not among the workspace's [rust]\n"),
+        "{text}"
+    );
+    let kb = fixtures().join("kb").canonicalize().unwrap();
+    assert!(
+        text.contains(&format!(
+            "    {}/checks/rust/isolate_functional_core.sh --workspace {} --config <scratch>/1.json\n",
+            kb.display(),
+            workspace.path().display()
+        )),
+        "{text}"
+    );
+}
+
+#[test]
+fn explain_json_matches_the_record_id_form_and_exits_two_when_unknown() {
+    let workspace = workspace_copy();
+    let output = cmv(
+        &[
+            "explain",
+            "fixture.intent.put-gateways-at-effect-boundaries",
+            "--json",
+        ],
+        workspace.path(),
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let report: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
+    assert_eq!(report["intent"]["key"], "craftsperson/rust/put-gateways-at-effect-boundaries");
+    assert_eq!(report["intent"]["resolution"], "id");
+    assert_eq!(report["intent"]["stale"], false);
+    assert_eq!(report["intent"]["validators"][0]["would_run"], true);
+    assert_eq!(report["knowledge_base"]["resolved_by"], "override");
+
+    let output = cmv(&["explain", "craftsperson/rust/not-compiled"], workspace.path());
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("not in the manifest"));
 }
 
 #[test]

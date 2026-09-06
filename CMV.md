@@ -1,10 +1,9 @@
 # cmv — Deterministic Verification of Compiled Intents
 
-> Design draft. Status: proposed (2026-09-05). Phases 1–2 are implemented;
-> Phase 3 is in progress (cmv check/status against a local knowledge base;
-> source-registry resolution, pinned revision, `cmv explain`, and release
-> wiring pending). Companion to [CHARTER.md](CHARTER.md), [SPEC.md](SPEC.md),
-> and [SETS.md](SETS.md).
+> Design draft. Status: proposed (2026-09-05). Phases 1–3 are implemented
+> (cmv check, status, explain; source-registry resolution; pinned revision).
+> Phases 4–6 (validator migration, benchmark switch-over) pending. Companion
+> to [CHARTER.md](CHARTER.md), [SPEC.md](SPEC.md), and [SETS.md](SETS.md).
 
 ## Motivation
 
@@ -279,30 +278,46 @@ missing or malformed manifest, unresolvable knowledge base, or bad usage.
 The adherence rate, when shown, is `pass / (pass + fail)` — the denominator is
 what the code had occasion to exhibit, exactly as the benchmark computes it.
 
-Additionally, cmv reports **stale** when the knowledge-base source has moved
-past the pinned revision and any selected record or validator changed. Stale is
-informational and does not change the exit code; the remedy is to re-run
-`cmf install`, because a newer knowledge base may change *selection*, which is
-cmf's decision, not cmv's. cmv never re-pins.
+When the knowledge base's `HEAD` has moved past the pinned revision, validators
+run from the **pinned tree** (materialized with `git archive` into the run's
+scratch directory), so verdicts come from the knowledge base as compiled.
+Additionally, cmv reports **stale** per intent by comparing against `HEAD`, not
+the pinned tree: the record's bytes at `HEAD` differ from the manifest
+checksum, or any of its validators' `run` files differ between `HEAD` and the
+pinned tree. Every report also says whether the knowledge base has `moved`
+(`HEAD` differs from the pin) and which tree was `verified_against`. All of
+this is informational and does not change the exit code; the remedy is to
+re-run `cmf install`, because a newer knowledge base may change *selection*,
+which is cmf's decision, not cmv's. cmv never re-pins.
 
 ## Command surface
 
 ```text
 cmv check [--json] [--strict] [--manifest <path>] [--root <project>]
-cmv explain <intent-key>      # show the validator(s) that would run and why
-cmv status                    # manifest summary, pin, stale/unavailable, languages detected
+cmv explain <intent> [--json] # show the validator(s) that would run and why
+cmv status [--json]           # manifest summary, pin, stale/unavailable, languages detected
 ```
 
 Human output is a linter-style listing grouped by state with `path:line`
 diagnostics from `locations`; `--json` emits the full per-intent report for CI
 and for the benchmark aggregator.
 
-Both `check` and `status` also accept `--knowledge-base <path>` as an
-override: the knowledge base is otherwise read from the `knowledge_base.path`
-the manifest recorded. The override is what makes cmv usable before
-source-registry resolution lands, and it stays useful afterwards for a
-checkout that is not a registered cmx source (a validator author's working
-copy, a CI cache).
+`explain` takes a catalog key, or a record `id` when the argument contains a
+`.`, and runs nothing. It reports how the manifest entry resolved (by id, by
+key, not found), the record's title and status, every declared validator with
+its language, `run`, `required` flag, and description, which would run for the
+detected languages and with exactly which argv, the `--config` document from
+`cmv.toml`, the stale flag, and whether the manifest dropped the intent. It
+exits `2` when the intent is not in the manifest at all.
+
+All three commands accept `--knowledge-base <path>` as an override of
+source-registry resolution (the order is override, then the manifest's
+`source` in the cmx registry, then the manifest's recorded `path`; the report
+records which answered). The override stays useful for a checkout that is not
+a registered cmx source (a validator author's working copy, a CI cache). They
+also accept `--at-head`, which verifies the knowledge base's working tree even
+when the manifest pins a revision its `HEAD` has moved past; the report says
+so. This is for validator authors iterating on a knowledge base.
 
 ## Calibration fixtures
 
@@ -384,12 +399,13 @@ knowledge base is unchanged and now also covers validators.
    validated at scan time. The invocation protocol and verdict JSON, including
    `locations`, are specified in this note's "Validator invocation protocol"
    section; they become a conformance fixture when cmv lands in Phase 3.
-3. **cmv binary.** New workspace member inheriting the workspace version.
-   Reads manifest and `cmv.toml`, detects languages, resolves the knowledge
-   base through the cmx source registry at the pinned revision, dispatches
-   validators, renders human and JSON output, exits per the table above.
-   Architecture map, release workflow, Homebrew formula, and book coverage
-   updated in the same commits.
+3. **cmv binary.** Done. New workspace member inheriting the workspace
+   version. Reads manifest and `cmv.toml`, detects languages, resolves the
+   knowledge base through the cmx source registry at the pinned revision
+   (materializing the pinned tree when the checkout has moved past it),
+   dispatches validators, explains one intent on request, renders human and
+   JSON output, exits per the table above. Architecture map, release workflow,
+   Homebrew formula, charter, and book coverage updated in the same commits.
 4. **Rust validators migrate.** The eight rate-card checks move to the
    knowledge base with `reference/` and `skeleton/` as their fixtures. cmv on
    the reference scores full marks; on the skeleton, zero. This is the first

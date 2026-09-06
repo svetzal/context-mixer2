@@ -1,8 +1,9 @@
 //! `cmv` binary entry point: the imperative shell. Resolves the project, its
-//! manifest, and the knowledge base from the command line; loads them through
-//! the real gateways; hands everything to the pure core; prints the report;
-//! and exits per `CMV.md`'s table (`2` for anything that stops the run before
-//! a verdict is reached).
+//! manifest, and the knowledge base from the command line and the cmx source
+//! registry; loads them through the real gateways; materializes the pinned
+//! revision when the checkout has moved past it; hands everything to the pure
+//! core; prints the report; and exits per `CMV.md`'s table (`2` for anything
+//! that stops the run before a verdict is reached).
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -14,13 +15,18 @@ use cmf::catalog;
 use cmf::manifest::{LOCAL_MANIFEST_FILE_NAME, Manifest};
 use cmv::cli::{Cli, Commands, LocationArgs};
 use cmv::config::{self, ProjectConfig};
-use cmv::dispatch::{self, Catalog, CheckRequest};
+use cmv::dispatch::{self, Catalog, CheckRequest, StatusRequest};
+use cmv::explain::{self, ExplainRequest};
 use cmv::language;
+use cmv::pin::{self, Checkout, KnowledgeBaseReport, PinPolicy};
 use cmv::process::RealProcessRunner;
 use cmv::report::{CheckReport, OutputFormat};
+use cmv::resolve::{self, Resolution};
 use cmv::verdict::{EXIT_USAGE, Strictness};
 use cmx_core::gateway::Filesystem;
 use cmx_core::gateway::real::RealFilesystem;
+use cmx_core::paths::ConfigPaths;
+use cmx_core::platform::Platform;
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -44,56 +50,94 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let format = OutputFormat::from_flag(json);
             let strictness = Strictness::from_flag(strict);
             let site = Site::resolve(location, &fs)?;
-            let catalog = catalog::scan(&site.knowledge_base, &fs).with_context(|| {
+            let scratch = Scratch::create(&fs)?;
+            let checkout = site.checkout(&scratch, &fs)?;
+            let catalog = catalog::scan(&checkout.root, &fs).with_context(|| {
                 format!(
                     "could not read knowledge base at {}; pass --knowledge-base <path> if it lives elsewhere",
-                    site.knowledge_base.display()
+                    site.resolution.path.display()
                 )
             })?;
             let languages = site.languages(&fs);
-            let scratch = Scratch::create(&fs)?;
             let request = CheckRequest {
                 manifest: &site.manifest,
                 catalog: &catalog,
                 config: &site.config,
                 languages: &languages,
-                knowledge_base: &site.knowledge_base,
+                trees: checkout.trees(),
                 workspace: &site.root,
                 scratch: &scratch.dir,
             };
             let outcomes = dispatch::check(&request, &fs, &RealProcessRunner)?;
+            let knowledge_base = KnowledgeBaseReport::new(&site.resolution, &checkout);
             drop(scratch);
-            let report = CheckReport::new(&site.manifest, &languages, outcomes, strictness);
+            let report =
+                CheckReport::new(&site.manifest, knowledge_base, &languages, outcomes, strictness);
             print!("{}", report.render(format)?);
             Ok(ExitCode::from(report.summary.exit_code))
         }
         Commands::Status { json, location } => {
             let format = OutputFormat::from_flag(json);
             let site = Site::resolve(location, &fs)?;
+            let scratch = Scratch::create(&fs)?;
+            let checkout = site.checkout(&scratch, &fs)?;
             let languages = site.languages(&fs);
-            let catalog = scan_if_present(&site.knowledge_base, &fs);
-            let report = dispatch::status(
-                &site.manifest,
-                &site.manifest_path,
-                catalog.as_ref(),
-                &languages,
-                &site.knowledge_base,
-                &fs,
-            )?;
+            let catalog = scan_if_present(&checkout.root, &fs);
+            let knowledge_base = KnowledgeBaseReport::new(&site.resolution, &checkout);
+            let request = StatusRequest {
+                manifest: &site.manifest,
+                manifest_path: &site.manifest_path,
+                catalog: catalog.as_ref(),
+                languages: &languages,
+                knowledge_base: &knowledge_base,
+                trees: checkout.trees(),
+            };
+            let report = dispatch::status(&request, &fs)?;
+            print!("{}", report.render(format)?);
+            Ok(ExitCode::SUCCESS)
+        }
+        Commands::Explain {
+            intent,
+            json,
+            location,
+        } => {
+            let format = OutputFormat::from_flag(json);
+            let site = Site::resolve(location, &fs)?;
+            let scratch = Scratch::create(&fs)?;
+            let checkout = site.checkout(&scratch, &fs)?;
+            let catalog = catalog::scan(&checkout.root, &fs).with_context(|| {
+                format!(
+                    "could not read knowledge base at {}; pass --knowledge-base <path> if it lives elsewhere",
+                    site.resolution.path.display()
+                )
+            })?;
+            let languages = site.languages(&fs);
+            let knowledge_base = KnowledgeBaseReport::new(&site.resolution, &checkout);
+            let request = ExplainRequest {
+                manifest: &site.manifest,
+                catalog: &catalog,
+                config: &site.config,
+                languages: &languages,
+                knowledge_base: &knowledge_base,
+                trees: checkout.trees(),
+                workspace: &site.root,
+            };
+            let report = explain::explain(&intent, &request, &fs)?;
             print!("{}", report.render(format)?);
             Ok(ExitCode::SUCCESS)
         }
     }
 }
 
-/// The project as resolved from the command line: root, manifest, config, and
-/// knowledge base.
+/// The project as resolved from the command line: root, manifest, config,
+/// knowledge base, and whether to honour the pin.
 struct Site {
     root: PathBuf,
     manifest_path: PathBuf,
     manifest: Manifest,
     config: ProjectConfig,
-    knowledge_base: PathBuf,
+    resolution: Resolution,
+    pin_policy: PinPolicy,
 }
 
 impl Site {
@@ -115,18 +159,42 @@ impl Site {
         let manifest: Manifest = serde_json::from_str(&raw)
             .with_context(|| format!("malformed manifest {}", manifest_path.display()))?;
         let config = config::load(&root, fs)?;
-        // The manifest records the root as cmf was given it; a relative path
-        // there is interpreted against cmv's working directory, exactly as it
-        // would be on the command line.
-        let knowledge_base =
-            location.knowledge_base.unwrap_or_else(|| manifest.knowledge_base.path.clone());
+        // The platform only affects install-directory resolution, which cmv
+        // never does; the sources registry is platform-independent.
+        let paths = ConfigPaths::from_env(Platform::Claude)?;
+        // A relative path — from the command line, the registry, or the
+        // manifest — is interpreted against cmv's working directory, exactly
+        // as it would be on the command line.
+        let resolution = resolve::resolve(
+            location.knowledge_base.as_deref(),
+            &manifest.knowledge_base,
+            fs,
+            &paths,
+        )?;
+        if let Some(warning) = &resolution.warning {
+            eprintln!("warning: {warning}");
+        }
         Ok(Self {
             root,
             manifest_path,
             manifest,
             config,
-            knowledge_base,
+            resolution,
+            pin_policy: PinPolicy::from_flag(location.at_head),
         })
+    }
+
+    /// Which tree to verify against, materializing the pinned revision under
+    /// `scratch` when the checkout has moved past it.
+    fn checkout(&self, scratch: &Scratch<'_>, fs: &dyn Filesystem) -> Result<Checkout> {
+        pin::materialize(
+            &self.resolution,
+            self.manifest.knowledge_base.revision.as_deref(),
+            self.pin_policy,
+            &scratch.dir,
+            fs,
+            &RealProcessRunner,
+        )
     }
 
     fn languages(&self, fs: &dyn Filesystem) -> Vec<String> {
@@ -159,8 +227,8 @@ fn scan_if_present(knowledge_base: &Path, fs: &dyn Filesystem) -> Option<Catalog
     }
 }
 
-/// A per-run temporary directory for the validators' `--config` files,
-/// removed when dropped.
+/// A per-run temporary directory for the validators' `--config` files and a
+/// materialized pinned tree, removed when dropped.
 struct Scratch<'a> {
     dir: PathBuf,
     fs: &'a dyn Filesystem,

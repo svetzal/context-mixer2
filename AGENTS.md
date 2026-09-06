@@ -48,10 +48,11 @@ Trunk-based development: `main` is the only long-lived branch. All work lands on
 ## CI / Release
 
 Two GitHub Actions workflows: `ci.yml` (on push/PR) and `release.yml` (on
-pushing a `v*` tag). `release.yml` runs the quality gate, builds binaries for
-three targets (macOS arm64/x64, Linux x64), creates a GitHub Release with the
-archives, and **overwrites the Homebrew tap formula** (`svetzal/homebrew-tap`,
-`Formula/cmx.rb`) with the tag's version. `release.yml` itself publishes
+pushing a `v*` tag). `release.yml` runs the quality gate, builds the cmx, cmf, and cmv
+binaries for three targets (macOS arm64/x64, Linux x64), creates a GitHub
+Release with the archives, and **overwrites the Homebrew tap formula**
+(`svetzal/homebrew-tap`, `Formula/cmx.rb`, which installs all three) with the
+tag's version. `release.yml` itself publishes
 neither to crates.io nor npm — those are the `cmx-core` library channels (see
 "cmx-core & cmx-core-ts" below).
 
@@ -85,14 +86,14 @@ Releasing is three distinct steps:
      but flag/behavior changes to already-documented commands are not — update
      the matching table rows, grammar blocks, and worked examples by hand.
      **A release that changed the surface but not the book is not ready to tag.**
-   - Bump `version` in the root `Cargo.toml` (workspace version; `cmx`/`cmf`
+   - Bump `version` in the root `Cargo.toml` (workspace version; `cmx`/`cmf`/`cmv`
      inherit it via `version.workspace = true`). `cmx-core` versions
      independently on its own tag channel — do not touch it in a cmx-only
      release. **If cmx-core's source has changed since its last `cmx-core-v*`
      tag, do not cut a cmx-only release at all** — use the coordinated
      cmx-core release process below so the crate, its TS twin, and the CLI move
      together.
-   - Run a build so `Cargo.lock` picks up the new `cmx`/`cmf` versions.
+   - Run a build so `Cargo.lock` picks up the new `cmx`/`cmf`/`cmv` versions.
    - Finalize `CHANGELOG.md` (date the new section, open a fresh
      `## [Unreleased]`).
 2. **Tag** (the publish trigger): create a **lightweight** tag `vX.Y.Z` (match
@@ -105,17 +106,20 @@ Releasing is three distinct steps:
    ```bash
    cargo install --path cmx --features llm --force
    cargo install --path cmf --force
+   cargo install --path cmv --force
    ```
 
    `cmx` is installed **with the `llm` feature** so the LLM-backed commands
    (`cmx skill info`'s summary, `cmx diff`) work locally; it pulls tokio +
    mojentic and needs the configured gateway's credentials (e.g.
    `OPENAI_API_KEY`) in the environment at runtime. `cmf` stays **lean**
-   (default features, no `llm`). Homebrew distribution remains lean for both.
+   (default features, no `llm`). `cmv` has no features at all — it is
+   deterministic by construction and never talks to a model — so it is
+   installed lean too. Homebrew distribution remains lean for all three.
 
    Run from a checkout at the released version (the tagged commit, or `main` at
    the same `version`). `--force` overwrites the previously installed binaries.
-   Verify with `cmx --version` / `cmf --version`.
+   Verify with `cmx --version` / `cmf --version` / `cmv --version`.
 
 Conventions and gotchas:
 
@@ -180,12 +184,12 @@ artifacts in one coordinated pass instead of a cmx-only `v*` release:
    - `cmx-core-vA.B.C` → `publish-cmx-core.yml` → **crates.io** (the job guards
      that the tag matches `cmx-core/Cargo.toml`'s version).
    - `cmx-core-ts-vA.B.C` → `publish-cmx-core-ts.yml` → **npm** (OIDC).
-   - `vX.Y.Z` → `release.yml` → cmx/cmf binaries + Homebrew.
+   - `vX.Y.Z` → `release.yml` → cmx/cmf/cmv binaries + Homebrew.
 
    crates.io and npm publishes cannot be overwritten (only yanked) — treat these
    two pushes as irreversible and confirm the prep is right before pushing.
-3. **Local install** the new cmx/cmf exactly as in the cmx release steps above,
-   and verify.
+3. **Local install** the new cmx/cmf/cmv exactly as in the cmx release steps
+   above, and verify.
 
 If cmx-core has **not** changed since its last `cmx-core-v*` tag, skip all of
 this and cut a normal cmx-only `v*` release.
@@ -446,24 +450,31 @@ the rustdoc gate, and `cargo deny`.
 ## cmv — Context Mixer Verify
 
 Deterministic verifier for the intents cmf compiled into a project. It reads the
-compile manifest cmf wrote, resolves each record in the knowledge base, runs the
-`static-check` validators matching the workspace's languages, and exits nonzero
-when a required intent is not held. No `llm` feature, no clock, no project code
+compile manifest cmf wrote, resolves the knowledge base through the cmx source
+registry (`--knowledge-base` override, then the manifest's `source`, then its
+`path`), verifies at the pinned revision when the checkout has moved past it (a
+`git archive` of the pin, unpacked into the run's scratch directory), resolves
+each record, runs the `static-check` validators matching the workspace's
+languages, and exits nonzero when a required intent is not held. Stale is always
+computed against the working tree. No `llm` feature, no clock, no project code
 executed: the same inputs render byte-identical output. It depends on the `cmf`
 crate for the manifest and catalog types as an interim arrangement until
 `CMV.md`'s "Shared selection" decision is settled.
 
 ### cmv Architecture
 
-- `cmv/src/main.rs` — binary entry point: the imperative shell that resolves the project, manifest, and knowledge base, loads them through the real gateways, hands everything to the pure core, prints the report, and exits per `CMV.md`'s table (`2` for anything that stops the run before a verdict)
+- `cmv/src/main.rs` — binary entry point: the imperative shell that resolves the project, manifest, and knowledge base (through the cmx source registry), loads them through the real gateways, materializes the pinned revision when the checkout has moved past it, hands everything to the pure core, prints the report, and exits per `CMV.md`'s table (`2` for anything that stops the run before a verdict)
 - `cmv/src/lib.rs` — crate root; exports all public modules and documents the interim dependency on `cmf`
-- `cmv/src/cli.rs` — clap grammar for `cmv check` and `cmv status`
+- `cmv/src/cli.rs` — clap grammar for `cmv check`, `cmv status`, and `cmv explain`, with the shared `--root`/`--manifest`/`--knowledge-base`/`--at-head` location arguments
+- `cmv/src/resolve.rs` — knowledge-base resolution in a fixed order — `--knowledge-base` override, the manifest's `source` looked up in the cmx sources registry, the manifest's recorded `path` — reporting which step answered (`resolved_by`) and warning, rather than failing, on a source name the registry does not know
+- `cmv/src/pin.rs` — honouring the pinned revision: when the manifest pins a commit the checkout's `HEAD` has moved past, materialize that tree through the `ProcessRunner` gateway (`git archive` into a tar, `tar -xf` into scratch) and verify there; `--at-head` (`PinPolicy`) bypasses it; owns the `knowledge_base` report block (`resolved_by`, pins, `verified_against`, `moved`)
+- `cmv/src/explain.rs` — `cmv explain <intent>`: how one manifest entry resolves to a record (by `id`, by `key`, not found), its title and status, every declared validator, which would run for the workspace's languages and with exactly which argv and `--config` document, the stale flag, and whether the manifest dropped it; shares its resolution, stale, and argv decisions with `dispatch` and runs nothing
 - `cmv/src/config.rs` — the hand-authored `cmv.toml` at the project root: language override, validator timeout, and per-intent tables handed to validators as JSON; a missing file means defaults
 - `cmv/src/language.rs` — language detection from the project's root-level build manifests, pure over the `Filesystem` gateway; a `cmv.toml` override replaces detection entirely
 - `cmv/src/verdict.rs` — the validator output contract (`Verdict`, `Location`), the per-intent `State`, the `IntentOutcome` cmv reports, and the `Summary` whose exit code gates the run; pure data and arithmetic
-- `cmv/src/dispatch.rs` — the verification core: `check` resolves every compiled intent (by `id`, then `key`), runs matching validators per the invocation protocol, combines several matches all-must-pass, and maps each run onto one `IntentOutcome`; `status` answers the same resolution questions without running anything
+- `cmv/src/dispatch.rs` — the verification core: `check` resolves every compiled intent (by `id`, then `key`), runs matching validators per the invocation protocol from the verified tree, combines several matches all-must-pass, maps each run onto one `IntentOutcome`, and computes `stale` against the working tree (record bytes at `HEAD`, plus validator `run` files differing between `HEAD` and a materialized pinned tree); `status` answers the same resolution questions without running anything
 - `cmv/src/process.rs` — the `ProcessRunner` gateway (run an executable with args, cwd, and a timeout): `RealProcessRunner` over `std::process::Command` (own process group on unix, group-killed on timeout) and the scripted `FakeProcessRunner`; kept out of `cmx-core` to avoid a coordinated release
-- `cmv/src/report.rs` — output rendering for `check` and `status`: deterministic JSON (`--json`) and the human listings; `Display` impls and their tests live here
+- `cmv/src/report.rs` — output rendering for `check`, `status`, and `explain`: deterministic JSON (`--json`) and the human listings, including the one informational `knowledge base has moved` line; `Display` impls and their tests live here
 
 ## Spec
 

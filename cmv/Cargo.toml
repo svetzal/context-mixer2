@@ -18,6 +18,7 @@ serde_json = "1"
 toml = "1"
 
 [dev-dependencies]
+cmx-core = { path = "../cmx-core", features = ["test-support"] }
 tempfile = "3"
 
 [lints]

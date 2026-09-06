@@ -11,6 +11,15 @@
       "revision": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
     }
   },
+  "knowledge_base": {
+    "path": "kb",
+    "resolved_by": "override",
+    "source": "guidelines",
+    "pinned_revision": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "head_revision": null,
+    "verified_against": "head",
+    "moved": false
+  },
   "languages": [
     "rust"
   ],

@@ -8,10 +8,16 @@
 //! same workspace, manifest, knowledge base, and `cmv.toml`, its output is
 //! byte-identical.
 //!
-//! The core ([`dispatch`], [`verdict`], [`report`], [`language`], [`config`])
-//! is pure over two gateways — cmx-core's `Filesystem` and this crate's own
-//! [`process::ProcessRunner`] — so every decision is testable with in-memory
-//! fakes. Only `main.rs` and [`process::RealProcessRunner`] touch the OS.
+//! The core ([`resolve`], [`pin`], [`dispatch`], [`explain`], [`verdict`],
+//! [`report`], [`language`], [`config`]) is pure over two gateways —
+//! cmx-core's `Filesystem` and this crate's own [`process::ProcessRunner`] —
+//! so every decision is testable with in-memory fakes. Only `main.rs` and
+//! [`process::RealProcessRunner`] touch the OS.
+//!
+//! The knowledge base is resolved through the cmx source registry
+//! ([`resolve`]) and, when the manifest pins a revision the checkout has moved
+//! past, verified at that revision by materializing the pinned tree with
+//! `git archive` ([`pin`]). Stale is always computed against the working tree.
 //!
 //! cmv depends on the `cmf` crate for [`cmf::manifest::Manifest`] and the
 //! catalog reader ([`cmf::catalog::scan`], [`cmf::catalog::Validator`]). This
@@ -23,7 +29,10 @@
 pub mod cli;
 pub mod config;
 pub mod dispatch;
+pub mod explain;
 pub mod language;
+pub mod pin;
 pub mod process;
 pub mod report;
+pub mod resolve;
 pub mod verdict;

@@ -31,6 +31,7 @@ fn parses_check_with_every_flag() {
         "out/manifest.json",
         "--knowledge-base",
         "../kb",
+        "--at-head",
     ])
     .expect("check should parse");
     assert_eq!(
@@ -42,6 +43,7 @@ fn parses_check_with_every_flag() {
                 root: Some(PathBuf::from("proj")),
                 manifest: Some(PathBuf::from("out/manifest.json")),
                 knowledge_base: Some(PathBuf::from("../kb")),
+                at_head: true,
             },
         }
     );
@@ -67,6 +69,22 @@ fn parses_status_with_location_and_json() {
                 root: Some(PathBuf::from("proj")),
                 manifest: None,
                 knowledge_base: Some(PathBuf::from("kb")),
+                at_head: false,
+            },
+        }
+    );
+}
+
+#[test]
+fn status_accepts_at_head() {
+    let cli = Cli::try_parse_from(["cmv", "status", "--at-head"]).expect("status should parse");
+    assert_eq!(
+        cli.command,
+        Commands::Status {
+            json: false,
+            location: LocationArgs {
+                at_head: true,
+                ..LocationArgs::default()
             },
         }
     );
@@ -84,9 +102,36 @@ fn a_subcommand_is_required() {
 }
 
 #[test]
-fn explain_is_not_yet_a_command() {
-    assert!(
-        Cli::try_parse_from(["cmv", "explain", "some/key"]).is_err(),
-        "explain lands in a later commit"
+fn parses_explain_with_an_intent_and_every_flag() {
+    let cli = Cli::try_parse_from([
+        "cmv",
+        "explain",
+        "craftsperson/rust/put-gateways-at-effect-boundaries",
+        "--json",
+        "--root",
+        "proj",
+        "--knowledge-base",
+        "kb",
+        "--at-head",
+    ])
+    .expect("explain should parse");
+    assert_eq!(
+        cli.command,
+        Commands::Explain {
+            intent: "craftsperson/rust/put-gateways-at-effect-boundaries".to_string(),
+            json: true,
+            location: LocationArgs {
+                root: Some(PathBuf::from("proj")),
+                manifest: None,
+                knowledge_base: Some(PathBuf::from("kb")),
+                at_head: true,
+            },
+        }
     );
+}
+
+#[test]
+fn explain_requires_an_intent_and_has_no_strict_flag() {
+    assert!(Cli::try_parse_from(["cmv", "explain"]).is_err());
+    assert!(Cli::try_parse_from(["cmv", "explain", "some/key", "--strict"]).is_err());
 }

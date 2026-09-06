@@ -13,8 +13,9 @@ Run it from the project root, or pass `--root <project>`.
 ## Commands
 
 ```text
-cmv check  [--json] [--strict] [--root <project>] [--manifest <path>] [--knowledge-base <path>]
-cmv status [--json]            [--root <project>] [--manifest <path>] [--knowledge-base <path>]
+cmv check            [--json] [--strict] [--root <project>] [--manifest <path>] [--knowledge-base <path>] [--at-head]
+cmv status           [--json]            [--root <project>] [--manifest <path>] [--knowledge-base <path>] [--at-head]
+cmv explain <intent> [--json]            [--root <project>] [--manifest <path>] [--knowledge-base <path>] [--at-head]
 ```
 
 | Command | Description |
@@ -22,7 +23,9 @@ cmv status [--json]            [--root <project>] [--manifest <path>] [--knowled
 | `cmv check` | Run every compiled intent's validators and report one verdict per intent |
 | `cmv check --strict` | Also fail the run when any intent could not be checked |
 | `cmv check --json` | Emit the full per-intent report as JSON for CI |
-| `cmv status` | Summarize the manifest, pin, languages, and validator coverage without running anything |
+| `cmv status` | Summarize the manifest, pin, languages, and validator coverage without running any validator |
+| `cmv explain <intent>` | Show what `check` would do for one intent — record resolution, validators, argv, config, stale — without running anything |
+| `--at-head` | Verify the knowledge base's working tree even when the manifest pins a revision its `HEAD` has moved past |
 
 Defaults:
 
@@ -30,11 +33,76 @@ Defaults:
 | --- | --- |
 | `--root` | the current directory |
 | `--manifest` | `<root>/.context-mixer/cmf-manifest.json`, where `cmf install --local --apply` writes it |
-| `--knowledge-base` | the `knowledge_base.path` recorded in the manifest |
+| `--knowledge-base` | resolved through the cmx source registry, then the manifest (see below) |
 
-`--knowledge-base` overrides where the intent records and validators are read
-from. A relative path — on the command line or in the manifest — is resolved
-against cmv's working directory.
+A relative path — on the command line, in the registry, or in the manifest — is
+resolved against cmv's working directory.
+
+## Where the knowledge base comes from
+
+The knowledge base is the registry (`CMV.md`, design decision 5): it is a git
+repository, so it is a cmx source, and cmv finds it the way cmx would. The
+resolution order is fixed, and every report says which step answered in its
+`knowledge_base.resolved_by` field:
+
+| `resolved_by` | Step |
+| --- | --- |
+| `override` | `--knowledge-base <path>` was given; nothing else is consulted |
+| `source` | the manifest's `knowledge_base.source` names a registered cmx source (`cmx source list`); its local directory or clone is used |
+| `path` | the manifest's recorded `knowledge_base.path` |
+
+A recorded source name the registry does not know falls through to `path` with
+a warning on stderr naming the source and suggesting `cmx source add`: the
+manifest still says where the records were when cmf read them, so the run can
+proceed.
+
+## The pinned revision
+
+The manifest records the git `revision` cmf read. When the resolved knowledge
+base is a git checkout whose `HEAD` differs from that pin, cmv verifies against
+the **pinned tree**, not the working tree: it runs
+
+```text
+git -C <knowledge-base> archive --format=tar -o <scratch>/kb.tar <revision>
+tar -xf <scratch>/kb.tar -C <scratch>/kb
+```
+
+and reads records from, and runs validators in, `<scratch>/kb` (executable bits
+survive `git archive`). Validators' `run` paths resolve inside it. The scratch
+directory is removed when the run ends and never appears in output.
+
+When `HEAD` equals the pin, the manifest has no `revision`, or the root is not
+a git checkout, cmv uses the root directly. When the pinned revision cannot be
+archived — typically because the checkout has not fetched it — cmv exits `2`
+naming the revision and suggesting `cmx source update <name>` (or `git fetch`
+when the knowledge base is not a registered source).
+
+`--at-head` bypasses the pin and verifies the working tree; the report's
+`verified_against` says `head`. This is for validator authors iterating on a
+knowledge base: edit the script, run `cmv check --at-head` against a project,
+repeat. It never re-pins anything.
+
+Every `check`, `status`, and `explain` report carries a `knowledge_base` block:
+
+| Field | Meaning |
+| --- | --- |
+| `path` | the knowledge-base root as resolved |
+| `resolved_by` | `override`, `source`, or `path` |
+| `source` | the cmx source name the manifest recorded, if any |
+| `pinned_revision` | the manifest's `revision`, if any |
+| `head_revision` | the working tree's `HEAD`, when it is a git checkout |
+| `verified_against` | `pinned` when the verdicts came from the pinned revision (materialized, or checked out as `HEAD`); `head` otherwise |
+| `moved` | `true` when `HEAD` differs from the pin |
+
+`moved` is informational and never changes the exit code. In human output it
+adds one line after the summary:
+
+```text
+knowledge base has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; 2 compiled records or validators changed; re-run cmf install to recompile
+```
+
+Recompiling is cmf's decision — a newer knowledge base may change *selection* —
+so cmv only reports it.
 
 ## Language detection
 
@@ -118,8 +186,12 @@ leaves it unchecked; otherwise it passes when at least one run was applicable.
 | `unchecked` | No validator for the workspace's languages, record missing from the knowledge base, validator could not start, crashed, timed out, or wrote no parseable verdict — the reason is reported | `1` only with `--strict` |
 | `unguided` | The manifest lists the intent as dropped; the guidance never reached the artifact | — |
 
-An intent is additionally marked **stale** when its record's bytes no longer
-match the checksum the manifest recorded at compile time. Stale is
+An intent is additionally marked **stale** when, at the working tree's `HEAD`,
+its record's bytes no longer match the checksum the manifest recorded at
+compile time, or — when validators ran from a materialized pinned tree — any
+of its validators' `run` files differ between `HEAD` and that tree. Stale is
+always computed against the working tree, never the pinned tree, so a moved
+knowledge base shows exactly which compiled intents it touched. Stale is
 informational and never changes the exit code; the remedy is to re-run
 `cmf install`, because a newer knowledge base may change *selection*, which is
 cmf's decision.
@@ -171,6 +243,15 @@ and no temporary path, so it is byte-stable across runs.
     "profile": { "id": "rust-shipping", "version": "0.3.0" },
     "knowledge_base": { "source": "guidelines", "path": "kb", "revision": "a1b2c3d4…" }
   },
+  "knowledge_base": {
+    "path": "/home/me/guidelines",
+    "resolved_by": "source",
+    "source": "guidelines",
+    "pinned_revision": "a1b2c3d4…",
+    "head_revision": "ffffffff…",
+    "verified_against": "pinned",
+    "moved": true
+  },
   "languages": ["rust"],
   "intents": [
     {
@@ -201,6 +282,8 @@ and no temporary path, so it is byte-stable across runs.
 - `manifest` echoes the manifest's `profile` and `knowledge_base` as recorded
   at compile time (`source` and `revision` are omitted when the manifest has
   none).
+- `knowledge_base` is where cmv actually read from and which tree it verified;
+  see "The pinned revision" above for every field.
 - `intents` lists every compiled intent in manifest order, then every dropped
   intent. `state` is one of `pass`, `fail`, `not_applicable`, `unchecked`,
   `unguided`; `reason` is present for the last two. `language` and
@@ -213,13 +296,55 @@ and no temporary path, so it is byte-stable across runs.
   exits with.
 
 `cmv status --json` emits `schema`, `manifest_path`, `profile`, `artifact`,
-`knowledge_base` (`path`, `exists`, `source`, `revision`), `languages`,
-`intents`, `dropped`, and `coverage` (`with_validator`, `missing`, `stale`),
-with `coverage` `null` when the knowledge base could not be scanned.
+`knowledge_base` (the block above plus `exists`), `languages`, `intents`,
+`dropped`, and `coverage` (`with_validator`, `missing`, `stale`), with
+`coverage` `null` when the knowledge base could not be scanned. The human form
+adds `HEAD revision` and `Verified against` lines after `Pinned revision`, and
+the `knowledge base has moved` line at the end when `moved`.
 
-## What is not here yet
+## Explaining one intent
 
-cmv reads the knowledge base from the path the manifest recorded or from
-`--knowledge-base`. Resolving it through the cmx source registry at the pinned
-revision, `cmv explain <intent-key>`, and release packaging follow in later
-commits; see `CMV.md`.
+`cmv explain <intent>` answers "what would `check` do with this one?" without
+running anything. The argument is a catalog key, or a record `id` when it
+contains a `.`. cmv exits `2` when the manifest neither compiled nor dropped
+the intent.
+
+```text
+Intent: craftsperson/rust/isolate-functional-core
+Id: guidelines.intent.isolate-functional-core
+Record: resolved by id
+Title: Isolate the functional core
+Status: confirmed (informational; never gates)
+Compiled: yes
+Dropped: no
+Stale: yes (record or validator changed at HEAD since compile)
+Knowledge base: /home/me/guidelines (resolved by cmx source, verified against pinned revision)
+Languages: rust
+Config: {"business_rule_minimum_matches":2,"business_rule_pattern":"\\b500\\b"}
+Validators:
+  rust  checks/rust/isolate_functional_core.py  (required)  would run
+    No module holding business rules references a gateway.
+    <pinned-tree>/checks/rust/isolate_functional_core.py --workspace /home/me/project --config <scratch>/1.json
+  python  checks/python/isolate_functional_core.py  (required)  skipped: language python is not among the workspace's [rust]
+    No module holding business rules imports an I/O client.
+    <pinned-tree>/checks/python/isolate_functional_core.py --workspace /home/me/project --config <scratch>/1.json
+```
+
+- `Record` is `resolved by id`, `resolved by key` (no record carries the
+  manifest's id, but one sits at its key), or `not found in knowledge base`.
+- `Config` is the exact JSON document the validators would receive through
+  `--config`: the intent's `[intent."<key>"]` table from `cmv.toml`, or `{}`.
+- Each validator line shows its language, `run`, whether it is required, and
+  whether it would run here; below it, its description and the exact argv.
+  `<scratch>` stands for the per-run temporary directory and `<pinned-tree>`
+  for a materialized pinned revision — both are created at check time and never
+  appear in output, so `explain` is byte-stable like everything else. When cmv
+  verifies the checkout directly, the program path is the real one.
+- A dropped intent shows `Dropped: yes (<reason>)`; its validators are listed
+  but marked skipped, because the guidance never reached the artifact.
+
+`cmv explain <intent> --json` emits `schema`, `knowledge_base`, `languages`,
+and `intent` (`key`, `id`, `resolution`, `title`, `status`, `compiled`,
+`dropped`, `drop_reason`, `stale`, `config`, and `validators`, each with
+`language`, `run`, `required`, `description`, `would_run`, `skipped`, and
+`argv`).

@@ -6,10 +6,14 @@
 //! in-memory fakes produce the same outcomes as against the OS.
 //!
 //! Resolution is by record `id` first, then by catalog `key`, so a record
-//! that moved in the knowledge base is still found. A record whose bytes no
-//! longer match the manifest checksum is reported `stale`, which never changes
-//! the exit code: the remedy is `cmf install`, because a newer knowledge base
-//! may change selection, and that is cmf's decision.
+//! that moved in the knowledge base is still found. An intent is reported
+//! `stale` when its record's bytes at the working tree's `HEAD` no longer
+//! match the manifest checksum, or — when validators run from a materialized
+//! pinned tree (see [`crate::pin`]) — when any of its validators' `run` files
+//! differ between `HEAD` and that tree. Stale is always computed against the
+//! working tree and never changes the exit code: the remedy is `cmf install`,
+//! because a newer knowledge base may change selection, and that is cmf's
+//! decision.
 //!
 //! When several validators match (a record may declare one per language, and
 //! a workspace may have several languages) they combine **all-must-pass**: any
@@ -32,26 +36,51 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::config::ProjectConfig;
+use crate::pin::KnowledgeBaseReport;
 use crate::process::{ProcessOutcome, ProcessRequest, ProcessRunner};
 use crate::verdict::{self, IntentOutcome, Location, State, empty_object};
 
 /// The scanned knowledge base, keyed by catalog key.
 pub type Catalog = BTreeMap<String, Intent>;
 
+/// The knowledge-base trees a run reads from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Trees<'a> {
+    /// The tree the catalog was scanned from and validators run in: the
+    /// resolved root, or the materialized pinned tree. Validator `run` paths
+    /// resolve against it (canonicalized through the filesystem gateway
+    /// before a process is started) and it is the validators' working
+    /// directory.
+    pub verified: &'a Path,
+    /// The knowledge base's working tree (`HEAD`), only when `verified` is a
+    /// materialized pinned tree rather than the working tree itself. Stale is
+    /// computed against it.
+    pub working: Option<&'a Path>,
+}
+
+impl<'a> Trees<'a> {
+    /// A run that verifies the working tree itself.
+    pub fn single(root: &'a Path) -> Self {
+        Self {
+            verified: root,
+            working: None,
+        }
+    }
+}
+
 /// Everything [`check`] needs besides its gateways.
 pub struct CheckRequest<'a> {
     /// The manifest cmf compiled for the workspace.
     pub manifest: &'a Manifest,
-    /// The knowledge base as scanned by `cmf::catalog::scan`.
+    /// The knowledge base as scanned by `cmf::catalog::scan` from
+    /// `trees.verified`.
     pub catalog: &'a Catalog,
     /// The project's `cmv.toml`.
     pub config: &'a ProjectConfig,
     /// Languages to verify as; validators for other languages do not run.
     pub languages: &'a [String],
-    /// Knowledge-base root. It is canonicalized through the filesystem
-    /// gateway before use: validator `run` paths resolve against it and it is
-    /// the validators' working directory.
-    pub knowledge_base: &'a Path,
+    /// The knowledge-base trees.
+    pub trees: Trees<'a>,
     /// The project root handed to validators as `--workspace`.
     pub workspace: &'a Path,
     /// Directory where each intent's `--config` JSON is written. The caller
@@ -67,12 +96,7 @@ pub fn check(
     runner: &dyn ProcessRunner,
 ) -> Result<Vec<IntentOutcome>> {
     let resolver = Resolver::new(request.catalog);
-    // Validators run with the knowledge base as their working directory, and a
-    // relative program path would be looked up against that new directory
-    // rather than cmv's; an absolute root makes `<root>/<run>` unambiguous.
-    let knowledge_base = fs.canonicalize(request.knowledge_base).with_context(|| {
-        format!("could not resolve knowledge base {}", request.knowledge_base.display())
-    })?;
+    let knowledge_base = canonical_root(request.trees.verified, fs)?;
     let mut outcomes =
         Vec::with_capacity(request.manifest.intents.len() + request.manifest.dropped.len());
     for (index, entry) in request.manifest.intents.iter().enumerate() {
@@ -93,14 +117,14 @@ fn check_intent(
     fs: &dyn Filesystem,
     runner: &dyn ProcessRunner,
 ) -> Result<IntentOutcome> {
-    let Some(intent) = resolver.resolve(entry) else {
+    let (Some(intent), _) = resolver.resolve(entry) else {
         return Ok(unchecked(entry, "record not in knowledge base", false));
     };
-    let stale = is_stale(intent, entry, fs)?;
+    let stale = is_stale(intent, entry, request.trees, fs)?;
     let validators: Vec<Validator<'_>> = intent
         .record
         .validators()
-        .filter(|validator| request.languages.iter().any(|language| language == validator.language))
+        .filter(|validator| language_matches(validator, request.languages))
         .collect();
     if validators.is_empty() {
         let reason = format!("no validator for languages [{}]", request.languages.join(", "));
@@ -118,11 +142,58 @@ fn check_intent(
     Ok(combine(entry, &runs, stale))
 }
 
-/// Whether the record's bytes no longer match what the manifest recorded.
-fn is_stale(intent: &Intent, entry: &IntentRef, fs: &dyn Filesystem) -> Result<bool> {
-    let current = checksum::checksum_file(&intent.path, fs)
-        .with_context(|| format!("could not checksum record {}", intent.path.display()))?;
-    Ok(current != entry.checksum)
+/// Whether a validator reads one of the workspace's languages.
+pub fn language_matches(validator: &Validator<'_>, languages: &[String]) -> bool {
+    languages.iter().any(|language| language == validator.language)
+}
+
+/// The absolute form of the tree validators run from. Validators run with it
+/// as their working directory, and a relative program path would be looked up
+/// against that new directory rather than cmv's; an absolute root makes
+/// `<root>/<run>` unambiguous.
+pub fn canonical_root(root: &Path, fs: &dyn Filesystem) -> Result<PathBuf> {
+    fs.canonicalize(root)
+        .with_context(|| format!("could not resolve knowledge base {}", root.display()))
+}
+
+/// Whether the intent has changed at the working tree's `HEAD` since compile:
+/// the record's bytes there no longer match the manifest checksum (or the
+/// record is gone), or, when validators run from a materialized pinned tree,
+/// any validator's `run` file differs between `HEAD` and that tree.
+pub fn is_stale(
+    intent: &Intent,
+    entry: &IntentRef,
+    trees: Trees<'_>,
+    fs: &dyn Filesystem,
+) -> Result<bool> {
+    let record_at_head = match trees.working {
+        Some(working) => working.join("intents").join(format!("{}.toml", intent.key)),
+        None => intent.path.clone(),
+    };
+    if checksum_if_present(&record_at_head, fs)?.as_deref() != Some(entry.checksum.as_str()) {
+        return Ok(true);
+    }
+    let Some(working) = trees.working else {
+        return Ok(false);
+    };
+    for validator in intent.record.validators() {
+        let pinned = checksum_if_present(&trees.verified.join(validator.run), fs)?;
+        let head = checksum_if_present(&working.join(validator.run), fs)?;
+        if pinned != head {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// The file's checksum, or `None` when there is no file there.
+fn checksum_if_present(path: &Path, fs: &dyn Filesystem) -> Result<Option<String>> {
+    if !fs.is_file(path) {
+        return Ok(None);
+    }
+    checksum::checksum_file(path, fs)
+        .map(Some)
+        .with_context(|| format!("could not checksum {}", path.display()))
 }
 
 /// One validator's contribution to an intent's outcome.
@@ -146,12 +217,7 @@ fn run_validator(
     let timeout = request.config.validator_timeout();
     let process = ProcessRequest {
         program: knowledge_base.join(validator.run),
-        args: vec![
-            OsString::from("--workspace"),
-            request.workspace.as_os_str().to_owned(),
-            OsString::from("--config"),
-            config_path.as_os_str().to_owned(),
-        ],
+        args: validator_args(request.workspace, config_path),
         cwd: knowledge_base.to_path_buf(),
         timeout,
     };
@@ -169,6 +235,18 @@ fn run_validator(
         evidence,
         locations,
     }
+}
+
+/// The arguments every validator receives, per the invocation protocol:
+/// `--workspace <project-root> --config <json-file>`. The one definition,
+/// shared with `cmv explain` so the argv it prints is the argv `check` uses.
+pub fn validator_args(workspace: &Path, config_path: &Path) -> Vec<OsString> {
+    vec![
+        OsString::from("--workspace"),
+        workspace.as_os_str().to_owned(),
+        OsString::from("--config"),
+        config_path.as_os_str().to_owned(),
+    ]
 }
 
 /// Turn how the process ended into a verdict, or the reason there is none.
@@ -305,14 +383,27 @@ fn unguided(dropped: &DroppedIntent, resolver: &Resolver<'_>) -> IntentOutcome {
     }
 }
 
+/// How a manifest entry was matched to a knowledge-base record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordResolution {
+    /// A record carries the entry's `id`.
+    Id,
+    /// No record carries the `id`, but one sits at the entry's `key`.
+    Key,
+    /// Neither; the record is not in the knowledge base.
+    NotFound,
+}
+
 /// Looks records up by `id` first, then by `key`.
-struct Resolver<'a> {
+pub struct Resolver<'a> {
     catalog: &'a Catalog,
     by_id: BTreeMap<&'a str, &'a Intent>,
 }
 
 impl<'a> Resolver<'a> {
-    fn new(catalog: &'a Catalog) -> Self {
+    /// Index the catalog by record `id`.
+    pub fn new(catalog: &'a Catalog) -> Self {
         let mut by_id = BTreeMap::new();
         // Catalog order is key order, so on a duplicated id the first key wins
         // deterministically.
@@ -322,11 +413,24 @@ impl<'a> Resolver<'a> {
         Self { catalog, by_id }
     }
 
-    fn resolve(&self, entry: &IntentRef) -> Option<&'a Intent> {
-        self.by_id.get(entry.id.as_str()).copied().or_else(|| self.by_key(&entry.key))
+    /// The record for a manifest entry, and how it was matched.
+    pub fn resolve(&self, entry: &IntentRef) -> (Option<&'a Intent>, RecordResolution) {
+        if let Some(intent) = self.by_id(&entry.id) {
+            return (Some(intent), RecordResolution::Id);
+        }
+        match self.by_key(&entry.key) {
+            Some(intent) => (Some(intent), RecordResolution::Key),
+            None => (None, RecordResolution::NotFound),
+        }
     }
 
-    fn by_key(&self, key: &str) -> Option<&'a Intent> {
+    /// The record carrying `id`, if any.
+    pub fn by_id(&self, id: &str) -> Option<&'a Intent> {
+        self.by_id.get(id).copied()
+    }
+
+    /// The record at catalog `key`, if any.
+    pub fn by_key(&self, key: &str) -> Option<&'a Intent> {
         self.catalog.get(key)
     }
 }
@@ -357,17 +461,15 @@ pub struct StatusReport {
     pub coverage: Option<Coverage>,
 }
 
-/// Where the knowledge base is and what the manifest pinned.
+/// Where the knowledge base is, how cmv found it, how the verified tree
+/// relates to the pin, and whether the root is there at all.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct KnowledgeBaseStatus {
-    /// The root cmv resolved (the manifest's path unless overridden).
-    pub path: PathBuf,
-    /// Whether that root is a directory.
+    /// The resolution and pin facts every report shares.
+    #[serde(flatten)]
+    pub resolved: KnowledgeBaseReport,
+    /// Whether the resolved root is a directory.
     pub exists: bool,
-    /// The cmx source name the manifest recorded, if any.
-    pub source: Option<String>,
-    /// The git revision the manifest recorded, if any.
-    pub revision: Option<String>,
 }
 
 /// How the scanned knowledge base covers the manifest's compiled intents.
@@ -382,35 +484,45 @@ pub struct Coverage {
     pub stale: usize,
 }
 
+/// Everything [`status`] needs besides the filesystem.
+pub struct StatusRequest<'a> {
+    /// The manifest cmf compiled for the workspace.
+    pub manifest: &'a Manifest,
+    /// Where the manifest was read from.
+    pub manifest_path: &'a Path,
+    /// The knowledge base as scanned from `trees.verified`; `None` when it
+    /// could not be scanned, in which case the report says where cmv looked
+    /// and stops short of coverage.
+    pub catalog: Option<&'a Catalog>,
+    /// Languages the workspace verifies as.
+    pub languages: &'a [String],
+    /// Where the knowledge base was found and which tree was used.
+    pub knowledge_base: &'a KnowledgeBaseReport,
+    /// The knowledge-base trees.
+    pub trees: Trees<'a>,
+}
+
 /// Summarize the manifest against the knowledge base without running
-/// validators. `catalog` is `None` when the knowledge base could not be
-/// scanned; the report then says where it looked and stops short of coverage.
-pub fn status(
-    manifest: &Manifest,
-    manifest_path: &Path,
-    catalog: Option<&Catalog>,
-    languages: &[String],
-    knowledge_base: &Path,
-    fs: &dyn Filesystem,
-) -> Result<StatusReport> {
-    let coverage = match catalog {
-        Some(catalog) => Some(coverage(manifest, catalog, languages, fs)?),
+/// validators.
+pub fn status(request: &StatusRequest<'_>, fs: &dyn Filesystem) -> Result<StatusReport> {
+    let coverage = match request.catalog {
+        Some(catalog) => {
+            Some(coverage(request.manifest, catalog, request.languages, request.trees, fs)?)
+        }
         None => None,
     };
     Ok(StatusReport {
         schema: crate::report::SCHEMA_VERSION,
-        manifest_path: manifest_path.to_path_buf(),
-        profile: manifest.profile.clone(),
-        artifact: manifest.artifact.clone(),
+        manifest_path: request.manifest_path.to_path_buf(),
+        profile: request.manifest.profile.clone(),
+        artifact: request.manifest.artifact.clone(),
         knowledge_base: KnowledgeBaseStatus {
-            path: knowledge_base.to_path_buf(),
-            exists: fs.is_dir(knowledge_base),
-            source: manifest.knowledge_base.source.clone(),
-            revision: manifest.knowledge_base.revision.clone(),
+            exists: fs.is_dir(&request.knowledge_base.path),
+            resolved: request.knowledge_base.clone(),
         },
-        languages: languages.to_vec(),
-        intents: manifest.intents.len(),
-        dropped: manifest.dropped.len(),
+        languages: request.languages.to_vec(),
+        intents: request.manifest.intents.len(),
+        dropped: request.manifest.dropped.len(),
         coverage,
     })
 }
@@ -419,6 +531,7 @@ fn coverage(
     manifest: &Manifest,
     catalog: &Catalog,
     languages: &[String],
+    trees: Trees<'_>,
     fs: &dyn Filesystem,
 ) -> Result<Coverage> {
     let resolver = Resolver::new(catalog);
@@ -428,17 +541,17 @@ fn coverage(
         stale: 0,
     };
     for entry in &manifest.intents {
-        let Some(intent) = resolver.resolve(entry) else {
+        let (Some(intent), _) = resolver.resolve(entry) else {
             coverage.missing += 1;
             continue;
         };
-        if is_stale(intent, entry, fs)? {
+        if is_stale(intent, entry, trees, fs)? {
             coverage.stale += 1;
         }
         if intent
             .record
             .validators()
-            .any(|validator| languages.iter().any(|language| language == validator.language))
+            .any(|validator| language_matches(&validator, languages))
         {
             coverage.with_validator += 1;
         }
@@ -581,13 +694,52 @@ evidence = [
                 catalog: &catalog,
                 config,
                 languages: &languages,
-                knowledge_base: Path::new(KB),
+                trees: Trees::single(Path::new(KB)),
+                workspace: Path::new(WORKSPACE),
+                scratch: Path::new(SCRATCH),
+            };
+            check(&request, &self.fs, runner).expect("check runs")
+        }
+
+        /// Copy the knowledge base to `PINNED` as the materialized pinned
+        /// tree, so `KB` plays the working tree that may since have changed.
+        fn materialize_pinned_copy(&self) {
+            for (path, bytes) in self.fs.snapshot_files() {
+                if let Ok(relative) = path.strip_prefix(KB) {
+                    self.fs.add_file(Path::new(PINNED).join(relative), bytes);
+                }
+            }
+            self.fs.add_dir(format!("{PINNED}/intents"));
+        }
+
+        /// Check with validators running from the pinned copy and stale
+        /// computed against `KB`.
+        fn check_pinned(
+            &self,
+            languages: &[&str],
+            runner: &FakeProcessRunner,
+        ) -> Vec<IntentOutcome> {
+            let manifest = self.manifest();
+            let catalog =
+                cmf::catalog::scan(Path::new(PINNED), &self.fs).expect("pinned tree scans");
+            let languages: Vec<String> = languages.iter().map(ToString::to_string).collect();
+            let request = CheckRequest {
+                manifest: &manifest,
+                catalog: &catalog,
+                config: &ProjectConfig::default(),
+                languages: &languages,
+                trees: Trees {
+                    verified: Path::new(PINNED),
+                    working: Some(Path::new(KB)),
+                },
                 workspace: Path::new(WORKSPACE),
                 scratch: Path::new(SCRATCH),
             };
             check(&request, &self.fs, runner).expect("check runs")
         }
     }
+
+    const PINNED: &str = "/scratch/kb";
 
     const RUST: &str = "checks/rust/check.py";
     const PYTHON: &str = "checks/python/check.py";
@@ -821,6 +973,93 @@ evidence = [
     }
 
     #[test]
+    fn pinned_tree_runs_the_pinned_validator_and_is_not_stale_when_head_is_unchanged() {
+        let mut kb = Kb::new();
+        kb.add("rust/a", &[rust_check(true)]);
+        kb.fs.add_file(format!("{KB}/{RUST}"), "pinned script");
+        kb.materialize_pinned_copy();
+        let runner = FakeProcessRunner::new().script_stdout(Path::new(PINNED).join(RUST), PASS);
+        let outcome = kb.check_pinned(&["rust"], &runner).remove(0);
+        assert_eq!(outcome.state, State::Pass);
+        assert!(!outcome.stale);
+        let call = &runner.calls()[0];
+        assert_eq!(call.program, Path::new(PINNED).join(RUST), "the pinned script runs");
+        assert_eq!(call.cwd, PathBuf::from(PINNED), "from the pinned tree");
+    }
+
+    #[test]
+    fn record_changed_at_head_is_stale_even_though_the_pinned_record_matches() {
+        let mut kb = Kb::new();
+        kb.add("rust/a", &[rust_check(true)]);
+        kb.materialize_pinned_copy();
+        kb.fs.add_file(format!("{KB}/intents/rust/a.toml"), "edited at HEAD");
+        let runner = FakeProcessRunner::new().script_stdout(Path::new(PINNED).join(RUST), PASS);
+        let outcome = kb.check_pinned(&["rust"], &runner).remove(0);
+        assert_eq!(outcome.state, State::Pass, "the pinned record still resolves and runs");
+        assert!(outcome.stale, "stale compares HEAD, not the pinned tree");
+    }
+
+    #[test]
+    fn record_removed_at_head_is_stale() {
+        let mut kb = Kb::new();
+        kb.add("rust/a", &[rust_check(true)]);
+        kb.materialize_pinned_copy();
+        kb.fs.remove_file(Path::new(&format!("{KB}/intents/rust/a.toml"))).unwrap();
+        let runner = FakeProcessRunner::new().script_stdout(Path::new(PINNED).join(RUST), PASS);
+        assert!(kb.check_pinned(&["rust"], &runner)[0].stale);
+    }
+
+    #[test]
+    fn validator_changed_between_head_and_pinned_tree_is_stale() {
+        let mut kb = Kb::new();
+        kb.add("rust/a", &[rust_check(true)]);
+        kb.fs.add_file(format!("{KB}/{RUST}"), "pinned script");
+        kb.materialize_pinned_copy();
+        kb.fs.add_file(format!("{KB}/{RUST}"), "corrected script at HEAD");
+        let runner = FakeProcessRunner::new().script_stdout(Path::new(PINNED).join(RUST), PASS);
+        let outcome = kb.check_pinned(&["rust"], &runner).remove(0);
+        assert_eq!(outcome.state, State::Pass);
+        assert!(outcome.stale, "a corrected validator makes the intent stale");
+    }
+
+    #[test]
+    fn validator_added_at_head_only_is_stale_and_absent_on_both_sides_is_not() {
+        let mut kb = Kb::new();
+        kb.add("rust/a", &[rust_check(true)]);
+        kb.materialize_pinned_copy();
+        let runner = FakeProcessRunner::new().script_stdout(Path::new(PINNED).join(RUST), PASS);
+        assert!(!kb.check_pinned(&["rust"], &runner)[0].stale, "missing on both sides is equal");
+        kb.fs.add_file(format!("{KB}/{RUST}"), "new at HEAD");
+        assert!(kb.check_pinned(&["rust"], &runner)[0].stale);
+    }
+
+    #[test]
+    fn without_a_working_tree_only_the_record_check_applies() {
+        let mut kb = Kb::new();
+        kb.add("rust/a", &[rust_check(true)]);
+        kb.fs.add_file(format!("{KB}/{RUST}"), "script");
+        let runner = FakeProcessRunner::new().script_stdout(program(RUST), PASS);
+        assert!(!kb.check(&["rust"], &runner)[0].stale);
+    }
+
+    #[test]
+    fn resolver_reports_how_it_matched() {
+        let mut kb = Kb::new();
+        kb.add("rust/a", &[]);
+        let catalog = kb.catalog();
+        let resolver = Resolver::new(&catalog);
+        let by_id = resolver.resolve(&kb.intents[0]);
+        assert_eq!(by_id.1, RecordResolution::Id);
+        let mut moved = kb.intents[0].clone();
+        moved.id = "kb.intent.renamed".to_string();
+        assert_eq!(resolver.resolve(&moved).1, RecordResolution::Key);
+        moved.key = "rust/gone".to_string();
+        let (intent, how) = resolver.resolve(&moved);
+        assert!(intent.is_none());
+        assert_eq!(how, RecordResolution::NotFound);
+    }
+
+    #[test]
     fn record_is_resolved_by_id_when_its_key_moved() {
         let mut kb = Kb::new();
         kb.add("rust/new-home", &[rust_check(true)]);
@@ -962,15 +1201,16 @@ evidence = [
         kb.intents[2].checksum = "sha256:stale".to_string();
         let manifest = kb.manifest();
         let catalog = kb.catalog();
-        let report = status(
-            &manifest,
-            Path::new("/project/.context-mixer/cmf-manifest.json"),
-            Some(&catalog),
-            &["rust".to_string()],
-            Path::new(KB),
-            &kb.fs,
-        )
-        .unwrap();
+        let knowledge_base = knowledge_base_report(KB);
+        let request = StatusRequest {
+            manifest: &manifest,
+            manifest_path: Path::new("/project/.context-mixer/cmf-manifest.json"),
+            catalog: Some(&catalog),
+            languages: &["rust".to_string()],
+            knowledge_base: &knowledge_base,
+            trees: Trees::single(Path::new(KB)),
+        };
+        let report = status(&request, &kb.fs).unwrap();
         assert_eq!(
             report,
             StatusReport {
@@ -979,10 +1219,8 @@ evidence = [
                 profile: manifest.profile.clone(),
                 artifact: manifest.artifact.clone(),
                 knowledge_base: KnowledgeBaseStatus {
-                    path: PathBuf::from(KB),
+                    resolved: knowledge_base,
                     exists: true,
-                    source: Some("guidelines".to_string()),
-                    revision: None,
                 },
                 languages: vec!["rust".to_string()],
                 intents: 4,
@@ -997,15 +1235,59 @@ evidence = [
     }
 
     #[test]
+    fn status_counts_validator_drift_against_the_pinned_tree_as_stale() {
+        let mut kb = Kb::new();
+        kb.add("rust/a", &[rust_check(true)]);
+        kb.fs.add_file(format!("{KB}/{RUST}"), "pinned script");
+        kb.materialize_pinned_copy();
+        kb.fs.add_file(format!("{KB}/{RUST}"), "corrected at HEAD");
+        let manifest = kb.manifest();
+        let catalog = cmf::catalog::scan(Path::new(PINNED), &kb.fs).unwrap();
+        let knowledge_base = knowledge_base_report(KB);
+        let request = StatusRequest {
+            manifest: &manifest,
+            manifest_path: Path::new("/m.json"),
+            catalog: Some(&catalog),
+            languages: &["rust".to_string()],
+            knowledge_base: &knowledge_base,
+            trees: Trees {
+                verified: Path::new(PINNED),
+                working: Some(Path::new(KB)),
+            },
+        };
+        let report = status(&request, &kb.fs).unwrap();
+        assert_eq!(report.coverage.unwrap().stale, 1);
+    }
+
+    #[test]
     fn status_without_a_scannable_knowledge_base_has_no_coverage() {
         let mut kb = Kb::new();
         kb.add("rust/a", &[rust_check(true)]);
         let manifest = kb.manifest();
-        let report =
-            status(&manifest, Path::new("/m.json"), None, &[], Path::new("/elsewhere"), &kb.fs)
-                .unwrap();
+        let knowledge_base = knowledge_base_report("/elsewhere");
+        let request = StatusRequest {
+            manifest: &manifest,
+            manifest_path: Path::new("/m.json"),
+            catalog: None,
+            languages: &[],
+            knowledge_base: &knowledge_base,
+            trees: Trees::single(Path::new("/elsewhere")),
+        };
+        let report = status(&request, &kb.fs).unwrap();
         assert!(!report.knowledge_base.exists);
         assert_eq!(report.coverage, None);
         assert_eq!(report.intents, 1);
+    }
+
+    fn knowledge_base_report(path: &str) -> KnowledgeBaseReport {
+        KnowledgeBaseReport {
+            path: PathBuf::from(path),
+            resolved_by: crate::resolve::ResolvedBy::Path,
+            source: Some("guidelines".to_string()),
+            pinned_revision: None,
+            head_revision: None,
+            verified_against: crate::pin::VerifiedAgainst::Head,
+            moved: false,
+        }
     }
 }

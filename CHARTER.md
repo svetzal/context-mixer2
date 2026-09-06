@@ -2,10 +2,11 @@
 
 ## Purpose
 
-Context Mixer manages the lifecycle of curated agentic context — portable agent definitions and composable skills — across AI coding assistants. It ships as two complementary CLIs:
+Context Mixer manages the lifecycle of curated agentic context — portable agent definitions and composable skills — across AI coding assistants. It ships as three complementary CLIs:
 
 - **cmx** — the consumer tool: a package manager that installs, versions, updates, and reconciles agents and skills across platforms.
-- **cmf** (Context Mixer Forge) — the materializer: it reads an externally maintained knowledge base of structured intent records, selects and assembles a profile-specific slice, and installs the resulting agent or skill through cmx-core.
+- **cmf** (Context Mixer Forge) — the materializer: it reads an externally maintained knowledge base of structured intent records, selects and assembles a profile-specific slice, installs the resulting agent or skill through cmx-core, and records what it composed.
+- **cmv** (Context Mixer Verify) — the verifier: it checks, deterministically, that a repository holds the intents cmf compiled for it, by running each intent's codified validator from the knowledge base at the pinned revision.
 
 The project rests on two pillars of equal weight:
 
@@ -14,7 +15,7 @@ The project rests on two pillars of equal weight:
 
 ## Goals
 
-- Provide two focused CLIs — cmx to consume and manage artifacts, cmf to materialize intents into installed guidance
+- Provide three focused CLIs — cmx to consume and manage artifacts, cmf to materialize intents into installed guidance, cmv to verify that a repository holds them
 - Install, update, and track agents and skills across Claude Code, GitHub Copilot, Cursor, Windsurf, Gemini CLI, opencode, Codex CLI, Pi, Crush, Amp, Zed, OpenHands, Hermes, and Devin
 - Support both global (user-wide) and local (project-scoped) installation with lock file tracking
 - Enable plugin marketplaces as git repositories with a standard manifest format
@@ -22,13 +23,15 @@ The project rests on two pillars of equal weight:
 - Surface outdated, untracked, deprecated, and diverged artifacts clearly
 - Provide a tool-neutral canonical home for hand-authored private artifacts, with a full reconciliation lifecycle: a system-wide survey (`doctor`) that diagnoses a disorganized installation, adoption of orphaned artifacts, promotion of in-place edits back to the canonical copy, and synchronization of copies that have diverged across platforms — so a curated set survives both day-to-day assistant edits and migrating between coding assistants
 - Support explainable, context-budgeted materialization of structured intents into agent and skill delivery surfaces
+- Verify, from source alone, that a repository holds the intents its guidance was compiled from
 - Offer LLM-powered diff analysis for understanding changes between installed and source versions
 
 ## Non-Goals
 
 - Deriving guidance from a repository's existing structure or code (that is what hone does). cmf compiles explicitly authored intent records; it does not infer policy from a codebase
 - Running a live guidance-selection harness. cmf may produce data and artifacts for dynamic harnesses, but session-time sensing, injection, leasing, and retraction belong to the harness
-- Authoring, validating, or maintaining the intent knowledge base. A separate tool owns those TOML documents; cmf consumes them read-only
+- Authoring, validating, or maintaining the intent knowledge base, including the validators that live beside its records. A separate tool owns those TOML documents and scripts; cmf and cmv consume them read-only
+- Judging adherence with a model. cmv parses; it never asks
 - Publishing plugins, marketplaces, or platform manifests. cmf installs assembled artifacts directly through cmx-core
 - Hosting a centralized registry or marketplace service
 - Managing LLM API keys, billing, or model routing

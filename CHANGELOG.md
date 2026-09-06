@@ -16,6 +16,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **cmv resolves the knowledge base through the cmx source registry and
+  verifies at the pinned revision.** Phase 3 of `CMV.md`, second half. The
+  knowledge-base root now resolves in a fixed order, recorded in every report
+  as `knowledge_base.resolved_by`: `--knowledge-base <path>` (`override`), the
+  manifest's `source` looked up in `sources.json` (`source`), then the
+  manifest's recorded `path` (`path`); a recorded source name the registry does
+  not know falls through to the path with a stderr warning suggesting `cmx
+  source add`. When the manifest pins a `revision` and the checkout's `HEAD`
+  has moved past it, cmv materializes the pinned tree into its scratch
+  directory (`git -C <kb> archive --format=tar -o <scratch>/kb.tar <rev>`,
+  then `tar -xf`) and reads records from, and runs validators in, that tree;
+  an unreachable revision exits `2` naming it and suggesting `cmx source
+  update <name>` or `git fetch`. `--at-head` on `check`, `status`, and
+  `explain` bypasses the pin for validator authors. Stale is now computed
+  against the working tree: a record whose bytes at `HEAD` differ from the
+  manifest checksum, or a validator whose `run` file differs between `HEAD` and
+  the pinned tree. Reports gain a `knowledge_base` block (`path`,
+  `resolved_by`, `source`, `pinned_revision`, `head_revision`,
+  `verified_against`, `moved`), and human output adds one informational line
+  when `moved` — `knowledge base has moved: HEAD <short> vs pinned <short>; N
+  compiled records or validators changed; re-run cmf install to recompile` —
+  which never affects the exit code.
+- **`cmv explain <intent>`.** Shows, for one compiled intent (by catalog key,
+  or by record id when the argument contains a `.`), how the manifest entry
+  resolved (by id, by key, not found), the record's title and status, every
+  declared validator with its language, `run`, `required` flag, and
+  description, which of them would run for the detected languages, the exact
+  argv `check` would use, the `--config` JSON handed over from `cmv.toml`, the
+  stale flag, and whether the manifest dropped it. Runs nothing. `--json`
+  variant; exit `2` when the intent is not in the manifest at all.
+- **cmv ships with cmx and cmf.** `release.yml` packages `cmv` in every
+  archive, the Homebrew formula installs and tests all three binaries, and the
+  charter now describes three complementary CLIs.
 - **New binary: `cmv`, the verifier.** Phase 3 of `CMV.md`, first half. `cmv
   check` reads the compile manifest cmf wrote for a project
   (`.context-mixer/cmf-manifest.json` by default), resolves each compiled
@@ -33,9 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   timestamps; the human listing is linter-style with `path:line` diagnostics.
   `cmv status` summarizes the manifest, pin, languages, and validator coverage
   without running anything. Several validators matching one intent combine
-  all-must-pass. The knowledge base is read from the manifest's recorded path
-  or `--knowledge-base <path>`; resolution through the cmx source registry at
-  the pinned revision, `cmv explain`, and release wiring follow.
+  all-must-pass.
 - **Intent records may declare executable validators.** An evidence entry of
   type `static-check` (`CMV.md`, "Intent record: validator evidence entries")
   now carries `language`, the source language the validator reads, and `run`,

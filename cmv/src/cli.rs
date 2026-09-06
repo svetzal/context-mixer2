@@ -1,4 +1,4 @@
-//! Command-line grammar for `cmv check` and `cmv status`.
+//! Command-line grammar for `cmv check`, `cmv status`, and `cmv explain`.
 
 use std::path::PathBuf;
 
@@ -17,7 +17,8 @@ pub struct Cli {
     pub command: Commands,
 }
 
-/// Where the project, its manifest, and the knowledge base are.
+/// Where the project, its manifest, and the knowledge base are, and which
+/// tree of the knowledge base to verify.
 #[derive(Args, Debug, Clone, Default, PartialEq, Eq)]
 pub struct LocationArgs {
     /// Project root. Defaults to the current directory.
@@ -29,9 +30,15 @@ pub struct LocationArgs {
     #[arg(long, value_name = "PATH")]
     pub manifest: Option<PathBuf>,
     /// Knowledge-base root holding the intent records and validators.
-    /// Defaults to the `knowledge_base.path` the manifest recorded.
+    /// Overrides resolution through the cmx source registry and the
+    /// `knowledge_base.path` the manifest recorded.
     #[arg(long, value_name = "PATH")]
     pub knowledge_base: Option<PathBuf>,
+    /// Verify the knowledge base's working tree even when the manifest pins a
+    /// revision its HEAD has moved past. For validator authors iterating on a
+    /// knowledge base; the report says which tree was used.
+    #[arg(long)]
+    pub at_head: bool,
 }
 
 /// Supported `cmv` operations.
@@ -43,7 +50,7 @@ pub enum Commands {
     /// Exit 0 when every required, applicable validator passed; 1 when any
     /// required validator failed (or, with --strict, any intent was
     /// unchecked); 2 for a missing or malformed manifest, an unreadable
-    /// knowledge base, or bad usage.
+    /// knowledge base, an unreachable pinned revision, or bad usage.
     Check {
         /// Emit the full per-intent report as JSON instead of the listing.
         #[arg(long)]
@@ -56,9 +63,26 @@ pub enum Commands {
         location: LocationArgs,
     },
     /// Summarize the manifest, the knowledge-base pin, detected languages, and
-    /// validator coverage without running anything.
+    /// validator coverage without running any validator.
     Status {
         /// Emit the summary as JSON.
+        #[arg(long)]
+        json: bool,
+        /// Where the project, manifest, and knowledge base are.
+        #[command(flatten)]
+        location: LocationArgs,
+    },
+    /// Show what `check` would do for one intent — how its record resolves,
+    /// its validators, which would run and with what argv and config — without
+    /// running anything.
+    ///
+    /// Exit 2 when the intent is neither compiled nor dropped in the manifest.
+    Explain {
+        /// Catalog key of the intent (e.g. `craftsperson/rust/put-gateways-at-effect-boundaries`),
+        /// or its record id when the argument contains a `.`.
+        #[arg(value_name = "INTENT")]
+        intent: String,
+        /// Emit the explanation as JSON.
         #[arg(long)]
         json: bool,
         /// Where the project, manifest, and knowledge base are.
