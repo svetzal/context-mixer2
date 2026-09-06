@@ -1,0 +1,13 @@
+id = "fixture.intent.compile-public-documentation"
+title = "Compile public documentation"
+category = "quality"
+tags = ["rust", "docs"]
+status = "hypothesized"
+capability = "Every public item explains itself."
+threat = "Undocumented items are misused."
+expectation = "rustdoc builds with warnings denied."
+strategy = "Deny missing_docs and gate on cargo doc."
+tradeoff = "Slower to add public items."
+evidence = [
+  { type = "architecture_review", description = "The doc gate runs in CI.", required = false },
+]

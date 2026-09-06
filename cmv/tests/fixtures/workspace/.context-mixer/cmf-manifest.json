@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "compiled_at": "2026-09-05T14:02:11+00:00",
+  "knowledge_base": {
+    "source": "guidelines",
+    "path": "kb",
+    "revision": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+  },
+  "profile": {
+    "id": "rust-shipping",
+    "version": "0.3.0"
+  },
+  "artifact": {
+    "name": "AGENTS",
+    "surface": "agent",
+    "checksum": "sha256:fbc47a06d0b3381c65bee8ac66ae9765984224379537d9798b83fde3edeca8ed"
+  },
+  "intents": [
+    {
+      "id": "fixture.intent.put-gateways-at-effect-boundaries",
+      "key": "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "checksum": "sha256:6f0d08d23148c626690ab8910c9b40c82db501ce93e3a505e907767969a588b5"
+    },
+    {
+      "id": "fixture.intent.isolate-functional-core",
+      "key": "craftsperson/rust/isolate-functional-core",
+      "checksum": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "fixture.intent.compile-public-documentation",
+      "key": "craftsperson/rust/compile-public-documentation",
+      "checksum": "sha256:ee60349ba5ea2557fc70e96059c612d911f5f4f4a36477572d2cdb4efae75090"
+    },
+    {
+      "id": "fixture.intent.prefer-owned-data",
+      "key": "craftsperson/rust/prefer-owned-data",
+      "checksum": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "dropped": [
+    {
+      "key": "craftsperson/rust/name-for-intent",
+      "reason": "budget"
+    }
+  ]
+}

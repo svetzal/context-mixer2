@@ -1,0 +1,5 @@
+validator_timeout_seconds = 10
+
+[intent."craftsperson/rust/isolate-functional-core"]
+business_rule_pattern = "\\b500\\b"
+business_rule_minimum_matches = 2

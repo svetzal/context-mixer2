@@ -1,5 +1,5 @@
 [workspace]
-members = ["cmx", "cmx-core", "cmf"]
+members = ["cmx", "cmx-core", "cmf", "cmv"]
 # Behavioural-exercise material: the fact extractor, the Rust scenario skeleton,
 # its reference solution, and every generated run workspace. These are fixtures
 # and harness tooling, not crates cmx ships, and they must stay out of

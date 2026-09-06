@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to cmx and cmf will be documented in this file.
+All notable changes to cmx, cmf, and cmv will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -16,6 +16,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **New binary: `cmv`, the verifier.** Phase 3 of `CMV.md`, first half. `cmv
+  check` reads the compile manifest cmf wrote for a project
+  (`.context-mixer/cmf-manifest.json` by default), resolves each compiled
+  intent's record in the knowledge base (by `id`, then `key`), detects the
+  workspace's languages from its root-level build manifests (overridable in
+  `cmv.toml`), runs every `static-check` validator whose `language` matches as
+  `<kb>/<run> --workspace <root> --config <json>`, and reports one of `pass`,
+  `fail`, `not applicable`, `unchecked` (no validator, could not start, crash,
+  timeout, or unparseable stdout — with the reason), or `unguided` (dropped by
+  the manifest) per intent, plus `stale` when the record's bytes changed since
+  compile. Exit `0` when every required intent held, `1` when a required
+  validator failed (or, with `--strict`, anything was unchecked), `2` for a
+  missing manifest, unreadable knowledge base, or bad usage; an optional
+  validator's failure never gates. `--json` emits a deterministic report with no
+  timestamps; the human listing is linter-style with `path:line` diagnostics.
+  `cmv status` summarizes the manifest, pin, languages, and validator coverage
+  without running anything. Several validators matching one intent combine
+  all-must-pass. The knowledge base is read from the manifest's recorded path
+  or `--knowledge-base <path>`; resolution through the cmx source registry at
+  the pinned revision, `cmv explain`, and release wiring follow.
 - **Intent records may declare executable validators.** An evidence entry of
   type `static-check` (`CMV.md`, "Intent record: validator evidence entries")
   now carries `language`, the source language the validator reads, and `run`,

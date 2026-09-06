@@ -35,6 +35,7 @@
 
 - [cmx Command Reference](./reference/commands.md)
 - [cmf Command Reference](./reference/cmf-commands.md)
+- [cmv Command Reference](./reference/cmv-commands.md)
 - [Frontmatter Reference](./reference/frontmatter.md)
 - [Lock File](./reference/lockfile.md)
 - [Platform Paths](./reference/platforms.md)

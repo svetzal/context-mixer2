@@ -443,6 +443,28 @@ skeleton, its reference solution, every generated run workspace, and the fact
 extractor are fixtures and tooling — they must stay out of `--workspace` builds,
 the rustdoc gate, and `cargo deny`.
 
+## cmv — Context Mixer Verify
+
+Deterministic verifier for the intents cmf compiled into a project. It reads the
+compile manifest cmf wrote, resolves each record in the knowledge base, runs the
+`static-check` validators matching the workspace's languages, and exits nonzero
+when a required intent is not held. No `llm` feature, no clock, no project code
+executed: the same inputs render byte-identical output. It depends on the `cmf`
+crate for the manifest and catalog types as an interim arrangement until
+`CMV.md`'s "Shared selection" decision is settled.
+
+### cmv Architecture
+
+- `cmv/src/main.rs` — binary entry point: the imperative shell that resolves the project, manifest, and knowledge base, loads them through the real gateways, hands everything to the pure core, prints the report, and exits per `CMV.md`'s table (`2` for anything that stops the run before a verdict)
+- `cmv/src/lib.rs` — crate root; exports all public modules and documents the interim dependency on `cmf`
+- `cmv/src/cli.rs` — clap grammar for `cmv check` and `cmv status`
+- `cmv/src/config.rs` — the hand-authored `cmv.toml` at the project root: language override, validator timeout, and per-intent tables handed to validators as JSON; a missing file means defaults
+- `cmv/src/language.rs` — language detection from the project's root-level build manifests, pure over the `Filesystem` gateway; a `cmv.toml` override replaces detection entirely
+- `cmv/src/verdict.rs` — the validator output contract (`Verdict`, `Location`), the per-intent `State`, the `IntentOutcome` cmv reports, and the `Summary` whose exit code gates the run; pure data and arithmetic
+- `cmv/src/dispatch.rs` — the verification core: `check` resolves every compiled intent (by `id`, then `key`), runs matching validators per the invocation protocol, combines several matches all-must-pass, and maps each run onto one `IntentOutcome`; `status` answers the same resolution questions without running anything
+- `cmv/src/process.rs` — the `ProcessRunner` gateway (run an executable with args, cwd, and a timeout): `RealProcessRunner` over `std::process::Command` (own process group on unix, group-killed on timeout) and the scripted `FakeProcessRunner`; kept out of `cmx-core` to avoid a coordinated release
+- `cmv/src/report.rs` — output rendering for `check` and `status`: deterministic JSON (`--json`) and the human listings; `Display` impls and their tests live here
+
 ## Spec
 
 See `SPEC.md` for the full design spec.

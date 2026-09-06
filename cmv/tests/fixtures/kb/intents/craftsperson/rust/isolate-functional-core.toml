@@ -1,0 +1,14 @@
+id = "fixture.intent.isolate-functional-core"
+title = "Isolate the functional core"
+category = "architecture"
+tags = ["rust", "design"]
+status = "confirmed"
+capability = "Business rules are pure functions."
+threat = "Rules tangled with I/O cannot be tested without it."
+expectation = "Modules holding business rules import no gateway."
+strategy = "Keep decisions in pure modules; push effects to the shell."
+tradeoff = "More plumbing between core and shell."
+evidence = [
+  { type = "static-check", language = "rust", run = "checks/rust/isolate_functional_core.sh", description = "No module holding business rules references a gateway.", required = true },
+  { type = "static-check", language = "python", run = "checks/python/isolate_functional_core.py", description = "No module holding business rules imports an I/O client.", required = true },
+]

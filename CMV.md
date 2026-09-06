@@ -1,9 +1,10 @@
 # cmv — Deterministic Verification of Compiled Intents
 
-> Design draft. Status: proposed (2026-09-05). Phases 1–2 (manifest,
-> validator evidence entries) are implemented; cmv itself is not.
-> Companion to [CHARTER.md](CHARTER.md), [SPEC.md](SPEC.md), and
-> [SETS.md](SETS.md).
+> Design draft. Status: proposed (2026-09-05). Phases 1–2 are implemented;
+> Phase 3 is in progress (cmv check/status against a local knowledge base;
+> source-registry resolution, pinned revision, `cmv explain`, and release
+> wiring pending). Companion to [CHARTER.md](CHARTER.md), [SPEC.md](SPEC.md),
+> and [SETS.md](SETS.md).
 
 ## Motivation
 
@@ -295,6 +296,13 @@ cmv status                    # manifest summary, pin, stale/unavailable, langua
 Human output is a linter-style listing grouped by state with `path:line`
 diagnostics from `locations`; `--json` emits the full per-intent report for CI
 and for the benchmark aggregator.
+
+Both `check` and `status` also accept `--knowledge-base <path>` as an
+override: the knowledge base is otherwise read from the `knowledge_base.path`
+the manifest recorded. The override is what makes cmv usable before
+source-registry resolution lands, and it stays useful afterwards for a
+checkout that is not a registered cmx source (a validator author's working
+copy, a CI cache).
 
 ## Calibration fixtures
 

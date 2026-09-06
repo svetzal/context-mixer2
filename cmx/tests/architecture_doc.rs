@@ -4,15 +4,15 @@
 //! synchronized with the actual source tree:
 //!
 //! - `every_documented_path_exists`: every backtick-quoted path that looks
-//!   like a source file (`cmx/src/…`, `cmx-core/src/…`, or `cmf/src/…`)
-//!   must exist on disk.
+//!   like a source file (`cmx/src/…`, `cmx-core/src/…`, `cmf/src/…`, or
+//!   `cmv/src/…`) must exist on disk.
 //!
 //! - `every_source_file_is_documented`: every `*.rs` file under `cmx/src`,
-//!   `cmx-core/src`, and `cmf/src` must appear (by its full repo-relative
-//!   path) somewhere in `AGENTS.md`.
+//!   `cmx-core/src`, `cmf/src`, and `cmv/src` must appear (by its full
+//!   repo-relative path) somewhere in `AGENTS.md`.
 //!
 //! - `every_documented_module_has_module_docs`: every `*.rs` file under
-//!   `cmx/src` and `cmf/src` (excluding `tests.rs` files) must carry a
+//!   `cmx/src`, `cmf/src`, and `cmv/src` (excluding `tests.rs` files) must carry a
 //!   `//!` module-level doc comment as its first substantive line. AGENTS.md
 //!   is the index; the module's own `//!` header is the authoritative
 //!   description of its purpose.
@@ -39,11 +39,17 @@ fn agents_md_content() -> String {
         .unwrap_or_else(|e| panic!("Failed to read AGENTS.md at {}: {}", path.display(), e))
 }
 
+/// The crates whose `src/` trees the Architecture section must index.
+const CRATE_SOURCE_DIRS: [&str; 4] = ["cmx/src", "cmx-core/src", "cmf/src", "cmv/src"];
+
+/// The binary crates whose every module must open with a `//!` header
+/// (cmx-core is fully documented via its own `missing_docs` deny).
+const MODULE_DOC_SOURCE_DIRS: [&str; 3] = ["cmx/src", "cmf/src", "cmv/src"];
+
 /// Return true if a backtick-quoted token looks like a repo-relative Rust
-/// source path for one of the three crates we care about.
+/// source path for one of the crates we care about.
 fn is_source_path(s: &str) -> bool {
-    let has_prefix =
-        s.starts_with("cmx/src/") || s.starts_with("cmx-core/src/") || s.starts_with("cmf/src/");
+    let has_prefix = CRATE_SOURCE_DIRS.iter().any(|dir| s.starts_with(&format!("{dir}/")));
     let has_rs_ext = Path::new(s).extension().is_some_and(|ext| ext.eq_ignore_ascii_case("rs"));
     has_prefix
         && has_rs_ext
@@ -126,7 +132,7 @@ fn every_documented_module_has_module_docs() {
     let root = workspace_root();
 
     let mut all_source_files = Vec::new();
-    for subdir in &["cmx/src", "cmf/src"] {
+    for subdir in MODULE_DOC_SOURCE_DIRS {
         all_source_files.extend(walk_source_files(&root, subdir));
     }
 
@@ -162,7 +168,7 @@ fn every_source_file_is_documented() {
     let content = agents_md_content();
 
     let mut all_source_files = Vec::new();
-    for subdir in &["cmx/src", "cmx-core/src", "cmf/src"] {
+    for subdir in CRATE_SOURCE_DIRS {
         all_source_files.extend(walk_source_files(&root, subdir));
     }
 
