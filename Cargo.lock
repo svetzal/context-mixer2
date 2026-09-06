@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "cmf"
-version = "3.2.0"
+version = "3.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -333,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "cmv"
-version = "3.2.0"
+version = "3.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -347,7 +347,7 @@ dependencies = [
 
 [[package]]
 name = "cmx"
-version = "3.2.0"
+version = "3.2.1"
 dependencies = [
  "anyhow",
  "chrono",
