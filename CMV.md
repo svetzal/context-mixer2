@@ -372,9 +372,10 @@ knowledge base is unchanged and now also covers validators.
 
 1. **Manifest.** Schema, `cmf install` writes it, `Assembly.selected` becomes
    a public contract, conformance fixture added. No cmv yet.
-2. **Validator evidence entries.** Catalog schema gains `language` and `run`;
-   invocation protocol and verdict JSON documented in `cmx-core/SPEC.md` or a
-   sibling; `locations` added to the verdict shape.
+2. **Validator evidence entries.** Catalog schema gains `language` and `run`,
+   validated at scan time. The invocation protocol and verdict JSON, including
+   `locations`, are specified in this note's "Validator invocation protocol"
+   section; they become a conformance fixture when cmv lands in Phase 3.
 3. **cmv binary.** New workspace member inheriting the workspace version.
    Reads manifest and `cmv.toml`, detects languages, resolves the knowledge
    base through the cmx source registry at the pinned revision, dispatches
