@@ -389,7 +389,7 @@ Read-only materializer for an externally maintained TOML intent knowledge base.
 - `cmf/src/main.rs` — binary entry point; assembles, previews, and applies installs through cmx-core
 - `cmf/src/lib.rs` — crate root; re-exports all public modules
 - `cmf/src/cli.rs` — clap grammar for `assemble`, `install`, and `status`
-- `cmf/src/catalog.rs` — read-only recursive discovery and parsing of TOML intent records
+- `cmf/src/catalog.rs` — read-only recursive discovery, parsing, and schema validation of TOML intent records, including `static-check` validator evidence entries
 - `cmf/src/profile.rs` — materialization-profile schema, loading, and scope guards
 - `cmf/src/assembly.rs` — deterministic selection, graph expansion, surface shaping, and budget enforcement
 - `cmf/src/manifest.rs` — the compile manifest, cmf's second output artifact: records which intent records were composed into a delivered artifact (profile, artifact checksum, per-record checksums, knowledge-base path/source/revision) so a verifier can hold the project to exactly those intents; written by `cmf assemble --manifest <path>` and by `cmf install --local --apply` to `.context-mixer/cmf-manifest.json`

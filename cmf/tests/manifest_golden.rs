@@ -126,3 +126,25 @@ fn golden_manifest_writes_through_the_filesystem_gateway() {
     let written = fixture.fs.get_file_content(&path).expect("manifest file exists");
     assert_eq!(String::from_utf8(written).unwrap(), manifest.to_json().unwrap());
 }
+
+#[test]
+fn fixture_validator_lives_on_the_record_the_profile_does_not_select() {
+    let fixture = fixture();
+    let (manifest, intents) = build_manifest(&fixture);
+    let unselected = "craftsperson/python/type-public-boundaries";
+    assert!(
+        manifest.intents.iter().all(|entry| entry.key != unselected),
+        "the validator-bearing record must stay out of the golden manifest"
+    );
+    let validators: Vec<_> = intents[unselected].record.validators().collect();
+    assert_eq!(validators.len(), 1, "the fixture declares exactly one validator");
+    assert_eq!(validators[0].language, "python");
+    assert_eq!(validators[0].run, Path::new("checks/python/type_public_boundaries.py"));
+    assert!(validators[0].required);
+    let others: usize = intents
+        .iter()
+        .filter(|(key, _)| *key != unselected)
+        .map(|(_, intent)| intent.record.validators().count())
+        .sum();
+    assert_eq!(others, 0, "no selected fixture record declares a validator");
+}

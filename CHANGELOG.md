@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Intent records may declare executable validators.** An evidence entry of
+  type `static-check` (`CMV.md`, "Intent record: validator evidence entries")
+  now carries `language`, the source language the validator reads, and `run`,
+  the validator executable relative to the knowledge-base root; `description`
+  stays required on every entry because it is what renders into the guidance.
+  The catalog exposes them as `Evidence::validator()` and
+  `IntentRecord::validators()`, and `catalog::scan` refuses a knowledge base,
+  naming the record and entry, when a `static-check` entry lacks either field,
+  when either field appears on any other evidence type, or when `run` is
+  absolute or contains `..`. Rendering is unchanged: `run` and `language` never
+  reach the assembled artifact. cmf records and renders validators; running
+  them is the future `cmv`'s job.
 - **cmf records what it compiled.** cmf now has a second output artifact, the
   compile manifest (`CMV.md`, "The manifest"): JSON with a `schema` version,
   the `compiled_at` instant, the knowledge base's path plus its cmx source name

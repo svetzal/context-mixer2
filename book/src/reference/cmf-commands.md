@@ -77,3 +77,27 @@ contributes the capability, threat, expectation, and accepted trade-off;
 `guidance` contributes the preferred strategy; and `evidence` contributes
 required or optional verification. Intent titles and evidence-type metadata
 stay in `--explain` provenance instead of consuming delivered context.
+
+### Validator evidence
+
+An evidence entry of type `static-check` declares an executable validator for
+the intent. It carries two extra fields: `language`, the source language the
+validator reads (`rust`, `python`, …), and `run`, the path of the validator
+executable relative to the knowledge-base root. A record may declare one
+`static-check` entry per language it can be checked in.
+
+```toml
+evidence = [
+  { type = "architecture_review", description = "Pure modules import no gateway.", required = true },
+  { type = "static-check", language = "rust", run = "checks/rust/isolate_functional_core.py", description = "No gateway trait is referenced from a pure module.", required = true },
+]
+```
+
+Only the `description` renders — under *Require* or *Observe when useful*,
+exactly like any other evidence — so the agent learns what will be checked
+while `language` and `run` never reach the delivered artifact. cmf rejects a
+knowledge base at scan time, naming the record and entry, when a `static-check`
+entry lacks `run` or `language`, when either field appears on another evidence
+type, or when `run` is absolute or contains `..`. Executing validators is the
+job of the future verifier, `cmv` (see `CMV.md`); cmf only records and renders
+them.

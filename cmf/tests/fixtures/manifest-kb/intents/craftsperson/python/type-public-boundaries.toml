@@ -8,3 +8,6 @@ threat = "Untyped boundaries hide shape mismatches until runtime."
 expectation = "Every public function is annotated."
 strategy = "Annotate parameters and returns on every public function."
 tradeoff = "Signatures grow."
+evidence = [
+  { type = "static-check", language = "python", run = "checks/python/type_public_boundaries.py", description = "Every public function's parameters and return are annotated.", required = true },
+]

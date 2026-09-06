@@ -1,7 +1,7 @@
 # cmv — Deterministic Verification of Compiled Intents
 
-> Design draft. Status: proposed (2026-09-05). Phase 1 (the manifest) is
-> implemented; cmv itself is not.
+> Design draft. Status: proposed (2026-09-05). Phases 1–2 (manifest,
+> validator evidence entries) are implemented; cmv itself is not.
 > Companion to [CHARTER.md](CHARTER.md), [SPEC.md](SPEC.md), and
 > [SETS.md](SETS.md).
 
@@ -92,11 +92,15 @@ Records already carry an `evidence` list whose entries have a `type`, a
 ```toml
 evidence = [
   { type = "architecture_review", description = "Core modules depend on project-owned gateway contracts rather than concrete vendor clients.", required = true },
-  { type = "static-check", language = "rust", run = "checks/rust/put_gateways_at_effect_boundaries.py", required = true },
-  { type = "static-check", language = "python", run = "checks/python/put_gateways_at_effect_boundaries.py", required = true },
+  { type = "static-check", language = "rust", run = "checks/rust/put_gateways_at_effect_boundaries.py", description = "No effectful call is made outside a gateway module.", required = true },
+  { type = "static-check", language = "python", run = "checks/python/put_gateways_at_effect_boundaries.py", description = "No effectful call is made outside a gateway module.", required = true },
 ]
 ```
 
+- `description` — required on every entry, validator or not. It is what the
+  agent sees: cmf renders it into the guidance under *Require* or *Observe
+  when useful*, so the agent knows what will be checked. `language` and `run`
+  never reach the artifact.
 - `language` — the source language this validator reads. Matched against the
   workspace's detected languages.
 - `run` — path relative to the knowledge-base root. Any executable; the
@@ -106,8 +110,14 @@ evidence = [
   binary for Rust, …).
 - `required` — whether a `fail` verdict fails the cmv run.
 
+cmf validates these at scan time and refuses the knowledge base, naming the
+record and the entry, when a `static-check` entry lacks `run` or `language`,
+when either field appears on an entry of any other type, or when `run` is
+absolute or contains a `..` component — it resolves against the knowledge-base
+root and must stay inside it.
+
 `cmf`'s catalog schema (`Evidence` in
-[cmf/src/catalog.rs](cmf/src/catalog.rs)) gains the optional `language` and
+[cmf/src/catalog.rs](cmf/src/catalog.rs)) carries the optional `language` and
 `run` fields. Entries without `run` remain non-executable evidence.
 
 ### Records have two identifiers; the manifest records both

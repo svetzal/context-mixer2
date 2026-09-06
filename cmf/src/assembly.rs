@@ -199,7 +199,7 @@ fn yaml_scalar(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::{Evidence, IntentRecord, Relation};
+    use crate::catalog::{Evidence, IntentRecord, Relation, STATIC_CHECK};
     use crate::profile::{Content, Graph, Selection};
 
     fn title_case(value: &str) -> String {
@@ -235,6 +235,8 @@ mod tests {
                     kind: "gate".to_string(),
                     description: "The gate passes.".to_string(),
                     required: true,
+                    language: None,
+                    run: None,
                 }],
             },
         }
@@ -298,5 +300,41 @@ mod tests {
         assert!(content.contains(block));
         assert!(!content.contains("Testing"));
         assert!(!content.contains("##"));
+    }
+
+    #[test]
+    fn validator_evidence_renders_only_its_description() {
+        let mut testing = intent("testing", "quality", &["tests"], vec![]);
+        testing.record.evidence.push(Evidence {
+            kind: STATIC_CHECK.to_string(),
+            description: "No effectful call leaves a gateway module.".to_string(),
+            required: true,
+            language: Some("rust".to_string()),
+            run: Some("checks/rust/gateways.py".to_string()),
+        });
+        let intents = BTreeMap::from([("testing".to_string(), testing)]);
+        let profile = Profile {
+            id: "test-work".to_string(),
+            name: None,
+            version: "1.0.0".to_string(),
+            description: "Use for test work".to_string(),
+            surface: Surface::Agent,
+            budget_tokens: 500,
+            select: Selection {
+                keys: vec!["testing".to_string()],
+                ..Default::default()
+            },
+            graph: Graph::default(),
+            content: Content::default(),
+        };
+
+        let content = assemble(&profile, &intents).unwrap().content;
+        assert!(
+            content
+                .contains("Require: The gate passes; No effectful call leaves a gateway module.")
+        );
+        assert!(!content.contains("checks/rust/gateways.py"));
+        assert!(!content.contains("rust"));
+        assert!(!content.contains(STATIC_CHECK));
     }
 }
