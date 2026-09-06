@@ -321,10 +321,17 @@ A skill installed for several tools is reported as **one logical artifact**
 whose `Platforms` column lists every surveyed copy as `platform@version` — not
 as N duplicates. That's the intended "curate once, project to many" outcome.
 The only multi-location situation `doctor` flags is `(diverged)`: copies whose
-**content differs** across locations. A divergence is an anomaly worth
-surfacing *whoever* owns the artifact, so it's flagged even for `external`
-artifacts; cmx just can't be the one to re-sync an external one (its owning
-tool must). Because the table attributes the version to each platform directly,
+**content differs** across locations. The comparison is representation-aware:
+an agent installed for Codex is generated TOML rather than the portable
+Markdown, so a Codex copy is compared against the Codex *projection* of the
+Markdown copy (what `cmx agent install` would write today), never against its
+raw bytes. Reformatting alone is therefore never divergence — but a Codex TOML
+that has been hand-edited, was written by an older cmx (no preserved
+frontmatter block), or was generated from a different version of the Markdown
+**is**. A divergence is an anomaly worth surfacing *whoever* owns the artifact,
+so it's flagged even for `external` artifacts; cmx just can't be the one to
+re-sync an external one (its owning tool must). Because the table attributes
+the version to each platform directly,
 it can show equal versions for content-diverged copies (for example
 `claude@1.1.2, codex@1.1.2`) or version skew (`codex@3.2.0, claude@3.3.0`)
 without hiding which copy is where. A detail line under the summary still names

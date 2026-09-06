@@ -507,6 +507,165 @@ fn codex_agent_without_preserved_block_falls_back_to_the_lock_version() {
     assert!(!report.has_issues(), "a tracked, versioned copy is not a problem");
 }
 
+// --- representation-aware divergence: Markdown vs generated Codex TOML ---
+
+fn reviewer_markdown(version: &str) -> String {
+    crate::test_support::metadata_versioned_agent_content("reviewer", "Reviews", version)
+}
+
+fn reviewer_artifact(report: &DoctorReport) -> &DoctorArtifact {
+    report.artifacts.iter().find(|a| a.name == "reviewer").expect("grouped")
+}
+
+#[test]
+fn codex_copy_that_is_the_projection_of_the_markdown_copy_is_not_diverged() {
+    let t = TestContext::new();
+    let markdown = reviewer_markdown("1.3.0");
+    let codex_toml = cmx_core::agent::markdown_to_codex_toml(&markdown, "reviewer");
+    track_agent(&t, Platform::Claude, "reviewer", &markdown, "1.3.0");
+    track_agent(&t, Platform::Codex, "reviewer", &codex_toml, "1.3.0");
+
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
+    let art = reviewer_artifact(&report);
+    assert_eq!(art.state, ArtifactState::Tracked);
+    assert!(!art.diverged, "reformatting alone is never divergence");
+    assert_eq!(report.counts().diverged, 0);
+    assert!(!report.has_issues(), "one agent projected to two tools is the steady state");
+
+    let codex_row = report
+        .rows
+        .iter()
+        .find(|r| r.name == "reviewer" && r.platforms.contains(&Platform::Codex))
+        .expect("codex row");
+    assert_eq!(codex_row.representation, Representation::CodexToml);
+    assert_eq!(codex_row.projected_codex_checksum, None);
+    let claude_row = report
+        .rows
+        .iter()
+        .find(|r| r.name == "reviewer" && r.platforms.contains(&Platform::Claude))
+        .expect("claude row");
+    assert_eq!(claude_row.representation, Representation::Portable);
+    assert_eq!(
+        claude_row.projected_codex_checksum.as_deref(),
+        Some(codex_row.content_checksum.as_str()),
+        "the Markdown copy's projection is exactly the Codex copy's bytes"
+    );
+}
+
+#[test]
+fn hand_edited_codex_copy_is_diverged() {
+    let t = TestContext::new();
+    let markdown = reviewer_markdown("1.3.0");
+    let generated = cmx_core::agent::markdown_to_codex_toml(&markdown, "reviewer");
+    let edited = generated.replace(
+        "developer_instructions = \"# reviewer\"",
+        "developer_instructions = \"# reviewer\\n\\nAlways be terse.\"",
+    );
+    assert_ne!(edited, generated, "the edit must actually change the TOML");
+    track_agent(&t, Platform::Claude, "reviewer", &markdown, "1.3.0");
+    track_agent(&t, Platform::Codex, "reviewer", &edited, "1.3.0");
+
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
+    let art = reviewer_artifact(&report);
+    assert!(art.diverged, "a TOML that is not what cmx would generate has diverged");
+    assert!(report.has_issues());
+}
+
+#[test]
+fn older_cmx_bare_toml_beside_a_markdown_copy_is_diverged() {
+    // A Codex agent written before the transform preserved the frontmatter:
+    // no `# ---` block, so it is not what cmx would generate today.
+    let t = TestContext::new();
+    let markdown = reviewer_markdown("1.3.0");
+    let old_toml =
+        "name = \"reviewer\"\ndescription = \"Reviews\"\ndeveloper_instructions = \"# reviewer\"\n";
+    track_agent(&t, Platform::Claude, "reviewer", &markdown, "1.3.0");
+    track_agent(&t, Platform::Codex, "reviewer", old_toml, "1.3.0");
+
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
+    assert!(reviewer_artifact(&report).diverged, "an older-format TOML needs a rewrite");
+}
+
+#[test]
+fn codex_copy_generated_from_an_older_markdown_version_is_diverged() {
+    let t = TestContext::new();
+    let newer = reviewer_markdown("1.4.0");
+    let stale_toml =
+        cmx_core::agent::markdown_to_codex_toml(&reviewer_markdown("1.3.0"), "reviewer");
+    track_agent(&t, Platform::Claude, "reviewer", &newer, "1.4.0");
+    track_agent(&t, Platform::Codex, "reviewer", &stale_toml, "1.3.0");
+
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
+    let art = reviewer_artifact(&report);
+    assert!(art.diverged, "the Codex copy lags the Markdown copy");
+    assert_eq!(art.versions, vec!["1.3.0".to_string(), "1.4.0".to_string()]);
+}
+
+#[test]
+fn codex_only_agent_is_not_diverged() {
+    let t = TestContext::new();
+    let codex_toml =
+        cmx_core::agent::markdown_to_codex_toml(&reviewer_markdown("1.3.0"), "reviewer");
+    track_agent(&t, Platform::Codex, "reviewer", &codex_toml, "1.3.0");
+
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
+    let art = reviewer_artifact(&report);
+    assert!(!art.diverged, "a single copy has nothing to diverge from");
+    assert!(!report.has_issues());
+}
+
+#[test]
+fn two_markdown_copies_are_still_compared_by_bytes() {
+    // Regression guard for the unchanged path: portable copies on two
+    // Markdown agent platforms are diverged exactly when their bytes differ.
+    let t = TestContext::new();
+    track_agent(&t, Platform::Claude, "reviewer", &reviewer_markdown("1.3.0"), "1.3.0");
+    track_agent(&t, Platform::Opencode, "reviewer", &reviewer_markdown("1.4.0"), "1.4.0");
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
+    assert!(reviewer_artifact(&report).diverged, "different Markdown bytes diverge");
+
+    let t = TestContext::new();
+    track_agent(&t, Platform::Claude, "reviewer", &reviewer_markdown("1.3.0"), "1.3.0");
+    track_agent(&t, Platform::Opencode, "reviewer", &reviewer_markdown("1.3.0"), "1.3.0");
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
+    assert!(!reviewer_artifact(&report).diverged, "identical Markdown bytes do not");
+}
+
+#[test]
+fn agent_installed_to_claude_and_codex_through_the_real_install_path_is_not_diverged() {
+    // Round trip: the projection `classify` computes must be byte-for-byte
+    // what `install` actually writes for Codex, or every Markdown+Codex pair
+    // would be a false positive again.
+    use crate::flags::Force;
+
+    let t = TestContext::new();
+    crate::test_support::setup_source_with_agent(
+        &t.fs,
+        &t.paths,
+        "my-source",
+        "/sources/my-source",
+        "my-agent",
+    );
+    let result = crate::install::install_many(
+        &["my-agent".to_string()],
+        ArtifactKind::Agent,
+        InstallScope::Global,
+        Force::No,
+        &[Platform::Claude, Platform::Codex],
+        &t.ctx(),
+    )
+    .unwrap();
+    assert!(result.failed.is_empty(), "install failures: {:?}", result.failed);
+    assert_eq!(result.installed.len(), 2, "one install per target platform");
+
+    let report = survey(SurveyScope::GlobalOnly, &t.ctx()).unwrap();
+    let art = report.artifacts.iter().find(|a| a.name == "my-agent").expect("grouped");
+    assert_eq!(art.state, ArtifactState::Tracked);
+    assert!(art.tools.contains(&Platform::Claude) && art.tools.contains(&Platform::Codex));
+    assert!(!art.diverged, "install's Codex TOML matches doctor's projection");
+    assert!(!report.has_issues());
+}
+
 // --- divergence_details (pure, no gateway fakes needed) ---
 
 /// Build a minimal `DoctorRow`. Callers override only the fields under test.
@@ -531,6 +690,8 @@ pub(crate) fn make_row(
         source: None,
         source_checksum: None,
         content_checksum: checksum.to_string(),
+        representation: Representation::Portable,
+        projected_codex_checksum: None,
     }
 }
 
@@ -566,6 +727,8 @@ fn make_doctor_row(name: &str, loc: &str, ver: &str, state: ArtifactState) -> Do
         source: None,
         source_checksum: None,
         content_checksum: format!("sha256:{ver}"),
+        representation: Representation::Portable,
+        projected_codex_checksum: None,
     }
 }
 
@@ -777,6 +940,8 @@ fn group_rows_tools_is_union_of_tracked_for() {
             source: None,
             source_checksum: None,
             content_checksum: "sha256:1.0.0".to_string(),
+            representation: Representation::Portable,
+            projected_codex_checksum: None,
         },
         DoctorRow {
             kind: ArtifactKind::Skill,
@@ -790,6 +955,8 @@ fn group_rows_tools_is_union_of_tracked_for() {
             source: None,
             source_checksum: None,
             content_checksum: "sha256:1.0.0".to_string(),
+            representation: Representation::Portable,
+            projected_codex_checksum: None,
         },
     ];
     let arts = group_rows(&rows);
@@ -812,6 +979,8 @@ fn group_rows_source_joins_distinct_provenance() {
             source: Some("repo-a".to_string()),
             source_checksum: None,
             content_checksum: "sha256:1.0.0".to_string(),
+            representation: Representation::Portable,
+            projected_codex_checksum: None,
         },
         DoctorRow {
             kind: ArtifactKind::Skill,
@@ -825,6 +994,8 @@ fn group_rows_source_joins_distinct_provenance() {
             source: Some("repo-b".to_string()),
             source_checksum: None,
             content_checksum: "sha256:1.0.0".to_string(),
+            representation: Representation::Portable,
+            projected_codex_checksum: None,
         },
     ];
     let arts = group_rows(&rows);
@@ -1093,38 +1264,41 @@ fn collect_missing_mixed_one_present_one_missing() {
     assert_eq!(missing[0].name, "gone");
 }
 
-// --- read_installed_version ---
+// --- read_installed_content ---
 
 #[test]
-fn read_installed_version_returns_version_from_skill_content() {
+fn read_installed_content_reads_a_skills_skill_md() {
     let t = TestContext::new();
     let pv = t.paths.with_platform(Platform::Claude);
     let skill_dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
     let dir = skill_dir.join("versioned-skill");
-    t.fs.add_file(dir.join("SKILL.md"), versioned_skill_content("A skill", "2.3.4"));
+    let content = versioned_skill_content("A skill", "2.3.4");
+    t.fs.add_file(dir.join("SKILL.md"), content.as_str());
 
-    let version = read_installed_version(ArtifactKind::Skill, &dir, &t.ctx());
-    assert_eq!(version.as_deref(), Some("2.3.4"));
+    let read = read_installed_content(ArtifactKind::Skill, &dir, &t.ctx());
+    assert_eq!(read.as_deref(), Some(content.as_str()));
 }
 
 #[test]
-fn read_installed_version_returns_none_when_no_version_in_content() {
+fn read_installed_content_reads_an_agent_file_itself() {
     let t = TestContext::new();
     let pv = t.paths.with_platform(Platform::Claude);
-    let skill_dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
-    let dir = skill_dir.join("unversioned-skill");
-    t.fs.add_file(dir.join("SKILL.md"), "---\ndescription: no version here\n---\n# skill\n");
+    let path = pv
+        .require_installed_artifact_path(ArtifactKind::Agent, "reviewer", InstallScope::Global)
+        .unwrap();
+    let content = crate::test_support::agent_content("reviewer", "Reviews");
+    t.fs.add_file(&path, content.as_str());
 
-    let version = read_installed_version(ArtifactKind::Skill, &dir, &t.ctx());
-    assert!(version.is_none(), "content without a version field → None");
+    let read = read_installed_content(ArtifactKind::Agent, &path, &t.ctx());
+    assert_eq!(read.as_deref(), Some(content.as_str()));
 }
 
 #[test]
-fn read_installed_version_returns_none_when_file_absent() {
+fn read_installed_content_returns_none_when_file_absent() {
     let t = TestContext::new();
     let nonexistent = std::path::PathBuf::from("/home/testuser/.claude/skills/missing-skill");
-    let version = read_installed_version(ArtifactKind::Skill, &nonexistent, &t.ctx());
-    assert!(version.is_none(), "nonexistent path → None");
+    let read = read_installed_content(ArtifactKind::Skill, &nonexistent, &t.ctx());
+    assert!(read.is_none(), "nonexistent path → None");
 }
 
 // --- set-consistency (Phase 3, end-to-end via survey) ---

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`cmx doctor` no longer reports an agent installed for both a Markdown
+  platform and Codex as `(diverged)` merely because the Codex copy is
+  generated TOML.** Divergence is now representation-aware: copies in the same
+  representation are still compared by content checksum, while a Codex TOML
+  copy is compared against the Codex *projection* of its portable Markdown
+  sibling — exactly what `cmx agent install` would write for Codex from that
+  Markdown today. Reformatting alone is never divergence; a Codex TOML that has
+  been hand-edited, or that was generated from a different version of the
+  Markdown, still is. Note that a Codex agent file written by a cmx before
+  3.2.0 (which carries no preserved frontmatter block) is not what current cmx
+  would generate and so reports `diverged` until `cmx agent install <name>
+  --force` rewrites it. `DoctorRow` gains `representation` and
+  `projected_codex_checksum` to carry the decision.
+
 ## [3.2.0] - 2026-09-06
 
 ### Removed

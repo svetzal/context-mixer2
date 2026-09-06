@@ -2,7 +2,9 @@
 //!
 //! Decides each installed artifact's [`ArtifactState`] from its content
 //! checksum against the pre-loaded lock files and source availability built
-//! by `locations.rs`, and assembles the raw per-location [`DoctorRow`]s the
+//! by `locations.rs`, records each copy's on-disk [`Representation`] (portable,
+//! or generated Codex TOML) together with the Codex projection checksum of a
+//! portable agent, and assembles the raw per-location [`DoctorRow`]s the
 //! survey later folds into logical artifacts (see `aggregate.rs`).
 
 use std::collections::{BTreeMap, HashMap};
@@ -17,7 +19,7 @@ use crate::scan;
 use crate::types::{ArtifactKind, InstallScope, LockFile};
 
 use super::locations::LocationAgg;
-use super::types::{ArtifactState, DoctorRow};
+use super::types::{ArtifactState, DoctorRow, Representation};
 
 /// Classify one on-disk artifact against the lock files of every platform that
 /// reads its location.
@@ -106,15 +108,61 @@ pub(crate) fn source_checksum_of(
     }
 }
 
-/// Read an installed artifact's declared version from its content file.
-pub(crate) fn read_installed_version(
+/// Read an installed artifact's content file — the agent file itself, or a
+/// skill's `SKILL.md` — as text. `None` when it is absent or not UTF-8.
+///
+/// Read once per copy: the same text yields the declared version and, for a
+/// portable agent, the Codex projection checksum.
+pub(crate) fn read_installed_content(
     kind: ArtifactKind,
     path: &Path,
     ctx: &AppContext<'_>,
 ) -> Option<String> {
     let content_path = kind.content_path(path);
-    let content = ctx.fs.read_to_string(&content_path).ok()?;
-    scan::extract_version_from_content(&content)
+    ctx.fs.read_to_string(&content_path).ok()
+}
+
+/// The on-disk representation of every copy at a location.
+///
+/// Skills are always portable, whatever platforms read the directory (the
+/// shared `.agents/skills` cohort mixes Codex with non-transforming tools, and
+/// that is fine — the transform only ever applies to agents). For an agent
+/// location, the platforms all resolve to the same directory and so read the
+/// same bytes; the first platform speaks for all of them, and the debug
+/// assertion pins that invariant in case a future cohort mixes transforming
+/// and non-transforming agent readers of one directory.
+pub(crate) fn representation_of(agg: &LocationAgg) -> Representation {
+    if agg.kind != ArtifactKind::Agent {
+        return Representation::Portable;
+    }
+    let transforms = agg.platforms[0].transforms_agent_to_toml();
+    debug_assert!(
+        agg.platforms.iter().all(|p| p.transforms_agent_to_toml() == transforms),
+        "platforms sharing an agent install directory must share a representation"
+    );
+    if transforms {
+        Representation::CodexToml
+    } else {
+        Representation::Portable
+    }
+}
+
+/// The checksum a portable agent's Codex TOML projection would have — what
+/// `cmx agent install` writes for Codex from this very Markdown — so a Codex
+/// sibling can be compared against it (see `aggregate.rs`). `None` for skills
+/// and for copies that are already Codex TOML.
+pub(crate) fn projected_codex_checksum(
+    kind: ArtifactKind,
+    representation: Representation,
+    name: &str,
+    content: Option<&str>,
+) -> Option<String> {
+    if kind != ArtifactKind::Agent || representation != Representation::Portable {
+        return None;
+    }
+    let markdown = content?;
+    let toml = crate::codex_agent::markdown_to_codex_toml(markdown, name);
+    Some(checksum::checksum_bytes(toml.as_bytes()))
 }
 
 /// The version recorded for `name` in the first of the location's platform
@@ -167,8 +215,16 @@ pub(crate) fn build_rows(
             {
                 state = ArtifactState::External;
             }
-            let version = read_installed_version(agg.kind, &path, ctx)
+            // One read serves both the version and, for a portable agent, the
+            // Codex projection checksum.
+            let content = read_installed_content(agg.kind, &path, ctx);
+            let version = content
+                .as_deref()
+                .and_then(scan::extract_version_from_content)
                 .or_else(|| lock_recorded_version(&name, agg, locks));
+            let representation = representation_of(agg);
+            let projected_codex_checksum =
+                projected_codex_checksum(agg.kind, representation, &name, content.as_deref());
             // The platforms cmx actually tracks this for: those whose lock file
             // records it (a subset of the location's readers).
             let tracked_for: Vec<Platform> = agg
@@ -193,6 +249,8 @@ pub(crate) fn build_rows(
                 source,
                 source_checksum,
                 content_checksum,
+                representation,
+                projected_codex_checksum,
             });
         }
     }
@@ -210,8 +268,11 @@ mod tests {
     use crate::platform::Platform;
     use crate::types::{ArtifactKind, InstallScope, LockEntry, LockFile, LockSource};
 
-    use super::{LocationAgg, classify_installed, lock_recorded_version, source_of};
-    use crate::doctor::types::ArtifactState;
+    use super::{
+        LocationAgg, classify_installed, lock_recorded_version, projected_codex_checksum,
+        representation_of, source_of,
+    };
+    use crate::doctor::types::{ArtifactState, Representation};
 
     fn make_lock(entries: &[(&str, &str, ArtifactKind)]) -> LockFile {
         let mut packages = std::collections::BTreeMap::new();
@@ -325,6 +386,74 @@ mod tests {
         let locks = HashMap::new();
         let result = classify_installed("my-skill", &agg, "sha256:abc", &locks, &no_sources());
         assert_eq!(result, ArtifactState::Orphaned);
+    }
+
+    // -----------------------------------------------------------------------
+    // representation_of / projected_codex_checksum
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn representation_is_codex_toml_only_for_agents_on_a_transforming_platform() {
+        let codex_agent = simple_agg(ArtifactKind::Agent, vec![Platform::Codex]);
+        assert_eq!(representation_of(&codex_agent), Representation::CodexToml);
+
+        let claude_agent = simple_agg(ArtifactKind::Agent, vec![Platform::Claude]);
+        assert_eq!(representation_of(&claude_agent), Representation::Portable);
+
+        // Codex reads skills verbatim: only agents take the TOML form.
+        let codex_skill = simple_agg(ArtifactKind::Skill, vec![Platform::Codex, Platform::Pi]);
+        assert_eq!(representation_of(&codex_skill), Representation::Portable);
+    }
+
+    #[test]
+    fn projection_matches_what_the_codex_transform_produces() {
+        let markdown =
+            crate::test_support::metadata_versioned_agent_content("reviewer", "Reviews", "1.3.0");
+        let expected = crate::checksum::checksum_bytes(
+            crate::codex_agent::markdown_to_codex_toml(&markdown, "reviewer").as_bytes(),
+        );
+        let projected = projected_codex_checksum(
+            ArtifactKind::Agent,
+            Representation::Portable,
+            "reviewer",
+            Some(&markdown),
+        );
+        assert_eq!(projected.as_deref(), Some(expected.as_str()));
+    }
+
+    #[test]
+    fn projection_is_none_for_skills_codex_copies_and_unreadable_content() {
+        let markdown = crate::test_support::agent_content("reviewer", "Reviews");
+        assert_eq!(
+            projected_codex_checksum(
+                ArtifactKind::Skill,
+                Representation::Portable,
+                "reviewer",
+                Some(&markdown)
+            ),
+            None,
+            "skills are never projected"
+        );
+        assert_eq!(
+            projected_codex_checksum(
+                ArtifactKind::Agent,
+                Representation::CodexToml,
+                "reviewer",
+                Some(&markdown)
+            ),
+            None,
+            "a Codex copy is already the projection"
+        );
+        assert_eq!(
+            projected_codex_checksum(
+                ArtifactKind::Agent,
+                Representation::Portable,
+                "reviewer",
+                None
+            ),
+            None,
+            "no content, no projection"
+        );
     }
 
     // -----------------------------------------------------------------------

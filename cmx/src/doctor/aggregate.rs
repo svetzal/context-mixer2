@@ -2,8 +2,11 @@
 //!
 //! Consolidates severity across a logical artifact's copies, folds the raw
 //! per-location [`DoctorRow`]s built by `classify.rs` into logical
-//! [`DoctorArtifact`]s, sorts the report's rows and missing entries, and finds
-//! lock entries whose artifact file has gone missing from disk.
+//! [`DoctorArtifact`]s — deciding representation-aware divergence, where a
+//! Codex TOML copy is compared through the Codex projection of its portable
+//! siblings rather than by raw bytes — sorts the report's rows and missing
+//! entries, and finds lock entries whose artifact file has gone missing from
+//! disk.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
@@ -12,7 +15,7 @@ use crate::context::AppContext;
 use crate::platform::Platform;
 use crate::types::{InstallScope, LockFile};
 
-use super::types::{ArtifactState, DoctorArtifact, DoctorRow, MissingRow};
+use super::types::{ArtifactState, DoctorArtifact, DoctorRow, MissingRow, Representation};
 
 /// Severity ordering used to pick a logical artifact's consolidated state when
 /// its copies disagree — the most actionable state wins.
@@ -28,9 +31,9 @@ pub(crate) fn state_severity(state: ArtifactState) -> u8 {
 
 /// Group per-location rows into logical artifacts — one per `(kind, name,
 /// scope)`, listing every tool it's installed for. A skill installed to several
-/// tools collapses to one artifact; it's flagged `diverged` only when its copies
-/// actually disagree (different state or version), not merely for existing in
-/// more than one place.
+/// tools collapses to one artifact; it's flagged `diverged` only when its copies'
+/// content actually disagrees (see [`content_diverged`]), not merely for
+/// existing in more than one place or in more than one representation.
 pub(crate) fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
     // Key by stringified kind so the map key is Ord without needing Ord on ArtifactKind.
     let mut groups: BTreeMap<(String, String, InstallScope), Vec<&DoctorRow>> = BTreeMap::new();
@@ -44,9 +47,46 @@ pub(crate) fn group_rows(rows: &[DoctorRow]) -> Vec<DoctorArtifact> {
     groups.into_values().map(|members| fold_group(&members)).collect()
 }
 
+/// Whether a logical artifact's copies have genuinely different content.
+///
+/// Divergence is a content question, independent of version and tracking
+/// state — so two copies that happen to share a version (or carry none) but
+/// differ in bytes are caught, while byte-identical copies that merely differ
+/// in tracking state are not. It is also representation-aware, because an
+/// agent's Codex copy is generated TOML and differs from its Markdown sibling
+/// *by design*:
+///
+/// - copies in the same [`Representation`] are diverged when their checksums
+///   differ (`portable.len() > 1 || transformed.len() > 1`);
+/// - when both representations are present, every Codex TOML checksum must
+///   equal the Codex *projection* of some portable copy — what `cmx agent
+///   install` would write for Codex from that Markdown today. A projection
+///   match means "the same agent, reformatted"; anything else (a hand-edited
+///   TOML, one written by an older cmx without the preserved block, or one
+///   generated from a different version of the Markdown) is diverged.
+///
+/// Skills and single-representation groups reduce to the plain checksum rule,
+/// and a Codex-only agent can never diverge against a sibling it doesn't have.
+fn content_diverged(members: &[&DoctorRow]) -> bool {
+    let of = |rep: Representation| members.iter().filter(move |r| r.representation == rep);
+    let portable: BTreeSet<&str> =
+        of(Representation::Portable).map(|r| r.content_checksum.as_str()).collect();
+    let transformed: BTreeSet<&str> =
+        of(Representation::CodexToml).map(|r| r.content_checksum.as_str()).collect();
+    let projections: BTreeSet<&str> = of(Representation::Portable)
+        .filter_map(|r| r.projected_codex_checksum.as_deref())
+        .collect();
+
+    portable.len() > 1
+        || transformed.len() > 1
+        || (!portable.is_empty()
+            && !transformed.is_empty()
+            && !transformed.iter().all(|cs| projections.contains(cs)))
+}
+
 /// Fold one group of per-location rows into a single logical `DoctorArtifact`,
-/// consolidating state by severity, detecting content divergence, and computing
-/// the union of tracked platforms.
+/// consolidating state by severity, detecting content divergence (see
+/// [`content_diverged`]), and computing the union of tracked platforms.
 fn fold_group(members: &[&DoctorRow]) -> DoctorArtifact {
     let first = members[0];
 
@@ -65,13 +105,7 @@ fn fold_group(members: &[&DoctorRow]) -> DoctorArtifact {
     let versions: BTreeSet<Option<&str>> = members.iter().map(|r| r.version.as_deref()).collect();
     let source_checksums: BTreeSet<Option<&str>> =
         members.iter().map(|r| r.source_checksum.as_deref()).collect();
-    // Divergence is a content question: copies are diverged only when
-    // their bytes actually differ. This catches genuinely different
-    // copies that happen to share a version (or carry none), and stops
-    // false-flagging byte-identical copies that merely differ in
-    // tracking state (e.g. tracked for one tool, untracked for another).
-    let checksums: BTreeSet<&str> = members.iter().map(|r| r.content_checksum.as_str()).collect();
-    let diverged = checksums.len() > 1;
+    let diverged = content_diverged(members);
 
     // Consolidated state: the most actionable across copies.
     let state = members
@@ -186,7 +220,35 @@ mod tests {
     use crate::types::{ArtifactKind, InstallScope};
 
     use super::{collect_missing, group_rows, state_severity};
-    use crate::doctor::types::{ArtifactState, DoctorArtifact};
+    use crate::doctor::types::{ArtifactState, DoctorArtifact, DoctorRow, Representation};
+
+    /// An agent copy at `location` held in `representation`, with the given
+    /// content checksum and (for portable copies) Codex projection checksum.
+    fn agent_row(
+        location: &str,
+        representation: Representation,
+        checksum: &str,
+        projection: Option<&str>,
+    ) -> DoctorRow {
+        let mut row = make_row(ArtifactKind::Agent, "reviewer", ArtifactState::Tracked, checksum);
+        row.location = PathBuf::from(location);
+        row.platforms = match representation {
+            Representation::Portable => vec![Platform::Claude],
+            Representation::CodexToml => vec![Platform::Codex],
+        };
+        row.tracked_for = row.platforms.clone();
+        row.representation = representation;
+        row.projected_codex_checksum = projection.map(str::to_string);
+        row
+    }
+
+    fn markdown_row(location: &str, checksum: &str, projection: &str) -> DoctorRow {
+        agent_row(location, Representation::Portable, checksum, Some(projection))
+    }
+
+    fn codex_row(checksum: &str) -> DoctorRow {
+        agent_row("/home/testuser/.codex/agents", Representation::CodexToml, checksum, None)
+    }
 
     // -----------------------------------------------------------------------
     // state_severity — ordering must be Drifted > Orphaned > Untracked > External > Tracked
@@ -261,6 +323,102 @@ mod tests {
             artifacts[0].diverged,
             "copies with different checksums must be flagged diverged"
         );
+    }
+
+    #[test]
+    fn skill_copies_with_different_checksums_still_diverge() {
+        // Skills are always portable and never projected; the plain checksum
+        // rule must survive the representation-aware refactor unchanged.
+        let mut row_a = make_row(ArtifactKind::Skill, "alpha", ArtifactState::Tracked, "sha256:v1");
+        row_a.location = PathBuf::from("/path/a");
+        let mut row_b = make_row(ArtifactKind::Skill, "alpha", ArtifactState::Tracked, "sha256:v2");
+        row_b.location = PathBuf::from("/path/b");
+        for row in [&row_a, &row_b] {
+            assert_eq!(row.representation, Representation::Portable);
+            assert_eq!(row.projected_codex_checksum, None);
+        }
+
+        let artifacts = group_rows(&[row_a, row_b]);
+        assert!(artifacts[0].diverged);
+    }
+
+    // -----------------------------------------------------------------------
+    // content_diverged — representation-aware rule
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn codex_copy_matching_the_markdown_projection_is_not_diverged() {
+        let rows = vec![
+            markdown_row("/home/testuser/.claude/agents", "sha256:md", "sha256:proj"),
+            codex_row("sha256:proj"),
+        ];
+        let artifacts = group_rows(&rows);
+        assert!(
+            !artifacts[0].diverged,
+            "a Codex TOML that is exactly the projection of its Markdown sibling is the same agent reformatted"
+        );
+    }
+
+    #[test]
+    fn codex_copy_not_matching_the_markdown_projection_is_diverged() {
+        let rows = vec![
+            markdown_row("/home/testuser/.claude/agents", "sha256:md", "sha256:proj"),
+            codex_row("sha256:edited"),
+        ];
+        let artifacts = group_rows(&rows);
+        assert!(artifacts[0].diverged, "an edited/stale/older-format TOML is diverged");
+    }
+
+    #[test]
+    fn codex_copy_matching_any_portable_projection_is_not_diverged() {
+        // Two byte-identical Markdown copies both project to the same TOML;
+        // the Codex copy matches that projection.
+        let rows = vec![
+            markdown_row("/home/testuser/.claude/agents", "sha256:md", "sha256:proj"),
+            markdown_row("/home/testuser/.config/opencode/agent", "sha256:md", "sha256:proj"),
+            codex_row("sha256:proj"),
+        ];
+        assert!(!group_rows(&rows)[0].diverged);
+    }
+
+    #[test]
+    fn codex_only_agent_is_never_diverged() {
+        let artifacts = group_rows(&[codex_row("sha256:toml")]);
+        assert!(!artifacts[0].diverged, "nothing to compare against");
+    }
+
+    #[test]
+    fn two_codex_copies_with_different_bytes_are_diverged() {
+        let mut local = codex_row("sha256:toml-b");
+        local.location = PathBuf::from("/project/.codex/agents");
+        let rows = vec![codex_row("sha256:toml-a"), local];
+        assert!(group_rows(&rows)[0].diverged);
+    }
+
+    #[test]
+    fn portable_agent_copies_are_compared_by_bytes() {
+        let same = vec![
+            markdown_row("/home/testuser/.claude/agents", "sha256:md", "sha256:proj"),
+            markdown_row("/home/testuser/.config/opencode/agent", "sha256:md", "sha256:proj"),
+        ];
+        assert!(!group_rows(&same)[0].diverged, "identical Markdown copies");
+
+        let different = vec![
+            markdown_row("/home/testuser/.claude/agents", "sha256:md-1", "sha256:proj-1"),
+            markdown_row("/home/testuser/.config/opencode/agent", "sha256:md-2", "sha256:proj-2"),
+        ];
+        assert!(group_rows(&different)[0].diverged, "different Markdown copies");
+    }
+
+    #[test]
+    fn portable_copy_without_a_projection_cannot_vouch_for_a_codex_copy() {
+        // The Markdown could not be read back (no projection), so the Codex
+        // copy has nothing to match: report divergence rather than guess.
+        let rows = vec![
+            agent_row("/home/testuser/.claude/agents", Representation::Portable, "sha256:md", None),
+            codex_row("sha256:proj"),
+        ];
+        assert!(group_rows(&rows)[0].diverged);
     }
 
     #[test]

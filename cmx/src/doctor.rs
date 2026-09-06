@@ -26,13 +26,15 @@ mod types;
 pub use divergence::{DivergenceDetail, DivergenceMember, divergence_details, location_members};
 pub use set_consistency::{SetInconsistency, SetProblem, set_inconsistencies};
 pub use survey::survey;
-pub use types::{ArtifactState, DoctorArtifact, DoctorReport, DoctorRow, MissingRow, StateCounts};
+pub use types::{
+    ArtifactState, DoctorArtifact, DoctorReport, DoctorRow, MissingRow, Representation, StateCounts,
+};
 
 // Re-export private survey helpers for the test suite.
 #[cfg(test)]
 pub(crate) use aggregate::{collect_missing, group_rows, state_severity};
 #[cfg(test)]
-pub(crate) use classify::{classify_installed, read_installed_version, source_of};
+pub(crate) use classify::{classify_installed, read_installed_content, source_of};
 #[cfg(test)]
 pub(crate) use locations::{LocationAgg, build_locations, survey_scopes};
 

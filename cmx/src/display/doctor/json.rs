@@ -165,6 +165,8 @@ mod tests {
             source: None,
             source_checksum: None,
             content_checksum: format!("sha256:{name}:{location}:{}", version.unwrap_or("none")),
+            representation: crate::doctor::Representation::Portable,
+            projected_codex_checksum: None,
         }
     }
 

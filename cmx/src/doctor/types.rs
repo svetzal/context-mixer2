@@ -42,6 +42,26 @@ impl ArtifactState {
     }
 }
 
+/// The on-disk representation of one installed copy.
+///
+/// Every platform sharing an install directory shares a representation, so it
+/// is a property of the *location*, not of any one platform reading it. Two
+/// copies of the same agent can legitimately differ byte-for-byte when they
+/// are held in different representations — the Codex copy is generated TOML,
+/// not the portable Markdown — so divergence compares copies across
+/// representations through the projection, never by raw bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Representation {
+    /// The artifact as cmx copies it verbatim: a Markdown agent file, or a
+    /// skill directory. Every skill copy, and every agent copy on a platform
+    /// that does not transform agents, is portable.
+    Portable,
+    /// An agent projected into Codex's TOML subagent format at install time
+    /// (see `cmx_core::agent::markdown_to_codex_toml`). Only agents on a
+    /// platform whose `transforms_agent_to_toml()` is true take this form.
+    CodexToml,
+}
+
 /// One installed artifact discovered on disk during the survey, at a single
 /// install location. This is the raw per-location unit; for the user-facing view
 /// these are grouped into [`DoctorArtifact`] (one logical artifact across all the
@@ -74,11 +94,28 @@ pub struct DoctorRow {
     /// `None` for untracked/orphaned/external (no lock entry to read one from).
     pub source_checksum: Option<String>,
     /// The artifact's current on-disk content checksum (SHA-256). Drives
-    /// content-based divergence: copies whose bytes differ are flagged diverged,
-    /// independent of their version or tracking state — so a genuine content
-    /// difference between two unversioned copies is caught, while byte-identical
-    /// copies that merely differ in tracking state are not.
+    /// content-based divergence, independent of version or tracking state:
+    /// copies in the **same** [`Representation`] are diverged when their bytes
+    /// differ, so a genuine content difference between two unversioned copies
+    /// is caught while byte-identical copies that merely differ in tracking
+    /// state are not. A `CodexToml` copy is never compared byte-for-byte
+    /// against a `Portable` one — it is compared against the portable copy's
+    /// [`projected_codex_checksum`](Self::projected_codex_checksum) instead.
     pub content_checksum: String,
+    /// How this copy is held on disk — portable Markdown/skill directory, or
+    /// generated Codex TOML. See [`Representation`].
+    pub representation: Representation,
+    /// For a `Portable` **agent** copy: the checksum its Codex TOML projection
+    /// would have, i.e. `checksum_bytes(markdown_to_codex_toml(content, name))`.
+    /// `None` for skills and for `CodexToml` copies.
+    ///
+    /// This exists so a Codex copy can be compared with a Markdown sibling
+    /// without false positives: the two differ by design, but a Codex file
+    /// that is byte-identical to what cmx would generate from the sibling
+    /// today is merely the same agent reformatted, while one that differs
+    /// (hand-edited, written by an older cmx, or generated from a different
+    /// version of the Markdown) has genuinely diverged.
+    pub projected_codex_checksum: Option<String>,
 }
 
 /// One *logical* artifact — a `(kind, name, scope)` grouped across every install
@@ -115,12 +152,19 @@ pub struct DoctorArtifact {
     pub source_checksum: Option<String>,
     /// The distinct install locations it occupies.
     pub locations: Vec<PathBuf>,
-    /// True when the copies' **content differs** across locations (distinct
-    /// checksums). This is the multi-location situation worth flagging — the
-    /// copies have genuinely drifted apart and need reconciling. Byte-identical
-    /// copies are just one skill installed to many tools, even when their
-    /// tracking state differs (e.g. tracked for one tool, untracked for
-    /// another) — that asymmetry surfaces through the per-copy state, not here.
+    /// True when the copies' **content differs** across locations. This is the
+    /// multi-location situation worth flagging — the copies have genuinely
+    /// drifted apart and need reconciling. Byte-identical copies are just one
+    /// skill installed to many tools, even when their tracking state differs
+    /// (e.g. tracked for one tool, untracked for another) — that asymmetry
+    /// surfaces through the per-copy state, not here.
+    ///
+    /// The comparison is representation-aware (see [`Representation`]):
+    /// copies in the same representation are compared by checksum, and a
+    /// Codex TOML copy is compared against the Codex *projection* of the
+    /// portable copies rather than their raw bytes. So a Codex agent that is
+    /// exactly what cmx would generate from its Markdown sibling is not
+    /// diverged, while a hand-edited, older-format, or stale-version TOML is.
     pub diverged: bool,
 }
 

@@ -213,7 +213,12 @@ everything that isn't is acknowledged but unflagged.
 > reported as a *single* tracked artifact whose `Platforms` column lists every
 > surveyed copy as `platform@version` — not as "duplicates." `diverged` is
 > reserved for the rare case where copies' content actually disagrees across
-> locations, even when the displayed versions happen to match. `doctor`'s hint
+> locations, even when the displayed versions happen to match. An agent's
+> Codex copy is generated TOML, so it is compared through the Codex projection
+> of the Markdown copy rather than byte-for-byte: reformatting alone is never
+> divergence, but a hand-edited or stale TOML (including one written by a cmx
+> before 3.2.0, which lacks the preserved frontmatter block) is — `cmx agent
+> install <name> --force` rewrites it. `doctor`'s hint
 > names the fix that fits the artifact's provenance:
 > [`cmx skill sync <name>`](./reconciling.md) reconciles copies **between install
 > locations** (the right move for an `external` or source-less skill), while
