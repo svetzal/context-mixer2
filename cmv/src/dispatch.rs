@@ -5,8 +5,12 @@
 //! `Filesystem` and [`ProcessRunner`] gateways: the same inputs against the
 //! in-memory fakes produce the same outcomes as against the OS.
 //!
-//! Resolution is by record `id` first, then by catalog `key`, so a record
-//! that moved in the knowledge base is still found. An intent is reported
+//! Resolution is by catalog `key` first — the manifest's compile-time locator
+//! — then by record `id` only when the key is gone and exactly one record
+//! carries the id (a moved record). Ids recur across collections by design
+//! (one specialization per language), so an id shared by several records
+//! never stands in for a missing key; the intent is reported unchecked with a
+//! reason naming those records. An intent is reported
 //! `stale` when its record's bytes at the working tree's `HEAD` no longer
 //! match the manifest checksum, or — when validators run from a materialized
 //! pinned tree (see [`crate::pin`]) — when any of its validators' `run` files
@@ -117,8 +121,15 @@ fn check_intent(
     fs: &dyn Filesystem,
     runner: &dyn ProcessRunner,
 ) -> Result<IntentOutcome> {
-    let (Some(intent), _) = resolver.resolve(entry) else {
-        return Ok(unchecked(entry, "record not in knowledge base", false));
+    let intent = match resolver.resolve(entry) {
+        Resolution::Found { intent, .. } => intent,
+        Resolution::NotFound { detail } => {
+            let reason = match detail {
+                Some(detail) => format!("{NOT_IN_KNOWLEDGE_BASE}: {detail}"),
+                None => NOT_IN_KNOWLEDGE_BASE.to_string(),
+            };
+            return Ok(unchecked(entry, &reason, false));
+        }
     };
     let stale = is_stale(intent, entry, request.trees, fs)?;
     let validators: Vec<Validator<'_>> = intent
@@ -384,49 +395,105 @@ fn unguided(dropped: &DroppedIntent, resolver: &Resolver<'_>) -> IntentOutcome {
 }
 
 /// How a manifest entry was matched to a knowledge-base record.
+///
+/// The manifest's `key` is the compile-time locator and is tried first: a
+/// record's `id` may intentionally recur across collections of the knowledge
+/// base (the same intent, specialized per language), so an `id` alone does
+/// not locate a record. The manifest checksum, not the resolution, is what
+/// flags a changed record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordResolution {
-    /// A record carries the entry's `id`.
-    Id,
-    /// No record carries the `id`, but one sits at the entry's `key`.
+    /// A record sits at the entry's `key`.
     Key,
-    /// Neither; the record is not in the knowledge base.
+    /// No record sits at the `key`, but exactly one record carries the
+    /// entry's `id`: the record moved since compile.
+    Id,
+    /// Neither: no record at the `key`, and the `id` matches no record — or
+    /// several, none of which can be told apart without the key.
     NotFound,
 }
 
-/// Looks records up by `id` first, then by `key`.
+/// The `unchecked` reason for a manifest entry no record matches.
+pub const NOT_IN_KNOWLEDGE_BASE: &str = "record not in knowledge base";
+
+/// The outcome of matching one manifest entry against the catalog.
+#[derive(Debug, Clone)]
+pub enum Resolution<'a> {
+    /// A record matched, and how.
+    Found {
+        /// The matched record.
+        intent: &'a Intent,
+        /// By key, or by a moved record's unique id.
+        how: RecordResolution,
+    },
+    /// Nothing matched. `detail` is set when the fallback by id was stopped
+    /// by several records sharing the id; it names them and the remedy.
+    NotFound {
+        /// Why the id could not stand in for the missing key, if that is
+        /// what happened.
+        detail: Option<String>,
+    },
+}
+
+/// Looks records up by `key` first, then by a unique `id`.
 pub struct Resolver<'a> {
     catalog: &'a Catalog,
-    by_id: BTreeMap<&'a str, &'a Intent>,
+    by_id: BTreeMap<&'a str, Vec<&'a Intent>>,
 }
 
 impl<'a> Resolver<'a> {
-    /// Index the catalog by record `id`.
+    /// Index the catalog by record `id`, keeping every record per id in key
+    /// order.
     pub fn new(catalog: &'a Catalog) -> Self {
-        let mut by_id = BTreeMap::new();
-        // Catalog order is key order, so on a duplicated id the first key wins
-        // deterministically.
+        let mut by_id: BTreeMap<&str, Vec<&Intent>> = BTreeMap::new();
         for intent in catalog.values() {
-            by_id.entry(intent.record.id.as_str()).or_insert(intent);
+            by_id.entry(intent.record.id.as_str()).or_default().push(intent);
         }
         Self { catalog, by_id }
     }
 
-    /// The record for a manifest entry, and how it was matched.
-    pub fn resolve(&self, entry: &IntentRef) -> (Option<&'a Intent>, RecordResolution) {
-        if let Some(intent) = self.by_id(&entry.id) {
-            return (Some(intent), RecordResolution::Id);
+    /// The record for a manifest entry, and how it was matched: the record at
+    /// the entry's `key`; failing that, the single record carrying its `id`
+    /// (a moved record); failing that, not found — with a reason naming the
+    /// records that share the id, when several do, so the remedy (`cmf
+    /// install` to recompile) is clear.
+    pub fn resolve(&self, entry: &IntentRef) -> Resolution<'a> {
+        if let Some(intent) = self.by_key(&entry.key) {
+            return Resolution::Found {
+                intent,
+                how: RecordResolution::Key,
+            };
         }
-        match self.by_key(&entry.key) {
-            Some(intent) => (Some(intent), RecordResolution::Key),
-            None => (None, RecordResolution::NotFound),
+        match self.with_id(&entry.id) {
+            [intent] => Resolution::Found {
+                intent,
+                how: RecordResolution::Id,
+            },
+            [] => Resolution::NotFound { detail: None },
+            shared => Resolution::NotFound {
+                detail: Some(format!(
+                    "no record at key {}, and id {} is shared by {} records ({}); re-run cmf install to recompile",
+                    entry.key,
+                    entry.id,
+                    shared.len(),
+                    shared.iter().map(|intent| intent.key.as_str()).collect::<Vec<_>>().join(", ")
+                )),
+            },
         }
     }
 
-    /// The record carrying `id`, if any.
+    /// The one record carrying `id`, when exactly one does.
     pub fn by_id(&self, id: &str) -> Option<&'a Intent> {
-        self.by_id.get(id).copied()
+        match self.with_id(id) {
+            [intent] => Some(intent),
+            _ => None,
+        }
+    }
+
+    /// Every record carrying `id`, in key order.
+    pub fn with_id(&self, id: &str) -> &[&'a Intent] {
+        self.by_id.get(id).map_or(&[], Vec::as_slice)
     }
 
     /// The record at catalog `key`, if any.
@@ -541,7 +608,7 @@ fn coverage(
         stale: 0,
     };
     for entry in &manifest.intents {
-        let (Some(intent), _) = resolver.resolve(entry) else {
+        let Resolution::Found { intent, .. } = resolver.resolve(entry) else {
             coverage.missing += 1;
             continue;
         };
@@ -1043,20 +1110,80 @@ evidence = [
     }
 
     #[test]
-    fn resolver_reports_how_it_matched() {
+    fn resolver_prefers_the_key_even_when_the_id_is_shared() {
+        let mut kb = Kb::new();
+        // Both records carry `kb.intent.a`; the manifest key picks the second.
+        kb.add("python/a", &[]).add("rust/a", &[]);
+        let catalog = kb.catalog();
+        let resolver = Resolver::new(&catalog);
+        let Resolution::Found { intent, how } = resolver.resolve(&kb.intents[1]) else {
+            panic!("keyed record resolves");
+        };
+        assert_eq!(intent.key, "rust/a");
+        assert_eq!(how, RecordResolution::Key);
+        assert_eq!(resolver.with_id("kb.intent.a").len(), 2);
+        assert!(resolver.by_id("kb.intent.a").is_none(), "a shared id names no single record");
+    }
+
+    #[test]
+    fn resolver_falls_back_to_a_unique_id_when_the_key_moved() {
+        let mut kb = Kb::new();
+        kb.add("rust/new-home", &[]);
+        let catalog = kb.catalog();
+        let resolver = Resolver::new(&catalog);
+        let mut moved = kb.intents[0].clone();
+        moved.key = "rust/old-home".to_string();
+        let Resolution::Found { intent, how } = resolver.resolve(&moved) else {
+            panic!("moved record resolves by its unique id");
+        };
+        assert_eq!(intent.key, "rust/new-home");
+        assert_eq!(how, RecordResolution::Id);
+    }
+
+    #[test]
+    fn resolver_refuses_to_guess_among_records_sharing_the_id() {
+        let mut kb = Kb::new();
+        kb.add("python/a", &[]).add("rust/a", &[]);
+        let catalog = kb.catalog();
+        let resolver = Resolver::new(&catalog);
+        let mut moved = kb.intents[1].clone();
+        moved.key = "rust/gone".to_string();
+        let Resolution::NotFound { detail } = resolver.resolve(&moved) else {
+            panic!("a shared id does not locate a record");
+        };
+        assert_eq!(
+            detail.as_deref(),
+            Some(
+                "no record at key rust/gone, and id kb.intent.a is shared by 2 records (python/a, rust/a); re-run cmf install to recompile"
+            )
+        );
+    }
+
+    #[test]
+    fn check_reports_a_shared_id_miss_as_unchecked_with_the_records_named() {
+        let mut kb = Kb::new();
+        kb.add("python/a", &[]).add("rust/a", &[rust_check(true)]);
+        kb.intents[1].key = "rust/gone".to_string();
+        let outcome = kb.check(&["rust"], &FakeProcessRunner::new()).remove(1);
+        assert_eq!(
+            unchecked_reason(&outcome),
+            "record not in knowledge base: no record at key rust/gone, and id kb.intent.a is shared by 2 records (python/a, rust/a); re-run cmf install to recompile"
+        );
+    }
+
+    #[test]
+    fn resolver_reports_not_found_when_neither_key_nor_id_match() {
         let mut kb = Kb::new();
         kb.add("rust/a", &[]);
         let catalog = kb.catalog();
         let resolver = Resolver::new(&catalog);
-        let by_id = resolver.resolve(&kb.intents[0]);
-        assert_eq!(by_id.1, RecordResolution::Id);
-        let mut moved = kb.intents[0].clone();
-        moved.id = "kb.intent.renamed".to_string();
-        assert_eq!(resolver.resolve(&moved).1, RecordResolution::Key);
-        moved.key = "rust/gone".to_string();
-        let (intent, how) = resolver.resolve(&moved);
-        assert!(intent.is_none());
-        assert_eq!(how, RecordResolution::NotFound);
+        let mut gone = kb.intents[0].clone();
+        gone.key = "rust/gone".to_string();
+        gone.id = "kb.intent.gone".to_string();
+        let Resolution::NotFound { detail } = resolver.resolve(&gone) else {
+            panic!("nothing matches");
+        };
+        assert_eq!(detail, None);
     }
 
     #[test]

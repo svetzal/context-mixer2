@@ -313,15 +313,19 @@ impl fmt::Display for ExplainReport {
         let intent = &self.intent;
         writeln!(f, "Intent: {}", intent.key)?;
         writeln!(f, "Id: {}", intent.id.as_deref().unwrap_or("unknown"))?;
-        writeln!(
-            f,
-            "Record: {}",
-            match intent.resolution {
-                RecordResolution::Id => "resolved by id",
-                RecordResolution::Key => "resolved by key (no record carries the manifest id)",
-                RecordResolution::NotFound => "not found in knowledge base",
+        match (intent.resolution, &intent.resolution_detail) {
+            (RecordResolution::Key, _) => writeln!(f, "Record: resolved by key")?,
+            (RecordResolution::Id, _) => writeln!(
+                f,
+                "Record: resolved by id (no record at the manifest key; one record carries its id)"
+            )?,
+            (RecordResolution::NotFound, None) => {
+                writeln!(f, "Record: not found in knowledge base")?;
             }
-        )?;
+            (RecordResolution::NotFound, Some(detail)) => {
+                writeln!(f, "Record: not found in knowledge base ({detail})")?;
+            }
+        }
         if let Some(title) = &intent.title {
             writeln!(f, "Title: {title}")?;
         }
@@ -809,7 +813,8 @@ Missing records: 1
             intent: IntentExplanation {
                 key: "rust/isolate-functional-core".to_string(),
                 id: Some("kb.intent.isolate-functional-core".to_string()),
-                resolution: RecordResolution::Id,
+                resolution: RecordResolution::Key,
+                resolution_detail: None,
                 title: Some("Isolate the functional core".to_string()),
                 status: Some("confirmed".to_string()),
                 compiled: true,
@@ -870,7 +875,7 @@ Missing records: 1
         let expected = "\
 Intent: rust/isolate-functional-core
 Id: kb.intent.isolate-functional-core
-Record: resolved by id
+Record: resolved by key
 Title: Isolate the functional core
 Status: confirmed (informational; never gates)
 Compiled: yes
@@ -898,6 +903,7 @@ Validators:
             key: "rust/budgeted".to_string(),
             id: None,
             resolution: RecordResolution::NotFound,
+            resolution_detail: None,
             title: None,
             status: None,
             compiled: false,
@@ -928,13 +934,38 @@ Validators:
     }
 
     #[test]
+    fn explain_names_a_moved_record_and_the_records_sharing_a_lost_key_id() {
+        let mut report = explain_report();
+        report.intent.resolution = RecordResolution::Id;
+        assert!(
+            report.to_string().contains(
+                "Record: resolved by id (no record at the manifest key; one record carries its id)\n"
+            ),
+            "{report}"
+        );
+
+        report.intent.resolution = RecordResolution::NotFound;
+        report.intent.resolution_detail = Some(
+            "no record at key rust/gone, and id kb.intent.a is shared by 2 records (python/a, rust/a); re-run cmf install to recompile".to_string(),
+        );
+        report.intent.validators.clear();
+        let text = report.to_string();
+        assert!(
+            text.contains(
+                "Record: not found in knowledge base (no record at key rust/gone, and id kb.intent.a is shared by 2 records (python/a, rust/a); re-run cmf install to recompile)\n"
+            ),
+            "{text}"
+        );
+    }
+
+    #[test]
     fn explain_json_carries_the_schema_and_the_knowledge_base_block() {
         let json = explain_report().render(OutputFormat::Json).unwrap();
         assert!(json.ends_with("}\n"));
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["schema"], 1);
         assert_eq!(value["knowledge_base"]["resolved_by"], "source");
-        assert_eq!(value["intent"]["resolution"], "id");
+        assert_eq!(value["intent"]["resolution"], "key");
         assert_eq!(value["intent"]["validators"][1]["would_run"], false);
         assert_eq!(value["intent"]["config"], json!({ "business_rule_minimum_matches": 2 }));
     }

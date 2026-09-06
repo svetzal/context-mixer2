@@ -95,9 +95,12 @@ evidence = [
 
 Only the `description` renders — under *Require* or *Observe when useful*,
 exactly like any other evidence — so the agent learns what will be checked
-while `language` and `run` never reach the delivered artifact. cmf rejects a
-knowledge base at scan time, naming the record and entry, when a `static-check`
-entry lacks `run` or `language`, when either field appears on another evidence
-type, or when `run` is absolute or contains `..`. Executing validators is the
-job of the future verifier, `cmv` (see `CMV.md`); cmf only records and renders
+while `language` and `run` never reach the delivered artifact. A `static-check`
+entry with neither `language` nor `run` is ordinary descriptive evidence — an
+expectation a validator may later make executable — and declares no validator.
+cmf rejects a knowledge base at scan time, naming the record and entry, when a
+`static-check` entry carries only one of `language` and `run` (both are needed
+to declare a validator), when either field appears on another evidence type,
+or when `run` is absolute or contains `..`. Executing validators is the
+job of the verifier, `cmv` (see `CMV.md`); cmf only records and renders
 them.

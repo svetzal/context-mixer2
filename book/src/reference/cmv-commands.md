@@ -147,9 +147,14 @@ silently fall back to detection.
 
 ## How validators run
 
-For each intent in the manifest, cmv resolves the record by its `id` first and
-its catalog `key` second, so a record that moved in the knowledge base is still
-found. It then runs each `static-check` validator whose language matches:
+For each intent in the manifest, cmv resolves the record by its catalog `key`
+first: the key is the compile-time locator, and a record's `id` may
+intentionally recur across collections (one specialization per language), so
+an id on its own cannot locate a record. When no record sits at the key, cmv
+falls back to the `id` only if exactly one record carries it — a record that
+moved. When several do, the intent is reported unchecked with a reason naming
+those records; `cmf install` recompiles against the current keys. cmv then runs
+each `static-check` validator whose language matches:
 
 ```text
 <knowledge-base-root>/<run> --workspace <project-root> --config <tempfile.json>
@@ -312,7 +317,7 @@ the intent.
 ```text
 Intent: craftsperson/rust/isolate-functional-core
 Id: guidelines.intent.isolate-functional-core
-Record: resolved by id
+Record: resolved by key
 Title: Isolate the functional core
 Status: confirmed (informational; never gates)
 Compiled: yes
@@ -330,8 +335,10 @@ Validators:
     <pinned-tree>/checks/python/isolate_functional_core.py --workspace /home/me/project --config <scratch>/1.json
 ```
 
-- `Record` is `resolved by id`, `resolved by key` (no record carries the
-  manifest's id, but one sits at its key), or `not found in knowledge base`.
+- `Record` is `resolved by key`, `resolved by id` (no record at the manifest's
+  key, but exactly one carries its id — a moved record), or `not found in
+  knowledge base`, followed in parentheses by the records sharing the id when
+  that is what stopped the fallback.
 - `Config` is the exact JSON document the validators would receive through
   `--config`: the intent's `[intent."<key>"]` table from `cmv.toml`, or `{}`.
 - Each validator line shows its language, `run`, whether it is required, and

@@ -1,6 +1,8 @@
 //! `cmv explain <intent>`: what `check` would do for one compiled intent,
 //! without running anything. Answers how the manifest entry resolves to a
-//! record (by `id`, by `key`, or not at all), what the record says, every
+//! record (by `key`, by a moved record's unique `id`, or not at all — naming
+//! the records that share the id when that blocked the fallback), what the
+//! record says, every
 //! validator it declares, which of those would run for the workspace's
 //! languages and with exactly which argv, the `--config` document they would
 //! receive from `cmv.toml`, whether the intent is stale, and whether the
@@ -19,8 +21,8 @@ use serde_json::Value;
 
 use crate::config::ProjectConfig;
 use crate::dispatch::{
-    Catalog, RecordResolution, Resolver, Trees, canonical_root, is_stale, language_matches,
-    validator_args,
+    Catalog, RecordResolution, Resolution, Resolver, Trees, canonical_root, is_stale,
+    language_matches, validator_args,
 };
 use crate::pin::KnowledgeBaseReport;
 
@@ -73,6 +75,9 @@ pub struct IntentExplanation {
     pub id: Option<String>,
     /// How the manifest entry was matched to a record.
     pub resolution: RecordResolution,
+    /// Why the record was not found, when the manifest key is gone and its
+    /// id is shared by several records — names them; `None` otherwise.
+    pub resolution_detail: Option<String>,
     /// The record's title, when found.
     pub title: Option<String>,
     /// The record's maturity status, when found. Informational: it never
@@ -164,7 +169,10 @@ fn explain_compiled(
     request: &ExplainRequest<'_>,
     fs: &dyn Filesystem,
 ) -> Result<IntentExplanation> {
-    let (record, resolution) = resolver.resolve(entry);
+    let (record, resolution, resolution_detail) = match resolver.resolve(entry) {
+        Resolution::Found { intent, how } => (Some(intent), how, None),
+        Resolution::NotFound { detail } => (None, RecordResolution::NotFound, detail),
+    };
     let stale = match record {
         Some(record) => is_stale(record, entry, request.trees, fs)?,
         None => false,
@@ -189,6 +197,7 @@ fn explain_compiled(
         key: entry.key.clone(),
         id: Some(entry.id.clone()),
         resolution,
+        resolution_detail,
         title: record.map(|record| record.record.title.clone()),
         status: record.map(|record| record.record.status.clone()),
         compiled: true,
@@ -234,6 +243,7 @@ fn explain_dropped_only(
         } else {
             RecordResolution::NotFound
         },
+        resolution_detail: None,
         title: record.map(|record| record.record.title.clone()),
         status: record.map(|record| record.record.status.clone()),
         compiled: false,
@@ -410,7 +420,8 @@ evidence = [
         let intent = report.intent;
         assert_eq!(intent.key, "rust/isolate");
         assert_eq!(intent.id.as_deref(), Some("kb.intent.isolate"));
-        assert_eq!(intent.resolution, RecordResolution::Id);
+        assert_eq!(intent.resolution, RecordResolution::Key);
+        assert_eq!(intent.resolution_detail, None);
         assert_eq!(intent.title.as_deref(), Some("Isolate the functional core"));
         assert_eq!(intent.status.as_deref(), Some("confirmed"));
         assert!(intent.compiled);
@@ -462,11 +473,62 @@ evidence = [
         let fixture = Fixture::new();
         let report = fixture.explain("kb.intent.isolate", &["rust"]).unwrap();
         assert_eq!(report.intent.key, "rust/isolate");
-        assert_eq!(report.intent.resolution, RecordResolution::Id);
+        assert_eq!(report.intent.resolution, RecordResolution::Key);
     }
 
     #[test]
-    fn moved_record_resolves_by_key_and_missing_record_is_not_found() {
+    fn a_shared_id_argument_is_not_matched_through_the_catalog() {
+        let fixture = Fixture::new();
+        fixture.fs.add_file(format!("{KB}/intents/python/isolate.toml"), RECORD);
+        // The manifest still names the id, so the compiled entry is found;
+        // the catalog lookup by id alone would be ambiguous.
+        let report = fixture.explain("kb.intent.isolate", &["rust"]).unwrap();
+        assert_eq!(report.intent.key, "rust/isolate");
+        assert_eq!(report.intent.resolution, RecordResolution::Key);
+    }
+
+    #[test]
+    fn the_key_wins_over_a_shared_id() {
+        let fixture = Fixture::new();
+        fixture.fs.add_file(
+            format!("{KB}/intents/python/isolate.toml"),
+            RECORD.replace("Isolate the functional core", "Python twin"),
+        );
+        let report = fixture.explain("rust/isolate", &["rust"]).unwrap();
+        assert_eq!(report.intent.resolution, RecordResolution::Key);
+        assert_eq!(report.intent.title.as_deref(), Some("Isolate the functional core"));
+    }
+
+    #[test]
+    fn moved_record_resolves_by_its_unique_id() {
+        let mut fixture = Fixture::new();
+        fixture.manifest.intents[1].key = "rust/old-home".to_string();
+        let report = fixture.explain("rust/old-home", &["rust"]).unwrap();
+        assert_eq!(report.intent.resolution, RecordResolution::Id);
+        assert_eq!(report.intent.resolution_detail, None);
+        assert_eq!(report.intent.title.as_deref(), Some("Isolate the functional core"));
+        assert_eq!(report.intent.key, "rust/old-home", "the manifest key stays the locator");
+    }
+
+    #[test]
+    fn moved_record_with_a_shared_id_is_not_found_and_names_the_records() {
+        let mut fixture = Fixture::new();
+        fixture.fs.add_file(format!("{KB}/intents/python/isolate.toml"), RECORD);
+        fixture.manifest.intents[1].key = "rust/old-home".to_string();
+        let report = fixture.explain("rust/old-home", &["rust"]).unwrap();
+        assert_eq!(report.intent.resolution, RecordResolution::NotFound);
+        assert_eq!(
+            report.intent.resolution_detail.as_deref(),
+            Some(
+                "no record at key rust/old-home, and id kb.intent.isolate is shared by 2 records (python/isolate, rust/isolate); re-run cmf install to recompile"
+            )
+        );
+        assert_eq!(report.intent.title, None);
+        assert!(report.intent.validators.is_empty());
+    }
+
+    #[test]
+    fn renamed_id_still_resolves_by_key_and_missing_record_is_not_found() {
         let mut fixture = Fixture::new();
         fixture.manifest.intents[1].id = "kb.intent.renamed".to_string();
         let report = fixture.explain("rust/isolate", &["rust"]).unwrap();
@@ -479,6 +541,7 @@ evidence = [
 
         let report = fixture.explain("rust/other", &["rust"]).unwrap();
         assert_eq!(report.intent.resolution, RecordResolution::NotFound);
+        assert_eq!(report.intent.resolution_detail, None);
         assert_eq!(report.intent.title, None);
         assert!(report.intent.validators.is_empty());
         assert!(!report.intent.stale, "nothing to compare");
@@ -585,7 +648,8 @@ evidence = [
         let fixture = Fixture::new();
         let report = fixture.explain("rust/isolate", &["python"]).unwrap();
         let value = serde_json::to_value(&report).unwrap();
-        assert_eq!(value["intent"]["resolution"], "id");
+        assert_eq!(value["intent"]["resolution"], "key");
+        assert_eq!(value["intent"]["resolution_detail"], Value::Null);
         assert_eq!(value["intent"]["compiled"], true);
         assert_eq!(value["intent"]["dropped"], false);
         assert_eq!(value["intent"]["drop_reason"], Value::Null);

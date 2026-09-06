@@ -1,9 +1,10 @@
 # cmv — Deterministic Verification of Compiled Intents
 
-> Design draft. Status: proposed (2026-09-05). Phases 1–3 are implemented
-> (cmv check, status, explain; source-registry resolution; pinned revision).
-> Phases 4–6 (validator migration, benchmark switch-over) pending. Companion
-> to [CHARTER.md](CHARTER.md), [SPEC.md](SPEC.md), and [SETS.md](SETS.md).
+> Design draft. Status: proposed (2026-09-05). Phases 1–4 are implemented
+> (cmv check, status, explain; source-registry resolution; pinned revision;
+> Rust validators live in the guidelines knowledge base with calibration
+> fixtures). Phases 5–6 pending. Companion to [CHARTER.md](CHARTER.md),
+> [SPEC.md](SPEC.md), and [SETS.md](SETS.md).
 
 ## Motivation
 
@@ -107,18 +108,27 @@ evidence = [
   language of the validator's implementation is independent of the language
   it validates, though in practice each language's own toolchain parses it
   best. The validator owns its fact extraction (Python's `ast`, the `syn`
-  binary for Rust, …).
+  binary for Rust, …). `language` and `run` together are what make a
+  `static-check` entry a validator; a `static-check` entry with neither is
+  descriptive evidence — "a static check should verify X" — that declares
+  nothing executable.
 - `required` — whether a `fail` verdict fails the cmv run.
 
-cmf validates these at scan time and refuses the knowledge base, naming the
-record and the entry, when a `static-check` entry lacks `run` or `language`,
-when either field appears on an entry of any other type, or when `run` is
-absolute or contains a `..` component — it resolves against the knowledge-base
-root and must stay inside it.
+cmf validates these at scan time. A `static-check` entry with neither `run`
+nor `language` is ordinary non-executable evidence: the knowledge base already
+uses the type descriptively (an expectation that a static check should verify
+something), and that is exactly the kind of expectation a validator later makes
+executable. cmf refuses the knowledge base, naming the record and the entry,
+when a `static-check` entry carries exactly one of the two fields
+(half-declared — both are needed to declare a validator), when either field
+appears on an entry of any other type, or when `run` is absolute or contains a
+`..` component — it resolves against the knowledge-base root and must stay
+inside it.
 
 `cmf`'s catalog schema (`Evidence` in
 [cmf/src/catalog.rs](cmf/src/catalog.rs)) carries the optional `language` and
-`run` fields. Entries without `run` remain non-executable evidence.
+`run` fields. Entries without both remain non-executable evidence;
+`Evidence::validator()` returns `None` for them.
 
 ### Records have two identifiers; the manifest records both
 
@@ -129,8 +139,19 @@ root and must stay inside it.
   `guidelines.intent.put-gateways-at-effect-boundaries`. Stable across file
   moves.
 
-cmv resolves by `id` and uses `key` as the locator. If a record moves in the
-knowledge base, the manifest still identifies it.
+cmv resolves by `key` first. The key is the compile-time locator — it is what
+cmf selected and what the artifact was assembled from — and the manifest
+checksum already flags a record whose content changed. An `id` alone cannot
+locate a record, because ids recur across collections by design: the knowledge
+base specializes one intent per language (nine records carry
+`guidelines.intent.isolate-functional-core-from-effects`, one per craftsperson
+collection), and resolving by id would silently pick a sibling's record.
+
+Only when the key is absent from the catalog does cmv fall back to the `id`,
+and only when exactly one record carries it — a record that moved. When the key
+is absent and several records share the id, the intent is not found; the reason
+names the records sharing the id, and the remedy is `cmf install` to recompile
+against the current keys.
 
 ### The manifest
 
@@ -406,7 +427,7 @@ knowledge base is unchanged and now also covers validators.
    dispatches validators, explains one intent on request, renders human and
    JSON output, exits per the table above. Architecture map, release workflow,
    Homebrew formula, charter, and book coverage updated in the same commits.
-4. **Rust validators migrate.** The eight rate-card checks move to the
+4. **Rust validators migrate.** Done. The eight rate-card checks move to the
    knowledge base with `reference/` and `skeleton/` as their fixtures. cmv on
    the reference scores full marks; on the skeleton, zero. This is the first
    end-to-end proof.

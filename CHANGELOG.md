@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which never affects the exit code.
 - **`cmv explain <intent>`.** Shows, for one compiled intent (by catalog key,
   or by record id when the argument contains a `.`), how the manifest entry
-  resolved (by id, by key, not found), the record's title and status, every
+  resolved (by key, by id, not found), the record's title and status, every
   declared validator with its language, `run`, `required` flag, and
   description, which of them would run for the detected languages, the exact
   argv `check` would use, the `--config` JSON handed over from `cmv.toml`, the
@@ -52,7 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **New binary: `cmv`, the verifier.** Phase 3 of `CMV.md`, first half. `cmv
   check` reads the compile manifest cmf wrote for a project
   (`.context-mixer/cmf-manifest.json` by default), resolves each compiled
-  intent's record in the knowledge base (by `id`, then `key`), detects the
+  intent's record in the knowledge base (by `key`, the compile-time locator;
+  then by `id` only when the key is gone and exactly one record carries the
+  id — ids recur across collections by design, so an id shared by several
+  records never stands in for a missing key, and the unchecked reason names
+  those records and points at `cmf install`), detects the
   workspace's languages from its root-level build manifests (overridable in
   `cmv.toml`), runs every `static-check` validator whose `language` matches as
   `<kb>/<run> --workspace <root> --config <json>`, and reports one of `pass`,
@@ -73,12 +77,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the validator executable relative to the knowledge-base root; `description`
   stays required on every entry because it is what renders into the guidance.
   The catalog exposes them as `Evidence::validator()` and
-  `IntentRecord::validators()`, and `catalog::scan` refuses a knowledge base,
-  naming the record and entry, when a `static-check` entry lacks either field,
-  when either field appears on any other evidence type, or when `run` is
-  absolute or contains `..`. Rendering is unchanged: `run` and `language` never
+  `IntentRecord::validators()`. A `static-check` entry with neither field is
+  ordinary descriptive evidence — an expectation a validator may later make
+  executable, as several existing records already use it — and declares no
+  validator; `catalog::scan` refuses a knowledge base, naming the record and
+  entry, when a `static-check` entry carries only one of the two fields (both
+  are needed to declare a validator), when either field appears on any other
+  evidence type, or when `run` is absolute or contains `..`. Rendering is
+  unchanged: `run` and `language` never
   reach the assembled artifact. cmf records and renders validators; running
-  them is the future `cmv`'s job.
+  them is `cmv`'s job.
 - **cmf records what it compiled.** cmf now has a second output artifact, the
   compile manifest (`CMV.md`, "The manifest"): JSON with a `schema` version,
   the `compiled_at` instant, the knowledge base's path plus its cmx source name

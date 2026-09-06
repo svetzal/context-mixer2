@@ -152,7 +152,7 @@ fn explain_names_the_validators_and_the_argv_without_running_anything() {
         text.starts_with("Intent: craftsperson/rust/isolate-functional-core\n"),
         "{text}"
     );
-    assert!(text.contains("Record: resolved by id\n"), "{text}");
+    assert!(text.contains("Record: resolved by key\n"), "{text}");
     assert!(text.contains("Title: Isolate the functional core\n"), "{text}");
     assert!(text.contains("Stale: yes"), "{text}");
     assert!(
@@ -194,7 +194,7 @@ fn explain_json_matches_the_record_id_form_and_exits_two_when_unknown() {
     assert_eq!(output.status.code(), Some(0));
     let report: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
     assert_eq!(report["intent"]["key"], "craftsperson/rust/put-gateways-at-effect-boundaries");
-    assert_eq!(report["intent"]["resolution"], "id");
+    assert_eq!(report["intent"]["resolution"], "key");
     assert_eq!(report["intent"]["stale"], false);
     assert_eq!(report["intent"]["validators"][0]["would_run"], true);
     assert_eq!(report["knowledge_base"]["resolved_by"], "override");

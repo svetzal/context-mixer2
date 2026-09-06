@@ -7,11 +7,15 @@ use anyhow::{Context, Result, bail};
 use cmx_core::gateway::Filesystem;
 use serde::Deserialize;
 
-/// Evidence `type` whose entry declares an executable validator.
+/// Evidence `type` that may declare an executable validator.
 ///
-/// A `static-check` entry must carry both `language` and `run`; no other
-/// evidence type may carry either. cmf only records and renders these entries
-/// — executing them is the verifier's job (see `CMV.md`).
+/// A `static-check` entry carrying both `language` and `run` declares a
+/// validator. One carrying neither is ordinary non-executable evidence — a
+/// descriptive "a static check should verify X" expectation that a validator
+/// may later make executable. One carrying exactly one of the two is
+/// half-declared and rejected at scan time, as is either field on any other
+/// evidence type. cmf only records and renders validators — executing them is
+/// the verifier's job (see `CMV.md`).
 pub const STATIC_CHECK: &str = "static-check";
 
 /// Directed relationship between intent records.
@@ -35,37 +39,44 @@ pub struct Evidence {
     /// Whether the evidence is mandatory.
     #[serde(default)]
     pub required: bool,
-    /// Source language a validator reads. Present only on [`STATIC_CHECK`]
-    /// entries.
+    /// Source language a validator reads. Allowed only on [`STATIC_CHECK`]
+    /// entries, and only together with `run`.
     #[serde(default)]
     pub language: Option<String>,
-    /// Validator executable, relative to the knowledge-base root. Present only
-    /// on [`STATIC_CHECK`] entries.
+    /// Validator executable, relative to the knowledge-base root. Allowed only
+    /// on [`STATIC_CHECK`] entries, and only together with `language`.
     #[serde(default)]
     pub run: Option<String>,
 }
 
 impl Evidence {
-    /// The executable validator this entry declares, if it is a
-    /// [`STATIC_CHECK`] entry.
+    /// The executable validator this entry declares: a [`STATIC_CHECK`] entry
+    /// carrying both `language` and `run`.
     ///
-    /// Entries returned by [`scan`] are already validated, so a
-    /// `static-check` entry always yields `Some`; the accessor stays total
-    /// rather than panicking on a hand-built half-declared entry.
+    /// A descriptive `static-check` entry (neither field) is non-executable
+    /// evidence and yields `None`. Entries returned by [`scan`] are already
+    /// validated, so a half-declared entry never reaches here; the accessor
+    /// stays total rather than panicking on a hand-built one.
     pub fn validator(&self) -> Option<Validator<'_>> {
         if self.kind != STATIC_CHECK {
             return None;
         }
         Some(Validator {
-            language: self.language.as_deref()?,
-            run: Path::new(self.run.as_deref()?),
+            language: declared(self.language.as_deref())?,
+            run: Path::new(declared(self.run.as_deref())?),
             required: self.required,
             description: &self.description,
         })
     }
 }
 
-/// An executable validator declared by a [`STATIC_CHECK`] evidence entry.
+/// A validator field counts as declared only when present and non-empty.
+fn declared(field: Option<&str>) -> Option<&str> {
+    field.filter(|value| !value.is_empty())
+}
+
+/// An executable validator declared by a fully declared [`STATIC_CHECK`]
+/// evidence entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Validator<'a> {
     /// Source language the validator reads, such as `rust` or `python`.
@@ -212,12 +223,20 @@ fn evidence_violation(entry: &Evidence) -> Option<String> {
     }
 }
 
+/// Both fields, a validator; neither, descriptive evidence; one, half-declared.
 fn static_check_violation(entry: &Evidence) -> Option<String> {
-    let missing = validator_fields(entry, |field| field.is_none_or(str::is_empty));
-    if !missing.is_empty() {
-        return Some(format!("static-check evidence must declare {}", missing.join(" and ")));
+    match (declared(entry.language.as_deref()), declared(entry.run.as_deref())) {
+        (Some(_), Some(run)) => run_path_violation(run),
+        (None, None) => None,
+        (None, Some(_)) => Some(half_declared("`language`")),
+        (Some(_), None) => Some(half_declared("`run`")),
     }
-    entry.run.as_deref().and_then(run_path_violation)
+}
+
+fn half_declared(missing: &str) -> String {
+    format!(
+        "static-check evidence needs both `language` and `run` to declare a validator; {missing} is missing"
+    )
 }
 
 fn non_executable_violation(entry: &Evidence) -> Option<String> {
@@ -232,11 +251,12 @@ fn non_executable_violation(entry: &Evidence) -> Option<String> {
 }
 
 /// Names of the validator-only fields (`language`, `run`) for which
-/// `matches` holds, ready to be listed in a message.
+/// `matches` holds, ready to be listed in a message. An empty value counts as
+/// absent, matching [`declared`].
 fn validator_fields(entry: &Evidence, matches: impl Fn(Option<&str>) -> bool) -> Vec<&'static str> {
     [
-        ("`language`", entry.language.as_deref()),
-        ("`run`", entry.run.as_deref()),
+        ("`language`", declared(entry.language.as_deref())),
+        ("`run`", declared(entry.run.as_deref())),
     ]
     .into_iter()
     .filter(|(_, value)| matches(*value))
@@ -356,7 +376,7 @@ tradeoff = "One more type per effect."
         assert_eq!(
             message,
             format!(
-                "intent {RECORD_PATH} evidence entry 1 (type \"static-check\"): static-check evidence must declare `run`"
+                "intent {RECORD_PATH} evidence entry 1 (type \"static-check\"): static-check evidence needs both `language` and `run` to declare a validator; `run` is missing"
             )
         );
     }
@@ -370,18 +390,27 @@ tradeoff = "One more type per effect."
         assert_eq!(
             message,
             format!(
-                "intent {RECORD_PATH} evidence entry 2 (type \"static-check\"): static-check evidence must declare `language`"
+                "intent {RECORD_PATH} evidence entry 2 (type \"static-check\"): static-check evidence needs both `language` and `run` to declare a validator; `language` is missing"
             )
         );
     }
 
     #[test]
-    fn rejects_static_check_missing_both_validator_fields() {
-        let message = rejection(&[r#"{ type = "static-check", description = "Checked." }"#]);
-        assert!(
-            message.ends_with("static-check evidence must declare `language` and `run`"),
-            "{message}"
-        );
+    fn descriptive_static_check_is_non_executable_evidence() {
+        let record = single_record(&[
+            r#"{ type = "static-check", description = "Every production ns form has a docstring.", required = true }"#,
+        ]);
+        assert_eq!(record.evidence[0].kind, STATIC_CHECK);
+        assert!(record.evidence[0].validator().is_none());
+        assert_eq!(record.validators().count(), 0);
+    }
+
+    #[test]
+    fn empty_validator_fields_count_as_absent() {
+        let record = single_record(&[
+            r#"{ type = "static-check", language = "", run = "", description = "Checked." }"#,
+        ]);
+        assert!(record.evidence[0].validator().is_none());
     }
 
     #[test]
