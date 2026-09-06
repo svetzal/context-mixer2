@@ -16,6 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **cmf records what it compiled.** cmf now has a second output artifact, the
+  compile manifest (`CMV.md`, "The manifest"): JSON with a `schema` version,
+  the `compiled_at` instant, the knowledge base's path plus its cmx source name
+  and git `HEAD` revision when available, the profile id and version, the
+  delivered artifact's name, surface, and content checksum, and one entry per
+  retained intent — `id`, catalog `key`, and the `sha256:` checksum of the
+  record file — in `Assembly.selected` order. `dropped` is present and empty,
+  because assembly still fails rather than drops on budget overrun. Two write
+  paths: `cmf assemble --manifest <path>` writes it wherever asked, and
+  `cmf install --local --apply` writes `.context-mixer/cmf-manifest.json` beside
+  the local lock file (the preview announces it; global installs write none).
+  Every effect goes through the cmx-core gateways, so the manifest is pinned
+  byte-for-byte by a golden fixture under `cmf/tests/fixtures/manifest-kb/`.
 - **Behavioural exercises now measure distributions, and compare models.**
   Collecting and analysing split apart: `runner.py` only gathers trials, and the
   new `aggregate.py` reads every `metrics.json` under `results/` and reports

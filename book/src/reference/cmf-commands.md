@@ -20,11 +20,28 @@ an explicit profile path can live elsewhere.
 `assemble --explain` writes selected intent keys, graph traversals, and the
 estimated token count to stderr, leaving stdout safe for redirection.
 `--surface agent|skill` can override a profile's delivery surface.
+`--manifest <path>` additionally writes the compile manifest (below) to that
+path.
 
 `install` is global by default. Use `--local` for project scope and `--force`
 to replace drifted or newer installed guidance. Target platforms come from
 cmx configuration and existing lock state; cmf does not duplicate their path
-or format rules.
+or format rules. A local install also records the compile manifest at
+`.context-mixer/cmf-manifest.json`, beside the local lock file: the preview
+says so, and `--apply` writes it. Global installs write no manifest.
+
+## Compile manifest
+
+The manifest is cmf's second output: a JSON record of what was compiled, so a
+verifier can later hold the project to exactly those intents. It carries a
+`schema` version (`1`), the `compiled_at` instant, the `knowledge_base` (its
+`path`, plus its cmx `source` name and git `revision` when the root is a
+registered source or a git checkout — both omitted otherwise), the `profile`
+id and version, the delivered `artifact` (name, surface, and `sha256:`
+checksum of its content), one `intents` entry per retained record (`id`,
+catalog `key`, and the `sha256:` checksum of the record file) in the order
+they were retained, and a `dropped` list that is currently always empty
+because assembly fails rather than drops on budget overrun.
 
 ## Profile schema
 

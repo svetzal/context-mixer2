@@ -42,18 +42,29 @@ pub enum Commands {
         /// Write selection and traversal provenance to stderr.
         #[arg(long)]
         explain: bool,
+        /// Also write the compile manifest (JSON recording the composed
+        /// intents, their checksums, and the knowledge-base revision) to this
+        /// path.
+        #[arg(long, value_name = "PATH")]
+        manifest: Option<PathBuf>,
     },
     /// Preview or apply installation of an assembled profile.
+    ///
+    /// A local install also writes the compile manifest to
+    /// `.context-mixer/cmf-manifest.json` beside the local lock file; the
+    /// preview says so, and `--apply` writes it. Global installs write no
+    /// manifest.
     Install {
         /// Profile path, or a name resolved below `<root>/profiles/`.
         profile: PathBuf,
         /// Override the profile's delivery surface.
         #[arg(long, value_enum)]
         surface: Option<SurfaceArg>,
-        /// Install project-locally instead of user-wide.
+        /// Install project-locally instead of user-wide, and record the
+        /// compile manifest in `.context-mixer/cmf-manifest.json`.
         #[arg(long)]
         local: bool,
-        /// Apply the displayed plan.
+        /// Apply the displayed plan (and, with --local, write the manifest).
         #[arg(long)]
         apply: bool,
         /// Overwrite drifted or newer installed guidance.

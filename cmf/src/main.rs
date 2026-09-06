@@ -8,6 +8,7 @@ use clap::Parser;
 use cmf::assembly::assemble;
 use cmf::catalog;
 use cmf::cli::{Cli, Commands, SurfaceArg};
+use cmf::manifest;
 use cmf::profile::{self, Surface};
 use cmx_core::artifact_install::{ArtifactIdentity, ArtifactInstaller, BundledArtifact};
 use cmx_core::gateway::real::RealFilesystem;
@@ -23,6 +24,7 @@ fn main() -> Result<ExitCode> {
             profile,
             surface,
             explain,
+            manifest: manifest_path,
         } => {
             let (mut profile, profile_path) = profile::load(&root, &profile, &fs)?;
             apply_surface(&mut profile.surface, surface);
@@ -30,6 +32,13 @@ fn main() -> Result<ExitCode> {
             let assembly = assemble(&profile, &intents)?;
             if explain {
                 print_explanation(&profile_path, &assembly);
+            }
+            if let Some(manifest_path) = manifest_path {
+                let production = ProductionContext::claude()?;
+                let ctx = production.ctx();
+                let manifest = manifest::build(&root, &profile, &assembly, &intents, &ctx)?;
+                manifest::write(&manifest, &manifest_path, ctx.fs)?;
+                eprintln!("manifest: {}", manifest_path.display());
             }
             print!("{}", assembly.content);
         }
@@ -45,7 +54,7 @@ fn main() -> Result<ExitCode> {
             let intents = catalog::scan(&root, &fs)?;
             let assembly = assemble(&profile, &intents)?;
             let bundle = match profile.surface {
-                Surface::Agent => BundledArtifact::agent(assembly.content),
+                Surface::Agent => BundledArtifact::agent(assembly.content.clone()),
                 Surface::Skill => BundledArtifact::skill_md(&assembly.content),
             };
             let installer = ArtifactInstaller::new(ArtifactIdentity::new(
@@ -56,12 +65,23 @@ fn main() -> Result<ExitCode> {
             let ctx = production.ctx();
             let scope = if local { Scope::Local } else { Scope::Global };
             let plan = installer.plan(&bundle, scope, force, &ctx)?;
+            // Only a project-local install has one repository to verify, so only
+            // it records a manifest (see CMV.md, "Open decisions").
+            let manifest_path = local.then(|| manifest::local_manifest_path(ctx.paths));
             eprintln!("Profile: {}", profile_path.display());
             print!("{plan}");
             if apply {
                 let report = installer.apply(&bundle, &plan, &ctx)?;
                 print!("{report}");
+                if let Some(manifest_path) = manifest_path {
+                    let manifest = manifest::build(&root, &profile, &assembly, &intents, &ctx)?;
+                    manifest::write(&manifest, &manifest_path, ctx.fs)?;
+                    println!("Manifest written to {}", manifest_path.display());
+                }
             } else {
+                if let Some(manifest_path) = manifest_path {
+                    println!("Manifest will be written to {}", manifest_path.display());
+                }
                 println!("Re-run with --apply to make these changes.");
             }
         }

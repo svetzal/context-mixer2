@@ -1,0 +1,13 @@
+id = "fixture.intent.isolate-functional-core"
+title = "Isolate the functional core"
+category = "architecture"
+tags = ["rust", "design"]
+status = "hypothesized"
+capability = "Business rules are pure functions over plain data."
+threat = "Decisions and effects interleave, so neither can be tested alone."
+expectation = "Pure modules import no gateway."
+strategy = "Keep decisions in pure functions; push I/O to a thin imperative shell."
+tradeoff = "Some data is copied across the seam."
+evidence = [
+  { type = "architecture_review", description = "Pure modules have no gateway imports.", required = false },
+]

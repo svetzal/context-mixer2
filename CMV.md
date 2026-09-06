@@ -1,6 +1,7 @@
 # cmv — Deterministic Verification of Compiled Intents
 
-> Design draft. Status: proposed (2026-09-05), not yet implemented.
+> Design draft. Status: proposed (2026-09-05). Phase 1 (the manifest) is
+> implemented; cmv itself is not.
 > Companion to [CHARTER.md](CHARTER.md), [SPEC.md](SPEC.md), and
 > [SETS.md](SETS.md).
 
@@ -174,6 +175,17 @@ state directory beside the local lock file.
   not the code.
 
 The manifest is the `--explain` output made durable and given a contract.
+
+Phase 1 shipped the manifest as specified above, with three concrete details.
+It lives at `.context-mixer/cmf-manifest.json`, written by
+`cmf install --local --apply` (the preview says it will be; global installs
+write none, per the open decision below), and `cmf assemble --manifest <path>`
+writes the same document wherever asked. `knowledge_base` gained a `path`
+field — the root as cmf resolved it — so the record is still locatable when
+`source` is absent because the root is not a registered cmx source. And
+`dropped` is present but always empty for now: assembly fails on budget
+overrun rather than dropping, so nothing has yet had a reason to appear there.
+The field stays so the schema does not move when assembly learns to drop.
 
 ### Project config
 

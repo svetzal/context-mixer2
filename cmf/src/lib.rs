@@ -3,4 +3,5 @@
 pub mod assembly;
 pub mod catalog;
 pub mod cli;
+pub mod manifest;
 pub mod profile;

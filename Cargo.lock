@@ -323,9 +323,11 @@ name = "cmf"
 version = "3.1.3"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "cmx-core",
  "serde",
+ "serde_json",
  "toml",
 ]
 

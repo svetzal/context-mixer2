@@ -1,0 +1,10 @@
+id = "fixture.intent.type-public-boundaries"
+title = "Type public boundaries"
+category = "quality"
+tags = ["python", "typing"]
+status = "confirmed"
+capability = "Callers learn a function's contract from its signature."
+threat = "Untyped boundaries hide shape mismatches until runtime."
+expectation = "Every public function is annotated."
+strategy = "Annotate parameters and returns on every public function."
+tradeoff = "Signatures grow."
