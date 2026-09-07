@@ -6,6 +6,7 @@ surface = "agent"
 budget_tokens = 400
 
 [select]
+ecosystems = ["rust"]
 keys = [
   "craftsperson/rust/put-gateways-at-effect-boundaries",
   "craftsperson/rust/isolate-functional-core",

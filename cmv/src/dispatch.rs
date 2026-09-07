@@ -728,6 +728,7 @@ evidence = [
                 profile: ProfileRef {
                     id: "shipping".to_string(),
                     version: "0.1.0".to_string(),
+                    ecosystems: vec![],
                 },
                 artifact: ArtifactRef {
                     name: "AGENTS".to_string(),

@@ -1,4 +1,5 @@
-//! Read-only discovery, parsing, and schema validation of TOML intent records.
+//! Read-only discovery, parsing, and schema validation of TOML intent records,
+//! plus the ecosystem qualifiers a record's catalog key carries.
 
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
@@ -137,6 +138,31 @@ pub struct Intent {
     pub path: PathBuf,
     /// Parsed record.
     pub record: IntentRecord,
+}
+
+impl Intent {
+    /// The ecosystem qualifiers of this record's key; see
+    /// [`ecosystem_qualifiers`].
+    pub fn qualifiers(&self) -> Vec<&str> {
+        ecosystem_qualifiers(&self.key)
+    }
+}
+
+/// The ecosystem qualifiers of a catalog key: the path segments between the
+/// first (the collection root, e.g. `craftsperson`) and the last (the slug).
+///
+/// The knowledge base documents its directory hierarchy as the realization
+/// hierarchy — `craftsperson/python/uv/` specializes Python guidance for
+/// uv-based projects — so the nesting *is* the record's ecosystem, and no
+/// record field needs to restate it. `craftsperson/python/uv/pin-interpreter`
+/// yields `["python", "uv"]`; `craftsperson/isolate-functional-core` yields
+/// nothing, as does a bare single-segment key.
+pub fn ecosystem_qualifiers(key: &str) -> Vec<&str> {
+    let segments: Vec<&str> = key.split('/').collect();
+    match segments.as_slice() {
+        [_collection, qualifiers @ .., _slug] => qualifiers.to_vec(),
+        _ => Vec::new(),
+    }
 }
 
 /// Read all structured intent records below `<root>/intents/`.
@@ -324,6 +350,35 @@ tradeoff = "One more type per effect."
     fn rejection(evidence: &[&str]) -> String {
         let error = scan_single(evidence).expect_err("record is rejected");
         format!("{error:#}")
+    }
+
+    #[test]
+    fn general_record_has_no_ecosystem_qualifiers() {
+        assert!(ecosystem_qualifiers("craftsperson/isolate-functional-core").is_empty());
+    }
+
+    #[test]
+    fn nested_record_qualifiers_are_the_segments_between_collection_and_slug() {
+        assert_eq!(ecosystem_qualifiers("craftsperson/rust/use-structured-tracing"), ["rust"]);
+        assert_eq!(
+            ecosystem_qualifiers("craftsperson/python/uv/pin-interpreter"),
+            ["python", "uv"]
+        );
+    }
+
+    #[test]
+    fn bare_single_segment_key_has_no_qualifiers() {
+        assert!(ecosystem_qualifiers("testing").is_empty());
+        assert!(ecosystem_qualifiers("").is_empty());
+    }
+
+    #[test]
+    fn intent_qualifiers_read_its_key() {
+        let fs = FakeFilesystem::new();
+        fs.add_file(RECORD_PATH, BASE_RECORD);
+        let intents = scan(Path::new(ROOT), &fs).expect("record scans");
+        let intent = &intents["craftsperson/rust/put-gateways-at-effect-boundaries"];
+        assert_eq!(intent.qualifiers(), ["rust"]);
     }
 
     #[test]

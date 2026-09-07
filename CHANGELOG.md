@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **cmf profiles can declare the ecosystems they target.** `[select]
+  ecosystems = ["python", "uv"]` filters selection by the realization
+  hierarchy the knowledge base already encodes in its directory layout: a
+  record's ecosystem qualifiers are the catalog-key segments between the
+  collection root and the slug, and a record is eligible when it has none or
+  every one is declared. Category/tag selection never picks an ineligible
+  record (so `quality`/`testing` no longer pulls every language's testing
+  records into one artifact), graph expansion skips edges to ineligible targets
+  and records them in `--explain` as `(skipped: ecosystem)`, and an explicit
+  key outside the declared ecosystems is an error naming the key and the
+  qualifier. A profile declaring no ecosystems behaves exactly as before.
+  `--explain` prints the declared ecosystems and the excluded count; the
+  compile manifest gains `profile.ecosystems` (always present, empty when
+  none) for cmv to compare against detected languages later.
+
 ## [3.2.1] - 2026-09-06
 
 ### Fixed

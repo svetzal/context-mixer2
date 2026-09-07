@@ -61,6 +61,16 @@ pub struct Selection {
     /// At least one required tag.
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Ecosystems the artifact targets, such as `["python", "uv"]`.
+    ///
+    /// A record's ecosystem qualifiers are the catalog-key path segments
+    /// between the collection root and the slug (see
+    /// [`crate::catalog::ecosystem_qualifiers`]). A record is eligible when it
+    /// has no qualifiers or every qualifier is declared here. Category/tag
+    /// selection never picks an ineligible record, graph expansion skips edges
+    /// to one, and naming one in `keys` is an error. Empty applies no filter.
+    #[serde(default)]
+    pub ecosystems: Vec<String>,
 }
 
 /// Graph expansion controls.

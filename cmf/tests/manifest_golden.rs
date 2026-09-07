@@ -128,6 +128,38 @@ fn golden_manifest_writes_through_the_filesystem_gateway() {
 }
 
 #[test]
+fn golden_profile_records_its_declared_ecosystems() {
+    let fixture = fixture();
+    let (manifest, _) = build_manifest(&fixture);
+    assert_eq!(manifest.profile.ecosystems, ["rust"]);
+}
+
+/// The Python fixture record is never selected because it lies outside the
+/// profile's `ecosystems = ["rust"]` — not merely because its tags differ.
+#[test]
+fn fixture_python_record_is_excluded_by_ecosystem_not_by_tag() {
+    let fixture = fixture();
+    let root = Path::new(KB_ROOT);
+    let (mut profile, _) =
+        cmf::profile::load(root, Path::new("rust-shipping"), &fixture.fs).expect("profile loads");
+    let intents = catalog::scan(root, &fixture.fs).expect("catalog scans");
+    let python = "craftsperson/python/type-public-boundaries";
+    assert_eq!(
+        cmf::assembly::excluding_qualifier(&profile, &intents[python]),
+        Some("python"),
+        "the Python record's qualifier is not among the declared ecosystems"
+    );
+
+    // Widen the selection so the Python record matches by category and tag;
+    // the ecosystem filter alone must still keep it out.
+    profile.select.categories = vec![intents[python].record.category.clone()];
+    profile.select.tags = intents[python].record.tags.clone();
+    let assembly = assemble(&profile, &intents).expect("profile assembles");
+    assert!(!assembly.selected.iter().any(|key| key == python));
+    assert_eq!(assembly.excluded_by_ecosystem, 1, "exactly the Python record is excluded");
+}
+
+#[test]
 fn fixture_validator_lives_on_the_record_the_profile_does_not_select() {
     let fixture = fixture();
     let (manifest, intents) = build_manifest(&fixture);

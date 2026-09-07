@@ -3,7 +3,8 @@
   "manifest": {
     "profile": {
       "id": "rust-shipping",
-      "version": "0.3.0"
+      "version": "0.3.0",
+      "ecosystems": []
     },
     "knowledge_base": {
       "source": "guidelines",

@@ -153,6 +153,29 @@ is absent and several records share the id, the intent is not found; the reason
 names the records sharing the id, and the remedy is `cmf install` to recompile
 against the current keys.
 
+### Records carry their ecosystem in the key; the manifest records the profile's
+
+The knowledge base states that its directory hierarchy is the realization
+hierarchy: `craftsperson/python/uv/` specializes Python guidance for uv-based
+projects. A record's **ecosystem qualifiers** are therefore the key segments
+between the collection root and the slug — `["python", "uv"]` for
+`craftsperson/python/uv/pin-interpreter`, `["rust"]` for
+`craftsperson/rust/use-structured-tracing`, none for
+`craftsperson/isolate-functional-core-from-effects`. No record field restates
+this; `cmf::catalog::ecosystem_qualifiers` derives it from the key.
+
+A profile declares the ecosystems it targets in `[select] ecosystems`, and cmf
+admits a record only when every qualifier it has is declared (a record with no
+qualifiers is always eligible; a profile declaring nothing filters nothing).
+Category/tag selection drops ineligible records, graph expansion skips edges to
+them, and an explicit key outside the declared ecosystems is a profile error.
+
+The manifest records the declared list as `profile.ecosystems` — always
+present, empty when the profile declared none — beside the profile `id` and
+`version`. cmv does not yet act on it; the intended use is to compare it with
+the languages cmv detects in the workspace and report a profile compiled for
+an ecosystem the project does not contain.
+
 ### The manifest
 
 Written by `cmf install`, committed with the project, read by cmv. JSON,
@@ -170,7 +193,8 @@ state directory beside the local lock file.
   },
   "profile": {
     "id": "rust-craftsperson-shipping",
-    "version": "0.1.0"
+    "version": "0.1.0",
+    "ecosystems": ["rust"]
   },
   "artifact": {
     "name": "AGENTS",

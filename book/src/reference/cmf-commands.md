@@ -37,7 +37,8 @@ verifier can later hold the project to exactly those intents. It carries a
 `schema` version (`1`), the `compiled_at` instant, the `knowledge_base` (its
 `path`, plus its cmx `source` name and git `revision` when the root is a
 registered source or a git checkout — both omitted otherwise), the `profile`
-id and version, the delivered `artifact` (name, surface, and `sha256:`
+id, version, and declared `ecosystems` (always present, empty when the profile
+declared none), the delivered `artifact` (name, surface, and `sha256:`
 checksum of its content), one `intents` entry per retained record (`id`,
 catalog `key`, and the `sha256:` checksum of the record file) in the order
 they were retained, and a `dropped` list that is currently always empty
@@ -56,6 +57,7 @@ budget_tokens = 2800
 keys = ["craftsperson/audit-dependency-risk"]
 categories = ["dependencies", "quality"]
 tags = ["security", "cargo"]
+ecosystems = ["rust"]
 
 [graph]
 follow = ["specializes", "related-to"]
@@ -70,6 +72,39 @@ A profile must name exact keys or combine category and tag filters. This guard
 prevents accidental whole-catalogue exports. Graph expansion is bounded, and
 generation fails instead of truncating when the shaped artifact exceeds its
 declared context budget.
+
+### Ecosystems
+
+The knowledge base carries a record's language and tooling as the directory it
+sits in — the directory hierarchy is the realization hierarchy, so
+`craftsperson/python/uv/` specializes Python guidance for uv-based projects. A
+record's **ecosystem qualifiers** are the segments of its catalog key between
+the collection root and the slug: `craftsperson/python/uv/pin-interpreter` has
+qualifiers `python` and `uv`, `craftsperson/rust/use-structured-tracing` has
+`rust`, and `craftsperson/isolate-functional-core-from-effects` has none.
+
+`[select] ecosystems` names the ecosystems the artifact targets. A record is
+**eligible** when it has no qualifiers or every qualifier it has is declared;
+so `ecosystems = ["python"]` admits the general records and the `python/`
+specializations but not `python/uv/`, and `["python", "uv"]` admits all three.
+A profile that declares no ecosystems applies no filter. Eligibility applies in
+three places:
+
+- **Category/tag selection** never picks an ineligible record. Without a
+  filter, `categories = ["quality"]` with `tags = ["testing"]` pulls every
+  ecosystem's testing records into one artifact; with one, only the declared
+  ecosystems' records (and the general ones) remain.
+- **Graph expansion** skips an edge to an ineligible target instead of
+  following it, and records the skip in `--explain`'s traversal as
+  `<key> --<relation>--> <target> (skipped: ecosystem)`.
+- **Explicit keys** must be eligible: naming a key outside the declared
+  ecosystems is an error that names the key and the qualifier that excluded
+  it, because a profile should not contradict itself.
+
+`--explain` prints the declared ecosystems and how many category/tag matches
+the filter excluded. The compile manifest records the declared list as
+`profile.ecosystems` (empty when none) so a verifier can compare it with the
+languages it detects.
 
 Selected intents render as compact, ordered blocks rather than separate
 guidance, rationale, and evidence sections. Within each block, `rationale`

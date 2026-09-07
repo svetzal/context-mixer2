@@ -31,7 +31,7 @@ fn main() -> Result<ExitCode> {
             let intents = catalog::scan(&root, &fs)?;
             let assembly = assemble(&profile, &intents)?;
             if explain {
-                print_explanation(&profile_path, &assembly);
+                print_explanation(&profile_path, &profile, &assembly);
             }
             if let Some(manifest_path) = manifest_path {
                 let production = ProductionContext::claude()?;
@@ -110,8 +110,22 @@ fn apply_surface(surface: &mut Surface, override_surface: Option<SurfaceArg>) {
     }
 }
 
-fn print_explanation(profile_path: &std::path::Path, assembly: &cmf::assembly::Assembly) {
+fn print_explanation(
+    profile_path: &std::path::Path,
+    profile: &profile::Profile,
+    assembly: &cmf::assembly::Assembly,
+) {
     eprintln!("profile: {}", profile_path.display());
+    let ecosystems = &profile.select.ecosystems;
+    if ecosystems.is_empty() {
+        eprintln!("ecosystems: (none declared; no filter applied)");
+    } else {
+        eprintln!("ecosystems: {}", ecosystems.join(", "));
+        eprintln!(
+            "excluded by ecosystem from category/tag matching: {}",
+            assembly.excluded_by_ecosystem
+        );
+    }
     eprintln!("selected intents ({}):", assembly.selected.len());
     for key in &assembly.selected {
         eprintln!("  {key}");

@@ -437,6 +437,7 @@ mod tests {
             profile: ProfileRef {
                 id: "rust-shipping".to_string(),
                 version: "0.3.0".to_string(),
+                ecosystems: vec![],
             },
             artifact: ArtifactRef {
                 name: "AGENTS".to_string(),

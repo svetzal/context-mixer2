@@ -73,6 +73,13 @@ pub struct ProfileRef {
     pub id: String,
     /// Artifact version the profile declares.
     pub version: String,
+    /// Ecosystems the profile declared in `[select] ecosystems`, in profile
+    /// order; empty when it declared none and so applied no filter. Always
+    /// written, so a verifier can compare it with the languages it detects.
+    /// Read with a default so manifests written before the field existed
+    /// still load.
+    #[serde(default)]
+    pub ecosystems: Vec<String>,
 }
 
 /// Identity and integrity of the delivered artifact.
@@ -130,6 +137,7 @@ pub fn build(
         profile: ProfileRef {
             id: profile.id.clone(),
             version: profile.version.clone(),
+            ecosystems: profile.select.ecosystems.clone(),
         },
         artifact: ArtifactRef {
             name: profile.artifact_name().to_string(),
@@ -345,7 +353,10 @@ mod tests {
             description: "Ship it".to_string(),
             surface: Surface::Agent,
             budget_tokens: 100,
-            select: Selection::default(),
+            select: Selection {
+                ecosystems: vec!["rust".to_string()],
+                ..Selection::default()
+            },
             graph: Graph::default(),
             content: Content::default(),
         }
@@ -356,6 +367,7 @@ mod tests {
             content: "rendered guidance\n".to_string(),
             selected: selected.iter().map(ToString::to_string).collect(),
             traversed: vec![],
+            excluded_by_ecosystem: 0,
             estimated_tokens: 5,
         }
     }
@@ -396,6 +408,7 @@ mod tests {
         assert_eq!(manifest.knowledge_base.path, PathBuf::from("/kb"));
         assert_eq!(manifest.profile.id, "shipping");
         assert_eq!(manifest.profile.version, "0.2.0");
+        assert_eq!(manifest.profile.ecosystems, ["rust"]);
         assert_eq!(manifest.artifact.name, "AGENTS");
         assert_eq!(manifest.artifact.surface, Surface::Agent);
         assert_eq!(
@@ -539,6 +552,39 @@ mod tests {
         let manifest = build_with(Path::new("/kb"), &fs, &["a/first", "b/second"]);
         let parsed: Manifest = serde_json::from_str(&manifest.to_json().unwrap()).unwrap();
         assert_eq!(parsed, manifest);
+    }
+
+    #[test]
+    fn manifest_written_before_ecosystems_existed_still_loads() {
+        let fs = FakeFilesystem::new();
+        let mut json: serde_json::Value = serde_json::from_str(
+            &build_with(Path::new("/kb"), &fs, &["a/first"]).to_json().unwrap(),
+        )
+        .unwrap();
+        json["profile"].as_object_mut().unwrap().remove("ecosystems");
+        let parsed: Manifest = serde_json::from_value(json).unwrap();
+        assert!(parsed.profile.ecosystems.is_empty(), "absent field reads as no filter");
+    }
+
+    #[test]
+    fn ecosystems_are_always_written_even_when_empty() {
+        let fs = FakeFilesystem::new();
+        let root = Path::new("/kb");
+        let intents = catalog(root, &fs);
+        let git = FakeGitClient::new();
+        let clock = FakeClock::at(Utc.with_ymd_and_hms(2026, 9, 5, 14, 2, 11).unwrap());
+        let paths = paths();
+        let ctx = AppContext {
+            fs: &fs,
+            git: &git,
+            clock: &clock,
+            paths: &paths,
+            llm: None,
+        };
+        let mut unfiltered = profile();
+        unfiltered.select.ecosystems.clear();
+        let manifest = build(root, &unfiltered, &assembly(&["a/first"]), &intents, &ctx).unwrap();
+        assert!(manifest.to_json().unwrap().contains("\"ecosystems\": []"));
     }
 
     #[test]
