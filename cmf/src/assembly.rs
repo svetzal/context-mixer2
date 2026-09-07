@@ -1,5 +1,18 @@
-//! Intent selection, ecosystem eligibility, graph expansion, and
-//! delivery-surface shaping.
+//! Intent selection, ecosystem eligibility, graph expansion, downward
+//! specialization expansion, and delivery-surface shaping.
+//!
+//! Assembly runs in a fixed order: the initial selection (explicit keys, then
+//! category/tag matches filtered by ecosystem); `follow`-edge expansion
+//! outward from the selection; downward specialization expansion, which pulls
+//! in every eligible record that `specializes` a selected one, transitively to
+//! a fixpoint; removal of general parents shadowed by a selected
+//! specialization; and finally the budget check. Downward expansion runs only
+//! when `graph.prefer_specializations` is true **and** the profile declares at
+//! least one ecosystem — without a declared list it would pull every
+//! language's version of every general record. Records it adds do not have
+//! their own `follow` edges expanded: that keeps the pass bounded and
+//! deterministic, and their `specializes` edge already points at a selected
+//! parent.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Write as _;
@@ -17,11 +30,16 @@ pub struct Assembly {
     /// Intent keys retained in the delivered artifact.
     pub selected: Vec<String>,
     /// Graph edges followed during expansion. An edge to a record outside the
-    /// profile's ecosystems is recorded with a `(skipped: ecosystem)` suffix.
+    /// profile's ecosystems is recorded with a `(skipped: ecosystem)` suffix;
+    /// a specialization pulled in by downward expansion is recorded as
+    /// `<general-key> <--specializes-- <specialization-key>`.
     pub traversed: Vec<String>,
     /// Records that matched the profile's categories and tags but were
     /// excluded because they lie outside its declared ecosystems.
     pub excluded_by_ecosystem: usize,
+    /// Eligible specializations of selected records pulled in by downward
+    /// expansion; zero when either of its gates does not hold.
+    pub specialized_downward: usize,
     /// Approximate token count.
     pub estimated_tokens: usize,
 }
@@ -32,8 +50,12 @@ pub fn assemble(profile: &Profile, intents: &BTreeMap<String, Intent>) -> Result
         mut selected,
         excluded_by_ecosystem,
     } = initial_selection(profile, intents)?;
-    let traversed = expand_graph(profile, intents, &mut selected)?;
+    let mut traversed = expand_graph(profile, intents, &mut selected)?;
+    let mut specialized_downward = 0;
     if profile.graph.prefer_specializations {
+        let pulled = specialize_downward(profile, intents, &mut selected);
+        specialized_downward = pulled.len();
+        traversed.extend(pulled);
         remove_shadowed_parents(intents, &mut selected);
     }
     if selected.is_empty() {
@@ -53,6 +75,7 @@ pub fn assemble(profile: &Profile, intents: &BTreeMap<String, Intent>) -> Result
         selected: selected.into_iter().collect(),
         traversed,
         excluded_by_ecosystem,
+        specialized_downward,
         estimated_tokens,
     })
 }
@@ -160,6 +183,58 @@ fn expand_graph(
         }
     }
     Ok(traversed)
+}
+
+/// Pull every eligible record that `specializes` a selected record into the
+/// selection, transitively to a fixpoint, returning one traversal line per
+/// pulled record in the form `<general-key> <--specializes-- <specialization-key>`.
+///
+/// This is the downward walk that lets a profile selecting general advice by
+/// category and tag find the ecosystem's own version of it; the caller then
+/// drops the shadowed general parent. It is a no-op when the profile declares
+/// no ecosystems, because without that list it would pull every language's
+/// specialization of every selected record. Records it adds are not expanded
+/// along their own `follow` edges (see the module header).
+pub fn specialize_downward(
+    profile: &Profile,
+    intents: &BTreeMap<String, Intent>,
+    selected: &mut BTreeSet<String>,
+) -> Vec<String> {
+    if profile.select.ecosystems.is_empty() {
+        return Vec::new();
+    }
+    let specializations_of = specialization_index(intents);
+    let mut pulled = Vec::new();
+    let mut queue: VecDeque<String> = selected.iter().cloned().collect();
+    while let Some(general) = queue.pop_front() {
+        let Some(specializations) = specializations_of.get(general.as_str()) else {
+            continue;
+        };
+        for specialization in specializations {
+            if !eligible(profile, specialization) {
+                continue;
+            }
+            if selected.insert(specialization.key.clone()) {
+                pulled.push(format!("{general} <--specializes-- {}", specialization.key));
+                queue.push_back(specialization.key.clone());
+            }
+        }
+    }
+    pulled
+}
+
+/// Reverse index of `specializes` edges: general key to the records that
+/// specialize it, in catalog order so downward expansion is deterministic.
+fn specialization_index(intents: &BTreeMap<String, Intent>) -> BTreeMap<&str, Vec<&Intent>> {
+    let mut index: BTreeMap<&str, Vec<&Intent>> = BTreeMap::new();
+    for intent in intents.values() {
+        for relation in &intent.record.relations {
+            if relation.kind == "specializes" {
+                index.entry(relation.target.as_str()).or_default().push(intent);
+            }
+        }
+    }
+    index
 }
 
 fn remove_shadowed_parents(intents: &BTreeMap<String, Intent>, selected: &mut BTreeSet<String>) {
@@ -586,6 +661,157 @@ mod tests {
                 "craftsperson/python/run-pytest"
             ]
         );
+    }
+
+    /// Select the general record only; every specialization is in another
+    /// category so it can be reached solely by downward expansion.
+    fn general_only_catalog() -> BTreeMap<String, Intent> {
+        let mut intents = multi_ecosystem_catalog();
+        for (key, intent) in &mut intents {
+            if key != "craftsperson/test-observable-behavior" {
+                intent.record.category = "specialized".to_string();
+            }
+        }
+        intents
+    }
+
+    fn preferring_specializations() -> Graph {
+        Graph {
+            prefer_specializations: true,
+            ..Graph::default()
+        }
+    }
+
+    #[test]
+    fn downward_expansion_pulls_the_declared_ecosystems_specialization_and_drops_the_parent() {
+        let intents = general_only_catalog();
+        let profile = selecting(category_tag_selection(&["python"]), preferring_specializations());
+
+        let assembled = assemble(&profile, &intents).unwrap();
+
+        assert_eq!(assembled.selected, ["craftsperson/python/run-pytest"]);
+        assert_eq!(
+            assembled.traversed,
+            [
+                "craftsperson/test-observable-behavior <--specializes-- craftsperson/python/run-pytest"
+            ]
+        );
+        assert_eq!(assembled.specialized_downward, 1);
+    }
+
+    #[test]
+    fn downward_expansion_is_transitive_through_nested_ecosystems() {
+        let mut intents = general_only_catalog();
+        intents
+            .get_mut("craftsperson/python/uv/run-uv-pytest")
+            .unwrap()
+            .record
+            .relations = vec![Relation {
+            kind: "specializes".to_string(),
+            target: "craftsperson/python/run-pytest".to_string(),
+        }];
+
+        let both =
+            selecting(category_tag_selection(&["python", "uv"]), preferring_specializations());
+        let assembled = assemble(&both, &intents).unwrap();
+        assert_eq!(assembled.selected, ["craftsperson/python/uv/run-uv-pytest"]);
+        assert_eq!(
+            assembled.traversed,
+            [
+                "craftsperson/test-observable-behavior <--specializes-- craftsperson/python/run-pytest",
+                "craftsperson/python/run-pytest <--specializes-- craftsperson/python/uv/run-uv-pytest",
+            ]
+        );
+        assert_eq!(assembled.specialized_downward, 2);
+
+        let python_only =
+            selecting(category_tag_selection(&["python"]), preferring_specializations());
+        let assembled = assemble(&python_only, &intents).unwrap();
+        assert_eq!(assembled.selected, ["craftsperson/python/run-pytest"]);
+        assert_eq!(assembled.specialized_downward, 1, "the uv record stays out");
+    }
+
+    #[test]
+    fn no_declared_ecosystems_disables_downward_expansion() {
+        let intents = general_only_catalog();
+        let profile = selecting(category_tag_selection(&[]), preferring_specializations());
+
+        let assembled = assemble(&profile, &intents).unwrap();
+
+        assert_eq!(assembled.selected, ["craftsperson/test-observable-behavior"]);
+        assert!(assembled.traversed.is_empty());
+        assert_eq!(assembled.specialized_downward, 0);
+    }
+
+    #[test]
+    fn prefer_specializations_false_disables_downward_expansion() {
+        let intents = general_only_catalog();
+        let profile = selecting(category_tag_selection(&["python"]), keep_parents());
+
+        let assembled = assemble(&profile, &intents).unwrap();
+
+        assert_eq!(assembled.selected, ["craftsperson/test-observable-behavior"]);
+        assert!(assembled.traversed.is_empty());
+        assert_eq!(assembled.specialized_downward, 0);
+    }
+
+    #[test]
+    fn a_general_record_reached_by_a_followed_edge_also_gets_its_specialization() {
+        let mut intents = general_only_catalog();
+        intents.insert(
+            "craftsperson/python/keep-tests-fast".to_string(),
+            intent(
+                "craftsperson/python/keep-tests-fast",
+                "performance",
+                &["speed"],
+                vec![Relation {
+                    kind: "related-to".to_string(),
+                    target: "craftsperson/test-observable-behavior".to_string(),
+                }],
+            ),
+        );
+        let profile = selecting(
+            Selection {
+                keys: strings(&["craftsperson/python/keep-tests-fast"]),
+                ecosystems: strings(&["python"]),
+                ..Default::default()
+            },
+            Graph {
+                follow: strings(&["related-to"]),
+                max_related_depth: 1,
+                prefer_specializations: true,
+            },
+        );
+
+        let assembled = assemble(&profile, &intents).unwrap();
+
+        assert_eq!(
+            assembled.selected,
+            [
+                "craftsperson/python/keep-tests-fast",
+                "craftsperson/python/run-pytest"
+            ]
+        );
+        assert_eq!(
+            assembled.traversed,
+            [
+                "craftsperson/python/keep-tests-fast --related-to--> craftsperson/test-observable-behavior",
+                "craftsperson/test-observable-behavior <--specializes-- craftsperson/python/run-pytest",
+            ]
+        );
+        assert_eq!(assembled.specialized_downward, 1);
+    }
+
+    #[test]
+    fn an_already_selected_specialization_is_not_counted_as_pulled() {
+        let intents = multi_ecosystem_catalog();
+        let profile = selecting(category_tag_selection(&["python"]), preferring_specializations());
+
+        let assembled = assemble(&profile, &intents).unwrap();
+
+        assert_eq!(assembled.selected, ["craftsperson/python/run-pytest"]);
+        assert!(assembled.traversed.is_empty());
+        assert_eq!(assembled.specialized_downward, 0);
     }
 
     #[test]

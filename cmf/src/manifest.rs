@@ -368,6 +368,7 @@ mod tests {
             selected: selected.iter().map(ToString::to_string).collect(),
             traversed: vec![],
             excluded_by_ecosystem: 0,
+            specialized_downward: 0,
             estimated_tokens: 5,
         }
     }

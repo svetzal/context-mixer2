@@ -170,6 +170,16 @@ qualifiers is always eligible; a profile declaring nothing filters nothing).
 Category/tag selection drops ineligible records, graph expansion skips edges to
 them, and an explicit key outside the declared ecosystems is a profile error.
 
+The declared list also makes it safe to walk the `specializes` edges downward.
+When a profile declares ecosystems and `prefer_specializations` holds, cmf pulls
+in every eligible record that specializes a selected one, transitively (a
+general record pulls `python/…`, which pulls `python/uv/…` when `uv` is
+declared), and then drops the shadowed general parent — so a profile that
+selected general advice by category and tag compiles the ecosystem's own
+version of it. The manifest's `intents` list therefore names the specialized
+records, not the general one, and cmv verifies those. Without a declared list
+the walk is a no-op, since it would otherwise pull every language's version.
+
 The manifest records the declared list as `profile.ecosystems` — always
 present, empty when the profile declared none — beside the profile `id` and
 `version`. cmv does not yet act on it; the intended use is to compare it with

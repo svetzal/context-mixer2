@@ -125,6 +125,9 @@ fn print_explanation(
             "excluded by ecosystem from category/tag matching: {}",
             assembly.excluded_by_ecosystem
         );
+        if profile.graph.prefer_specializations {
+            eprintln!("specialized downward: {}", assembly.specialized_downward);
+        }
     }
     eprintln!("selected intents ({}):", assembly.selected.len());
     for key in &assembly.selected {

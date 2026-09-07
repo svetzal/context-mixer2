@@ -82,8 +82,14 @@ pub struct Graph {
     /// Maximum number of graph edges beyond the initial selection.
     #[serde(default)]
     pub max_related_depth: usize,
-    /// Drop generalized parents when a selected specialization exists.
-    #[serde(default)]
+    /// Prefer an ecosystem's specialization over the general advice it
+    /// specializes: drop generalized parents when a selected specialization
+    /// exists, and — when [`Selection::ecosystems`] is non-empty — first pull
+    /// in every eligible record that `specializes` a selected one so those
+    /// specializations are found even when the profile selected only the
+    /// general record. Defaults to `true`, whether or not the profile has a
+    /// `[graph]` table.
+    #[serde(default = "default_prefer_specializations")]
     pub prefer_specializations: bool,
 }
 
@@ -92,9 +98,13 @@ impl Default for Graph {
         Self {
             follow: Vec::new(),
             max_related_depth: 0,
-            prefer_specializations: true,
+            prefer_specializations: default_prefer_specializations(),
         }
     }
+}
+
+fn default_prefer_specializations() -> bool {
+    true
 }
 
 /// Fields to include in the delivered artifact.
@@ -165,4 +175,35 @@ fn validate(profile: &Profile) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(raw: &str) -> Profile {
+        toml::from_str(raw).unwrap()
+    }
+
+    const HEAD: &str = r#"
+id = "shipping"
+description = "Use when shipping"
+surface = "agent"
+budget_tokens = 100
+
+[select]
+keys = ["craftsperson/x"]
+"#;
+
+    #[test]
+    fn prefer_specializations_defaults_to_true_with_and_without_a_graph_table() {
+        assert!(parse(HEAD).graph.prefer_specializations);
+        assert!(parse(&format!("{HEAD}\n[graph]\nfollow = []\n")).graph.prefer_specializations);
+    }
+
+    #[test]
+    fn prefer_specializations_can_be_switched_off() {
+        let profile = parse(&format!("{HEAD}\n[graph]\nprefer_specializations = false\n"));
+        assert!(!profile.graph.prefer_specializations);
+    }
 }

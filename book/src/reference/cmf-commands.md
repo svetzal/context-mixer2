@@ -71,7 +71,11 @@ include = ["guidance", "rationale", "evidence"]
 A profile must name exact keys or combine category and tag filters. This guard
 prevents accidental whole-catalogue exports. Graph expansion is bounded, and
 generation fails instead of truncating when the shaped artifact exceeds its
-declared context budget.
+declared context budget. `prefer_specializations` defaults to `true` whether or
+not a `[graph]` table is present: a selected specialization drops the general
+record it specializes, and, when `ecosystems` is declared, the declared
+ecosystems' specializations of every selected record are pulled in first (see
+[Downward expansion](#downward-expansion)).
 
 ### Ecosystems
 
@@ -105,6 +109,36 @@ three places:
 the filter excluded. The compile manifest records the declared list as
 `profile.ecosystems` (empty when none) so a verifier can compare it with the
 languages it detects.
+
+### Downward expansion
+
+Graph expansion along `follow` edges walks *upward*: from a specialization
+along its `specializes` edge to the general record. A profile that selects
+general advice by category and tag would therefore never find the ecosystem's
+own version of it. Once the ecosystems are declared it is safe to walk
+*downward* too, because only the project's own specializations qualify.
+
+After selection and `follow` expansion, cmf pulls in every eligible record that
+`specializes` a selected record, transitively to a fixpoint: a general record
+pulls `python/…`, which pulls `python/uv/…` when `uv` is declared. The existing
+shadow removal then drops the general parent, so the ecosystem's version
+*replaces* the general advice rather than duplicating it. Downward expansion
+runs only when **both** gates hold; otherwise it is a no-op:
+
+- `[graph] prefer_specializations` is `true` (its default). Its meaning —
+  prefer an ecosystem's specialization over the general advice — now covers
+  both finding specializations and dropping the parents they shadow.
+- `[select] ecosystems` is non-empty. Without a declared list, downward
+  expansion would pull every language's version of every general record, which
+  is exactly the failure the filter exists to prevent.
+
+Assembly order is: initial selection → `follow` expansion → downward expansion
+→ shadowed-parent removal → budget check. Records added by downward expansion
+do **not** have their own `follow` edges expanded; that keeps the pass bounded
+and deterministic, and their `specializes` edge already points at a selected
+parent. Each pull appears in `--explain`'s traversal as
+`<general-key> <--specializes-- <specialization-key>`, and `--explain` prints
+the total as `specialized downward: N` beside the ecosystem lines.
 
 Selected intents render as compact, ordered blocks rather than separate
 guidance, rationale, and evidence sections. Within each block, `rationale`

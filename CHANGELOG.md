@@ -23,6 +23,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--explain` prints the declared ecosystems and the excluded count; the
   compile manifest gains `profile.ecosystems` (always present, empty when
   none) for cmv to compare against detected languages later.
+- **cmf assembly walks `specializes` edges downward to find the declared
+  ecosystems' own version of selected general advice.** Graph expansion only
+  followed `specializes` upward, so a profile selecting general records by
+  category and tag never reached the ecosystem's specialization of them. Now,
+  when `[graph] prefer_specializations` is true and `[select] ecosystems` is
+  non-empty, every eligible record that `specializes` a selected one is pulled
+  in, transitively to a fixpoint (a general record pulls `python/…`, which
+  pulls `python/uv/…` when `uv` is declared), after `follow` expansion and
+  before shadowed-parent removal — so the specialization replaces the general
+  advice rather than duplicating it. Pulled records' own `follow` edges are not
+  expanded. Each pull is recorded in `--explain`'s traversal as
+  `<general-key> <--specializes-- <specialization-key>`, and `--explain` prints
+  `specialized downward: N`. Without declared ecosystems the walk is a no-op,
+  since it would otherwise pull every language's version of every general
+  record. The compile manifest schema is unchanged.
+
+### Fixed
+
+- **`prefer_specializations` now defaults to `true` inside an explicit
+  `[graph]` table too.** A profile with a `[graph]` table that omitted the flag
+  silently got `false` (serde's `bool` default) while a profile without the
+  table got `true` (`Graph::default()`), contradicting the documented default.
 
 ## [3.2.1] - 2026-09-06
 
