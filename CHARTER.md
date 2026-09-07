@@ -5,8 +5,8 @@
 Context Mixer manages the lifecycle of curated agentic context — portable agent definitions and composable skills — across AI coding assistants. It ships as three complementary CLIs:
 
 - **cmx** — the consumer tool: a package manager that installs, versions, updates, and reconciles agents and skills across platforms.
-- **cmf** (Context Mixer Forge) — the materializer: it reads an externally maintained knowledge base of structured intent records, selects and assembles a profile-specific slice, installs the resulting agent or skill through cmx-core, and records what it composed.
-- **cmv** (Context Mixer Verify) — the verifier: it checks, deterministically, that a repository holds the intents cmf compiled for it, by running each intent's codified validator from the knowledge base at the pinned revision.
+- **cmf** (Context Mixer Forge) — the materializer: it reads an externally maintained intent atlas — the ecosystems it supports and their sensors, structured intent records in and around those ecosystems, and the validators beside them — selects and assembles a profile-specific slice for the project's ecosystems, installs the resulting agent or skill through cmx-core, and records what it composed.
+- **cmv** (Context Mixer Verify) — the verifier: it checks, deterministically, that a repository holds the intents cmf compiled for it, by running each intent's codified validator from the atlas at the pinned revision.
 
 The project rests on two pillars of equal weight:
 
@@ -30,7 +30,7 @@ The project rests on two pillars of equal weight:
 
 - Deriving guidance from a repository's existing structure or code (that is what hone does). cmf compiles explicitly authored intent records; it does not infer policy from a codebase
 - Running a live guidance-selection harness. cmf may produce data and artifacts for dynamic harnesses, but session-time sensing, injection, leasing, and retraction belong to the harness
-- Authoring, validating, or maintaining the intent knowledge base, including the validators that live beside its records. A separate tool owns those TOML documents and scripts; cmf and cmv consume them read-only
+- Authoring, validating, or maintaining the intent atlas, including the sensors and validators that live beside its records. A separate tool owns those TOML documents and scripts; cmf and cmv consume them read-only
 - Judging adherence with a model. cmv parses; it never asks
 - Publishing plugins, marketplaces, or platform manifests. cmf installs assembled artifacts directly through cmx-core
 - Hosting a centralized registry or marketplace service
