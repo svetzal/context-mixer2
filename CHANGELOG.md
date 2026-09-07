@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **cmf profiles can declare the ecosystems they target.** `[select]
   ecosystems = ["python", "uv"]` filters selection by the realization
-  hierarchy the knowledge base already encodes in its directory layout: a
+  hierarchy the intent atlas already encodes in its directory layout: a
   record's ecosystem qualifiers are the catalog-key segments between the
   collection root and the slug, and a record is eligible when it has none or
   every one is declared. Category/tag selection never picks an ineligible
@@ -38,6 +38,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `specialized downward: N`. Without declared ecosystems the walk is a no-op,
   since it would otherwise pull every language's version of every general
   record. The compile manifest schema is unchanged.
+
+### Changed
+
+- **The intent atlas has its own crate.** Catalog scanning, profile loading,
+  selection (`intent_atlas::selection::select`), and the compile-manifest
+  types moved out of cmf into the new `intent-atlas` workspace member — the
+  one reader of the atlas's shape that cmf and cmv share (see `CMV.md`, "The
+  `intent-atlas` crate"). cmv now depends on `intent-atlas` instead of on cmf,
+  and cmf keeps only rendering and the budget. A pure move: the assembled
+  artifact and every golden fixture are byte-identical apart from the rename
+  below.
+- **`knowledge_base` is now `atlas`.** The compile manifest's `knowledge_base`
+  block is written and read as `atlas` (fields unchanged: `source`, `path`,
+  `revision`); cmv's `check`, `status`, and `explain` reports carry an `atlas`
+  block where they carried `knowledge_base` (and `manifest.atlas` in place of
+  `manifest.knowledge_base`); and human output says "atlas" where it said
+  "knowledge base" — `atlas has moved: …`, the `Atlas:` line in `cmv status`,
+  `cmv explain`, and `cmf status`, and `record not in atlas`. `cmv
+  --knowledge-base <path>` is renamed `--atlas <path>`; the old spelling still
+  parses as a hidden alias for one release. Nothing shipped with the old
+  manifest key, so there is no read-side alias for it.
 
 ### Fixed
 

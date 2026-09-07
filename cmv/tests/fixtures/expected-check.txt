@@ -5,11 +5,11 @@ UNGUIDED   craftsperson/rust/name-for-intent
 UNCHECKED  craftsperson/rust/compile-public-documentation
            no validator for languages [rust]
 UNCHECKED  craftsperson/rust/prefer-owned-data
-           record not in knowledge base
+           record not in atlas
 FAIL       craftsperson/rust/isolate-functional-core  (required)  (stale: record changed since compile)
            business rules live beside I/O in src/main.rs
            src/main.rs:12
            src/rates.rs
 
 1 pass, 1 fail, 0 not applicable, 2 unchecked, 1 unguided; adherence 50.0%
-1 record changed in the knowledge base since compile; re-run `cmf install` to recompile.
+1 record changed in the atlas since compile; re-run `cmf install` to recompile.

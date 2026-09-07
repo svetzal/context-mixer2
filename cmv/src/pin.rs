@@ -1,4 +1,4 @@
-//! Honouring the pinned revision: which tree of the knowledge base cmv reads
+//! Honouring the pinned revision: which tree of the atlas cmv reads
 //! records from and runs validators in (see `CMV.md`, design decision 5).
 //!
 //! When the manifest records a `revision`, the resolved root is a git
@@ -9,9 +9,9 @@
 //! decodes lossily) and validators run there. When `HEAD` equals the pin,
 //! there is no pin, or the root is not a git checkout, the root itself is
 //! used. [`PinPolicy::AtHead`] (`--at-head`) skips the pin and verifies the
-//! working tree, for validator authors iterating on a knowledge base.
+//! working tree, for validator authors iterating on an atlas.
 //!
-//! Whether the knowledge base has *moved* (`HEAD` differs from the pin) is
+//! Whether the atlas has *moved* (`HEAD` differs from the pin) is
 //! reported but never affects the exit code: cmv never re-pins, and
 //! recompiling is cmf's decision.
 
@@ -20,8 +20,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use cmf::manifest::git_head_commit;
 use cmx_core::gateway::Filesystem;
+use intent_atlas::manifest::git_head_commit;
 use serde::Serialize;
 
 use crate::dispatch::Trees;
@@ -66,7 +66,7 @@ pub enum VerifiedAgainst {
 pub struct Checkout {
     /// The tree records are read from and validators run in.
     pub root: PathBuf,
-    /// The knowledge base's own working tree, when `root` is a materialized
+    /// The atlas's own working tree, when `root` is a materialized
     /// pinned tree rather than the working tree itself.
     pub working_tree: Option<PathBuf>,
     /// The commit the working tree's `HEAD` points at, when it is a git
@@ -153,9 +153,9 @@ fn materialize_pinned_tree(
 ) -> Result<PathBuf> {
     // `git -C` and the working directory are both the checkout, so a root
     // given relative to cmv's working directory must be made absolute first.
-    let root = fs.canonicalize(&resolution.path).with_context(|| {
-        format!("could not resolve knowledge base {}", resolution.path.display())
-    })?;
+    let root = fs
+        .canonicalize(&resolution.path)
+        .with_context(|| format!("could not resolve atlas {}", resolution.path.display()))?;
     let tar = scratch.join("kb.tar");
     let tree = scratch.join("kb");
     let archive = ProcessRequest {
@@ -175,7 +175,7 @@ fn materialize_pinned_tree(
     };
     if let Err(reason) = succeeded(runner.run(&archive), "git archive") {
         bail!(
-            "revision {revision} pinned by the manifest is not reachable in the knowledge base at {} ({reason}); {} to fetch it, or pass --at-head to verify the working tree instead",
+            "revision {revision} pinned by the manifest is not reachable in the atlas at {} ({reason}); {} to fetch it, or pass --at-head to verify the working tree instead",
             root.display(),
             fetch_remedy(resolution)
         );
@@ -233,11 +233,11 @@ fn succeeded(outcome: ProcessOutcome, what: &str) -> std::result::Result<(), Str
     }
 }
 
-/// The `knowledge_base` block of every report: where the records came from,
+/// The `atlas` block of every report: where the records came from,
 /// how cmv found them, and how the tree it verified relates to the pin.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct KnowledgeBaseReport {
-    /// The knowledge-base root as resolved.
+pub struct AtlasReport {
+    /// The atlas root as resolved.
     pub path: PathBuf,
     /// Which step of the resolution order produced `path`.
     pub resolved_by: ResolvedBy,
@@ -253,8 +253,8 @@ pub struct KnowledgeBaseReport {
     pub moved: bool,
 }
 
-impl KnowledgeBaseReport {
-    /// Combine where the knowledge base was found with which tree was used.
+impl AtlasReport {
+    /// Combine where the atlas was found with which tree was used.
     pub fn new(resolution: &Resolution, checkout: &Checkout) -> Self {
         Self {
             path: resolution.path.clone(),
@@ -523,7 +523,7 @@ mod tests {
         let resolution = resolution(ResolvedBy::Source, Some("guidelines"));
         let checkout =
             materialize_with(&fs, &resolution, Some(PIN), PinPolicy::AtHead, &runner).unwrap();
-        let report = KnowledgeBaseReport::new(&resolution, &checkout);
+        let report = AtlasReport::new(&resolution, &checkout);
         assert_eq!(
             serde_json::to_value(&report).unwrap(),
             serde_json::json!({

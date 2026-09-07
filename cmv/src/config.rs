@@ -1,5 +1,5 @@
 //! Project configuration: the hand-authored `cmv.toml` at the project root
-//! (see `CMV.md`, "Project config"). It holds what neither the knowledge base
+//! (see `CMV.md`, "Project config"). It holds what neither the atlas
 //! nor the code can supply — a language override, the validator timeout, and
 //! per-intent settings handed to validators as JSON. A missing file means
 //! defaults.

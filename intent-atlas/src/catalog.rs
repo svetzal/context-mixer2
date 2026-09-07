@@ -44,7 +44,7 @@ pub struct Evidence {
     /// entries, and only together with `run`.
     #[serde(default)]
     pub language: Option<String>,
-    /// Validator executable, relative to the knowledge-base root. Allowed only
+    /// Validator executable, relative to the atlas root. Allowed only
     /// on [`STATIC_CHECK`] entries, and only together with `language`.
     #[serde(default)]
     pub run: Option<String>,
@@ -82,7 +82,7 @@ fn declared(field: Option<&str>) -> Option<&str> {
 pub struct Validator<'a> {
     /// Source language the validator reads, such as `rust` or `python`.
     pub language: &'a str,
-    /// Executable path relative to the knowledge-base root.
+    /// Executable path relative to the atlas root.
     pub run: &'a Path,
     /// Whether a failing verdict gates the verification run.
     pub required: bool,
@@ -129,7 +129,7 @@ impl IntentRecord {
     }
 }
 
-/// Parsed intent plus its knowledge-base identity.
+/// Parsed intent plus its atlas identity.
 #[derive(Debug, Clone)]
 pub struct Intent {
     /// Path-derived key below `intents/`, without `.toml`.
@@ -151,7 +151,7 @@ impl Intent {
 /// The ecosystem qualifiers of a catalog key: the path segments between the
 /// first (the collection root, e.g. `craftsperson`) and the last (the slug).
 ///
-/// The knowledge base documents its directory hierarchy as the realization
+/// The atlas documents its directory hierarchy as the realization
 /// hierarchy — `craftsperson/python/uv/` specializes Python guidance for
 /// uv-based projects — so the nesting *is* the record's ecosystem, and no
 /// record field needs to restate it. `craftsperson/python/uv/pin-interpreter`
@@ -290,7 +290,7 @@ fn validator_fields(entry: &Evidence, matches: impl Fn(Option<&str>) -> bool) ->
     .collect()
 }
 
-/// A validator path resolves against the knowledge-base root and must stay
+/// A validator path resolves against the atlas root and must stay
 /// inside it: relative, and never climbing through `..`.
 fn run_path_violation(run: &str) -> Option<String> {
     for component in Path::new(run).components() {
@@ -300,9 +300,7 @@ fn run_path_violation(run: &str) -> Option<String> {
                 return Some(format!("validator path {run:?} must not contain `..`"));
             }
             Component::RootDir | Component::Prefix(_) => {
-                return Some(format!(
-                    "validator path {run:?} must be relative to the knowledge-base root"
-                ));
+                return Some(format!("validator path {run:?} must be relative to the atlas root"));
             }
         }
     }
@@ -497,13 +495,13 @@ tradeoff = "One more type per effect."
         assert_eq!(
             message,
             format!(
-                "intent {RECORD_PATH} evidence entry 1 (type \"static-check\"): validator path \"/usr/bin/check\" must be relative to the knowledge-base root"
+                "intent {RECORD_PATH} evidence entry 1 (type \"static-check\"): validator path \"/usr/bin/check\" must be relative to the atlas root"
             )
         );
     }
 
     #[test]
-    fn rejects_validator_path_escaping_the_knowledge_base() {
+    fn rejects_validator_path_escaping_the_atlas() {
         let message = rejection(&[
             r#"{ type = "static-check", language = "rust", run = "checks/../../outside.py", description = "Checked.", required = true }"#,
         ]);

@@ -6,13 +6,13 @@
       "version": "0.3.0",
       "ecosystems": []
     },
-    "knowledge_base": {
+    "atlas": {
       "source": "guidelines",
       "path": "kb",
       "revision": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
     }
   },
-  "knowledge_base": {
+  "atlas": {
     "path": "kb",
     "resolved_by": "override",
     "source": "guidelines",
@@ -88,7 +88,7 @@
       "language": null,
       "required": false,
       "state": "unchecked",
-      "reason": "record not in knowledge base",
+      "reason": "record not in atlas",
       "description": null,
       "signals": {},
       "evidence": [],

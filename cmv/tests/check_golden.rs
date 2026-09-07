@@ -1,4 +1,4 @@
-//! End-to-end golden test: the `cmv` binary against a fixture knowledge base
+//! End-to-end golden test: the `cmv` binary against a fixture atlas
 //! whose validators are `/bin/sh` scripts, run through the real process
 //! runner on a temporary copy of the fixture workspace.
 //!
@@ -10,7 +10,7 @@
 //! listing are pinned byte for byte.
 //!
 //! cmv runs with the fixtures directory as its working directory and
-//! `--knowledge-base kb`, so the `knowledge_base.path` it reports is the same
+//! `--atlas kb`, so the `atlas.path` it reports is the same
 //! relative path on every machine, and with `HOME` pointed at the temp dir so
 //! the developer's own cmx source registry never takes part.
 
@@ -51,7 +51,7 @@ fn cmv(args: &[&str], workspace: &Path) -> Output {
         .args(args)
         .arg("--root")
         .arg(workspace)
-        .args(["--knowledge-base", "kb"])
+        .args(["--atlas", "kb"])
         .current_dir(fixtures())
         .env("HOME", workspace)
         .output()
@@ -119,10 +119,7 @@ fn status_reports_the_pin_languages_and_coverage_without_running_validators() {
     assert_eq!(output.status.code(), Some(0));
     let text = stdout(&output);
     assert!(text.contains("Profile: rust-shipping 0.3.0\n"), "{text}");
-    assert!(
-        text.contains("Knowledge base: kb (present, resolved by --knowledge-base)\n"),
-        "{text}"
-    );
+    assert!(text.contains("Atlas: kb (present, resolved by --atlas)\n"), "{text}");
     assert!(text.contains("Source: guidelines\n"), "{text}");
     assert!(
         text.contains("Pinned revision: a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\n"),
@@ -197,7 +194,7 @@ fn explain_json_matches_the_record_id_form_and_exits_two_when_unknown() {
     assert_eq!(report["intent"]["resolution"], "key");
     assert_eq!(report["intent"]["stale"], false);
     assert_eq!(report["intent"]["validators"][0]["would_run"], true);
-    assert_eq!(report["knowledge_base"]["resolved_by"], "override");
+    assert_eq!(report["atlas"]["resolved_by"], "override");
 
     let output = cmv(&["explain", "craftsperson/rust/not-compiled"], workspace.path());
     assert_eq!(output.status.code(), Some(2));
@@ -217,12 +214,12 @@ fn missing_manifest_exits_two_with_the_cmf_remedy() {
 }
 
 #[test]
-fn unreadable_knowledge_base_exits_two() {
+fn unreadable_atlas_exits_two() {
     let workspace = workspace_copy();
     let output = Command::new(env!("CARGO_BIN_EXE_cmv"))
         .args(["check", "--root"])
         .arg(workspace.path())
-        .args(["--knowledge-base", "/nonexistent/kb"])
+        .args(["--atlas", "/nonexistent/kb"])
         .output()
         .expect("cmv runs");
     assert_eq!(output.status.code(), Some(2));

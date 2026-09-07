@@ -1,10 +1,10 @@
 # cmf Command Reference
 
-cmf is a read-only consumer of a structured intent knowledge base. Another
+cmf is a read-only consumer of a structured intent atlas. Another
 tool owns authoring and validation of the TOML records; cmf scans them to
 assemble and install agent-facing guidance.
 
-Run commands from the knowledge-base root, or pass `--root <path>`. Intent
+Run commands from the atlas root, or pass `--root <path>`. Intent
 records live below `intents/`. Named profiles resolve below `profiles/`, while
 an explicit profile path can live elsewhere.
 
@@ -34,7 +34,7 @@ says so, and `--apply` writes it. Global installs write no manifest.
 
 The manifest is cmf's second output: a JSON record of what was compiled, so a
 verifier can later hold the project to exactly those intents. It carries a
-`schema` version (`1`), the `compiled_at` instant, the `knowledge_base` (its
+`schema` version (`1`), the `compiled_at` instant, the `atlas` (its
 `path`, plus its cmx `source` name and git `revision` when the root is a
 registered source or a git checkout — both omitted otherwise), the `profile`
 id, version, and declared `ecosystems` (always present, empty when the profile
@@ -79,7 +79,7 @@ ecosystems' specializations of every selected record are pulled in first (see
 
 ### Ecosystems
 
-The knowledge base carries a record's language and tooling as the directory it
+The atlas carries a record's language and tooling as the directory it
 sits in — the directory hierarchy is the realization hierarchy, so
 `craftsperson/python/uv/` specializes Python guidance for uv-based projects. A
 record's **ecosystem qualifiers** are the segments of its catalog key between
@@ -152,7 +152,7 @@ stay in `--explain` provenance instead of consuming delivered context.
 An evidence entry of type `static-check` declares an executable validator for
 the intent. It carries two extra fields: `language`, the source language the
 validator reads (`rust`, `python`, …), and `run`, the path of the validator
-executable relative to the knowledge-base root. A record may declare one
+executable relative to the atlas root. A record may declare one
 `static-check` entry per language it can be checked in.
 
 ```toml
@@ -167,7 +167,7 @@ exactly like any other evidence — so the agent learns what will be checked
 while `language` and `run` never reach the delivered artifact. A `static-check`
 entry with neither `language` nor `run` is ordinary descriptive evidence — an
 expectation a validator may later make executable — and declares no validator.
-cmf rejects a knowledge base at scan time, naming the record and entry, when a
+cmf rejects an atlas at scan time, naming the record and entry, when a
 `static-check` entry carries only one of `language` and `run` (both are needed
 to declare a validator), when either field appears on another evidence type,
 or when `run` is absolute or contains `..`. Executing validators is the

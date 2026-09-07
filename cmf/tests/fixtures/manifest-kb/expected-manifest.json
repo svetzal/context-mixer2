@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "compiled_at": "2026-09-05T14:02:11+00:00",
-  "knowledge_base": {
+  "atlas": {
     "source": "guidelines",
     "path": "/kb",
     "revision": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"

@@ -10,7 +10,7 @@ description = "Deterministic verifier for intents compiled by cmf"
 
 [dependencies]
 cmx-core = { path = "../cmx-core" }
-cmf = { path = "../cmf" }
+intent-atlas = { path = "../intent-atlas" }
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }

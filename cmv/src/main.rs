@@ -1,5 +1,5 @@
 //! `cmv` binary entry point: the imperative shell. Resolves the project, its
-//! manifest, and the knowledge base from the command line and the cmx source
+//! manifest, and the atlas from the command line and the cmx source
 //! registry; loads them through the real gateways; materializes the pinned
 //! revision when the checkout has moved past it; hands everything to the pure
 //! core; prints the report; and exits per `CMV.md`'s table (`2` for anything
@@ -11,14 +11,12 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use cmf::catalog;
-use cmf::manifest::{LOCAL_MANIFEST_FILE_NAME, Manifest};
 use cmv::cli::{Cli, Commands, LocationArgs};
 use cmv::config::{self, ProjectConfig};
 use cmv::dispatch::{self, Catalog, CheckRequest, StatusRequest};
 use cmv::explain::{self, ExplainRequest};
 use cmv::language;
-use cmv::pin::{self, Checkout, KnowledgeBaseReport, PinPolicy};
+use cmv::pin::{self, AtlasReport, Checkout, PinPolicy};
 use cmv::process::RealProcessRunner;
 use cmv::report::{CheckReport, OutputFormat};
 use cmv::resolve::{self, Resolution};
@@ -27,6 +25,8 @@ use cmx_core::gateway::Filesystem;
 use cmx_core::gateway::real::RealFilesystem;
 use cmx_core::paths::ConfigPaths;
 use cmx_core::platform::Platform;
+use intent_atlas::catalog;
+use intent_atlas::manifest::{LOCAL_MANIFEST_FILE_NAME, Manifest};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -54,7 +54,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let checkout = site.checkout(&scratch, &fs)?;
             let catalog = catalog::scan(&checkout.root, &fs).with_context(|| {
                 format!(
-                    "could not read knowledge base at {}; pass --knowledge-base <path> if it lives elsewhere",
+                    "could not read atlas at {}; pass --atlas <path> if it lives elsewhere",
                     site.resolution.path.display()
                 )
             })?;
@@ -69,10 +69,9 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 scratch: &scratch.dir,
             };
             let outcomes = dispatch::check(&request, &fs, &RealProcessRunner)?;
-            let knowledge_base = KnowledgeBaseReport::new(&site.resolution, &checkout);
+            let atlas = AtlasReport::new(&site.resolution, &checkout);
             drop(scratch);
-            let report =
-                CheckReport::new(&site.manifest, knowledge_base, &languages, outcomes, strictness);
+            let report = CheckReport::new(&site.manifest, atlas, &languages, outcomes, strictness);
             print!("{}", report.render(format)?);
             Ok(ExitCode::from(report.summary.exit_code))
         }
@@ -83,13 +82,13 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let checkout = site.checkout(&scratch, &fs)?;
             let languages = site.languages(&fs);
             let catalog = scan_if_present(&checkout.root, &fs);
-            let knowledge_base = KnowledgeBaseReport::new(&site.resolution, &checkout);
+            let atlas = AtlasReport::new(&site.resolution, &checkout);
             let request = StatusRequest {
                 manifest: &site.manifest,
                 manifest_path: &site.manifest_path,
                 catalog: catalog.as_ref(),
                 languages: &languages,
-                knowledge_base: &knowledge_base,
+                atlas: &atlas,
                 trees: checkout.trees(),
             };
             let report = dispatch::status(&request, &fs)?;
@@ -107,18 +106,18 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let checkout = site.checkout(&scratch, &fs)?;
             let catalog = catalog::scan(&checkout.root, &fs).with_context(|| {
                 format!(
-                    "could not read knowledge base at {}; pass --knowledge-base <path> if it lives elsewhere",
+                    "could not read atlas at {}; pass --atlas <path> if it lives elsewhere",
                     site.resolution.path.display()
                 )
             })?;
             let languages = site.languages(&fs);
-            let knowledge_base = KnowledgeBaseReport::new(&site.resolution, &checkout);
+            let atlas = AtlasReport::new(&site.resolution, &checkout);
             let request = ExplainRequest {
                 manifest: &site.manifest,
                 catalog: &catalog,
                 config: &site.config,
                 languages: &languages,
-                knowledge_base: &knowledge_base,
+                atlas: &atlas,
                 trees: checkout.trees(),
                 workspace: &site.root,
             };
@@ -130,7 +129,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
 }
 
 /// The project as resolved from the command line: root, manifest, config,
-/// knowledge base, and whether to honour the pin.
+/// atlas, and whether to honour the pin.
 struct Site {
     root: PathBuf,
     manifest_path: PathBuf,
@@ -165,12 +164,7 @@ impl Site {
         // A relative path — from the command line, the registry, or the
         // manifest — is interpreted against cmv's working directory, exactly
         // as it would be on the command line.
-        let resolution = resolve::resolve(
-            location.knowledge_base.as_deref(),
-            &manifest.knowledge_base,
-            fs,
-            &paths,
-        )?;
+        let resolution = resolve::resolve(location.atlas.as_deref(), &manifest.atlas, fs, &paths)?;
         if let Some(warning) = &resolution.warning {
             eprintln!("warning: {warning}");
         }
@@ -189,7 +183,7 @@ impl Site {
     fn checkout(&self, scratch: &Scratch<'_>, fs: &dyn Filesystem) -> Result<Checkout> {
         pin::materialize(
             &self.resolution,
-            self.manifest.knowledge_base.revision.as_deref(),
+            self.manifest.atlas.revision.as_deref(),
             self.pin_policy,
             &scratch.dir,
             fs,
@@ -203,25 +197,22 @@ impl Site {
 }
 
 /// Where `cmf install --local` writes the manifest: `.context-mixer/` under the
-/// project root, beside the local lock file (`cmf::manifest::local_manifest_path`
+/// project root, beside the local lock file (`intent_atlas::manifest::local_manifest_path`
 /// gives the same relative location from cmx-core's `ConfigPaths`).
 fn default_manifest_path(root: &Path) -> PathBuf {
     root.join(".context-mixer").join(LOCAL_MANIFEST_FILE_NAME)
 }
 
-/// Scan the knowledge base for `status`, which reports rather than fails when
+/// Scan the atlas for `status`, which reports rather than fails when
 /// it cannot be read.
-fn scan_if_present(knowledge_base: &Path, fs: &dyn Filesystem) -> Option<Catalog> {
-    if !fs.is_dir(knowledge_base) {
+fn scan_if_present(atlas: &Path, fs: &dyn Filesystem) -> Option<Catalog> {
+    if !fs.is_dir(atlas) {
         return None;
     }
-    match catalog::scan(knowledge_base, fs) {
+    match catalog::scan(atlas, fs) {
         Ok(catalog) => Some(catalog),
         Err(error) => {
-            eprintln!(
-                "warning: could not read knowledge base at {}: {error:#}",
-                knowledge_base.display()
-            );
+            eprintln!("warning: could not read atlas at {}: {error:#}", atlas.display());
             None
         }
     }

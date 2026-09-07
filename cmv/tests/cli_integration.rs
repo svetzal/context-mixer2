@@ -29,7 +29,7 @@ fn parses_check_with_every_flag() {
         "proj",
         "--manifest",
         "out/manifest.json",
-        "--knowledge-base",
+        "--atlas",
         "../kb",
         "--at-head",
     ])
@@ -42,7 +42,7 @@ fn parses_check_with_every_flag() {
             location: LocationArgs {
                 root: Some(PathBuf::from("proj")),
                 manifest: Some(PathBuf::from("out/manifest.json")),
-                knowledge_base: Some(PathBuf::from("../kb")),
+                atlas: Some(PathBuf::from("../kb")),
                 at_head: true,
             },
         }
@@ -51,16 +51,8 @@ fn parses_check_with_every_flag() {
 
 #[test]
 fn parses_status_with_location_and_json() {
-    let cli = Cli::try_parse_from([
-        "cmv",
-        "status",
-        "--json",
-        "--root",
-        "proj",
-        "--knowledge-base",
-        "kb",
-    ])
-    .expect("status should parse");
+    let cli = Cli::try_parse_from(["cmv", "status", "--json", "--root", "proj", "--atlas", "kb"])
+        .expect("status should parse");
     assert_eq!(
         cli.command,
         Commands::Status {
@@ -68,7 +60,7 @@ fn parses_status_with_location_and_json() {
             location: LocationArgs {
                 root: Some(PathBuf::from("proj")),
                 manifest: None,
-                knowledge_base: Some(PathBuf::from("kb")),
+                atlas: Some(PathBuf::from("kb")),
                 at_head: false,
             },
         }
@@ -110,7 +102,7 @@ fn parses_explain_with_an_intent_and_every_flag() {
         "--json",
         "--root",
         "proj",
-        "--knowledge-base",
+        "--atlas",
         "kb",
         "--at-head",
     ])
@@ -123,7 +115,7 @@ fn parses_explain_with_an_intent_and_every_flag() {
             location: LocationArgs {
                 root: Some(PathBuf::from("proj")),
                 manifest: None,
-                knowledge_base: Some(PathBuf::from("kb")),
+                atlas: Some(PathBuf::from("kb")),
                 at_head: true,
             },
         }
@@ -134,4 +126,27 @@ fn parses_explain_with_an_intent_and_every_flag() {
 fn explain_requires_an_intent_and_has_no_strict_flag() {
     assert!(Cli::try_parse_from(["cmv", "explain"]).is_err());
     assert!(Cli::try_parse_from(["cmv", "explain", "some/key", "--strict"]).is_err());
+}
+
+#[test]
+fn knowledge_base_is_a_hidden_alias_for_atlas() {
+    let cli = Cli::try_parse_from(["cmv", "check", "--knowledge-base", "../kb"])
+        .expect("the old spelling should still parse");
+    assert_eq!(
+        cli.command,
+        Commands::Check {
+            json: false,
+            strict: false,
+            location: LocationArgs {
+                atlas: Some(PathBuf::from("../kb")),
+                ..LocationArgs::default()
+            },
+        }
+    );
+    let help = match Cli::try_parse_from(["cmv", "check", "--help"]) {
+        Err(error) => error.to_string(),
+        Ok(_) => panic!("--help exits early"),
+    };
+    assert!(help.contains("--atlas <PATH>"), "{help}");
+    assert!(!help.contains("--knowledge-base"), "the alias must stay out of help:\n{help}");
 }

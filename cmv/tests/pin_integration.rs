@@ -1,8 +1,8 @@
-//! End-to-end test of the pinned revision: the fixture knowledge base becomes
+//! End-to-end test of the pinned revision: the fixture atlas becomes
 //! a real git repository, the manifest pins its first commit, and a second
 //! commit changes one record and one validator script at `HEAD`. cmv must run
 //! the *pinned* script (whose verdict differs from HEAD's), report the
-//! knowledge base as moved, mark the changed intent stale, and flip to HEAD's
+//! atlas as moved, mark the changed intent stale, and flip to HEAD's
 //! verdict under `--at-head`. Skips with a message when `git` is not on PATH.
 //!
 //! `HOME` points at the temp dir so the developer's own cmx source registry
@@ -73,7 +73,7 @@ fn commit_all(repo: &Path, message: &str) -> String {
 
 const PUT_GATEWAYS: &str = "craftsperson/rust/put-gateways-at-effect-boundaries";
 
-/// A knowledge-base repository with two commits and a workspace whose
+/// An atlas repository with two commits and a workspace whose
 /// manifest pins the first.
 struct Scenario {
     tmp: TempDir,
@@ -89,7 +89,7 @@ impl Scenario {
         let kb = tmp.path().join("kb");
         copy_tree(&fixtures().join("kb"), &kb);
         git(&kb, &["init", "-q"]);
-        let pinned = commit_all(&kb, "knowledge base as compiled");
+        let pinned = commit_all(&kb, "atlas as compiled");
 
         let workspace = tmp.path().join("workspace");
         copy_tree(&fixtures().join("workspace"), &workspace);
@@ -123,9 +123,8 @@ impl Scenario {
         let path = self.workspace.join(".context-mixer/cmf-manifest.json");
         let mut manifest: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-        manifest["knowledge_base"]["path"] =
-            serde_json::Value::String(self.kb.display().to_string());
-        manifest["knowledge_base"]["revision"] = serde_json::Value::String(revision.to_string());
+        manifest["atlas"]["path"] = serde_json::Value::String(self.kb.display().to_string());
+        manifest["atlas"]["revision"] = serde_json::Value::String(revision.to_string());
         fs::write(&path, serde_json::to_string_pretty(&manifest).unwrap()).unwrap();
     }
 
@@ -179,7 +178,7 @@ fn validators_run_from_the_pinned_tree_and_stale_compares_head() {
     );
 
     assert_eq!(
-        report["knowledge_base"],
+        report["atlas"],
         serde_json::json!({
             "path": scenario.kb.display().to_string(),
             "resolved_by": "path",
@@ -202,7 +201,7 @@ fn validators_run_from_the_pinned_tree_and_stale_compares_head() {
 
     let human = String::from_utf8(scenario.cmv(&["check"]).stdout).unwrap();
     let expected_line = format!(
-        "knowledge base has moved: HEAD {} vs pinned {}; 2 compiled records or validators changed; re-run cmf install to recompile\n",
+        "atlas has moved: HEAD {} vs pinned {}; 2 compiled records or validators changed; re-run cmf install to recompile\n",
         &scenario.head[..12],
         &scenario.pinned[..12]
     );
@@ -217,8 +216,8 @@ fn at_head_verifies_the_working_tree_and_flips_the_verdict() {
     }
     let scenario = Scenario::build();
     let (_, report) = scenario.check_json(&["--at-head"]);
-    assert_eq!(report["knowledge_base"]["verified_against"], "head");
-    assert_eq!(report["knowledge_base"]["moved"], true);
+    assert_eq!(report["atlas"]["verified_against"], "head");
+    assert_eq!(report["atlas"]["moved"], true);
     let put_gateways = intent(&report, PUT_GATEWAYS);
     assert_eq!(put_gateways["state"], "fail", "HEAD's script says no");
     assert_eq!(put_gateways["evidence"], serde_json::json!(["HEAD script says no"]));
@@ -239,7 +238,7 @@ fn status_reports_the_pin_and_the_move_without_running_validators() {
     assert!(text.contains(&format!("HEAD revision: {}\n", scenario.head)), "{text}");
     assert!(text.contains("Verified against: pinned revision\n"), "{text}");
     assert!(text.contains("Stale records: 2\n"), "{text}");
-    assert!(text.contains("knowledge base has moved: HEAD "), "{text}");
+    assert!(text.contains("atlas has moved: HEAD "), "{text}");
 }
 
 #[test]
@@ -251,8 +250,8 @@ fn head_equal_to_the_pin_uses_the_checkout_directly() {
     let scenario = Scenario::build();
     scenario.write_manifest(&scenario.head);
     let (_, report) = scenario.check_json(&[]);
-    assert_eq!(report["knowledge_base"]["moved"], false);
-    assert_eq!(report["knowledge_base"]["verified_against"], "pinned");
+    assert_eq!(report["atlas"]["moved"], false);
+    assert_eq!(report["atlas"]["verified_against"], "pinned");
     assert_eq!(intent(&report, PUT_GATEWAYS)["state"], "fail", "HEAD is what is pinned now");
 }
 

@@ -36,7 +36,14 @@ fn main() -> Result<ExitCode> {
             if let Some(manifest_path) = manifest_path {
                 let production = ProductionContext::claude()?;
                 let ctx = production.ctx();
-                let manifest = manifest::build(&root, &profile, &assembly, &intents, &ctx)?;
+                let manifest = manifest::build(
+                    &root,
+                    &profile,
+                    &assembly.selected,
+                    &assembly.content,
+                    &intents,
+                    &ctx,
+                )?;
                 manifest::write(&manifest, &manifest_path, ctx.fs)?;
                 eprintln!("manifest: {}", manifest_path.display());
             }
@@ -74,7 +81,14 @@ fn main() -> Result<ExitCode> {
                 let report = installer.apply(&bundle, &plan, &ctx)?;
                 print!("{report}");
                 if let Some(manifest_path) = manifest_path {
-                    let manifest = manifest::build(&root, &profile, &assembly, &intents, &ctx)?;
+                    let manifest = manifest::build(
+                        &root,
+                        &profile,
+                        &assembly.selected,
+                        &assembly.content,
+                        &intents,
+                        &ctx,
+                    )?;
                     manifest::write(&manifest, &manifest_path, ctx.fs)?;
                     println!("Manifest written to {}", manifest_path.display());
                 }
@@ -88,7 +102,7 @@ fn main() -> Result<ExitCode> {
         Commands::Status => {
             let intents = catalog::scan(&root, &fs)?;
             let profiles = catalog::profile_count(&root, &fs)?;
-            println!("Knowledge base: {}", root.display());
+            println!("Atlas: {}", root.display());
             println!("Structured intents: {}", intents.len());
             println!("Materialization profiles: {profiles}");
             if profiles == 0 {

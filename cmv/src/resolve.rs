@@ -1,11 +1,11 @@
-//! Knowledge-base resolution: which directory holds the intent records and
+//! Atlas resolution: which directory holds the intent records and
 //! validators, and how that answer was reached (see `CMV.md`, design decision
-//! 5, "The knowledge base is the registry, pinned by revision").
+//! 5, "The atlas is the registry, pinned by revision").
 //!
-//! The order is fixed: a `--knowledge-base <path>` override wins; otherwise
-//! the manifest's `knowledge_base.source` is looked up in the cmx sources
+//! The order is fixed: a `--atlas <path>` override wins; otherwise
+//! the manifest's `atlas.source` is looked up in the cmx sources
 //! registry (`sources.json`, through the `Filesystem` gateway and
-//! `ConfigPaths`); otherwise the manifest's recorded `knowledge_base.path` is
+//! `ConfigPaths`); otherwise the manifest's recorded `atlas.path` is
 //! used. A source name the registry does not know falls through to the path
 //! with a warning, because the manifest still says where the records were when
 //! cmf read them. Pure over the gateways: nothing here prints or exits.
@@ -13,28 +13,28 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use cmf::manifest::KnowledgeBase;
 use cmx_core::config;
 use cmx_core::gateway::Filesystem;
 use cmx_core::paths::ConfigPaths;
+use intent_atlas::manifest::Atlas;
 use serde::Serialize;
 
-/// Which step of the resolution order produced the knowledge-base root.
+/// Which step of the resolution order produced the atlas root.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ResolvedBy {
-    /// `--knowledge-base <path>` on the command line.
+    /// `--atlas <path>` on the command line.
     Override,
-    /// The manifest's `knowledge_base.source`, found in the cmx registry.
+    /// The manifest's `atlas.source`, found in the cmx registry.
     Source,
-    /// The manifest's `knowledge_base.path`.
+    /// The manifest's `atlas.path`.
     Path,
 }
 
-/// Where the knowledge base is and how cmv decided.
+/// Where the atlas is and how cmv decided.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Resolution {
-    /// The knowledge-base root, as resolved (not canonicalized).
+    /// The atlas root, as resolved (not canonicalized).
     pub path: PathBuf,
     /// The step that produced `path`.
     pub resolved_by: ResolvedBy,
@@ -46,13 +46,13 @@ pub struct Resolution {
     pub warning: Option<String>,
 }
 
-/// Resolve the knowledge-base root per the order in the module docs.
+/// Resolve the atlas root per the order in the module docs.
 ///
 /// Only the source step touches the registry, so an override never fails on
 /// an unreadable `sources.json`.
 pub fn resolve(
     override_path: Option<&Path>,
-    recorded: &KnowledgeBase,
+    recorded: &Atlas,
     fs: &dyn Filesystem,
     paths: &ConfigPaths,
 ) -> Result<Resolution> {
@@ -94,11 +94,7 @@ pub fn resolve(
     }
 }
 
-fn from_path(
-    recorded: &KnowledgeBase,
-    source: Option<String>,
-    warning: Option<String>,
-) -> Resolution {
+fn from_path(recorded: &Atlas, source: Option<String>, warning: Option<String>) -> Resolution {
     Resolution {
         path: recorded.path.clone(),
         resolved_by: ResolvedBy::Path,
@@ -114,8 +110,8 @@ mod tests {
     use cmx_core::test_support::{make_git_entry, make_local_entry, test_paths};
     use cmx_core::types::{SourceEntry, SourceType, SourcesFile};
 
-    fn recorded(source: Option<&str>) -> KnowledgeBase {
-        KnowledgeBase {
+    fn recorded(source: Option<&str>) -> Atlas {
+        Atlas {
             source: source.map(str::to_string),
             path: PathBuf::from("/recorded/kb"),
             revision: None,

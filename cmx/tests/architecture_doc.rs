@@ -4,18 +4,18 @@
 //! synchronized with the actual source tree:
 //!
 //! - `every_documented_path_exists`: every backtick-quoted path that looks
-//!   like a source file (`cmx/src/…`, `cmx-core/src/…`, `cmf/src/…`, or
-//!   `cmv/src/…`) must exist on disk.
+//!   like a source file (`cmx/src/…`, `cmx-core/src/…`, `intent-atlas/src/…`,
+//!   `cmf/src/…`, or `cmv/src/…`) must exist on disk.
 //!
 //! - `every_source_file_is_documented`: every `*.rs` file under `cmx/src`,
-//!   `cmx-core/src`, `cmf/src`, and `cmv/src` must appear (by its full
-//!   repo-relative path) somewhere in `AGENTS.md`.
+//!   `cmx-core/src`, `intent-atlas/src`, `cmf/src`, and `cmv/src` must appear
+//!   (by its full repo-relative path) somewhere in `AGENTS.md`.
 //!
 //! - `every_documented_module_has_module_docs`: every `*.rs` file under
-//!   `cmx/src`, `cmf/src`, and `cmv/src` (excluding `tests.rs` files) must carry a
-//!   `//!` module-level doc comment as its first substantive line. AGENTS.md
-//!   is the index; the module's own `//!` header is the authoritative
-//!   description of its purpose.
+//!   `cmx/src`, `intent-atlas/src`, `cmf/src`, and `cmv/src` (excluding
+//!   `tests.rs` files) must carry a `//!` module-level doc comment as its
+//!   first substantive line. AGENTS.md is the index; the module's own `//!`
+//!   header is the authoritative description of its purpose.
 //!
 //! When you add, move, or delete a module, update the Architecture section in
 //! the same commit. The quality-gate sentence in `AGENTS.md` says so too.
@@ -40,11 +40,17 @@ fn agents_md_content() -> String {
 }
 
 /// The crates whose `src/` trees the Architecture section must index.
-const CRATE_SOURCE_DIRS: [&str; 4] = ["cmx/src", "cmx-core/src", "cmf/src", "cmv/src"];
+const CRATE_SOURCE_DIRS: [&str; 5] = [
+    "cmx/src",
+    "cmx-core/src",
+    "intent-atlas/src",
+    "cmf/src",
+    "cmv/src",
+];
 
-/// The binary crates whose every module must open with a `//!` header
-/// (cmx-core is fully documented via its own `missing_docs` deny).
-const MODULE_DOC_SOURCE_DIRS: [&str; 3] = ["cmx/src", "cmf/src", "cmv/src"];
+/// The crates whose every module must open with a `//!` header (cmx-core is
+/// fully documented via its own `missing_docs` deny).
+const MODULE_DOC_SOURCE_DIRS: [&str; 4] = ["cmx/src", "intent-atlas/src", "cmf/src", "cmv/src"];
 
 /// Return true if a backtick-quoted token looks like a repo-relative Rust
 /// source path for one of the crates we care about.

@@ -21,12 +21,12 @@ cargo clippy --all-targets --all-features -- -D warnings && \
 cargo test --all-features
 ```
 
-Note: `cmx-core` denies `missing_docs` at the crate level (see
-`cmx-core/Cargo.toml`) and is fully documented; `cmx`/`cmf` currently only
-warn on missing per-item docs (module-level `//!` headers are complete, but
-not every `pub` item yet has a doc comment), so this workspace-wide
-`-D warnings` doc command may still fail until that backlog is cleared —
-track it as a follow-up, not a regression.
+Note: `missing_docs` is a workspace-level `warn` that `-D warnings` turns into
+an error for every crate; `cmx-core` and `intent-atlas` are fully documented
+(`intent-atlas` additionally denies it at the crate root), and `cmx`/`cmf`/`cmv`
+are documented at the module level with per-item docs still being filled in,
+so this workspace-wide doc command may still fail on that backlog — track it as
+a follow-up, not a regression.
 
 Additional recommended checks:
 
@@ -385,19 +385,28 @@ TypeScript port additions mirror the Rust artifact API:
 - `cmx-core-ts/src/agent.ts` — Markdown-agent to Codex-TOML transformation
 - `cmx-core-ts/src/artifact-installer.ts` — generated agent/skill plan-and-apply API
 
+## intent-atlas — the shared reader of the intent atlas
+
+The intent atlas is the externally maintained knowledge base cmf composes from and cmv verifies against: the ecosystems it supports, the intent records placed in the directory hierarchy that names their ecosystem, the validators beside those records, and the profiles that name a slice of it for a delivery surface (see `CMV.md`, "Three responsibilities"). This crate is the one reader of the atlas's shape that cmf and cmv share — catalog scanning and the ecosystem qualifiers a key carries, profile loading, selection, and the compile-manifest types — so cmv does not depend on cmf and neither binary duplicates the other's reading of it. It sits beside `cmx-core` rather than inside it because cmx has no use for it and cmx-core's TypeScript twin and lockstep release would make every atlas change pay for a port and a coordinated release for a consumer that does not exist; it stays `publish = false` until a second consumer appears. It is a library, so it denies `missing_docs` at the crate root.
+
+### intent-atlas Architecture
+
+- `intent-atlas/src/lib.rs` — crate root; states what the atlas is and exports `catalog`, `profile`, `selection`, and `manifest`
+- `intent-atlas/src/catalog.rs` — read-only recursive discovery, parsing, and schema validation of TOML intent records, including `static-check` validator evidence entries, plus the ecosystem qualifiers a record's catalog key carries (the segments between collection root and slug)
+- `intent-atlas/src/profile.rs` — materialization-profile schema (including `[select] ecosystems`), loading, and scope guards
+- `intent-atlas/src/selection.rs` — deterministic selection, ecosystem eligibility (a record is eligible when every key qualifier is a declared ecosystem; applied to category/tag selection, graph expansion, and explicit keys), graph expansion, and downward specialization expansion (when `prefer_specializations` holds and ecosystems are declared, pull every eligible record that `specializes` a selected one to a fixpoint before shadowed parents are removed; pulled records' own `follow` edges are not expanded); `select` runs those passes in that order and returns the selected key set with its traversal provenance
+- `intent-atlas/src/manifest.rs` — the compile manifest, cmf's second output artifact: records which intent records were composed into a delivered artifact (profile, artifact checksum, per-record checksums, atlas path/source/revision) so a verifier can hold the project to exactly those intents; built and written by cmf (`cmf assemble --manifest <path>`, and `cmf install --local --apply` to `.context-mixer/cmf-manifest.json`), read by cmv
+
 ## cmf — Context Mixer Forge
 
-Read-only materializer for an externally maintained TOML intent knowledge base.
+Read-only materializer for an externally maintained TOML intent atlas, read through `intent-atlas`.
 
 ### cmf Architecture
 
 - `cmf/src/main.rs` — binary entry point; assembles, previews, and applies installs through cmx-core
-- `cmf/src/lib.rs` — crate root; re-exports all public modules
+- `cmf/src/lib.rs` — crate root; exports `assembly` and `cli`, and re-exports `intent_atlas::{catalog, profile, manifest}` so cmf's own `cmf::catalog::…` paths keep resolving (cmv must not use these re-exports)
 - `cmf/src/cli.rs` — clap grammar for `assemble`, `install`, and `status`
-- `cmf/src/catalog.rs` — read-only recursive discovery, parsing, and schema validation of TOML intent records, including `static-check` validator evidence entries, plus the ecosystem qualifiers a record's catalog key carries (the segments between collection root and slug)
-- `cmf/src/profile.rs` — materialization-profile schema (including `[select] ecosystems`), loading, and scope guards
-- `cmf/src/assembly.rs` — deterministic selection, ecosystem eligibility (a record is eligible when every key qualifier is a declared ecosystem; applied to category/tag selection, graph expansion, and explicit keys), graph expansion, downward specialization expansion (when `prefer_specializations` holds and ecosystems are declared, pull every eligible record that `specializes` a selected one to a fixpoint before shadowed parents are removed; pulled records' own `follow` edges are not expanded), surface shaping, and budget enforcement
-- `cmf/src/manifest.rs` — the compile manifest, cmf's second output artifact: records which intent records were composed into a delivered artifact (profile, artifact checksum, per-record checksums, knowledge-base path/source/revision) so a verifier can hold the project to exactly those intents; written by `cmf assemble --manifest <path>` and by `cmf install --local --apply` to `.context-mixer/cmf-manifest.json`
+- `cmf/src/assembly.rs` — delivery-surface shaping and budget enforcement: `assemble` calls `intent_atlas::selection::select`, renders the selected records into a Markdown agent or `SKILL.md`, fails when the estimate exceeds `budget_tokens`, and returns `Assembly` (content, selected keys, traversal provenance, exclusion counts, estimated tokens)
 
 ### cmf Assembly Benchmarks
 
@@ -451,31 +460,31 @@ the rustdoc gate, and `cargo deny`.
 ## cmv — Context Mixer Verify
 
 Deterministic verifier for the intents cmf compiled into a project. It reads the
-compile manifest cmf wrote, resolves the knowledge base through the cmx source
-registry (`--knowledge-base` override, then the manifest's `source`, then its
+compile manifest cmf wrote, resolves the intent atlas through the cmx source
+registry (`--atlas` override, then the manifest's `source`, then its
 `path`), verifies at the pinned revision when the checkout has moved past it (a
 `git archive` of the pin, unpacked into the run's scratch directory), resolves
 each record, runs the `static-check` validators matching the workspace's
 languages, and exits nonzero when a required intent is not held. Stale is always
 computed against the working tree. No `llm` feature, no clock, no project code
-executed: the same inputs render byte-identical output. It depends on the `cmf`
-crate for the manifest and catalog types as an interim arrangement until
-`CMV.md`'s "Shared selection" decision is settled.
+executed: the same inputs render byte-identical output. It reads the atlas —
+the compile manifest and the catalog — through the `intent-atlas` crate it
+shares with cmf, and does not depend on cmf.
 
 ### cmv Architecture
 
-- `cmv/src/main.rs` — binary entry point: the imperative shell that resolves the project, manifest, and knowledge base (through the cmx source registry), loads them through the real gateways, materializes the pinned revision when the checkout has moved past it, hands everything to the pure core, prints the report, and exits per `CMV.md`'s table (`2` for anything that stops the run before a verdict)
-- `cmv/src/lib.rs` — crate root; exports all public modules and documents the interim dependency on `cmf`
-- `cmv/src/cli.rs` — clap grammar for `cmv check`, `cmv status`, and `cmv explain`, with the shared `--root`/`--manifest`/`--knowledge-base`/`--at-head` location arguments
-- `cmv/src/resolve.rs` — knowledge-base resolution in a fixed order — `--knowledge-base` override, the manifest's `source` looked up in the cmx sources registry, the manifest's recorded `path` — reporting which step answered (`resolved_by`) and warning, rather than failing, on a source name the registry does not know
-- `cmv/src/pin.rs` — honouring the pinned revision: when the manifest pins a commit the checkout's `HEAD` has moved past, materialize that tree through the `ProcessRunner` gateway (`git archive` into a tar, `tar -xf` into scratch) and verify there; `--at-head` (`PinPolicy`) bypasses it; owns the `knowledge_base` report block (`resolved_by`, pins, `verified_against`, `moved`)
+- `cmv/src/main.rs` — binary entry point: the imperative shell that resolves the project, manifest, and atlas (through the cmx source registry), loads them through the real gateways, materializes the pinned revision when the checkout has moved past it, hands everything to the pure core, prints the report, and exits per `CMV.md`'s table (`2` for anything that stops the run before a verdict)
+- `cmv/src/lib.rs` — crate root; exports all public modules and states the dependency on `intent-atlas` (not on cmf)
+- `cmv/src/cli.rs` — clap grammar for `cmv check`, `cmv status`, and `cmv explain`, with the shared `--root`/`--manifest`/`--atlas`/`--at-head` location arguments (`--knowledge-base` parses as a hidden alias of `--atlas`)
+- `cmv/src/resolve.rs` — atlas resolution in a fixed order — `--atlas` override, the manifest's `source` looked up in the cmx sources registry, the manifest's recorded `path` — reporting which step answered (`resolved_by`) and warning, rather than failing, on a source name the registry does not know
+- `cmv/src/pin.rs` — honouring the pinned revision: when the manifest pins a commit the checkout's `HEAD` has moved past, materialize that tree through the `ProcessRunner` gateway (`git archive` into a tar, `tar -xf` into scratch) and verify there; `--at-head` (`PinPolicy`) bypasses it; owns the `atlas` report block (`resolved_by`, pins, `verified_against`, `moved`)
 - `cmv/src/explain.rs` — `cmv explain <intent>`: how one manifest entry resolves to a record (by `key`, by a moved record's unique `id`, not found — naming the records that share the id when that blocked the fallback), its title and status, every declared validator, which would run for the workspace's languages and with exactly which argv and `--config` document, the stale flag, and whether the manifest dropped it; shares its resolution, stale, and argv decisions with `dispatch` and runs nothing
 - `cmv/src/config.rs` — the hand-authored `cmv.toml` at the project root: language override, validator timeout, and per-intent tables handed to validators as JSON; a missing file means defaults
 - `cmv/src/language.rs` — language detection from the project's root-level build manifests, pure over the `Filesystem` gateway; a `cmv.toml` override replaces detection entirely
 - `cmv/src/verdict.rs` — the validator output contract (`Verdict`, `Location`), the per-intent `State`, the `IntentOutcome` cmv reports, and the `Summary` whose exit code gates the run; pure data and arithmetic
 - `cmv/src/dispatch.rs` — the verification core: `check` resolves every compiled intent (by `key`, the compile-time locator; then by `id` only when the key is gone and exactly one record carries the id, since ids recur across collections by design), runs matching validators per the invocation protocol from the verified tree, combines several matches all-must-pass, maps each run onto one `IntentOutcome`, and computes `stale` against the working tree (record bytes at `HEAD`, plus validator `run` files differing between `HEAD` and a materialized pinned tree); `status` answers the same resolution questions without running anything
 - `cmv/src/process.rs` — the `ProcessRunner` gateway (run an executable with args, cwd, and a timeout): `RealProcessRunner` over `std::process::Command` (own process group on unix, group-killed on timeout) and the scripted `FakeProcessRunner`; kept out of `cmx-core` to avoid a coordinated release
-- `cmv/src/report.rs` — output rendering for `check`, `status`, and `explain`: deterministic JSON (`--json`) and the human listings, including the one informational `knowledge base has moved` line; `Display` impls and their tests live here
+- `cmv/src/report.rs` — output rendering for `check`, `status`, and `explain`: deterministic JSON (`--json`) and the human listings, including the one informational `atlas has moved` line; `Display` impls and their tests live here
 
 ## Spec
 

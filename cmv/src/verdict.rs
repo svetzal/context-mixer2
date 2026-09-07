@@ -12,8 +12,8 @@ pub const EXIT_HELD: u8 = 0;
 /// Exit code when a required validator failed, or, under
 /// [`Strictness::Strict`], any intent was unchecked.
 pub const EXIT_NOT_HELD: u8 = 1;
-/// Exit code for a missing or malformed manifest, an unresolvable knowledge
-/// base, or bad usage. Raised by the binary, never computed by [`summarize`].
+/// Exit code for a missing or malformed manifest, an unresolvable atlas, or
+/// bad usage. Raised by the binary, never computed by [`summarize`].
 pub const EXIT_USAGE: u8 = 2;
 
 /// Whether an unchecked intent fails the run.
@@ -141,7 +141,7 @@ impl State {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct IntentOutcome {
     /// The record's stable `id`; `None` for a dropped intent whose record is
-    /// no longer in the knowledge base.
+    /// no longer in the atlas.
     pub id: Option<String>,
     /// The path-derived catalog key.
     pub key: String,

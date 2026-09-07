@@ -7,13 +7,13 @@
 use std::fmt;
 
 use anyhow::{Context, Result};
-use cmf::manifest::{KnowledgeBase, Manifest, ProfileRef};
-use cmf::profile::Surface;
+use intent_atlas::manifest::{Atlas, Manifest, ProfileRef};
+use intent_atlas::profile::Surface;
 use serde::Serialize;
 
 use crate::dispatch::{RecordResolution, StatusReport};
 use crate::explain::{ExplainReport, ValidatorPlan};
-use crate::pin::{KnowledgeBaseReport, VerifiedAgainst, short_revision};
+use crate::pin::{AtlasReport, VerifiedAgainst, short_revision};
 use crate::resolve::ResolvedBy;
 use crate::verdict::{IntentOutcome, State, Strictness, Summary, summarize};
 
@@ -48,7 +48,7 @@ pub struct CheckReport {
     /// What the manifest said it compiled from.
     pub manifest: ManifestSummary,
     /// Where cmv actually read the records from, and which tree it verified.
-    pub knowledge_base: KnowledgeBaseReport,
+    pub atlas: AtlasReport,
     /// Languages the workspace was verified as.
     pub languages: Vec<String>,
     /// One outcome per compiled intent (manifest order), then per dropped
@@ -64,14 +64,14 @@ pub struct ManifestSummary {
     /// The profile that drove selection.
     pub profile: ProfileRef,
     /// Where the records came from, as recorded at compile time.
-    pub knowledge_base: KnowledgeBase,
+    pub atlas: Atlas,
 }
 
 impl CheckReport {
     /// Assemble the report and compute its summary.
     pub fn new(
         manifest: &Manifest,
-        knowledge_base: KnowledgeBaseReport,
+        atlas: AtlasReport,
         languages: &[String],
         intents: Vec<IntentOutcome>,
         strictness: Strictness,
@@ -81,9 +81,9 @@ impl CheckReport {
             schema: SCHEMA_VERSION,
             manifest: ManifestSummary {
                 profile: manifest.profile.clone(),
-                knowledge_base: manifest.knowledge_base.clone(),
+                atlas: manifest.atlas.clone(),
             },
-            knowledge_base,
+            atlas,
             languages: languages.to_vec(),
             intents,
             summary,
@@ -153,43 +153,39 @@ impl fmt::Display for CheckReport {
         writeln!(f)?;
         write_summary(f, &self.summary)?;
         let stale = self.intents.iter().filter(|intent| intent.stale).count();
-        write_remedy(f, &self.knowledge_base, stale)
+        write_remedy(f, &self.atlas, stale)
     }
 }
 
-/// The one remedy line, when there is something to remedy: the knowledge base
+/// The one remedy line, when there is something to remedy: the atlas
 /// has moved past the pin (with how much of the compile that touched), or,
 /// short of that, some compiled records changed. Informational either way;
 /// cmv never re-pins.
-fn write_remedy(
-    f: &mut fmt::Formatter<'_>,
-    knowledge_base: &KnowledgeBaseReport,
-    stale: usize,
-) -> fmt::Result {
-    if knowledge_base.moved {
-        return write_moved_line(f, knowledge_base, Some(stale));
+fn write_remedy(f: &mut fmt::Formatter<'_>, atlas: &AtlasReport, stale: usize) -> fmt::Result {
+    if atlas.moved {
+        return write_moved_line(f, atlas, Some(stale));
     }
     if stale > 0 {
         writeln!(
             f,
-            "{stale} {} changed in the knowledge base since compile; re-run `cmf install` to recompile.",
+            "{stale} {} changed in the atlas since compile; re-run `cmf install` to recompile.",
             plural(stale, "record", "records")
         )?;
     }
     Ok(())
 }
 
-/// `knowledge base has moved: HEAD <short> vs pinned <short>; N compiled
+/// `atlas has moved: HEAD <short> vs pinned <short>; N compiled
 /// records or validators changed; re-run cmf install to recompile`. The count
-/// is omitted when the knowledge base could not be scanned.
+/// is omitted when the atlas could not be scanned.
 fn write_moved_line(
     f: &mut fmt::Formatter<'_>,
-    knowledge_base: &KnowledgeBaseReport,
+    atlas: &AtlasReport,
     changed: Option<usize>,
 ) -> fmt::Result {
-    let head = knowledge_base.head_revision.as_deref().map_or("unknown", short_revision);
-    let pinned = knowledge_base.pinned_revision.as_deref().map_or("unknown", short_revision);
-    write!(f, "knowledge base has moved: HEAD {head} vs pinned {pinned}")?;
+    let head = atlas.head_revision.as_deref().map_or("unknown", short_revision);
+    let pinned = atlas.pinned_revision.as_deref().map_or("unknown", short_revision);
+    write!(f, "atlas has moved: HEAD {head} vs pinned {pinned}")?;
     if let Some(changed) = changed {
         write!(
             f,
@@ -202,7 +198,7 @@ fn write_moved_line(
 
 fn resolved_by_name(resolved_by: ResolvedBy) -> &'static str {
     match resolved_by {
-        ResolvedBy::Override => "--knowledge-base",
+        ResolvedBy::Override => "--atlas",
         ResolvedBy::Source => "cmx source",
         ResolvedBy::Path => "manifest path",
     }
@@ -265,12 +261,12 @@ impl fmt::Display for StatusReport {
         writeln!(f, "Manifest: {}", self.manifest_path.display())?;
         writeln!(f, "Profile: {} {}", self.profile.id, self.profile.version)?;
         writeln!(f, "Artifact: {} ({})", self.artifact.name, surface_name(self.artifact.surface))?;
-        let kb = &self.knowledge_base.resolved;
+        let kb = &self.atlas.resolved;
         writeln!(
             f,
-            "Knowledge base: {} ({}, resolved by {})",
+            "Atlas: {} ({}, resolved by {})",
             kb.path.display(),
-            if self.knowledge_base.exists {
+            if self.atlas.exists {
                 "present"
             } else {
                 "missing"
@@ -299,7 +295,7 @@ impl fmt::Display for StatusReport {
                 writeln!(f, "Stale records: {}", coverage.stale)?;
                 writeln!(f, "Missing records: {}", coverage.missing)?;
             }
-            None => writeln!(f, "Validators: unknown (knowledge base not scanned)")?,
+            None => writeln!(f, "Validators: unknown (atlas not scanned)")?,
         }
         if kb.moved {
             write_moved_line(f, kb, self.coverage.as_ref().map(|coverage| coverage.stale))?;
@@ -320,10 +316,10 @@ impl fmt::Display for ExplainReport {
                 "Record: resolved by id (no record at the manifest key; one record carries its id)"
             )?,
             (RecordResolution::NotFound, None) => {
-                writeln!(f, "Record: not found in knowledge base")?;
+                writeln!(f, "Record: not found in atlas")?;
             }
             (RecordResolution::NotFound, Some(detail)) => {
-                writeln!(f, "Record: not found in knowledge base ({detail})")?;
+                writeln!(f, "Record: not found in atlas ({detail})")?;
             }
         }
         if let Some(title) = &intent.title {
@@ -348,10 +344,10 @@ impl fmt::Display for ExplainReport {
                 "no"
             }
         )?;
-        let kb = &self.knowledge_base;
+        let kb = &self.atlas;
         writeln!(
             f,
-            "Knowledge base: {} (resolved by {}, verified against {})",
+            "Atlas: {} (resolved by {}, verified against {})",
             kb.path.display(),
             resolved_by_name(kb.resolved_by),
             verified_against_name(kb.verified_against)
@@ -364,7 +360,7 @@ impl fmt::Display for ExplainReport {
         writeln!(f, "Config: {}", intent.config)?;
         if intent.validators.is_empty() {
             if intent.resolution == RecordResolution::NotFound {
-                writeln!(f, "Validators: unknown (record not in knowledge base)")?;
+                writeln!(f, "Validators: unknown (record not in atlas)")?;
             } else {
                 writeln!(f, "Validators: none declared")?;
             }
@@ -418,10 +414,10 @@ fn surface_name(surface: Surface) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dispatch::{Coverage, KnowledgeBaseStatus};
+    use crate::dispatch::{AtlasStatus, Coverage};
     use crate::explain::IntentExplanation;
     use crate::verdict::{Location, empty_object};
-    use cmf::manifest::ArtifactRef;
+    use intent_atlas::manifest::ArtifactRef;
     use serde_json::json;
     use std::path::PathBuf;
 
@@ -429,7 +425,7 @@ mod tests {
         Manifest {
             schema: 1,
             compiled_at: "2026-09-05T14:02:11+00:00".to_string(),
-            knowledge_base: KnowledgeBase {
+            atlas: Atlas {
                 source: Some("guidelines".to_string()),
                 path: PathBuf::from("/kb"),
                 revision: Some("a1b2c3d4e5f60718293a4b5c6d7e8f9012345678".to_string()),
@@ -507,8 +503,8 @@ mod tests {
     const PIN: &str = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678";
     const HEAD: &str = "ffffffffffffffffffffffffffffffffffffffff";
 
-    fn knowledge_base() -> KnowledgeBaseReport {
-        KnowledgeBaseReport {
+    fn atlas() -> AtlasReport {
+        AtlasReport {
             path: PathBuf::from("/kb"),
             resolved_by: ResolvedBy::Source,
             source: Some("guidelines".to_string()),
@@ -519,24 +515,24 @@ mod tests {
         }
     }
 
-    fn moved_knowledge_base() -> KnowledgeBaseReport {
-        KnowledgeBaseReport {
+    fn moved_atlas() -> AtlasReport {
+        AtlasReport {
             head_revision: Some(HEAD.to_string()),
             moved: true,
-            ..knowledge_base()
+            ..atlas()
         }
     }
 
     fn check_report(
-        knowledge_base: KnowledgeBaseReport,
+        atlas: AtlasReport,
         outcomes: Vec<IntentOutcome>,
         strictness: Strictness,
     ) -> CheckReport {
-        CheckReport::new(&manifest(), knowledge_base, &["rust".to_string()], outcomes, strictness)
+        CheckReport::new(&manifest(), atlas, &["rust".to_string()], outcomes, strictness)
     }
 
     fn report() -> CheckReport {
-        check_report(knowledge_base(), sample_outcomes(), Strictness::Lenient)
+        check_report(atlas(), sample_outcomes(), Strictness::Lenient)
     }
 
     #[test]
@@ -555,18 +551,15 @@ FAIL       rust/isolate-functional-core  (required)
 FAIL       rust/optional  (optional)
 
 1 pass, 2 fail, 1 not applicable, 1 unchecked, 1 unguided; adherence 33.3%
-1 record changed in the knowledge base since compile; re-run `cmf install` to recompile.
+1 record changed in the atlas since compile; re-run `cmf install` to recompile.
 ";
         assert_eq!(report().render(OutputFormat::Human).unwrap(), expected);
     }
 
     #[test]
     fn human_listing_without_stale_records_has_no_remedy_line() {
-        let report = check_report(
-            knowledge_base(),
-            vec![outcome("rust/a", State::Pass)],
-            Strictness::Lenient,
-        );
+        let report =
+            check_report(atlas(), vec![outcome("rust/a", State::Pass)], Strictness::Lenient);
         assert_eq!(
             report.to_string(),
             "PASS       rust/a\n\n1 pass, 0 fail, 0 not applicable, 0 unchecked, 0 unguided; adherence 100.0%\n"
@@ -575,8 +568,7 @@ FAIL       rust/optional  (optional)
 
     #[test]
     fn human_listing_for_an_empty_manifest() {
-        let report =
-            CheckReport::new(&manifest(), knowledge_base(), &[], vec![], Strictness::Strict);
+        let report = CheckReport::new(&manifest(), atlas(), &[], vec![], Strictness::Strict);
         assert_eq!(
             report.to_string(),
             "no intents in manifest\n\n0 pass, 0 fail, 0 not applicable, 0 unchecked, 0 unguided; adherence n/a\n"
@@ -591,48 +583,42 @@ FAIL       rust/optional  (optional)
         ];
         outcomes[0].stale = true;
         outcomes[1].stale = true;
-        let report = check_report(knowledge_base(), outcomes, Strictness::Lenient);
+        let report = check_report(atlas(), outcomes, Strictness::Lenient);
         assert!(report.to_string().ends_with(
-            "2 records changed in the knowledge base since compile; re-run `cmf install` to recompile.\n"
+            "2 records changed in the atlas since compile; re-run `cmf install` to recompile.\n"
         ));
     }
 
     #[test]
-    fn moved_knowledge_base_replaces_the_stale_line_with_the_moved_line() {
+    fn moved_atlas_replaces_the_stale_line_with_the_moved_line() {
         let mut outcomes = vec![
             outcome("rust/a", State::Pass),
             outcome("rust/b", State::Pass),
         ];
         outcomes[0].stale = true;
-        let text = check_report(moved_knowledge_base(), outcomes, Strictness::Lenient).to_string();
+        let text = check_report(moved_atlas(), outcomes, Strictness::Lenient).to_string();
         assert!(
             text.ends_with(
                 "2 pass, 0 fail, 0 not applicable, 0 unchecked, 0 unguided; adherence 100.0%\n\
-                 knowledge base has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; 1 compiled record or validator changed; re-run cmf install to recompile\n"
+                 atlas has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; 1 compiled record or validator changed; re-run cmf install to recompile\n"
             ),
             "{text}"
         );
-        assert!(!text.contains("changed in the knowledge base since compile"), "{text}");
+        assert!(!text.contains("changed in the atlas since compile"), "{text}");
     }
 
     #[test]
     fn moved_line_pluralizes_and_reports_zero_changes() {
-        let text = check_report(
-            moved_knowledge_base(),
-            vec![outcome("rust/a", State::Pass)],
-            Strictness::Lenient,
-        )
-        .to_string();
+        let text =
+            check_report(moved_atlas(), vec![outcome("rust/a", State::Pass)], Strictness::Lenient)
+                .to_string();
         assert!(text.contains("; 0 compiled records or validators changed; "), "{text}");
     }
 
     #[test]
     fn moved_line_never_changes_the_exit_code() {
-        let report = check_report(
-            moved_knowledge_base(),
-            vec![outcome("rust/a", State::Pass)],
-            Strictness::Strict,
-        );
+        let report =
+            check_report(moved_atlas(), vec![outcome("rust/a", State::Pass)], Strictness::Strict);
         assert_eq!(report.summary.exit_code, 0);
     }
 
@@ -644,10 +630,10 @@ FAIL       rust/optional  (optional)
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["schema"], 1);
         assert_eq!(value["manifest"]["profile"]["id"], "rust-shipping");
-        assert_eq!(value["manifest"]["knowledge_base"]["source"], "guidelines");
-        assert_eq!(value["manifest"]["knowledge_base"]["path"], "/kb");
+        assert_eq!(value["manifest"]["atlas"]["source"], "guidelines");
+        assert_eq!(value["manifest"]["atlas"]["path"], "/kb");
         assert_eq!(
-            value["knowledge_base"],
+            value["atlas"],
             json!({
                 "path": "/kb",
                 "resolved_by": "source",
@@ -707,8 +693,8 @@ FAIL       rust/optional  (optional)
             manifest_path: PathBuf::from("/project/.context-mixer/cmf-manifest.json"),
             profile: manifest().profile,
             artifact: manifest().artifact,
-            knowledge_base: KnowledgeBaseStatus {
-                resolved: knowledge_base(),
+            atlas: AtlasStatus {
+                resolved: atlas(),
                 exists: true,
             },
             languages: vec!["python".to_string(), "rust".to_string()],
@@ -728,7 +714,7 @@ FAIL       rust/optional  (optional)
 Manifest: /project/.context-mixer/cmf-manifest.json
 Profile: rust-shipping 0.3.0
 Artifact: AGENTS (agent)
-Knowledge base: /kb (present, resolved by cmx source)
+Atlas: /kb (present, resolved by cmx source)
 Source: guidelines
 Pinned revision: a1b2c3d4e5f60718293a4b5c6d7e8f9012345678
 HEAD revision: a1b2c3d4e5f60718293a4b5c6d7e8f9012345678
@@ -745,8 +731,8 @@ Missing records: 1
     #[test]
     fn status_lines_spell_out_what_is_unavailable() {
         let mut report = status_report();
-        report.knowledge_base = KnowledgeBaseStatus {
-            resolved: KnowledgeBaseReport {
+        report.atlas = AtlasStatus {
+            resolved: AtlasReport {
                 path: PathBuf::from("/gone"),
                 resolved_by: ResolvedBy::Path,
                 source: None,
@@ -760,26 +746,23 @@ Missing records: 1
         report.languages = vec![];
         report.coverage = None;
         let text = report.to_string();
-        assert!(
-            text.contains("Knowledge base: /gone (missing, resolved by manifest path)\n"),
-            "{text}"
-        );
+        assert!(text.contains("Atlas: /gone (missing, resolved by manifest path)\n"), "{text}");
         assert!(text.contains("Source: unregistered\n"), "{text}");
         assert!(text.contains("Pinned revision: unavailable\n"), "{text}");
         assert!(text.contains("HEAD revision: unavailable\n"), "{text}");
         assert!(text.contains("Verified against: working tree (HEAD)\n"), "{text}");
         assert!(text.contains("Languages: none detected\n"), "{text}");
-        assert!(text.ends_with("Validators: unknown (knowledge base not scanned)\n"), "{text}");
+        assert!(text.ends_with("Validators: unknown (atlas not scanned)\n"), "{text}");
     }
 
     #[test]
-    fn status_reports_a_moved_knowledge_base_with_the_stale_count() {
+    fn status_reports_a_moved_atlas_with_the_stale_count() {
         let mut report = status_report();
-        report.knowledge_base.resolved = moved_knowledge_base();
+        report.atlas.resolved = moved_atlas();
         let text = report.to_string();
         assert!(
             text.ends_with(
-                "Missing records: 1\nknowledge base has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; 1 compiled record or validator changed; re-run cmf install to recompile\n"
+                "Missing records: 1\natlas has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; 1 compiled record or validator changed; re-run cmf install to recompile\n"
             ),
             "{text}"
         );
@@ -787,7 +770,7 @@ Missing records: 1
         let text = report.to_string();
         assert!(
             text.ends_with(
-                "knowledge base has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; re-run cmf install to recompile\n"
+                "atlas has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; re-run cmf install to recompile\n"
             ),
             "the count is omitted without coverage: {text}"
         );
@@ -798,10 +781,10 @@ Missing records: 1
         let json = status_report().render(OutputFormat::Json).unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["schema"], 1);
-        assert_eq!(value["knowledge_base"]["exists"], true);
-        assert_eq!(value["knowledge_base"]["resolved_by"], "source");
-        assert_eq!(value["knowledge_base"]["verified_against"], "pinned");
-        assert_eq!(value["knowledge_base"]["moved"], false);
+        assert_eq!(value["atlas"]["exists"], true);
+        assert_eq!(value["atlas"]["resolved_by"], "source");
+        assert_eq!(value["atlas"]["verified_against"], "pinned");
+        assert_eq!(value["atlas"]["moved"], false);
         assert_eq!(value["coverage"]["with_validator"], 2);
         assert_eq!(value["languages"], json!(["python", "rust"]));
     }
@@ -809,7 +792,7 @@ Missing records: 1
     fn explain_report() -> ExplainReport {
         ExplainReport {
             schema: 1,
-            knowledge_base: knowledge_base(),
+            atlas: atlas(),
             languages: vec!["rust".to_string()],
             intent: IntentExplanation {
                 key: "rust/isolate-functional-core".to_string(),
@@ -882,7 +865,7 @@ Status: confirmed (informational; never gates)
 Compiled: yes
 Dropped: no
 Stale: yes (record or validator changed at HEAD since compile)
-Knowledge base: /kb (resolved by cmx source, verified against pinned revision)
+Atlas: /kb (resolved by cmx source, verified against pinned revision)
 Languages: rust
 Config: {\"business_rule_minimum_matches\":2}
 Validators:
@@ -899,7 +882,7 @@ Validators:
     #[test]
     fn explain_lines_for_a_dropped_intent_whose_record_is_gone() {
         let mut report = explain_report();
-        report.knowledge_base = moved_knowledge_base();
+        report.atlas = moved_atlas();
         report.intent = IntentExplanation {
             key: "rust/budgeted".to_string(),
             id: None,
@@ -916,7 +899,7 @@ Validators:
         };
         let text = report.to_string();
         assert!(text.contains("Id: unknown\n"), "{text}");
-        assert!(text.contains("Record: not found in knowledge base\n"), "{text}");
+        assert!(text.contains("Record: not found in atlas\n"), "{text}");
         assert!(!text.contains("Title:"), "{text}");
         assert!(text.contains("Compiled: no\n"), "{text}");
         assert!(
@@ -925,10 +908,10 @@ Validators:
         );
         assert!(text.contains("Stale: no\n"), "{text}");
         assert!(text.contains("Config: {}\n"), "{text}");
-        assert!(text.contains("Validators: unknown (record not in knowledge base)\n"), "{text}");
+        assert!(text.contains("Validators: unknown (record not in atlas)\n"), "{text}");
         assert!(
             text.ends_with(
-                "knowledge base has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; re-run cmf install to recompile\n"
+                "atlas has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; re-run cmf install to recompile\n"
             ),
             "{text}"
         );
@@ -953,19 +936,19 @@ Validators:
         let text = report.to_string();
         assert!(
             text.contains(
-                "Record: not found in knowledge base (no record at key rust/gone, and id kb.intent.a is shared by 2 records (python/a, rust/a); re-run cmf install to recompile)\n"
+                "Record: not found in atlas (no record at key rust/gone, and id kb.intent.a is shared by 2 records (python/a, rust/a); re-run cmf install to recompile)\n"
             ),
             "{text}"
         );
     }
 
     #[test]
-    fn explain_json_carries_the_schema_and_the_knowledge_base_block() {
+    fn explain_json_carries_the_schema_and_the_atlas_block() {
         let json = explain_report().render(OutputFormat::Json).unwrap();
         assert!(json.ends_with("}\n"));
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["schema"], 1);
-        assert_eq!(value["knowledge_base"]["resolved_by"], "source");
+        assert_eq!(value["atlas"]["resolved_by"], "source");
         assert_eq!(value["intent"]["resolution"], "key");
         assert_eq!(value["intent"]["validators"][1]["would_run"], false);
         assert_eq!(value["intent"]["config"], json!({ "business_rule_minimum_matches": 2 }));

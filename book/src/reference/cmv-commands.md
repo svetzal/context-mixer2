@@ -2,10 +2,10 @@
 
 cmv verifies, deterministically, that a project holds the intents cmf compiled
 for it. It reads the compile manifest `cmf install --local` wrote, resolves
-each compiled intent's record in the knowledge base, runs the validators that
+each compiled intent's record in the atlas, runs the validators that
 match the workspace's languages, and exits nonzero when a required intent is
 not held. It never asks a model, never reads the clock, and never executes
-project code: given the same workspace, manifest, knowledge base, and
+project code: given the same workspace, manifest, atlas, and
 `cmv.toml`, its output is byte-identical.
 
 Run it from the project root, or pass `--root <project>`.
@@ -13,9 +13,9 @@ Run it from the project root, or pass `--root <project>`.
 ## Commands
 
 ```text
-cmv check            [--json] [--strict] [--root <project>] [--manifest <path>] [--knowledge-base <path>] [--at-head]
-cmv status           [--json]            [--root <project>] [--manifest <path>] [--knowledge-base <path>] [--at-head]
-cmv explain <intent> [--json]            [--root <project>] [--manifest <path>] [--knowledge-base <path>] [--at-head]
+cmv check            [--json] [--strict] [--root <project>] [--manifest <path>] [--atlas <path>] [--at-head]
+cmv status           [--json]            [--root <project>] [--manifest <path>] [--atlas <path>] [--at-head]
+cmv explain <intent> [--json]            [--root <project>] [--manifest <path>] [--atlas <path>] [--at-head]
 ```
 
 | Command | Description |
@@ -25,7 +25,7 @@ cmv explain <intent> [--json]            [--root <project>] [--manifest <path>] 
 | `cmv check --json` | Emit the full per-intent report as JSON for CI |
 | `cmv status` | Summarize the manifest, pin, languages, and validator coverage without running any validator |
 | `cmv explain <intent>` | Show what `check` would do for one intent — record resolution, validators, argv, config, stale — without running anything |
-| `--at-head` | Verify the knowledge base's working tree even when the manifest pins a revision its `HEAD` has moved past |
+| `--at-head` | Verify the atlas's working tree even when the manifest pins a revision its `HEAD` has moved past |
 
 Defaults:
 
@@ -33,23 +33,23 @@ Defaults:
 | --- | --- |
 | `--root` | the current directory |
 | `--manifest` | `<root>/.context-mixer/cmf-manifest.json`, where `cmf install --local --apply` writes it |
-| `--knowledge-base` | resolved through the cmx source registry, then the manifest (see below) |
+| `--atlas` | resolved through the cmx source registry, then the manifest (see below); `--knowledge-base` still parses as a hidden alias |
 
 A relative path — on the command line, in the registry, or in the manifest — is
 resolved against cmv's working directory.
 
-## Where the knowledge base comes from
+## Where the atlas comes from
 
-The knowledge base is the registry (`CMV.md`, design decision 5): it is a git
+The atlas is the registry (`CMV.md`, design decision 5): it is a git
 repository, so it is a cmx source, and cmv finds it the way cmx would. The
 resolution order is fixed, and every report says which step answered in its
-`knowledge_base.resolved_by` field:
+`atlas.resolved_by` field:
 
 | `resolved_by` | Step |
 | --- | --- |
-| `override` | `--knowledge-base <path>` was given; nothing else is consulted |
-| `source` | the manifest's `knowledge_base.source` names a registered cmx source (`cmx source list`); its local directory or clone is used |
-| `path` | the manifest's recorded `knowledge_base.path` |
+| `override` | `--atlas <path>` (or its hidden alias `--knowledge-base`) was given; nothing else is consulted |
+| `source` | the manifest's `atlas.source` names a registered cmx source (`cmx source list`); its local directory or clone is used |
+| `path` | the manifest's recorded `atlas.path` |
 
 A recorded source name the registry does not know falls through to `path` with
 a warning on stderr naming the source and suggesting `cmx source add`: the
@@ -58,12 +58,12 @@ proceed.
 
 ## The pinned revision
 
-The manifest records the git `revision` cmf read. When the resolved knowledge
-base is a git checkout whose `HEAD` differs from that pin, cmv verifies against
+The manifest records the git `revision` cmf read. When the resolved atlas is
+a git checkout whose `HEAD` differs from that pin, cmv verifies against
 the **pinned tree**, not the working tree: it runs
 
 ```text
-git -C <knowledge-base> archive --format=tar -o <scratch>/kb.tar <revision>
+git -C <atlas> archive --format=tar -o <scratch>/kb.tar <revision>
 tar -xf <scratch>/kb.tar -C <scratch>/kb
 ```
 
@@ -75,18 +75,18 @@ When `HEAD` equals the pin, the manifest has no `revision`, or the root is not
 a git checkout, cmv uses the root directly. When the pinned revision cannot be
 archived — typically because the checkout has not fetched it — cmv exits `2`
 naming the revision and suggesting `cmx source update <name>` (or `git fetch`
-when the knowledge base is not a registered source).
+when the atlas is not a registered source).
 
 `--at-head` bypasses the pin and verifies the working tree; the report's
-`verified_against` says `head`. This is for validator authors iterating on a
-knowledge base: edit the script, run `cmv check --at-head` against a project,
+`verified_against` says `head`. This is for validator authors iterating on an
+atlas: edit the script, run `cmv check --at-head` against a project,
 repeat. It never re-pins anything.
 
-Every `check`, `status`, and `explain` report carries a `knowledge_base` block:
+Every `check`, `status`, and `explain` report carries an `atlas` block:
 
 | Field | Meaning |
 | --- | --- |
-| `path` | the knowledge-base root as resolved |
+| `path` | the atlas root as resolved |
 | `resolved_by` | `override`, `source`, or `path` |
 | `source` | the cmx source name the manifest recorded, if any |
 | `pinned_revision` | the manifest's `revision`, if any |
@@ -98,10 +98,10 @@ Every `check`, `status`, and `explain` report carries a `knowledge_base` block:
 adds one line after the summary:
 
 ```text
-knowledge base has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; 2 compiled records or validators changed; re-run cmf install to recompile
+atlas has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; 2 compiled records or validators changed; re-run cmf install to recompile
 ```
 
-Recompiling is cmf's decision — a newer knowledge base may change *selection* —
+Recompiling is cmf's decision — a newer atlas may change *selection* —
 so cmv only reports it.
 
 ## Language detection
@@ -121,7 +121,7 @@ in `cmv.toml` replaces detection entirely.
 ## Project config: `cmv.toml`
 
 Hand-authored, at the project root, entirely optional. It carries what neither
-the knowledge base nor the code can supply.
+the atlas nor the code can supply.
 
 ```toml
 # Replace detection; an empty list runs no validators.
@@ -157,10 +157,10 @@ those records; `cmf install` recompiles against the current keys. cmv then runs
 each `static-check` validator whose language matches:
 
 ```text
-<knowledge-base-root>/<run> --workspace <project-root> --config <tempfile.json>
+<atlas-root>/<run> --workspace <project-root> --config <tempfile.json>
 ```
 
-with the knowledge-base root as the working directory. The validator writes one
+with the atlas root as the working directory. The validator writes one
 JSON document to stdout and exits 0:
 
 ```json
@@ -188,7 +188,7 @@ leaves it unchecked; otherwise it passes when at least one run was applicable.
 | `pass` | Validator ran; `applicable: true`, `followed: true` | — |
 | `fail` | Validator ran; `applicable: true`, `followed: false` | `1` if the validator is `required` |
 | `not_applicable` | Validator ran; `applicable: false` — the condition never arose | — |
-| `unchecked` | No validator for the workspace's languages, record missing from the knowledge base, validator could not start, crashed, timed out, or wrote no parseable verdict — the reason is reported | `1` only with `--strict` |
+| `unchecked` | No validator for the workspace's languages, record missing from the atlas, validator could not start, crashed, timed out, or wrote no parseable verdict — the reason is reported | `1` only with `--strict` |
 | `unguided` | The manifest lists the intent as dropped; the guidance never reached the artifact | — |
 
 An intent is additionally marked **stale** when, at the working tree's `HEAD`,
@@ -196,9 +196,9 @@ its record's bytes no longer match the checksum the manifest recorded at
 compile time, or — when validators ran from a materialized pinned tree — any
 of its validators' `run` files differ between `HEAD` and that tree. Stale is
 always computed against the working tree, never the pinned tree, so a moved
-knowledge base shows exactly which compiled intents it touched. Stale is
+atlas shows exactly which compiled intents it touched. Stale is
 informational and never changes the exit code; the remedy is to re-run
-`cmf install`, because a newer knowledge base may change *selection*, which is
+`cmf install`, because a newer atlas may change *selection*, which is
 cmf's decision.
 
 ## Exit codes
@@ -207,7 +207,7 @@ cmf's decision.
 | --- | --- |
 | `0` | Every required, applicable validator passed |
 | `1` | A required validator failed, or, with `--strict`, an intent was unchecked |
-| `2` | Missing or malformed manifest, unreadable knowledge base, or bad usage |
+| `2` | Missing or malformed manifest, unreadable atlas, or bad usage |
 
 An optional validator's failure is reported but never changes the exit code.
 
@@ -228,7 +228,7 @@ FAIL       craftsperson/rust/isolate-functional-core  (required)  (stale: record
            src/main.rs:12
 
 1 pass, 1 fail, 0 not applicable, 1 unchecked, 1 unguided; adherence 50.0%
-1 record changed in the knowledge base since compile; re-run `cmf install` to recompile.
+1 record changed in the atlas since compile; re-run `cmf install` to recompile.
 ```
 
 Under each intent come its evidence strings, then its locations as
@@ -246,9 +246,9 @@ and no temporary path, so it is byte-stable across runs.
   "schema": 1,
   "manifest": {
     "profile": { "id": "rust-shipping", "version": "0.3.0" },
-    "knowledge_base": { "source": "guidelines", "path": "kb", "revision": "a1b2c3d4…" }
+    "atlas": { "source": "guidelines", "path": "kb", "revision": "a1b2c3d4…" }
   },
-  "knowledge_base": {
+  "atlas": {
     "path": "/home/me/guidelines",
     "resolved_by": "source",
     "source": "guidelines",
@@ -284,16 +284,16 @@ and no temporary path, so it is byte-stable across runs.
 }
 ```
 
-- `manifest` echoes the manifest's `profile` and `knowledge_base` as recorded
+- `manifest` echoes the manifest's `profile` and `atlas` as recorded
   at compile time (`source` and `revision` are omitted when the manifest has
   none).
-- `knowledge_base` is where cmv actually read from and which tree it verified;
+- `atlas` is where cmv actually read from and which tree it verified;
   see "The pinned revision" above for every field.
 - `intents` lists every compiled intent in manifest order, then every dropped
   intent. `state` is one of `pass`, `fail`, `not_applicable`, `unchecked`,
   `unguided`; `reason` is present for the last two. `language` and
   `description` are `null` when no validator ran; `id` is `null` for a dropped
-  intent whose record is no longer in the knowledge base. `language` and
+  intent whose record is no longer in the atlas. `language` and
   `description` join several validators' values with `, ` and ` / `
   respectively, and `signals` is then an object keyed by language.
 - `summary.adherence_rate` is `pass / (pass + fail)` rounded to four decimals,
@@ -301,11 +301,11 @@ and no temporary path, so it is byte-stable across runs.
   exits with.
 
 `cmv status --json` emits `schema`, `manifest_path`, `profile`, `artifact`,
-`knowledge_base` (the block above plus `exists`), `languages`, `intents`,
+`atlas` (the block above plus `exists`), `languages`, `intents`,
 `dropped`, and `coverage` (`with_validator`, `missing`, `stale`), with
-`coverage` `null` when the knowledge base could not be scanned. The human form
+`coverage` `null` when the atlas could not be scanned. The human form
 adds `HEAD revision` and `Verified against` lines after `Pinned revision`, and
-the `knowledge base has moved` line at the end when `moved`.
+the `atlas has moved` line at the end when `moved`.
 
 ## Explaining one intent
 
@@ -323,7 +323,7 @@ Status: confirmed (informational; never gates)
 Compiled: yes
 Dropped: no
 Stale: yes (record or validator changed at HEAD since compile)
-Knowledge base: /home/me/guidelines (resolved by cmx source, verified against pinned revision)
+Atlas: /home/me/guidelines (resolved by cmx source, verified against pinned revision)
 Languages: rust
 Config: {"business_rule_minimum_matches":2,"business_rule_pattern":"\\b500\\b"}
 Validators:
@@ -337,7 +337,7 @@ Validators:
 
 - `Record` is `resolved by key`, `resolved by id` (no record at the manifest's
   key, but exactly one carries its id — a moved record), or `not found in
-  knowledge base`, followed in parentheses by the records sharing the id when
+  atlas`, followed in parentheses by the records sharing the id when
   that is what stopped the fallback.
 - `Config` is the exact JSON document the validators would receive through
   `--config`: the intent's `[intent."<key>"]` table from `cmv.toml`, or `{}`.
@@ -350,7 +350,7 @@ Validators:
 - A dropped intent shows `Dropped: yes (<reason>)`; its validators are listed
   but marked skipped, because the guidance never reached the artifact.
 
-`cmv explain <intent> --json` emits `schema`, `knowledge_base`, `languages`,
+`cmv explain <intent> --json` emits `schema`, `atlas`, `languages`,
 and `intent` (`key`, `id`, `resolution`, `title`, `status`, `compiled`,
 `dropped`, `drop_reason`, `stale`, `config`, and `validators`, each with
 `language`, `run`, `required`, `description`, `would_run`, `skipped`, and

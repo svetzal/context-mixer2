@@ -1,5 +1,5 @@
 //! The verification core: [`check`] resolves every compiled intent against the
-//! knowledge base, runs the validators that match the workspace's languages,
+//! atlas, runs the validators that match the workspace's languages,
 //! and maps each run onto exactly one [`IntentOutcome`]; [`status`] answers
 //! the same resolution questions without running anything. Pure over the
 //! `Filesystem` and [`ProcessRunner`] gateways: the same inputs against the
@@ -16,7 +16,7 @@
 //! pinned tree (see [`crate::pin`]) — when any of its validators' `run` files
 //! differ between `HEAD` and that tree. Stale is always computed against the
 //! working tree and never changes the exit code: the remedy is `cmf install`,
-//! because a newer knowledge base may change selection, and that is cmf's
+//! because a newer atlas may change selection, and that is cmf's
 //! decision.
 //!
 //! When several validators match (a record may declare one per language, and
@@ -32,22 +32,22 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use cmf::catalog::{Intent, Validator};
-use cmf::manifest::{ArtifactRef, DroppedIntent, IntentRef, Manifest, ProfileRef};
 use cmx_core::checksum;
 use cmx_core::gateway::Filesystem;
+use intent_atlas::catalog::{Intent, Validator};
+use intent_atlas::manifest::{ArtifactRef, DroppedIntent, IntentRef, Manifest, ProfileRef};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::config::ProjectConfig;
-use crate::pin::KnowledgeBaseReport;
+use crate::pin::AtlasReport;
 use crate::process::{ProcessOutcome, ProcessRequest, ProcessRunner};
 use crate::verdict::{self, IntentOutcome, Location, State, empty_object};
 
-/// The scanned knowledge base, keyed by catalog key.
+/// The scanned atlas, keyed by catalog key.
 pub type Catalog = BTreeMap<String, Intent>;
 
-/// The knowledge-base trees a run reads from.
+/// The atlas trees a run reads from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Trees<'a> {
     /// The tree the catalog was scanned from and validators run in: the
@@ -56,7 +56,7 @@ pub struct Trees<'a> {
     /// before a process is started) and it is the validators' working
     /// directory.
     pub verified: &'a Path,
-    /// The knowledge base's working tree (`HEAD`), only when `verified` is a
+    /// The atlas's working tree (`HEAD`), only when `verified` is a
     /// materialized pinned tree rather than the working tree itself. Stale is
     /// computed against it.
     pub working: Option<&'a Path>,
@@ -76,14 +76,14 @@ impl<'a> Trees<'a> {
 pub struct CheckRequest<'a> {
     /// The manifest cmf compiled for the workspace.
     pub manifest: &'a Manifest,
-    /// The knowledge base as scanned by `cmf::catalog::scan` from
+    /// The atlas as scanned by `intent_atlas::catalog::scan` from
     /// `trees.verified`.
     pub catalog: &'a Catalog,
     /// The project's `cmv.toml`.
     pub config: &'a ProjectConfig,
     /// Languages to verify as; validators for other languages do not run.
     pub languages: &'a [String],
-    /// The knowledge-base trees.
+    /// The atlas trees.
     pub trees: Trees<'a>,
     /// The project root handed to validators as `--workspace`.
     pub workspace: &'a Path,
@@ -100,11 +100,11 @@ pub fn check(
     runner: &dyn ProcessRunner,
 ) -> Result<Vec<IntentOutcome>> {
     let resolver = Resolver::new(request.catalog);
-    let knowledge_base = canonical_root(request.trees.verified, fs)?;
+    let atlas = canonical_root(request.trees.verified, fs)?;
     let mut outcomes =
         Vec::with_capacity(request.manifest.intents.len() + request.manifest.dropped.len());
     for (index, entry) in request.manifest.intents.iter().enumerate() {
-        outcomes.push(check_intent(index, entry, request, &knowledge_base, &resolver, fs, runner)?);
+        outcomes.push(check_intent(index, entry, request, &atlas, &resolver, fs, runner)?);
     }
     for dropped in &request.manifest.dropped {
         outcomes.push(unguided(dropped, &resolver));
@@ -116,7 +116,7 @@ fn check_intent(
     index: usize,
     entry: &IntentRef,
     request: &CheckRequest<'_>,
-    knowledge_base: &Path,
+    atlas: &Path,
     resolver: &Resolver<'_>,
     fs: &dyn Filesystem,
     runner: &dyn ProcessRunner,
@@ -125,8 +125,8 @@ fn check_intent(
         Resolution::Found { intent, .. } => intent,
         Resolution::NotFound { detail } => {
             let reason = match detail {
-                Some(detail) => format!("{NOT_IN_KNOWLEDGE_BASE}: {detail}"),
-                None => NOT_IN_KNOWLEDGE_BASE.to_string(),
+                Some(detail) => format!("{NOT_IN_ATLAS}: {detail}"),
+                None => NOT_IN_ATLAS.to_string(),
             };
             return Ok(unchecked(entry, &reason, false));
         }
@@ -148,7 +148,7 @@ fn check_intent(
         .with_context(|| format!("could not write validator config {}", config_path.display()))?;
     let runs: Vec<ValidatorRun> = validators
         .iter()
-        .map(|validator| run_validator(validator, knowledge_base, &config_path, request, runner))
+        .map(|validator| run_validator(validator, atlas, &config_path, request, runner))
         .collect();
     Ok(combine(entry, &runs, stale))
 }
@@ -164,7 +164,7 @@ pub fn language_matches(validator: &Validator<'_>, languages: &[String]) -> bool
 /// `<root>/<run>` unambiguous.
 pub fn canonical_root(root: &Path, fs: &dyn Filesystem) -> Result<PathBuf> {
     fs.canonicalize(root)
-        .with_context(|| format!("could not resolve knowledge base {}", root.display()))
+        .with_context(|| format!("could not resolve atlas {}", root.display()))
 }
 
 /// Whether the intent has changed at the working tree's `HEAD` since compile:
@@ -220,16 +220,16 @@ struct ValidatorRun {
 
 fn run_validator(
     validator: &Validator<'_>,
-    knowledge_base: &Path,
+    atlas: &Path,
     config_path: &Path,
     request: &CheckRequest<'_>,
     runner: &dyn ProcessRunner,
 ) -> ValidatorRun {
     let timeout = request.config.validator_timeout();
     let process = ProcessRequest {
-        program: knowledge_base.join(validator.run),
+        program: atlas.join(validator.run),
         args: validator_args(request.workspace, config_path),
-        cwd: knowledge_base.to_path_buf(),
+        cwd: atlas.to_path_buf(),
         timeout,
     };
     let (state, signals, evidence, locations) =
@@ -394,11 +394,11 @@ fn unguided(dropped: &DroppedIntent, resolver: &Resolver<'_>) -> IntentOutcome {
     }
 }
 
-/// How a manifest entry was matched to a knowledge-base record.
+/// How a manifest entry was matched to an atlas record.
 ///
 /// The manifest's `key` is the compile-time locator and is tried first: a
-/// record's `id` may intentionally recur across collections of the knowledge
-/// base (the same intent, specialized per language), so an `id` alone does
+/// record's `id` may intentionally recur across collections of the atlas
+/// (the same intent, specialized per language), so an `id` alone does
 /// not locate a record. The manifest checksum, not the resolution, is what
 /// flags a changed record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -415,7 +415,7 @@ pub enum RecordResolution {
 }
 
 /// The `unchecked` reason for a manifest entry no record matches.
-pub const NOT_IN_KNOWLEDGE_BASE: &str = "record not in knowledge base";
+pub const NOT_IN_ATLAS: &str = "record not in atlas";
 
 /// The outcome of matching one manifest entry against the catalog.
 #[derive(Debug, Clone)]
@@ -502,9 +502,9 @@ impl<'a> Resolver<'a> {
     }
 }
 
-/// What `cmv status` reports: the manifest's identity, the knowledge base's
+/// What `cmv status` reports: the manifest's identity, the atlas's
 /// whereabouts and pin, the workspace's languages, and how much of the
-/// manifest the knowledge base can currently vouch for. Nothing is executed.
+/// manifest the atlas can currently vouch for. Nothing is executed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StatusReport {
     /// Report schema version.
@@ -515,37 +515,37 @@ pub struct StatusReport {
     pub profile: ProfileRef,
     /// The delivered artifact.
     pub artifact: ArtifactRef,
-    /// The knowledge base as cmv resolved it.
-    pub knowledge_base: KnowledgeBaseStatus,
+    /// The atlas as cmv resolved it.
+    pub atlas: AtlasStatus,
     /// Languages the workspace verifies as.
     pub languages: Vec<String>,
     /// Compiled intents in the manifest.
     pub intents: usize,
     /// Dropped intents in the manifest.
     pub dropped: usize,
-    /// How the knowledge base covers the manifest; `None` when it could not be
+    /// How the atlas covers the manifest; `None` when it could not be
     /// scanned.
     pub coverage: Option<Coverage>,
 }
 
-/// Where the knowledge base is, how cmv found it, how the verified tree
+/// Where the atlas is, how cmv found it, how the verified tree
 /// relates to the pin, and whether the root is there at all.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct KnowledgeBaseStatus {
+pub struct AtlasStatus {
     /// The resolution and pin facts every report shares.
     #[serde(flatten)]
-    pub resolved: KnowledgeBaseReport,
+    pub resolved: AtlasReport,
     /// Whether the resolved root is a directory.
     pub exists: bool,
 }
 
-/// How the scanned knowledge base covers the manifest's compiled intents.
+/// How the scanned atlas covers the manifest's compiled intents.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Coverage {
     /// Compiled intents with at least one validator for the workspace's
     /// languages.
     pub with_validator: usize,
-    /// Compiled intents whose record is no longer in the knowledge base.
+    /// Compiled intents whose record is no longer in the atlas.
     pub missing: usize,
     /// Compiled intents whose record changed since compile.
     pub stale: usize,
@@ -557,19 +557,19 @@ pub struct StatusRequest<'a> {
     pub manifest: &'a Manifest,
     /// Where the manifest was read from.
     pub manifest_path: &'a Path,
-    /// The knowledge base as scanned from `trees.verified`; `None` when it
+    /// The atlas as scanned from `trees.verified`; `None` when it
     /// could not be scanned, in which case the report says where cmv looked
     /// and stops short of coverage.
     pub catalog: Option<&'a Catalog>,
     /// Languages the workspace verifies as.
     pub languages: &'a [String],
-    /// Where the knowledge base was found and which tree was used.
-    pub knowledge_base: &'a KnowledgeBaseReport,
-    /// The knowledge-base trees.
+    /// Where the atlas was found and which tree was used.
+    pub atlas: &'a AtlasReport,
+    /// The atlas trees.
     pub trees: Trees<'a>,
 }
 
-/// Summarize the manifest against the knowledge base without running
+/// Summarize the manifest against the atlas without running
 /// validators.
 pub fn status(request: &StatusRequest<'_>, fs: &dyn Filesystem) -> Result<StatusReport> {
     let coverage = match request.catalog {
@@ -583,9 +583,9 @@ pub fn status(request: &StatusRequest<'_>, fs: &dyn Filesystem) -> Result<Status
         manifest_path: request.manifest_path.to_path_buf(),
         profile: request.manifest.profile.clone(),
         artifact: request.manifest.artifact.clone(),
-        knowledge_base: KnowledgeBaseStatus {
-            exists: fs.is_dir(&request.knowledge_base.path),
-            resolved: request.knowledge_base.clone(),
+        atlas: AtlasStatus {
+            exists: fs.is_dir(&request.atlas.path),
+            resolved: request.atlas.clone(),
         },
         languages: request.languages.to_vec(),
         intents: request.manifest.intents.len(),
@@ -630,9 +630,9 @@ fn coverage(
 mod tests {
     use super::*;
     use crate::process::{FakeProcessRunner, exited};
-    use cmf::manifest::KnowledgeBase;
-    use cmf::profile::Surface;
     use cmx_core::gateway::fakes::FakeFilesystem;
+    use intent_atlas::manifest::Atlas;
+    use intent_atlas::profile::Surface;
     use serde_json::json;
 
     const KB: &str = "/kb";
@@ -665,7 +665,7 @@ evidence = [
         )
     }
 
-    /// A knowledge base on a fake filesystem plus the manifest entries that
+    /// An atlas on a fake filesystem plus the manifest entries that
     /// point at it, built up by the tests.
     struct Kb {
         fs: FakeFilesystem,
@@ -720,7 +720,7 @@ evidence = [
             Manifest {
                 schema: 1,
                 compiled_at: "2026-09-05T14:02:11+00:00".to_string(),
-                knowledge_base: KnowledgeBase {
+                atlas: Atlas {
                     source: Some("guidelines".to_string()),
                     path: PathBuf::from(KB),
                     revision: None,
@@ -741,7 +741,7 @@ evidence = [
         }
 
         fn catalog(&self) -> Catalog {
-            cmf::catalog::scan(Path::new(KB), &self.fs).expect("fixture knowledge base scans")
+            intent_atlas::catalog::scan(Path::new(KB), &self.fs).expect("fixture atlas scans")
         }
 
         fn check(&self, languages: &[&str], runner: &FakeProcessRunner) -> Vec<IntentOutcome> {
@@ -769,7 +769,7 @@ evidence = [
             check(&request, &self.fs, runner).expect("check runs")
         }
 
-        /// Copy the knowledge base to `PINNED` as the materialized pinned
+        /// Copy the atlas to `PINNED` as the materialized pinned
         /// tree, so `KB` plays the working tree that may since have changed.
         fn materialize_pinned_copy(&self) {
             for (path, bytes) in self.fs.snapshot_files() {
@@ -788,8 +788,8 @@ evidence = [
             runner: &FakeProcessRunner,
         ) -> Vec<IntentOutcome> {
             let manifest = self.manifest();
-            let catalog =
-                cmf::catalog::scan(Path::new(PINNED), &self.fs).expect("pinned tree scans");
+            let catalog = intent_atlas::catalog::scan(Path::new(PINNED), &self.fs)
+                .expect("pinned tree scans");
             let languages: Vec<String> = languages.iter().map(ToString::to_string).collect();
             let request = CheckRequest {
                 manifest: &manifest,
@@ -915,12 +915,12 @@ evidence = [
     }
 
     #[test]
-    fn record_missing_from_knowledge_base_is_unchecked() {
+    fn record_missing_from_atlas_is_unchecked() {
         let mut kb = Kb::new();
         kb.add_missing("rust/ghost");
         let runner = FakeProcessRunner::new();
         let outcome = kb.check(&["rust"], &runner).remove(0);
-        assert_eq!(unchecked_reason(&outcome), "record not in knowledge base");
+        assert_eq!(unchecked_reason(&outcome), "record not in atlas");
         assert_eq!(outcome.id.as_deref(), Some("kb.intent.rust/ghost"));
         assert_eq!(outcome.language, None);
         assert_eq!(outcome.description, None);
@@ -1168,7 +1168,7 @@ evidence = [
         let outcome = kb.check(&["rust"], &FakeProcessRunner::new()).remove(1);
         assert_eq!(
             unchecked_reason(&outcome),
-            "record not in knowledge base: no record at key rust/gone, and id kb.intent.a is shared by 2 records (python/a, rust/a); re-run cmf install to recompile"
+            "record not in atlas: no record at key rust/gone, and id kb.intent.a is shared by 2 records (python/a, rust/a); re-run cmf install to recompile"
         );
     }
 
@@ -1329,13 +1329,13 @@ evidence = [
         kb.intents[2].checksum = "sha256:stale".to_string();
         let manifest = kb.manifest();
         let catalog = kb.catalog();
-        let knowledge_base = knowledge_base_report(KB);
+        let atlas = atlas_report(KB);
         let request = StatusRequest {
             manifest: &manifest,
             manifest_path: Path::new("/project/.context-mixer/cmf-manifest.json"),
             catalog: Some(&catalog),
             languages: &["rust".to_string()],
-            knowledge_base: &knowledge_base,
+            atlas: &atlas,
             trees: Trees::single(Path::new(KB)),
         };
         let report = status(&request, &kb.fs).unwrap();
@@ -1346,8 +1346,8 @@ evidence = [
                 manifest_path: PathBuf::from("/project/.context-mixer/cmf-manifest.json"),
                 profile: manifest.profile.clone(),
                 artifact: manifest.artifact.clone(),
-                knowledge_base: KnowledgeBaseStatus {
-                    resolved: knowledge_base,
+                atlas: AtlasStatus {
+                    resolved: atlas,
                     exists: true,
                 },
                 languages: vec!["rust".to_string()],
@@ -1370,14 +1370,14 @@ evidence = [
         kb.materialize_pinned_copy();
         kb.fs.add_file(format!("{KB}/{RUST}"), "corrected at HEAD");
         let manifest = kb.manifest();
-        let catalog = cmf::catalog::scan(Path::new(PINNED), &kb.fs).unwrap();
-        let knowledge_base = knowledge_base_report(KB);
+        let catalog = intent_atlas::catalog::scan(Path::new(PINNED), &kb.fs).unwrap();
+        let atlas = atlas_report(KB);
         let request = StatusRequest {
             manifest: &manifest,
             manifest_path: Path::new("/m.json"),
             catalog: Some(&catalog),
             languages: &["rust".to_string()],
-            knowledge_base: &knowledge_base,
+            atlas: &atlas,
             trees: Trees {
                 verified: Path::new(PINNED),
                 working: Some(Path::new(KB)),
@@ -1388,27 +1388,27 @@ evidence = [
     }
 
     #[test]
-    fn status_without_a_scannable_knowledge_base_has_no_coverage() {
+    fn status_without_a_scannable_atlas_has_no_coverage() {
         let mut kb = Kb::new();
         kb.add("rust/a", &[rust_check(true)]);
         let manifest = kb.manifest();
-        let knowledge_base = knowledge_base_report("/elsewhere");
+        let atlas = atlas_report("/elsewhere");
         let request = StatusRequest {
             manifest: &manifest,
             manifest_path: Path::new("/m.json"),
             catalog: None,
             languages: &[],
-            knowledge_base: &knowledge_base,
+            atlas: &atlas,
             trees: Trees::single(Path::new("/elsewhere")),
         };
         let report = status(&request, &kb.fs).unwrap();
-        assert!(!report.knowledge_base.exists);
+        assert!(!report.atlas.exists);
         assert_eq!(report.coverage, None);
         assert_eq!(report.intents, 1);
     }
 
-    fn knowledge_base_report(path: &str) -> KnowledgeBaseReport {
-        KnowledgeBaseReport {
+    fn atlas_report(path: &str) -> AtlasReport {
+        AtlasReport {
             path: PathBuf::from(path),
             resolved_by: crate::resolve::ResolvedBy::Path,
             source: Some("guidelines".to_string()),

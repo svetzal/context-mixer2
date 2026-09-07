@@ -13,9 +13,9 @@
 use std::path::Path;
 
 use anyhow::{Result, bail};
-use cmf::catalog::{Intent, Validator};
-use cmf::manifest::{DroppedIntent, IntentRef, Manifest};
 use cmx_core::gateway::Filesystem;
+use intent_atlas::catalog::{Intent, Validator};
+use intent_atlas::manifest::{DroppedIntent, IntentRef, Manifest};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -24,7 +24,7 @@ use crate::dispatch::{
     Catalog, RecordResolution, Resolution, Resolver, Trees, canonical_root, is_stale,
     language_matches, validator_args,
 };
-use crate::pin::KnowledgeBaseReport;
+use crate::pin::AtlasReport;
 
 /// Placeholder for the per-run scratch directory in a printed argv; the real
 /// directory is created at check time and never appears in output.
@@ -38,15 +38,15 @@ pub const PINNED_TREE_PLACEHOLDER: &str = "<pinned-tree>";
 pub struct ExplainRequest<'a> {
     /// The manifest cmf compiled for the workspace.
     pub manifest: &'a Manifest,
-    /// The knowledge base as scanned from `trees.verified`.
+    /// The atlas as scanned from `trees.verified`.
     pub catalog: &'a Catalog,
     /// The project's `cmv.toml`.
     pub config: &'a ProjectConfig,
     /// Languages the workspace verifies as.
     pub languages: &'a [String],
-    /// Where the knowledge base was found and which tree was used.
-    pub knowledge_base: &'a KnowledgeBaseReport,
-    /// The knowledge-base trees.
+    /// Where the atlas was found and which tree was used.
+    pub atlas: &'a AtlasReport,
+    /// The atlas trees.
     pub trees: Trees<'a>,
     /// The project root validators would receive as `--workspace`.
     pub workspace: &'a Path,
@@ -58,7 +58,7 @@ pub struct ExplainReport {
     /// Report schema version.
     pub schema: u32,
     /// Where the records came from and which tree was used.
-    pub knowledge_base: KnowledgeBaseReport,
+    pub atlas: AtlasReport,
     /// Languages the workspace verifies as.
     pub languages: Vec<String>,
     /// The explained intent.
@@ -71,7 +71,7 @@ pub struct IntentExplanation {
     /// The manifest's catalog key.
     pub key: String,
     /// The record's `id`: from the manifest when compiled, else from the
-    /// record when a dropped intent's record is still in the knowledge base.
+    /// record when a dropped intent's record is still in the atlas.
     pub id: Option<String>,
     /// How the manifest entry was matched to a record.
     pub resolution: RecordResolution,
@@ -106,7 +106,7 @@ pub struct IntentExplanation {
 pub struct ValidatorPlan {
     /// Source language the validator reads.
     pub language: String,
-    /// Executable path relative to the knowledge-base root.
+    /// Executable path relative to the atlas root.
     pub run: String,
     /// Whether a failing verdict gates the run.
     pub required: bool,
@@ -155,7 +155,7 @@ pub fn explain(
     };
     Ok(ExplainReport {
         schema: crate::report::SCHEMA_VERSION,
-        knowledge_base: request.knowledge_base.clone(),
+        atlas: request.atlas.clone(),
         languages: request.languages.to_vec(),
         intent,
     })
@@ -291,10 +291,10 @@ mod tests {
     use super::*;
     use crate::pin::VerifiedAgainst;
     use crate::resolve::ResolvedBy;
-    use cmf::manifest::{ArtifactRef, KnowledgeBase, ProfileRef};
-    use cmf::profile::Surface;
     use cmx_core::checksum;
     use cmx_core::gateway::fakes::FakeFilesystem;
+    use intent_atlas::manifest::{ArtifactRef, Atlas, ProfileRef};
+    use intent_atlas::profile::Surface;
     use serde_json::json;
     use std::path::PathBuf;
 
@@ -323,7 +323,7 @@ evidence = [
         fs: FakeFilesystem,
         manifest: Manifest,
         config: ProjectConfig,
-        knowledge_base: KnowledgeBaseReport,
+        atlas: AtlasReport,
     }
 
     impl Fixture {
@@ -335,7 +335,7 @@ evidence = [
             let manifest = Manifest {
                 schema: 1,
                 compiled_at: "2026-09-05T14:02:11+00:00".to_string(),
-                knowledge_base: KnowledgeBase {
+                atlas: Atlas {
                     source: None,
                     path: PathBuf::from(KB),
                     revision: None,
@@ -373,7 +373,7 @@ evidence = [
                 fs,
                 manifest,
                 config,
-                knowledge_base: KnowledgeBaseReport {
+                atlas: AtlasReport {
                     path: PathBuf::from(KB),
                     resolved_by: ResolvedBy::Path,
                     source: None,
@@ -396,14 +396,15 @@ evidence = [
             trees: Trees<'_>,
             catalog_root: &Path,
         ) -> Result<ExplainReport> {
-            let catalog = cmf::catalog::scan(catalog_root, &self.fs).expect("catalog scans");
+            let catalog =
+                intent_atlas::catalog::scan(catalog_root, &self.fs).expect("catalog scans");
             let languages: Vec<String> = languages.iter().map(ToString::to_string).collect();
             let request = ExplainRequest {
                 manifest: &self.manifest,
                 catalog: &catalog,
                 config: &self.config,
                 languages: &languages,
-                knowledge_base: &self.knowledge_base,
+                atlas: &self.atlas,
                 trees,
                 workspace: Path::new(WORKSPACE),
             };
@@ -417,7 +418,7 @@ evidence = [
         let report = fixture.explain("rust/isolate", &["rust"]).unwrap();
         assert_eq!(report.schema, 1);
         assert_eq!(report.languages, ["rust"]);
-        assert_eq!(report.knowledge_base, fixture.knowledge_base);
+        assert_eq!(report.atlas, fixture.atlas);
         let intent = report.intent;
         assert_eq!(intent.key, "rust/isolate");
         assert_eq!(intent.id.as_deref(), Some("kb.intent.isolate"));
@@ -657,6 +658,6 @@ evidence = [
         assert_eq!(value["intent"]["validators"][0]["would_run"], false);
         assert_eq!(value["intent"]["validators"][1]["would_run"], true);
         assert_eq!(value["intent"]["validators"][1]["skipped"], Value::Null);
-        assert_eq!(value["knowledge_base"]["verified_against"], "head");
+        assert_eq!(value["atlas"]["verified_against"], "head");
     }
 }

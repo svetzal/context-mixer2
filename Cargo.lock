@@ -326,6 +326,7 @@ dependencies = [
  "chrono",
  "clap",
  "cmx-core",
+ "intent-atlas",
  "serde",
  "serde_json",
  "toml",
@@ -337,8 +338,8 @@ version = "3.2.1"
 dependencies = [
  "anyhow",
  "clap",
- "cmf",
  "cmx-core",
+ "intent-atlas",
  "serde",
  "serde_json",
  "tempfile",
@@ -1040,6 +1041,18 @@ checksum = "07aa2048142242915a31d35844fb311e0e53fcca590c3a0a40dcf1b841fa09eb"
 dependencies = [
  "equivalent",
  "hashbrown",
+]
+
+[[package]]
+name = "intent-atlas"
+version = "3.2.1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "cmx-core",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

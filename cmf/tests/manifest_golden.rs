@@ -1,6 +1,6 @@
 //! Golden test: the compile manifest, byte for byte.
 //!
-//! The fixture knowledge base under `tests/fixtures/manifest-kb/` is loaded
+//! The fixture atlas under `tests/fixtures/manifest-kb/` is loaded
 //! into the in-memory gateways at a fixed root, with a fake git checkout, a
 //! fake clock, and a cmx sources registry naming the root — so the serialized
 //! manifest is fully deterministic and pinned by `expected-manifest.json`.
@@ -80,7 +80,8 @@ fn build_manifest(fixture: &Fixture) -> (manifest::Manifest, BTreeMap<String, In
         llm: None,
     };
     let manifest =
-        manifest::build(root, &profile, &assembly, &intents, &ctx).expect("manifest builds");
+        manifest::build(root, &profile, &assembly.selected, &assembly.content, &intents, &ctx)
+            .expect("manifest builds");
     (manifest, intents)
 }
 
@@ -145,7 +146,7 @@ fn fixture_python_record_is_excluded_by_ecosystem_not_by_tag() {
     let intents = catalog::scan(root, &fixture.fs).expect("catalog scans");
     let python = "craftsperson/python/type-public-boundaries";
     assert_eq!(
-        cmf::assembly::excluding_qualifier(&profile, &intents[python]),
+        intent_atlas::selection::excluding_qualifier(&profile, &intents[python]),
         Some("python"),
         "the Python record's qualifier is not among the declared ecosystems"
     );

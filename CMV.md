@@ -3,8 +3,8 @@
 > Design draft. Status: proposed (2026-09-05). Phases 1–4 are implemented
 > (cmv check, status, explain; source-registry resolution; pinned revision;
 > Rust validators live in the guidelines intent atlas with calibration
-> fixtures). Phases 5–6 pending; Phases 7–8 (the `intent-atlas` crate,
-> sensors) are designed below and not yet implemented. Companion to [CHARTER.md](CHARTER.md),
+> fixtures; the `intent-atlas` crate is extracted). Phases 5–6 and 8
+> (sensors) pending. Companion to [CHARTER.md](CHARTER.md),
 > [SPEC.md](SPEC.md), and [SETS.md](SETS.md).
 
 ## Motivation
@@ -549,7 +549,7 @@ intent atlas is unchanged and now also covers validators.
 5. **Python validators migrate.** Sixteen checks, two scenarios.
 6. **Benchmark switches over.** `runner.py` calls cmf and cmv; `rescore.py`
    reduces to cmv over archives; `adherence.py` retired.
-7. **The `intent-atlas` crate.** A pure move: catalog, profile, selection,
+7. **The `intent-atlas` crate.** Done. A pure move: catalog, profile, selection,
    and manifest types leave `cmf/src/` for the new workspace member; cmv's
    dependency on cmf is replaced; the manifest's `knowledge_base` block and
    cmv's `--knowledge-base` flag are renamed `atlas` (the old flag stays as a

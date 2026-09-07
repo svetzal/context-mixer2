@@ -20,7 +20,6 @@ use cmx_core::paths::ConfigPaths;
 use cmx_core::types::{InstallScope, SourcesFile};
 use serde::{Deserialize, Serialize};
 
-use crate::assembly::Assembly;
 use crate::catalog::Intent;
 use crate::profile::{Profile, Surface};
 
@@ -40,12 +39,13 @@ pub struct Manifest {
     /// RFC 3339 instant the artifact was compiled, from the `Clock` gateway.
     pub compiled_at: String,
     /// Where the intent records were read from.
-    pub knowledge_base: KnowledgeBase,
+    pub atlas: Atlas,
     /// The profile that drove selection.
     pub profile: ProfileRef,
     /// The delivered artifact.
     pub artifact: ArtifactRef,
-    /// The intents retained in the artifact, in `Assembly.selected` order.
+    /// The intents retained in the artifact, in the order they were retained
+    /// (cmf's `Assembly.selected`).
     pub intents: Vec<IntentRef>,
     /// Intents the profile asked for that did not survive assembly. Always
     /// present; empty until assembly learns to drop by budget instead of
@@ -53,13 +53,13 @@ pub struct Manifest {
     pub dropped: Vec<DroppedIntent>,
 }
 
-/// The knowledge base a manifest was compiled from.
+/// The intent atlas a manifest was compiled from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct KnowledgeBase {
+pub struct Atlas {
     /// The cmx source name, when the root matches a registered source.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
-    /// The knowledge-base root as given to cmf.
+    /// The atlas root as given to cmf.
     pub path: PathBuf,
     /// The git `HEAD` commit, when the root is a git checkout.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -115,13 +115,15 @@ pub struct DroppedIntent {
 
 /// Build the manifest for one assembly.
 ///
-/// `root` is the knowledge-base root exactly as the caller resolved it; it is
-/// recorded verbatim in `knowledge_base.path` and used to look up the git
-/// revision and the registered cmx source.
+/// `root` is the atlas root exactly as the caller resolved it; it is recorded
+/// verbatim in `atlas.path` and used to look up the git revision and the
+/// registered cmx source. `selected` is the retained intent keys in delivery
+/// order and `content` the rendered artifact they produced.
 pub fn build(
     root: &Path,
     profile: &Profile,
-    assembly: &Assembly,
+    selected: &[String],
+    content: &str,
     intents: &BTreeMap<String, Intent>,
     ctx: &AppContext<'_>,
 ) -> Result<Manifest> {
@@ -129,7 +131,7 @@ pub fn build(
     Ok(Manifest {
         schema: SCHEMA_VERSION,
         compiled_at: ctx.clock.now().to_rfc3339(),
-        knowledge_base: KnowledgeBase {
+        atlas: Atlas {
             source: registered_source_name(root, &sources, ctx.fs),
             path: root.to_path_buf(),
             revision: git_head_commit(root, ctx.fs),
@@ -142,9 +144,9 @@ pub fn build(
         artifact: ArtifactRef {
             name: profile.artifact_name().to_string(),
             surface: profile.surface,
-            checksum: checksum::checksum_bytes(assembly.content.as_bytes()),
+            checksum: checksum::checksum_bytes(content.as_bytes()),
         },
-        intents: intent_entries(&assembly.selected, intents, ctx.fs)?,
+        intents: intent_entries(selected, intents, ctx.fs)?,
         dropped: Vec::new(),
     })
 }
@@ -362,15 +364,10 @@ mod tests {
         }
     }
 
-    fn assembly(selected: &[&str]) -> Assembly {
-        Assembly {
-            content: "rendered guidance\n".to_string(),
-            selected: selected.iter().map(ToString::to_string).collect(),
-            traversed: vec![],
-            excluded_by_ecosystem: 0,
-            specialized_downward: 0,
-            estimated_tokens: 5,
-        }
+    const CONTENT: &str = "rendered guidance\n";
+
+    fn selected(keys: &[&str]) -> Vec<String> {
+        keys.iter().map(ToString::to_string).collect()
     }
 
     fn catalog(root: &Path, fs: &FakeFilesystem) -> BTreeMap<String, Intent> {
@@ -384,7 +381,7 @@ mod tests {
         entries.into_iter().collect()
     }
 
-    fn build_with(root: &Path, fs: &FakeFilesystem, selected: &[&str]) -> Manifest {
+    fn build_with(root: &Path, fs: &FakeFilesystem, keys: &[&str]) -> Manifest {
         let intents = catalog(root, fs);
         let git = FakeGitClient::new();
         let clock = FakeClock::at(Utc.with_ymd_and_hms(2026, 9, 5, 14, 2, 11).unwrap());
@@ -396,7 +393,7 @@ mod tests {
             paths: &paths,
             llm: None,
         };
-        build(root, &profile(), &assembly(selected), &intents, &ctx).unwrap()
+        build(root, &profile(), &selected(keys), CONTENT, &intents, &ctx).unwrap()
     }
 
     #[test]
@@ -406,7 +403,7 @@ mod tests {
         let manifest = build_with(root, &fs, &["a/first"]);
         assert_eq!(manifest.schema, SCHEMA_VERSION);
         assert_eq!(manifest.compiled_at, "2026-09-05T14:02:11+00:00");
-        assert_eq!(manifest.knowledge_base.path, PathBuf::from("/kb"));
+        assert_eq!(manifest.atlas.path, PathBuf::from("/kb"));
         assert_eq!(manifest.profile.id, "shipping");
         assert_eq!(manifest.profile.version, "0.2.0");
         assert_eq!(manifest.profile.ecosystems, ["rust"]);
@@ -445,7 +442,7 @@ mod tests {
     fn revision_omitted_when_root_is_not_a_git_checkout() {
         let fs = FakeFilesystem::new();
         let manifest = build_with(Path::new("/kb"), &fs, &["a/first"]);
-        assert_eq!(manifest.knowledge_base.revision, None);
+        assert_eq!(manifest.atlas.revision, None);
         let json = manifest.to_json().unwrap();
         assert!(!json.contains("revision"), "absent revision must be omitted, not null:\n{json}");
     }
@@ -507,7 +504,7 @@ mod tests {
             .insert("elsewhere".to_string(), make_local_entry("/other", None));
         config::save_sources(&sources, &fs, &paths).unwrap();
         let manifest = build_with(Path::new("/kb"), &fs, &["a/first"]);
-        assert_eq!(manifest.knowledge_base.source, None);
+        assert_eq!(manifest.atlas.source, None);
         let json = manifest.to_json().unwrap();
         assert!(!json.contains("\"source\""), "absent source must be omitted, not null:\n{json}");
     }
@@ -520,7 +517,7 @@ mod tests {
         sources.sources.insert("guidelines".to_string(), make_local_entry("/kb", None));
         config::save_sources(&sources, &fs, &paths).unwrap();
         let manifest = build_with(Path::new("/kb"), &fs, &["a/first"]);
-        assert_eq!(manifest.knowledge_base.source.as_deref(), Some("guidelines"));
+        assert_eq!(manifest.atlas.source.as_deref(), Some("guidelines"));
     }
 
     #[test]
@@ -584,7 +581,8 @@ mod tests {
         };
         let mut unfiltered = profile();
         unfiltered.select.ecosystems.clear();
-        let manifest = build(root, &unfiltered, &assembly(&["a/first"]), &intents, &ctx).unwrap();
+        let manifest =
+            build(root, &unfiltered, &selected(&["a/first"]), CONTENT, &intents, &ctx).unwrap();
         assert!(manifest.to_json().unwrap().contains("\"ecosystems\": []"));
     }
 

@@ -12,7 +12,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 )]
 /// Top-level `cmf` parser.
 pub struct Cli {
-    /// Intent knowledge-base root. Defaults to the current directory.
+    /// Intent atlas root. Defaults to the current directory.
     #[arg(long, global = true)]
     pub root: Option<PathBuf>,
     /// Operation to perform.
@@ -43,7 +43,7 @@ pub enum Commands {
         #[arg(long)]
         explain: bool,
         /// Also write the compile manifest (JSON recording the composed
-        /// intents, their checksums, and the knowledge-base revision) to this
+        /// intents, their checksums, and the atlas revision) to this
         /// path.
         #[arg(long, value_name = "PATH")]
         manifest: Option<PathBuf>,
@@ -71,6 +71,6 @@ pub enum Commands {
         #[arg(long)]
         force: bool,
     },
-    /// Report intent and profile inventory for the knowledge base.
+    /// Report intent and profile inventory for the atlas.
     Status,
 }
