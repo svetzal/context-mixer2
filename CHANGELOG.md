@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The intent atlas declares its ecosystems, and how to recognize them, in
+  `ecosystems.toml`.** A new `intent_atlas::sensors` module reads a table per
+  ecosystem at the atlas root — `signatures` (predicate kinds `{ file }`,
+  `{ file, contains }`, and `{ glob }`, matched against the project root
+  only, through the filesystem gateway) and optional `implies` — validates it
+  against the scanned records (every name is a directory some record uses
+  below `intents/`, every `implies` target is declared, a declared nested
+  ecosystem implies its parent), and detects a project's ecosystems from it.
+  `cmf install --local` (preview and apply) now senses the current directory
+  and warns on stderr, `warning: profile <id> targets <a, b> but this project
+  shows <c, d>` (or `… but the atlas declares no sensors` / `… but nothing
+  was detected`), when the profile declares an ecosystem that was not
+  detected; `cmf status` prints `Sensors: N ecosystems`. cmv drops its
+  built-in table of build files (`Cargo.toml` → rust, …) and detects with the
+  sensors of the tree it verifies; an atlas with no sensor file leaves every
+  validator-bearing intent `unchecked` with `atlas declares no sensors; set
+  ecosystems in cmv.toml to override`, which `status` and `explain` echo.
+  Renamed accordingly: `cmv.toml`'s `languages` is now `ecosystems` (no
+  alias; nothing shipped), the `check`/`status`/`explain` reports carry
+  `ecosystems` where they carried `languages`, and the unchecked reason
+  reads `no validator for ecosystems [..]`. `check` gains `profile_mismatch`
+  (the manifest profile's ecosystems detection did not find) with an
+  informational `manifest profile targets … but the workspace shows …` line,
+  and every report's `atlas` block gains `sensors: bool`.
 - **cmf profiles can declare the ecosystems they target.** `[select]
   ecosystems = ["python", "uv"]` filters selection by the realization
   hierarchy the intent atlas already encodes in its directory layout: a

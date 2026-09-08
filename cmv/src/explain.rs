@@ -4,7 +4,7 @@
 //! the records that share the id when that blocked the fallback), what the
 //! record says, every
 //! validator it declares, which of those would run for the workspace's
-//! languages and with exactly which argv, the `--config` document they would
+//! ecosystems and with exactly which argv, the `--config` document they would
 //! receive from `cmv.toml`, whether the intent is stale, and whether the
 //! manifest dropped it. Pure over the `Filesystem` gateway; shares its
 //! resolution, stale, and argv decisions with [`crate::dispatch`] so what it
@@ -22,8 +22,9 @@ use serde_json::Value;
 use crate::config::ProjectConfig;
 use crate::dispatch::{
     Catalog, RecordResolution, Resolution, Resolver, Trees, canonical_root, is_stale,
-    language_matches, validator_args,
+    validator_args,
 };
+use crate::ecosystems::Ecosystems;
 use crate::pin::AtlasReport;
 
 /// Placeholder for the per-run scratch directory in a printed argv; the real
@@ -42,8 +43,8 @@ pub struct ExplainRequest<'a> {
     pub catalog: &'a Catalog,
     /// The project's `cmv.toml`.
     pub config: &'a ProjectConfig,
-    /// Languages the workspace verifies as.
-    pub languages: &'a [String],
+    /// The ecosystems the workspace verifies as.
+    pub ecosystems: &'a Ecosystems,
     /// Where the atlas was found and which tree was used.
     pub atlas: &'a AtlasReport,
     /// The atlas trees.
@@ -59,8 +60,8 @@ pub struct ExplainReport {
     pub schema: u32,
     /// Where the records came from and which tree was used.
     pub atlas: AtlasReport,
-    /// Languages the workspace verifies as.
-    pub languages: Vec<String>,
+    /// The ecosystems the workspace verifies as, and where they came from.
+    pub ecosystems: Ecosystems,
     /// The explained intent.
     pub intent: IntentExplanation,
 }
@@ -156,7 +157,7 @@ pub fn explain(
     Ok(ExplainReport {
         schema: crate::report::SCHEMA_VERSION,
         atlas: request.atlas.clone(),
-        languages: request.languages.to_vec(),
+        ecosystems: request.ecosystems.clone(),
         intent,
     })
 }
@@ -261,14 +262,8 @@ fn plan(
     program_root: &Path,
     config_path: &Path,
 ) -> ValidatorPlan {
-    let would_run = language_matches(validator, request.languages);
-    let skipped = (!would_run).then(|| {
-        format!(
-            "language {} is not among the workspace's [{}]",
-            validator.language,
-            request.languages.join(", ")
-        )
-    });
+    let would_run = request.ecosystems.admits(validator);
+    let skipped = (!would_run).then(|| request.ecosystems.skip_reason(validator.language));
     let mut argv = vec![program_root.join(validator.run).display().to_string()];
     argv.extend(
         validator_args(request.workspace, config_path)
@@ -381,29 +376,35 @@ evidence = [
                     head_revision: None,
                     verified_against: VerifiedAgainst::Head,
                     moved: false,
+                    sensors: true,
                 },
             }
         }
 
-        fn explain(&self, argument: &str, languages: &[&str]) -> Result<ExplainReport> {
-            self.explain_with(argument, languages, Trees::single(Path::new(KB)), Path::new(KB))
+        fn explain(&self, argument: &str, ecosystems: &[&str]) -> Result<ExplainReport> {
+            let ecosystems =
+                Ecosystems::Detected(ecosystems.iter().map(ToString::to_string).collect());
+            self.explain_as(argument, &ecosystems)
+        }
+
+        fn explain_as(&self, argument: &str, ecosystems: &Ecosystems) -> Result<ExplainReport> {
+            self.explain_with(argument, ecosystems, Trees::single(Path::new(KB)), Path::new(KB))
         }
 
         fn explain_with(
             &self,
             argument: &str,
-            languages: &[&str],
+            ecosystems: &Ecosystems,
             trees: Trees<'_>,
             catalog_root: &Path,
         ) -> Result<ExplainReport> {
             let catalog =
                 intent_atlas::catalog::scan(catalog_root, &self.fs).expect("catalog scans");
-            let languages: Vec<String> = languages.iter().map(ToString::to_string).collect();
             let request = ExplainRequest {
                 manifest: &self.manifest,
                 catalog: &catalog,
                 config: &self.config,
-                languages: &languages,
+                ecosystems,
                 atlas: &self.atlas,
                 trees,
                 workspace: Path::new(WORKSPACE),
@@ -417,7 +418,7 @@ evidence = [
         let fixture = Fixture::new();
         let report = fixture.explain("rust/isolate", &["rust"]).unwrap();
         assert_eq!(report.schema, 1);
-        assert_eq!(report.languages, ["rust"]);
+        assert_eq!(report.ecosystems.names(), ["rust"]);
         assert_eq!(report.atlas, fixture.atlas);
         let intent = report.intent;
         assert_eq!(intent.key, "rust/isolate");
@@ -456,7 +457,8 @@ evidence = [
                     description: "No rules beside clients.".to_string(),
                     would_run: false,
                     skipped: Some(
-                        "language python is not among the workspace's [rust]".to_string()
+                        "language python is not among the workspace's ecosystems [rust]"
+                            .to_string()
                     ),
                     argv: Some(vec![
                         "/kb/checks/python/isolate.py".to_string(),
@@ -572,7 +574,12 @@ evidence = [
             working: Some(Path::new(KB)),
         };
         let report = fixture
-            .explain_with("rust/isolate", &["rust"], trees, Path::new(PINNED))
+            .explain_with(
+                "rust/isolate",
+                &Ecosystems::Detected(vec!["rust".to_string()]),
+                trees,
+                Path::new(PINNED),
+            )
             .unwrap();
         assert!(report.intent.stale, "the validator changed at HEAD");
         assert_eq!(
@@ -634,6 +641,21 @@ evidence = [
         assert!(intent.dropped);
         assert_eq!(intent.drop_reason.as_deref(), Some("budget"));
         assert!(intent.validators[0].would_run, "the compiled entry still runs");
+    }
+
+    #[test]
+    fn without_sensors_every_validator_is_skipped_with_the_override_hint() {
+        let fixture = Fixture::new();
+        let intent = fixture.explain_as("rust/isolate", &Ecosystems::Undetectable).unwrap().intent;
+        assert_eq!(intent.validators.len(), 2);
+        for plan in &intent.validators {
+            assert!(!plan.would_run);
+            assert_eq!(
+                plan.skipped.as_deref(),
+                Some("atlas declares no sensors; set ecosystems in cmv.toml to override")
+            );
+            assert!(plan.argv.is_some(), "the argv is still shown");
+        }
     }
 
     #[test]

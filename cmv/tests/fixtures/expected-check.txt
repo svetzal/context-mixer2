@@ -3,7 +3,7 @@ PASS       craftsperson/rust/put-gateways-at-effect-boundaries
 UNGUIDED   craftsperson/rust/name-for-intent
            budget
 UNCHECKED  craftsperson/rust/compile-public-documentation
-           no validator for languages [rust]
+           no validator for ecosystems [rust]
 UNCHECKED  craftsperson/rust/prefer-owned-data
            record not in atlas
 FAIL       craftsperson/rust/isolate-functional-core  (required)  (stale: record changed since compile)

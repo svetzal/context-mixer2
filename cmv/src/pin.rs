@@ -22,6 +22,7 @@ use std::time::Duration;
 use anyhow::{Context, Result, bail};
 use cmx_core::gateway::Filesystem;
 use intent_atlas::manifest::git_head_commit;
+use intent_atlas::sensors::Sensors;
 use serde::Serialize;
 
 use crate::dispatch::Trees;
@@ -251,11 +252,15 @@ pub struct AtlasReport {
     pub verified_against: VerifiedAgainst,
     /// Whether `HEAD` differs from the pin.
     pub moved: bool,
+    /// Whether the verified tree declares any ecosystem sensors
+    /// (`ecosystems.toml` present and non-empty).
+    pub sensors: bool,
 }
 
 impl AtlasReport {
-    /// Combine where the atlas was found with which tree was used.
-    pub fn new(resolution: &Resolution, checkout: &Checkout) -> Self {
+    /// Combine where the atlas was found, which tree was used, and whether
+    /// that tree's sensors (as loaded from it) declare anything.
+    pub fn new(resolution: &Resolution, checkout: &Checkout, sensors: Option<&Sensors>) -> Self {
         Self {
             path: resolution.path.clone(),
             resolved_by: resolution.resolved_by,
@@ -264,6 +269,7 @@ impl AtlasReport {
             head_revision: checkout.head_revision.clone(),
             verified_against: checkout.verified_against,
             moved: checkout.moved(),
+            sensors: sensors.is_some_and(|sensors| !sensors.is_empty()),
         }
     }
 }
@@ -523,7 +529,7 @@ mod tests {
         let resolution = resolution(ResolvedBy::Source, Some("guidelines"));
         let checkout =
             materialize_with(&fs, &resolution, Some(PIN), PinPolicy::AtHead, &runner).unwrap();
-        let report = AtlasReport::new(&resolution, &checkout);
+        let report = AtlasReport::new(&resolution, &checkout, None);
         assert_eq!(
             serde_json::to_value(&report).unwrap(),
             serde_json::json!({
@@ -534,8 +540,12 @@ mod tests {
                 "head_revision": HEAD,
                 "verified_against": "head",
                 "moved": true,
+                "sensors": false,
             })
         );
+        let sensors = Sensors::parse("[rust]\nsignatures = [{ file = \"Cargo.toml\" }]\n").unwrap();
+        assert!(AtlasReport::new(&resolution, &checkout, Some(&sensors)).sensors);
+        assert!(!AtlasReport::new(&resolution, &checkout, Some(&Sensors::default())).sensors);
     }
 
     #[test]

@@ -3,8 +3,8 @@
 > Design draft. Status: proposed (2026-09-05). Phases 1–4 are implemented
 > (cmv check, status, explain; source-registry resolution; pinned revision;
 > Rust validators live in the guidelines intent atlas with calibration
-> fixtures; the `intent-atlas` crate is extracted). Phases 5–6 and 8
-> (sensors) pending. Companion to [CHARTER.md](CHARTER.md),
+> fixtures; the `intent-atlas` crate is extracted; sensors drive ecosystem
+> detection in cmf and cmv). Phases 5–6 pending. Companion to [CHARTER.md](CHARTER.md),
 > [SPEC.md](SPEC.md), and [SETS.md](SETS.md).
 
 ## Motivation
@@ -322,11 +322,13 @@ the way a linter does. The Rust fact extractor emits line numbers and Python's
 ### Ecosystem detection
 
 cmv runs every validator whose `language` is among the ecosystems detected in
-the workspace. Detection is the atlas's sensors (next section), evaluated
-against the project root; the same detected set feeds cmf's mismatch warning.
-It is overridable in `cmv.toml` (`ecosystems = ["rust"]`). Until Phase 8
-lands, cmv detects from a built-in table of root build files (`Cargo.toml` →
-rust, `pyproject.toml` → python, …), which the sensors replace.
+the workspace. Detection is the atlas's sensors (next section), read from the
+tree being verified — the pinned tree when one is materialized, so the
+sensors are pinned with the records — and evaluated against the project
+root; the same detected set feeds cmf's mismatch warning. It is overridable
+in `cmv.toml` (`ecosystems = ["rust"]`), which replaces detection entirely.
+There is no built-in table of build files: an atlas with no sensor file
+detects nothing, and cmv reports that state (below) rather than guessing.
 
 ## Ecosystems and sensors
 
@@ -354,35 +356,59 @@ implies = ["elixir"]
 signatures = [{ file = "mix.exs", contains = ":phoenix" }]
 ```
 
-- An ecosystem is **detected** when any of its signatures holds. Its
-  `implies` list is then detected too, transitively.
-- **Predicate kinds** are the extension point: `file` (a root-relative path
-  exists), `glob` (a root-relative pattern matches at least one file), and
-  `contains` (combined with `file`: the file holds the literal). New kinds —
-  a dependency named in a manifest, a regex — are added to the matcher without
-  touching existing signatures. A sensor file that uses a kind the tooling
-  does not know is a scan error naming it, never a silent miss.
+- An ecosystem is **detected** when any of its signatures holds
+  (`signatures` is a non-empty list). Its `implies` list is then detected
+  too, transitively; the result is sorted and deduplicated.
+- **Predicate kinds** are the extension point: `{ file = "<path>" }` (a
+  root-relative path exists, as a file or a directory), `{ file = "<path>",
+  contains = "<literal>" }` (the file exists and holds the literal — `contains`
+  requires `file`), and `{ glob = "<pattern>" }` (at least one root-level
+  entry, file or directory, has a name matching the pattern). New kinds — a
+  dependency named in a manifest, a regex — are one more variant in the
+  matcher, without touching existing signatures. A predicate with an unknown
+  key, no recognized kind, a `contains` without `file`, a `glob` combined with
+  `file`, or an empty value is a parse error naming the ecosystem and the
+  signature, never a silent miss; a `file` path may not be absolute or contain
+  `..`. The tables reject unknown fields.
 - Every predicate is evaluated through the filesystem gateway and reads only
   the project root, so the matcher is pure and fixture-testable, and cmv stays
   deterministic: at a pinned revision, the sensors are pinned with everything
   else.
 - The names are the atlas's own vocabulary: an ecosystem's name must be a
   directory the realization hierarchy uses (`python`, `rust`, `python/uv` →
-  `uv`), so a sensor's `implies` must agree with the nesting. cmf reports a
-  disagreement as an atlas error at scan time.
-- An atlas with no sensor file detects nothing. cmf then cannot warn about a
-  profile's ecosystems and cmv reports every validator-bearing intent
-  *unchecked* with the reason, rather than guessing from a built-in table.
+  `uv`), so a sensor's `implies` must agree with the nesting. Both cmf and cmv
+  validate the file against the scanned catalog right after loading and reject
+  the atlas — naming the ecosystem and the record that exposed the problem —
+  when a declared name is not a directory any record uses, when an `implies`
+  target is not declared, or when a declared nested ecosystem does not imply
+  its parent. An ecosystem the records use but the file does not declare is
+  simply undetectable, not an error.
+- An atlas with no sensor file (or one declaring nothing) detects nothing,
+  and the tooling keeps that apart from an empty detection. cmf's warning
+  then says so, and cmv reports every validator-bearing intent *unchecked*
+  with the reason `atlas declares no sensors; set ecosystems in cmv.toml to
+  override` (which `status` and `explain` echo), rather than guessing from a
+  built-in table. Every cmv report's `atlas` block carries `sensors: bool`.
 
 What the detected set is for:
 
-- **cmf**, at `install --local`: compare the profile's declared ecosystems
-  with the detected set and warn — a profile compiled for `rust` against a
-  Python project is almost certainly the wrong profile. A profile declaring no
-  ecosystems gets no warning, since it filters nothing.
+- **cmf**, at `install --local` (preview and apply): compare the profile's
+  declared ecosystems with the set detected in the current directory and
+  warn on stderr — `warning: profile <id> targets <a, b> but this project
+  shows <c, d>`, or `… but the atlas declares no sensors` / `… but nothing
+  was detected` — since a profile compiled for `rust` against a Python
+  project is almost certainly the wrong profile. A profile declaring no
+  ecosystems gets no warning, since it filters nothing. `cmf status` prints
+  `Sensors: N ecosystems` (or `none declared`); `assemble` has no project and
+  does no detection.
 - **cmv**: choose which validators run (an entry's `language` must be in the
   detected set), and flag a manifest whose `profile.ecosystems` names an
-  ecosystem the workspace does not contain. Both informational; neither
+  ecosystem the workspace does not contain: the `check` report carries
+  `profile_mismatch` (the declared ecosystems detection did not find; empty
+  when the atlas declares no sensors) and the human listing ends with
+  `manifest profile targets <a, b> but the workspace shows <c, d>; the
+  guidance may be for a different ecosystem` (or `… but no sensors detected
+  anything` when the detected set is empty). Both informational; neither
   changes the exit code.
 
 ## Verdict states and exit codes
@@ -555,7 +581,7 @@ intent atlas is unchanged and now also covers validators.
    cmv's `--knowledge-base` flag are renamed `atlas` (the old flag stays as a
    hidden alias for one release). No behaviour change; the golden fixtures
    prove it.
-8. **Sensors.** `ecosystems.toml` at the atlas root, the matcher with its
+8. **Sensors.** Done. `ecosystems.toml` at the atlas root, the matcher with its
    predicate kinds, cmf's mismatch warning at `install --local`, and cmv
    switching from its built-in language table to the atlas's sensors, with the
    guidelines repository declaring its ecosystems in the same change.

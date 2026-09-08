@@ -20,6 +20,7 @@ toml = "1"
 [dev-dependencies]
 chrono = "0.4.45"
 cmx-core = { path = "../cmx-core", features = ["test-support"] }
+tempfile = "3"
 
 [lints]
 workspace = true

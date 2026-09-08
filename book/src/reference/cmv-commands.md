@@ -3,8 +3,8 @@
 cmv verifies, deterministically, that a project holds the intents cmf compiled
 for it. It reads the compile manifest `cmf install --local` wrote, resolves
 each compiled intent's record in the atlas, runs the validators that
-match the workspace's languages, and exits nonzero when a required intent is
-not held. It never asks a model, never reads the clock, and never executes
+match the workspace's ecosystems (detected by the atlas's own sensors), and
+exits nonzero when a required intent is not held. It never asks a model, never reads the clock, and never executes
 project code: given the same workspace, manifest, atlas, and
 `cmv.toml`, its output is byte-identical.
 
@@ -23,7 +23,7 @@ cmv explain <intent> [--json]            [--root <project>] [--manifest <path>] 
 | `cmv check` | Run every compiled intent's validators and report one verdict per intent |
 | `cmv check --strict` | Also fail the run when any intent could not be checked |
 | `cmv check --json` | Emit the full per-intent report as JSON for CI |
-| `cmv status` | Summarize the manifest, pin, languages, and validator coverage without running any validator |
+| `cmv status` | Summarize the manifest, pin, ecosystems, and validator coverage without running any validator |
 | `cmv explain <intent>` | Show what `check` would do for one intent — record resolution, validators, argv, config, stale — without running anything |
 | `--at-head` | Verify the atlas's working tree even when the manifest pins a revision its `HEAD` has moved past |
 
@@ -104,19 +104,45 @@ atlas has moved: HEAD ffffffffffff vs pinned a1b2c3d4e5f6; 2 compiled records or
 Recompiling is cmf's decision — a newer atlas may change *selection* —
 so cmv only reports it.
 
-## Language detection
+## Ecosystem detection
 
-cmv verifies as the languages it finds at the project root (not below it):
+cmv verifies as the ecosystems the **atlas's sensors** detect at the project
+root. The atlas declares them in `ecosystems.toml` at its root — one table
+per ecosystem, each with the signatures that recognize it and the ecosystems
+it implies (see the [cmf reference](./cmf-commands.md#sensors) for the
+schema). cmv has no built-in table of build files: the atlas knows which
+ecosystems it supports, and the names are its own vocabulary (the directories
+below `intents/`), so the sensors are read from the tree being verified — the
+pinned tree when one is materialized — and validated against its records
+before anything runs.
 
-| File at the root | Language |
-| --- | --- |
-| `Cargo.toml` | `rust` |
-| `pyproject.toml`, `setup.cfg`, `setup.py`, or any `requirements*.txt` | `python` |
-| `package.json` | `typescript` when `tsconfig.json` is beside it, else `javascript` |
-| `go.mod` | `go` |
+A validator runs only when its `language` is in the detected set. Setting
+`ecosystems` in `cmv.toml` replaces detection entirely.
 
-A validator runs only when its `language` is in that set. Setting `languages`
-in `cmv.toml` replaces detection entirely.
+An atlas with **no sensor file** (or one declaring nothing) detects nothing,
+and cmv says so rather than guessing: when `cmv.toml` gives no override,
+every validator-bearing intent is `unchecked` with the reason
+
+```text
+atlas declares no sensors; set ecosystems in cmv.toml to override
+```
+
+`cmv status` reports `Ecosystems: none (atlas declares no sensors; …)`, and
+`cmv explain` marks each validator `skipped:` with the same reason. The
+`atlas.sensors` field of every JSON report says whether the verified tree
+declared any.
+
+When the manifest's `profile.ecosystems` names an ecosystem detection did not
+find, `cmv check` reports it as `profile_mismatch` and ends the human listing
+with one informational line:
+
+```text
+manifest profile targets rust but the workspace shows python; the guidance may be for a different ecosystem
+```
+
+or `… but no sensors detected anything` when the detected set is empty. It
+never changes the exit code, and it is not computed when the atlas declares
+no sensors. A `cmv.toml` override counts as the workspace's word.
 
 ## Project config: `cmv.toml`
 
@@ -124,8 +150,8 @@ Hand-authored, at the project root, entirely optional. It carries what neither
 the atlas nor the code can supply.
 
 ```toml
-# Replace detection; an empty list runs no validators.
-languages = ["rust"]
+# Replace the atlas's sensor detection; an empty list runs no validators.
+ecosystems = ["rust"]
 
 # Seconds before a validator is killed and its intent reported unchecked.
 # Default 60.
@@ -142,7 +168,7 @@ business_rule_minimum_matches = 2
 blocking_symbols = ["time.sleep", "requests.get"]
 ```
 
-Unknown top-level keys are rejected, so a misspelled `languages` cannot
+Unknown top-level keys are rejected, so a misspelled `ecosystems` cannot
 silently fall back to detection.
 
 ## How validators run
@@ -177,7 +203,7 @@ JSON document to stdout and exits 0:
 (default `[]`), and `locations` (default `[]`; `line` optional) may be omitted.
 
 When several validators match one intent (a record with one validator per
-language, in a workspace with several languages) they combine
+language, in a workspace with several ecosystems) they combine
 **all-must-pass**: any failure fails the intent; otherwise any unchecked run
 leaves it unchecked; otherwise it passes when at least one run was applicable.
 
@@ -188,7 +214,7 @@ leaves it unchecked; otherwise it passes when at least one run was applicable.
 | `pass` | Validator ran; `applicable: true`, `followed: true` | — |
 | `fail` | Validator ran; `applicable: true`, `followed: false` | `1` if the validator is `required` |
 | `not_applicable` | Validator ran; `applicable: false` — the condition never arose | — |
-| `unchecked` | No validator for the workspace's languages, record missing from the atlas, validator could not start, crashed, timed out, or wrote no parseable verdict — the reason is reported | `1` only with `--strict` |
+| `unchecked` | No validator for the workspace's ecosystems (or the atlas declares no sensors), record missing from the atlas, validator could not start, crashed, timed out, or wrote no parseable verdict — the reason is reported | `1` only with `--strict` |
 | `unguided` | The manifest lists the intent as dropped; the guidance never reached the artifact | — |
 
 An intent is additionally marked **stale** when, at the working tree's `HEAD`,
@@ -222,7 +248,7 @@ PASS       craftsperson/rust/put-gateways-at-effect-boundaries
 UNGUIDED   craftsperson/rust/name-for-intent
            budget
 UNCHECKED  craftsperson/rust/compile-public-documentation
-           no validator for languages [rust]
+           no validator for ecosystems [rust]
 FAIL       craftsperson/rust/isolate-functional-core  (required)  (stale: record changed since compile)
            business rules live beside I/O in src/main.rs
            src/main.rs:12
@@ -255,9 +281,11 @@ and no temporary path, so it is byte-stable across runs.
     "pinned_revision": "a1b2c3d4…",
     "head_revision": "ffffffff…",
     "verified_against": "pinned",
-    "moved": true
+    "moved": true,
+    "sensors": true
   },
-  "languages": ["rust"],
+  "ecosystems": ["rust"],
+  "profile_mismatch": [],
   "intents": [
     {
       "id": "guidelines.intent.isolate-functional-core",
@@ -288,7 +316,12 @@ and no temporary path, so it is byte-stable across runs.
   at compile time (`source` and `revision` are omitted when the manifest has
   none).
 - `atlas` is where cmv actually read from and which tree it verified;
-  see "The pinned revision" above for every field.
+  see "The pinned revision" above for every field. `sensors` says whether
+  that tree declares any ecosystem sensors.
+- `ecosystems` is the set the workspace was verified as (detected, or the
+  `cmv.toml` override; `[]` when nothing was detected or nothing could be),
+  and `profile_mismatch` lists the manifest profile's declared ecosystems
+  that were not detected (see "Ecosystem detection").
 - `intents` lists every compiled intent in manifest order, then every dropped
   intent. `state` is one of `pass`, `fail`, `not_applicable`, `unchecked`,
   `unguided`; `reason` is present for the last two. `language` and
@@ -301,7 +334,7 @@ and no temporary path, so it is byte-stable across runs.
   exits with.
 
 `cmv status --json` emits `schema`, `manifest_path`, `profile`, `artifact`,
-`atlas` (the block above plus `exists`), `languages`, `intents`,
+`atlas` (the block above plus `exists`), `ecosystems`, `intents`,
 `dropped`, and `coverage` (`with_validator`, `missing`, `stale`), with
 `coverage` `null` when the atlas could not be scanned. The human form
 adds `HEAD revision` and `Verified against` lines after `Pinned revision`, and
@@ -324,13 +357,13 @@ Compiled: yes
 Dropped: no
 Stale: yes (record or validator changed at HEAD since compile)
 Atlas: /home/me/guidelines (resolved by cmx source, verified against pinned revision)
-Languages: rust
+Ecosystems: rust
 Config: {"business_rule_minimum_matches":2,"business_rule_pattern":"\\b500\\b"}
 Validators:
   rust  checks/rust/isolate_functional_core.py  (required)  would run
     No module holding business rules references a gateway.
     <pinned-tree>/checks/rust/isolate_functional_core.py --workspace /home/me/project --config <scratch>/1.json
-  python  checks/python/isolate_functional_core.py  (required)  skipped: language python is not among the workspace's [rust]
+  python  checks/python/isolate_functional_core.py  (required)  skipped: language python is not among the workspace's ecosystems [rust]
     No module holding business rules imports an I/O client.
     <pinned-tree>/checks/python/isolate_functional_core.py --workspace /home/me/project --config <scratch>/1.json
 ```
@@ -350,7 +383,7 @@ Validators:
 - A dropped intent shows `Dropped: yes (<reason>)`; its validators are listed
   but marked skipped, because the guidance never reached the artifact.
 
-`cmv explain <intent> --json` emits `schema`, `atlas`, `languages`,
+`cmv explain <intent> --json` emits `schema`, `atlas`, `ecosystems`,
 and `intent` (`key`, `id`, `resolution`, `title`, `status`, `compiled`,
 `dropped`, `drop_reason`, `stale`, `config`, and `validators`, each with
 `language`, `run`, `required`, `description`, `would_run`, `skipped`, and

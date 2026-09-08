@@ -1,6 +1,6 @@
 //! The verification core: [`check`] resolves every compiled intent against the
-//! atlas, runs the validators that match the workspace's languages,
-//! and maps each run onto exactly one [`IntentOutcome`]; [`status`] answers
+//! atlas, runs the validators that match the workspace's ecosystems
+//! ([`crate::ecosystems::Ecosystems`]), and maps each run onto exactly one [`IntentOutcome`]; [`status`] answers
 //! the same resolution questions without running anything. Pure over the
 //! `Filesystem` and [`ProcessRunner`] gateways: the same inputs against the
 //! in-memory fakes produce the same outcomes as against the OS.
@@ -20,7 +20,7 @@
 //! decision.
 //!
 //! When several validators match (a record may declare one per language, and
-//! a workspace may have several languages) they combine **all-must-pass**: any
+//! a workspace may have several ecosystems) they combine **all-must-pass**: any
 //! failure fails the intent, otherwise any unchecked run leaves it unchecked,
 //! otherwise it passes when at least one run was applicable. `CMV.md` lists
 //! the alternative (any-passes) as an open decision; all-must-pass is the
@@ -40,6 +40,7 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::config::ProjectConfig;
+use crate::ecosystems::Ecosystems;
 use crate::pin::AtlasReport;
 use crate::process::{ProcessOutcome, ProcessRequest, ProcessRunner};
 use crate::verdict::{self, IntentOutcome, Location, State, empty_object};
@@ -81,8 +82,9 @@ pub struct CheckRequest<'a> {
     pub catalog: &'a Catalog,
     /// The project's `cmv.toml`.
     pub config: &'a ProjectConfig,
-    /// Languages to verify as; validators for other languages do not run.
-    pub languages: &'a [String],
+    /// The ecosystems to verify as; validators for other languages do not
+    /// run.
+    pub ecosystems: &'a Ecosystems,
     /// The atlas trees.
     pub trees: Trees<'a>,
     /// The project root handed to validators as `--workspace`.
@@ -135,10 +137,10 @@ fn check_intent(
     let validators: Vec<Validator<'_>> = intent
         .record
         .validators()
-        .filter(|validator| language_matches(validator, request.languages))
+        .filter(|validator| request.ecosystems.admits(validator))
         .collect();
     if validators.is_empty() {
-        let reason = format!("no validator for languages [{}]", request.languages.join(", "));
+        let reason = request.ecosystems.unchecked_reason(&intent.record);
         return Ok(unchecked(entry, &reason, stale));
     }
     let config_path = request.scratch.join(format!("{index}.json"));
@@ -151,11 +153,6 @@ fn check_intent(
         .map(|validator| run_validator(validator, atlas, &config_path, request, runner))
         .collect();
     Ok(combine(entry, &runs, stale))
-}
-
-/// Whether a validator reads one of the workspace's languages.
-pub fn language_matches(validator: &Validator<'_>, languages: &[String]) -> bool {
-    languages.iter().any(|language| language == validator.language)
 }
 
 /// The absolute form of the tree validators run from. Validators run with it
@@ -503,7 +500,7 @@ impl<'a> Resolver<'a> {
 }
 
 /// What `cmv status` reports: the manifest's identity, the atlas's
-/// whereabouts and pin, the workspace's languages, and how much of the
+/// whereabouts and pin, the workspace's ecosystems, and how much of the
 /// manifest the atlas can currently vouch for. Nothing is executed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StatusReport {
@@ -517,8 +514,8 @@ pub struct StatusReport {
     pub artifact: ArtifactRef,
     /// The atlas as cmv resolved it.
     pub atlas: AtlasStatus,
-    /// Languages the workspace verifies as.
-    pub languages: Vec<String>,
+    /// The ecosystems the workspace verifies as, and where they came from.
+    pub ecosystems: Ecosystems,
     /// Compiled intents in the manifest.
     pub intents: usize,
     /// Dropped intents in the manifest.
@@ -543,7 +540,7 @@ pub struct AtlasStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Coverage {
     /// Compiled intents with at least one validator for the workspace's
-    /// languages.
+    /// ecosystems.
     pub with_validator: usize,
     /// Compiled intents whose record is no longer in the atlas.
     pub missing: usize,
@@ -561,8 +558,8 @@ pub struct StatusRequest<'a> {
     /// could not be scanned, in which case the report says where cmv looked
     /// and stops short of coverage.
     pub catalog: Option<&'a Catalog>,
-    /// Languages the workspace verifies as.
-    pub languages: &'a [String],
+    /// The ecosystems the workspace verifies as.
+    pub ecosystems: &'a Ecosystems,
     /// Where the atlas was found and which tree was used.
     pub atlas: &'a AtlasReport,
     /// The atlas trees.
@@ -574,7 +571,7 @@ pub struct StatusRequest<'a> {
 pub fn status(request: &StatusRequest<'_>, fs: &dyn Filesystem) -> Result<StatusReport> {
     let coverage = match request.catalog {
         Some(catalog) => {
-            Some(coverage(request.manifest, catalog, request.languages, request.trees, fs)?)
+            Some(coverage(request.manifest, catalog, request.ecosystems, request.trees, fs)?)
         }
         None => None,
     };
@@ -587,7 +584,7 @@ pub fn status(request: &StatusRequest<'_>, fs: &dyn Filesystem) -> Result<Status
             exists: fs.is_dir(&request.atlas.path),
             resolved: request.atlas.clone(),
         },
-        languages: request.languages.to_vec(),
+        ecosystems: request.ecosystems.clone(),
         intents: request.manifest.intents.len(),
         dropped: request.manifest.dropped.len(),
         coverage,
@@ -597,7 +594,7 @@ pub fn status(request: &StatusRequest<'_>, fs: &dyn Filesystem) -> Result<Status
 fn coverage(
     manifest: &Manifest,
     catalog: &Catalog,
-    languages: &[String],
+    ecosystems: &Ecosystems,
     trees: Trees<'_>,
     fs: &dyn Filesystem,
 ) -> Result<Coverage> {
@@ -615,11 +612,7 @@ fn coverage(
         if is_stale(intent, entry, trees, fs)? {
             coverage.stale += 1;
         }
-        if intent
-            .record
-            .validators()
-            .any(|validator| language_matches(&validator, languages))
-        {
+        if intent.record.validators().any(|validator| ecosystems.admits(&validator)) {
             coverage.with_validator += 1;
         }
     }
@@ -744,24 +737,24 @@ evidence = [
             intent_atlas::catalog::scan(Path::new(KB), &self.fs).expect("fixture atlas scans")
         }
 
-        fn check(&self, languages: &[&str], runner: &FakeProcessRunner) -> Vec<IntentOutcome> {
-            self.check_with(languages, &ProjectConfig::default(), runner)
+        fn check(&self, ecosystems: &[&str], runner: &FakeProcessRunner) -> Vec<IntentOutcome> {
+            self.check_with(ecosystems, &ProjectConfig::default(), runner)
         }
 
         fn check_with(
             &self,
-            languages: &[&str],
+            ecosystems: &[&str],
             config: &ProjectConfig,
             runner: &FakeProcessRunner,
         ) -> Vec<IntentOutcome> {
             let manifest = self.manifest();
             let catalog = self.catalog();
-            let languages: Vec<String> = languages.iter().map(ToString::to_string).collect();
+            let ecosystems = detected(ecosystems);
             let request = CheckRequest {
                 manifest: &manifest,
                 catalog: &catalog,
                 config,
-                languages: &languages,
+                ecosystems: &ecosystems,
                 trees: Trees::single(Path::new(KB)),
                 workspace: Path::new(WORKSPACE),
                 scratch: Path::new(SCRATCH),
@@ -784,18 +777,18 @@ evidence = [
         /// computed against `KB`.
         fn check_pinned(
             &self,
-            languages: &[&str],
+            ecosystems: &[&str],
             runner: &FakeProcessRunner,
         ) -> Vec<IntentOutcome> {
             let manifest = self.manifest();
             let catalog = intent_atlas::catalog::scan(Path::new(PINNED), &self.fs)
                 .expect("pinned tree scans");
-            let languages: Vec<String> = languages.iter().map(ToString::to_string).collect();
+            let ecosystems = detected(ecosystems);
             let request = CheckRequest {
                 manifest: &manifest,
                 catalog: &catalog,
                 config: &ProjectConfig::default(),
-                languages: &languages,
+                ecosystems: &ecosystems,
                 trees: Trees {
                     verified: Path::new(PINNED),
                     working: Some(Path::new(KB)),
@@ -930,22 +923,48 @@ evidence = [
     }
 
     #[test]
-    fn no_validator_for_the_workspace_languages_is_unchecked() {
+    fn no_validator_for_the_workspace_ecosystems_is_unchecked() {
         let mut kb = Kb::new();
         kb.add("rust/a", &[python_check(true)]);
         let runner = FakeProcessRunner::new();
         let outcome = kb.check(&["go", "rust"], &runner).remove(0);
-        assert_eq!(unchecked_reason(&outcome), "no validator for languages [go, rust]");
+        assert_eq!(unchecked_reason(&outcome), "no validator for ecosystems [go, rust]");
         assert!(runner.calls().is_empty(), "no validator is started");
         assert!(!kb.fs.exists(Path::new(&format!("{SCRATCH}/0.json"))), "no config is written");
     }
 
     #[test]
-    fn record_without_validators_is_unchecked_with_an_empty_language_list() {
+    fn record_without_validators_is_unchecked_with_an_empty_ecosystem_list() {
         let mut kb = Kb::new();
         kb.add("rust/a", &[]);
         let outcome = kb.check(&[], &FakeProcessRunner::new()).remove(0);
-        assert_eq!(unchecked_reason(&outcome), "no validator for languages []");
+        assert_eq!(unchecked_reason(&outcome), "no validator for ecosystems []");
+    }
+
+    #[test]
+    fn without_sensors_every_validator_bearing_intent_is_unchecked_with_the_override_hint() {
+        let mut kb = Kb::new();
+        kb.add("rust/a", &[rust_check(true)]);
+        kb.add("rust/b", &[]);
+        let manifest = kb.manifest();
+        let catalog = kb.catalog();
+        let runner = FakeProcessRunner::new().script_stdout(program(RUST), PASS);
+        let request = CheckRequest {
+            manifest: &manifest,
+            catalog: &catalog,
+            config: &ProjectConfig::default(),
+            ecosystems: &Ecosystems::Undetectable,
+            trees: Trees::single(Path::new(KB)),
+            workspace: Path::new(WORKSPACE),
+            scratch: Path::new(SCRATCH),
+        };
+        let outcomes = check(&request, &kb.fs, &runner).unwrap();
+        assert_eq!(
+            unchecked_reason(&outcomes[0]),
+            "atlas declares no sensors; set ecosystems in cmv.toml to override"
+        );
+        assert_eq!(unchecked_reason(&outcomes[1]), "no validator for ecosystems []");
+        assert!(runner.calls().is_empty(), "nothing runs without a detected ecosystem");
     }
 
     #[test]
@@ -1211,7 +1230,7 @@ evidence = [
     }
 
     #[test]
-    fn only_validators_for_workspace_languages_run() {
+    fn only_validators_for_workspace_ecosystems_run() {
         let mut kb = Kb::new();
         kb.add("rust/a", &[rust_check(true), python_check(true)]);
         let runner = FakeProcessRunner::new().script_stdout(program(RUST), PASS);
@@ -1334,7 +1353,7 @@ evidence = [
             manifest: &manifest,
             manifest_path: Path::new("/project/.context-mixer/cmf-manifest.json"),
             catalog: Some(&catalog),
-            languages: &["rust".to_string()],
+            ecosystems: &detected(&["rust"]),
             atlas: &atlas,
             trees: Trees::single(Path::new(KB)),
         };
@@ -1350,7 +1369,7 @@ evidence = [
                     resolved: atlas,
                     exists: true,
                 },
-                languages: vec!["rust".to_string()],
+                ecosystems: detected(&["rust"]),
                 intents: 4,
                 dropped: 1,
                 coverage: Some(Coverage {
@@ -1376,7 +1395,7 @@ evidence = [
             manifest: &manifest,
             manifest_path: Path::new("/m.json"),
             catalog: Some(&catalog),
-            languages: &["rust".to_string()],
+            ecosystems: &detected(&["rust"]),
             atlas: &atlas,
             trees: Trees {
                 verified: Path::new(PINNED),
@@ -1397,7 +1416,7 @@ evidence = [
             manifest: &manifest,
             manifest_path: Path::new("/m.json"),
             catalog: None,
-            languages: &[],
+            ecosystems: &Ecosystems::Undetectable,
             atlas: &atlas,
             trees: Trees::single(Path::new("/elsewhere")),
         };
@@ -1405,6 +1424,30 @@ evidence = [
         assert!(!report.atlas.exists);
         assert_eq!(report.coverage, None);
         assert_eq!(report.intents, 1);
+    }
+
+    #[test]
+    fn status_without_sensors_counts_no_validator_as_selectable() {
+        let mut kb = Kb::new();
+        kb.add("rust/a", &[rust_check(true)]);
+        let manifest = kb.manifest();
+        let catalog = kb.catalog();
+        let atlas = atlas_report(KB);
+        let request = StatusRequest {
+            manifest: &manifest,
+            manifest_path: Path::new("/m.json"),
+            catalog: Some(&catalog),
+            ecosystems: &Ecosystems::Undetectable,
+            atlas: &atlas,
+            trees: Trees::single(Path::new(KB)),
+        };
+        let report = status(&request, &kb.fs).unwrap();
+        assert_eq!(report.coverage.unwrap().with_validator, 0);
+        assert_eq!(report.ecosystems, Ecosystems::Undetectable);
+    }
+
+    fn detected(names: &[&str]) -> Ecosystems {
+        Ecosystems::Detected(names.iter().map(ToString::to_string).collect())
     }
 
     fn atlas_report(path: &str) -> AtlasReport {
@@ -1416,6 +1459,7 @@ evidence = [
             head_revision: None,
             verified_against: crate::pin::VerifiedAgainst::Head,
             moved: false,
+            sensors: false,
         }
     }
 }

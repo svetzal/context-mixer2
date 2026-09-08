@@ -15,7 +15,7 @@ an explicit profile path can live elsewhere.
 | `cmf assemble <profile>` | Write an assembled agent or `SKILL.md` document to stdout |
 | `cmf install <profile>` | Preview platform-aware installation through cmx-core |
 | `cmf install <profile> --apply` | Apply the displayed installation plan |
-| `cmf status` | Count structured intents and materialization profiles |
+| `cmf status` | Count structured intents, materialization profiles, and declared sensors |
 
 `assemble --explain` writes selected intent keys, graph traversals, and the
 estimated token count to stderr, leaving stdout safe for redirection.
@@ -29,6 +29,24 @@ cmx configuration and existing lock state; cmf does not duplicate their path
 or format rules. A local install also records the compile manifest at
 `.context-mixer/cmf-manifest.json`, beside the local lock file: the preview
 says so, and `--apply` writes it. Global installs write no manifest.
+
+A local install (preview and apply alike) also compares the profile's declared
+`[select] ecosystems` with what the atlas's [sensors](#sensors) detect in the
+current directory, and warns on stderr when a declared ecosystem is missing —
+a profile compiled for `rust` against a Python project is almost certainly the
+wrong profile:
+
+```text
+warning: profile rust-shipping targets rust but this project shows python
+```
+
+The line ends `… but the atlas declares no sensors` when the atlas has no
+sensor file, and `… but nothing was detected` when its sensors found nothing.
+A profile that declares no ecosystems filters nothing and never warns.
+`assemble` has no project and does no detection.
+
+`cmf status` adds a `Sensors: N ecosystems` line (`Sensors: none declared`
+when the atlas has no sensor file).
 
 ## Compile manifest
 
@@ -108,7 +126,7 @@ three places:
 `--explain` prints the declared ecosystems and how many category/tag matches
 the filter excluded. The compile manifest records the declared list as
 `profile.ecosystems` (empty when none) so a verifier can compare it with the
-languages it detects.
+ecosystems it detects (cmv reports the difference as `profile_mismatch`).
 
 ### Downward expansion
 
@@ -146,6 +164,61 @@ contributes the capability, threat, expectation, and accepted trade-off;
 `guidance` contributes the preferred strategy; and `evidence` contributes
 required or optional verification. Intent titles and evidence-type metadata
 stay in `--explain` provenance instead of consuming delivered context.
+
+### Sensors
+
+The atlas declares the ecosystems it supports, and how to recognize each in a
+project, in `ecosystems.toml` at its root. cmf and cmv read it — cmf for the
+`install --local` warning above, cmv to decide which validators run — and
+neither carries a built-in table of build files.
+
+```toml
+[python]
+signatures = [
+  { file = "pyproject.toml" },
+  { file = "setup.py" },
+  { glob = "requirements*.txt" },
+]
+
+[uv]
+implies = ["python"]
+signatures = [
+  { file = "uv.lock" },
+  { file = "pyproject.toml", contains = "[tool.uv]" },
+]
+```
+
+One table per ecosystem. `signatures` is a non-empty list of predicates; the
+ecosystem is **detected** when any one holds. `implies` (optional) names the
+ecosystems detected whenever this one is, transitively — `uv` implies
+`python`. The predicate kinds are:
+
+| Predicate | Holds when |
+| --- | --- |
+| `{ file = "<path>" }` | the root-relative path exists, as a file or a directory |
+| `{ file = "<path>", contains = "<literal>" }` | the file exists and holds the literal |
+| `{ glob = "<pattern>" }` | at least one root-level entry, file or directory, has a name matching the pattern |
+
+Every predicate reads only the project root, so detection is deterministic
+and, at a pinned revision, pinned with everything else. A predicate with an
+unknown key, no recognized kind, a `contains` without `file`, a `glob`
+combined with `file`, or an empty value is a parse error naming the ecosystem
+and the signature; a `file` path may not be absolute or contain `..`.
+
+The names are the atlas's own vocabulary: an ecosystem's name must be a
+directory the realization hierarchy below `intents/` uses (`python` for
+`intents/craftsperson/python/`, `uv` for the nested
+`intents/craftsperson/python/uv/`). cmf and cmv validate the file against
+the scanned records and reject the atlas, naming the ecosystem and the record
+that exposed the problem, when a declared name is not such a directory, when
+an `implies` target is not declared, or when a declared nested ecosystem does
+not imply its parent. An ecosystem the records use but the file does not
+declare is simply undetectable.
+
+An atlas with no sensor file detects nothing. cmf then cannot compare a
+profile's ecosystems (the warning says so) and cmv reports every
+validator-bearing intent unchecked with a reason (see the
+[cmv reference](./cmv-commands.md#ecosystem-detection)).
 
 ### Validator evidence
 

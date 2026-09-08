@@ -187,6 +187,7 @@ fn validators_run_from_the_pinned_tree_and_stale_compares_head() {
             "head_revision": scenario.head,
             "verified_against": "pinned",
             "moved": true,
+            "sensors": true,
         })
     );
 

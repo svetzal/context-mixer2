@@ -14,8 +14,8 @@ use clap::Parser;
 use cmv::cli::{Cli, Commands, LocationArgs};
 use cmv::config::{self, ProjectConfig};
 use cmv::dispatch::{self, Catalog, CheckRequest, StatusRequest};
+use cmv::ecosystems::Ecosystems;
 use cmv::explain::{self, ExplainRequest};
-use cmv::language;
 use cmv::pin::{self, AtlasReport, Checkout, PinPolicy};
 use cmv::process::RealProcessRunner;
 use cmv::report::{CheckReport, OutputFormat};
@@ -27,6 +27,7 @@ use cmx_core::paths::ConfigPaths;
 use cmx_core::platform::Platform;
 use intent_atlas::catalog;
 use intent_atlas::manifest::{LOCAL_MANIFEST_FILE_NAME, Manifest};
+use intent_atlas::sensors::{self, Sensors};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -52,26 +53,21 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let site = Site::resolve(location, &fs)?;
             let scratch = Scratch::create(&fs)?;
             let checkout = site.checkout(&scratch, &fs)?;
-            let catalog = catalog::scan(&checkout.root, &fs).with_context(|| {
-                format!(
-                    "could not read atlas at {}; pass --atlas <path> if it lives elsewhere",
-                    site.resolution.path.display()
-                )
-            })?;
-            let languages = site.languages(&fs);
+            let (catalog, sensors) = site.scan_atlas(&checkout, &fs)?;
+            let ecosystems = site.ecosystems(sensors.as_ref(), &fs);
             let request = CheckRequest {
                 manifest: &site.manifest,
                 catalog: &catalog,
                 config: &site.config,
-                languages: &languages,
+                ecosystems: &ecosystems,
                 trees: checkout.trees(),
                 workspace: &site.root,
                 scratch: &scratch.dir,
             };
             let outcomes = dispatch::check(&request, &fs, &RealProcessRunner)?;
-            let atlas = AtlasReport::new(&site.resolution, &checkout);
+            let atlas = AtlasReport::new(&site.resolution, &checkout, sensors.as_ref());
             drop(scratch);
-            let report = CheckReport::new(&site.manifest, atlas, &languages, outcomes, strictness);
+            let report = CheckReport::new(&site.manifest, atlas, ecosystems, outcomes, strictness);
             print!("{}", report.render(format)?);
             Ok(ExitCode::from(report.summary.exit_code))
         }
@@ -80,14 +76,26 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let site = Site::resolve(location, &fs)?;
             let scratch = Scratch::create(&fs)?;
             let checkout = site.checkout(&scratch, &fs)?;
-            let languages = site.languages(&fs);
-            let catalog = scan_if_present(&checkout.root, &fs);
-            let atlas = AtlasReport::new(&site.resolution, &checkout);
+            // `status` reports rather than fails when the atlas is absent or
+            // cannot be read.
+            let (catalog, sensors) = if fs.is_dir(&checkout.root) {
+                match site.scan_atlas(&checkout, &fs) {
+                    Ok((catalog, sensors)) => (Some(catalog), sensors),
+                    Err(error) => {
+                        eprintln!("warning: {error:#}");
+                        (None, None)
+                    }
+                }
+            } else {
+                (None, None)
+            };
+            let ecosystems = site.ecosystems(sensors.as_ref(), &fs);
+            let atlas = AtlasReport::new(&site.resolution, &checkout, sensors.as_ref());
             let request = StatusRequest {
                 manifest: &site.manifest,
                 manifest_path: &site.manifest_path,
                 catalog: catalog.as_ref(),
-                languages: &languages,
+                ecosystems: &ecosystems,
                 atlas: &atlas,
                 trees: checkout.trees(),
             };
@@ -104,19 +112,14 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let site = Site::resolve(location, &fs)?;
             let scratch = Scratch::create(&fs)?;
             let checkout = site.checkout(&scratch, &fs)?;
-            let catalog = catalog::scan(&checkout.root, &fs).with_context(|| {
-                format!(
-                    "could not read atlas at {}; pass --atlas <path> if it lives elsewhere",
-                    site.resolution.path.display()
-                )
-            })?;
-            let languages = site.languages(&fs);
-            let atlas = AtlasReport::new(&site.resolution, &checkout);
+            let (catalog, sensors) = site.scan_atlas(&checkout, &fs)?;
+            let ecosystems = site.ecosystems(sensors.as_ref(), &fs);
+            let atlas = AtlasReport::new(&site.resolution, &checkout, sensors.as_ref());
             let request = ExplainRequest {
                 manifest: &site.manifest,
                 catalog: &catalog,
                 config: &site.config,
-                languages: &languages,
+                ecosystems: &ecosystems,
                 atlas: &atlas,
                 trees: checkout.trees(),
                 workspace: &site.root,
@@ -191,8 +194,27 @@ impl Site {
         )
     }
 
-    fn languages(&self, fs: &dyn Filesystem) -> Vec<String> {
-        language::resolve(self.config.languages.as_deref(), language::detect(&self.root, fs))
+    /// Read the verified tree: its catalog, then its sensors validated
+    /// against that catalog (the sensors are pinned with the records).
+    fn scan_atlas(
+        &self,
+        checkout: &Checkout,
+        fs: &dyn Filesystem,
+    ) -> Result<(Catalog, Option<Sensors>)> {
+        let catalog = catalog::scan(&checkout.root, fs).with_context(|| {
+            format!(
+                "could not read atlas at {}; pass --atlas <path> if it lives elsewhere",
+                self.resolution.path.display()
+            )
+        })?;
+        let sensors = sensors::load_validated(&checkout.root, &catalog, fs)?;
+        Ok((catalog, sensors))
+    }
+
+    /// The ecosystems to verify as: the `cmv.toml` override, else what the
+    /// atlas's sensors detect at the project root.
+    fn ecosystems(&self, sensors: Option<&Sensors>, fs: &dyn Filesystem) -> Ecosystems {
+        Ecosystems::resolve(self.config.ecosystems.as_deref(), sensors, &self.root, fs)
     }
 }
 
@@ -201,21 +223,6 @@ impl Site {
 /// gives the same relative location from cmx-core's `ConfigPaths`).
 fn default_manifest_path(root: &Path) -> PathBuf {
     root.join(".context-mixer").join(LOCAL_MANIFEST_FILE_NAME)
-}
-
-/// Scan the atlas for `status`, which reports rather than fails when
-/// it cannot be read.
-fn scan_if_present(atlas: &Path, fs: &dyn Filesystem) -> Option<Catalog> {
-    if !fs.is_dir(atlas) {
-        return None;
-    }
-    match catalog::scan(atlas, fs) {
-        Ok(catalog) => Some(catalog),
-        Err(error) => {
-            eprintln!("warning: could not read atlas at {}: {error:#}", atlas.display());
-            None
-        }
-    }
 }
 
 /// A per-run temporary directory for the validators' `--config` files and a

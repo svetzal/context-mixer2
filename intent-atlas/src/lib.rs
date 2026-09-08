@@ -15,6 +15,8 @@
 //! - [`selection`] turns a profile and a scanned catalog into the selected
 //!   key set: initial selection, `follow` expansion, downward specialization,
 //!   and shadowed-parent removal.
+//! - [`sensors`] reads the atlas's `ecosystems.toml`, validates it against
+//!   the catalog, and detects a project's ecosystems from it.
 //! - [`manifest`] is the compile manifest cmf writes and cmv reads.
 //!
 //! Rendering the selection into guidance and enforcing the budget stay in
@@ -33,3 +35,4 @@ pub mod catalog;
 pub mod manifest;
 pub mod profile;
 pub mod selection;
+pub mod sensors;

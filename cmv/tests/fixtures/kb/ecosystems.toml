@@ -1,0 +1,5 @@
+# The fixture atlas's sensors: a `Cargo.toml` at the project root means rust.
+# The fixture workspace has one, so the golden check runs the rust validators.
+
+[rust]
+signatures = [{ file = "Cargo.toml" }]

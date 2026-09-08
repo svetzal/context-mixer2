@@ -113,7 +113,7 @@ fn strict_check_still_exits_one_here_and_reports_the_unchecked_intents() {
 }
 
 #[test]
-fn status_reports_the_pin_languages_and_coverage_without_running_validators() {
+fn status_reports_the_pin_ecosystems_and_coverage_without_running_validators() {
     let workspace = workspace_copy();
     let output = cmv(&["status"], workspace.path());
     assert_eq!(output.status.code(), Some(0));
@@ -127,11 +127,11 @@ fn status_reports_the_pin_languages_and_coverage_without_running_validators() {
     );
     assert!(text.contains("HEAD revision: unavailable\n"), "{text}");
     assert!(text.contains("Verified against: working tree (HEAD)\n"), "{text}");
-    assert!(text.contains("Languages: rust\n"), "{text}");
+    assert!(text.contains("Ecosystems: rust\n"), "{text}");
     assert!(text.contains("Intents: 4 compiled, 1 dropped\n"), "{text}");
     assert!(
         text.contains(
-            "Validators: 2 of 4 compiled intents have a validator for the detected languages\n"
+            "Validators: 2 of 4 compiled intents have a validator for the workspace's ecosystems\n"
         ),
         "{text}"
     );
@@ -163,7 +163,7 @@ fn explain_names_the_validators_and_the_argv_without_running_anything() {
         "{text}"
     );
     assert!(
-        text.contains("  python  checks/python/isolate_functional_core.py  (required)  skipped: language python is not among the workspace's [rust]\n"),
+        text.contains("  python  checks/python/isolate_functional_core.py  (required)  skipped: language python is not among the workspace's ecosystems [rust]\n"),
         "{text}"
     );
     let kb = fixtures().join("kb").canonicalize().unwrap();

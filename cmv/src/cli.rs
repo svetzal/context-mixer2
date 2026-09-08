@@ -64,7 +64,7 @@ pub enum Commands {
         #[command(flatten)]
         location: LocationArgs,
     },
-    /// Summarize the manifest, the atlas pin, detected languages, and
+    /// Summarize the manifest, the atlas pin, detected ecosystems, and
     /// validator coverage without running any validator.
     Status {
         /// Emit the summary as JSON.

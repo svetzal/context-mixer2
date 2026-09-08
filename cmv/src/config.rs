@@ -1,7 +1,7 @@
 //! Project configuration: the hand-authored `cmv.toml` at the project root
 //! (see `CMV.md`, "Project config"). It holds what neither the atlas
-//! nor the code can supply — a language override, the validator timeout, and
-//! per-intent settings handed to validators as JSON. A missing file means
+//! nor the code can supply — an ecosystems override, the validator timeout,
+//! and per-intent settings handed to validators as JSON. A missing file means
 //! defaults.
 
 use std::collections::BTreeMap;
@@ -24,9 +24,10 @@ pub const DEFAULT_VALIDATOR_TIMEOUT_SECONDS: u64 = 60;
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
-    /// Languages to verify as, replacing detection entirely when present.
+    /// Ecosystems to verify as, replacing the atlas's sensor detection
+    /// entirely when present.
     #[serde(default)]
-    pub languages: Option<Vec<String>>,
+    pub ecosystems: Option<Vec<String>>,
     /// Per-validator timeout; [`DEFAULT_VALIDATOR_TIMEOUT_SECONDS`] when absent.
     #[serde(default)]
     validator_timeout_seconds: Option<u64>,
@@ -83,16 +84,16 @@ mod tests {
         let fs = FakeFilesystem::new();
         let config = load(Path::new(ROOT), &fs).unwrap();
         assert_eq!(config, ProjectConfig::default());
-        assert_eq!(config.languages, None);
+        assert_eq!(config.ecosystems, None);
         assert_eq!(config.validator_timeout(), Duration::from_secs(60));
         assert_eq!(config.intent_config("any/key"), json!({}));
     }
 
     #[test]
-    fn parses_language_override_timeout_and_intent_tables() {
+    fn parses_ecosystems_override_timeout_and_intent_tables() {
         let config = load_with(
             r#"
-languages = ["rust", "python"]
+ecosystems = ["rust", "python"]
 validator_timeout_seconds = 5
 
 [intent."craftsperson/rust/isolate-functional-core"]
@@ -106,7 +107,7 @@ blocking_symbols = ["time.sleep"]
         )
         .unwrap();
         assert_eq!(
-            config.languages.as_deref(),
+            config.ecosystems.as_deref(),
             Some(&["rust".to_string(), "python".to_string()][..])
         );
         assert_eq!(config.validator_timeout(), Duration::from_secs(5));
@@ -133,15 +134,15 @@ blocking_symbols = ["time.sleep"]
 
     #[test]
     fn unknown_top_level_key_is_rejected_with_the_path() {
-        let error = load_with("langauges = [\"rust\"]\n").unwrap_err();
+        let error = load_with("ecosystem = [\"rust\"]\n").unwrap_err();
         let message = format!("{error:#}");
         assert!(message.contains("/project/cmv.toml"), "{message}");
-        assert!(message.contains("langauges"), "{message}");
+        assert!(message.contains("ecosystem"), "{message}");
     }
 
     #[test]
     fn malformed_toml_is_rejected_with_the_path() {
-        let error = load_with("languages = [\n").unwrap_err();
+        let error = load_with("ecosystems = [\n").unwrap_err();
         assert!(format!("{error:#}").contains("could not parse /project/cmv.toml"));
     }
 }

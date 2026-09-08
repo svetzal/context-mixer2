@@ -9,9 +9,11 @@ use std::fmt;
 use anyhow::{Context, Result};
 use intent_atlas::manifest::{Atlas, Manifest, ProfileRef};
 use intent_atlas::profile::Surface;
+use intent_atlas::sensors;
 use serde::Serialize;
 
 use crate::dispatch::{RecordResolution, StatusReport};
+use crate::ecosystems::Ecosystems;
 use crate::explain::{ExplainReport, ValidatorPlan};
 use crate::pin::{AtlasReport, VerifiedAgainst, short_revision};
 use crate::resolve::ResolvedBy;
@@ -49,8 +51,13 @@ pub struct CheckReport {
     pub manifest: ManifestSummary,
     /// Where cmv actually read the records from, and which tree it verified.
     pub atlas: AtlasReport,
-    /// Languages the workspace was verified as.
-    pub languages: Vec<String>,
+    /// The ecosystems the workspace was verified as, and where they came from.
+    pub ecosystems: Ecosystems,
+    /// Ecosystems the manifest's profile declared that were not detected —
+    /// the guidance may have been compiled for a different ecosystem. Empty
+    /// when the atlas declares no sensors (nothing could be detected).
+    /// Informational; never changes the exit code.
+    pub profile_mismatch: Vec<String>,
     /// One outcome per compiled intent (manifest order), then per dropped
     /// intent.
     pub intents: Vec<IntentOutcome>,
@@ -68,15 +75,20 @@ pub struct ManifestSummary {
 }
 
 impl CheckReport {
-    /// Assemble the report and compute its summary.
+    /// Assemble the report, compare the profile's declared ecosystems with
+    /// the detected ones, and compute the summary.
     pub fn new(
         manifest: &Manifest,
         atlas: AtlasReport,
-        languages: &[String],
+        ecosystems: Ecosystems,
         intents: Vec<IntentOutcome>,
         strictness: Strictness,
     ) -> Self {
         let summary = summarize(&intents, strictness);
+        let profile_mismatch = match &ecosystems {
+            Ecosystems::Undetectable => vec![],
+            detected => sensors::undetected(&manifest.profile.ecosystems, detected.names()),
+        };
         Self {
             schema: SCHEMA_VERSION,
             manifest: ManifestSummary {
@@ -84,7 +96,8 @@ impl CheckReport {
                 atlas: manifest.atlas.clone(),
             },
             atlas,
-            languages: languages.to_vec(),
+            ecosystems,
+            profile_mismatch,
             intents,
             summary,
         }
@@ -153,8 +166,30 @@ impl fmt::Display for CheckReport {
         writeln!(f)?;
         write_summary(f, &self.summary)?;
         let stale = self.intents.iter().filter(|intent| intent.stale).count();
-        write_remedy(f, &self.atlas, stale)
+        write_remedy(f, &self.atlas, stale)?;
+        if !self.profile_mismatch.is_empty() {
+            write_mismatch_line(f, &self.manifest.profile.ecosystems, self.ecosystems.names())?;
+        }
+        Ok(())
     }
+}
+
+/// `manifest profile targets <a, b> but the workspace shows <c, d>; the
+/// guidance may be for a different ecosystem` — or `… but no sensors detected
+/// anything` when the detected set is empty. Informational; never changes
+/// the exit code.
+fn write_mismatch_line(
+    f: &mut fmt::Formatter<'_>,
+    declared: &[String],
+    detected: &[String],
+) -> fmt::Result {
+    write!(f, "manifest profile targets {} but ", declared.join(", "))?;
+    if detected.is_empty() {
+        write!(f, "no sensors detected anything")?;
+    } else {
+        write!(f, "the workspace shows {}", detected.join(", "))?;
+    }
+    writeln!(f, "; the guidance may be for a different ecosystem")
 }
 
 /// The one remedy line, when there is something to remedy: the atlas
@@ -277,17 +312,13 @@ impl fmt::Display for StatusReport {
         writeln!(f, "Pinned revision: {}", kb.pinned_revision.as_deref().unwrap_or("unavailable"))?;
         writeln!(f, "HEAD revision: {}", kb.head_revision.as_deref().unwrap_or("unavailable"))?;
         writeln!(f, "Verified against: {}", verified_against_name(kb.verified_against))?;
-        if self.languages.is_empty() {
-            writeln!(f, "Languages: none detected")?;
-        } else {
-            writeln!(f, "Languages: {}", self.languages.join(", "))?;
-        }
+        writeln!(f, "Ecosystems: {}", self.ecosystems.describe())?;
         writeln!(f, "Intents: {} compiled, {} dropped", self.intents, self.dropped)?;
         match &self.coverage {
             Some(coverage) => {
                 writeln!(
                     f,
-                    "Validators: {} of {} compiled {} have a validator for the detected languages",
+                    "Validators: {} of {} compiled {} have a validator for the workspace's ecosystems",
                     coverage.with_validator,
                     self.intents,
                     plural(self.intents, "intent", "intents")
@@ -352,11 +383,7 @@ impl fmt::Display for ExplainReport {
             resolved_by_name(kb.resolved_by),
             verified_against_name(kb.verified_against)
         )?;
-        if self.languages.is_empty() {
-            writeln!(f, "Languages: none detected")?;
-        } else {
-            writeln!(f, "Languages: {}", self.languages.join(", "))?;
-        }
+        writeln!(f, "Ecosystems: {}", self.ecosystems.describe())?;
         writeln!(f, "Config: {}", intent.config)?;
         if intent.validators.is_empty() {
             if intent.resolution == RecordResolution::NotFound {
@@ -479,7 +506,7 @@ mod tests {
         let mut unchecked = outcome(
             "python/type-public-boundaries",
             State::Unchecked {
-                reason: "no validator for languages [rust]".to_string(),
+                reason: "no validator for ecosystems [rust]".to_string(),
             },
         );
         unchecked.stale = true;
@@ -512,6 +539,7 @@ mod tests {
             head_revision: Some(PIN.to_string()),
             verified_against: VerifiedAgainst::Pinned,
             moved: false,
+            sensors: true,
         }
     }
 
@@ -523,12 +551,16 @@ mod tests {
         }
     }
 
+    fn rust() -> Ecosystems {
+        Ecosystems::Detected(vec!["rust".to_string()])
+    }
+
     fn check_report(
         atlas: AtlasReport,
         outcomes: Vec<IntentOutcome>,
         strictness: Strictness,
     ) -> CheckReport {
-        CheckReport::new(&manifest(), atlas, &["rust".to_string()], outcomes, strictness)
+        CheckReport::new(&manifest(), atlas, rust(), outcomes, strictness)
     }
 
     fn report() -> CheckReport {
@@ -543,7 +575,7 @@ N/A        rust/never-arises
 UNGUIDED   rust/compile-public-documentation
            budget
 UNCHECKED  python/type-public-boundaries  (stale: record changed since compile)
-           no validator for languages [rust]
+           no validator for ecosystems [rust]
 FAIL       rust/isolate-functional-core  (required)
            no gateway trait is declared
            src/http.rs:14
@@ -568,7 +600,13 @@ FAIL       rust/optional  (optional)
 
     #[test]
     fn human_listing_for_an_empty_manifest() {
-        let report = CheckReport::new(&manifest(), atlas(), &[], vec![], Strictness::Strict);
+        let report = CheckReport::new(
+            &manifest(),
+            atlas(),
+            Ecosystems::Detected(vec![]),
+            vec![],
+            Strictness::Strict,
+        );
         assert_eq!(
             report.to_string(),
             "no intents in manifest\n\n0 pass, 0 fail, 0 not applicable, 0 unchecked, 0 unguided; adherence n/a\n"
@@ -622,6 +660,61 @@ FAIL       rust/optional  (optional)
         assert_eq!(report.summary.exit_code, 0);
     }
 
+    fn mismatch_report(declared: &[&str], ecosystems: Ecosystems) -> CheckReport {
+        let mut manifest = manifest();
+        manifest.profile.ecosystems = declared.iter().map(ToString::to_string).collect();
+        CheckReport::new(
+            &manifest,
+            atlas(),
+            ecosystems,
+            vec![outcome("rust/a", State::Pass)],
+            Strictness::Strict,
+        )
+    }
+
+    #[test]
+    fn profile_mismatch_lists_the_declared_ecosystems_detection_missed() {
+        let report =
+            mismatch_report(&["rust", "python"], Ecosystems::Detected(vec!["python".to_string()]));
+        assert_eq!(report.profile_mismatch, ["rust"]);
+        assert!(
+            report.to_string().ends_with(
+                "manifest profile targets rust, python but the workspace shows python; the guidance may be for a different ecosystem\n"
+            ),
+            "{report}"
+        );
+        assert_eq!(report.summary.exit_code, 0, "informational only");
+
+        let report = mismatch_report(&["rust"], Ecosystems::Detected(vec![]));
+        assert_eq!(report.profile_mismatch, ["rust"]);
+        assert!(
+            report.to_string().ends_with(
+                "manifest profile targets rust but no sensors detected anything; the guidance may be for a different ecosystem\n"
+            ),
+            "{report}"
+        );
+
+        let report = mismatch_report(&["rust"], Ecosystems::Overridden(vec!["python".to_string()]));
+        assert_eq!(report.profile_mismatch, ["rust"], "an override counts as the workspace's word");
+    }
+
+    #[test]
+    fn profile_mismatch_is_empty_when_detection_agrees_or_cannot_run() {
+        let report = mismatch_report(&["rust"], rust());
+        assert!(report.profile_mismatch.is_empty());
+        assert!(!report.to_string().contains("manifest profile targets"), "{report}");
+
+        let report = mismatch_report(&[], Ecosystems::Detected(vec![]));
+        assert!(
+            report.profile_mismatch.is_empty(),
+            "a profile declaring nothing filters nothing"
+        );
+
+        let report = mismatch_report(&["rust"], Ecosystems::Undetectable);
+        assert!(report.profile_mismatch.is_empty(), "nothing could be detected");
+        assert!(!report.to_string().contains("manifest profile targets"), "{report}");
+    }
+
     #[test]
     fn json_report_has_the_documented_shape_and_no_timestamp() {
         let json = report().render(OutputFormat::Json).unwrap();
@@ -642,9 +735,11 @@ FAIL       rust/optional  (optional)
                 "head_revision": PIN,
                 "verified_against": "pinned",
                 "moved": false,
+                "sensors": true,
             })
         );
-        assert_eq!(value["languages"], json!(["rust"]));
+        assert_eq!(value["ecosystems"], json!(["rust"]));
+        assert_eq!(value["profile_mismatch"], json!([]));
         assert_eq!(value["intents"].as_array().unwrap().len(), 6);
         assert_eq!(
             value["intents"][0],
@@ -662,7 +757,7 @@ FAIL       rust/optional  (optional)
             })
         );
         assert_eq!(value["intents"][2]["state"], "unchecked");
-        assert_eq!(value["intents"][2]["reason"], "no validator for languages [rust]");
+        assert_eq!(value["intents"][2]["reason"], "no validator for ecosystems [rust]");
         assert_eq!(value["intents"][2]["language"], serde_json::Value::Null);
         assert_eq!(
             value["summary"],
@@ -697,7 +792,7 @@ FAIL       rust/optional  (optional)
                 resolved: atlas(),
                 exists: true,
             },
-            languages: vec!["python".to_string(), "rust".to_string()],
+            ecosystems: Ecosystems::Detected(vec!["python".to_string(), "rust".to_string()]),
             intents: 4,
             dropped: 1,
             coverage: Some(Coverage {
@@ -719,9 +814,9 @@ Source: guidelines
 Pinned revision: a1b2c3d4e5f60718293a4b5c6d7e8f9012345678
 HEAD revision: a1b2c3d4e5f60718293a4b5c6d7e8f9012345678
 Verified against: pinned revision
-Languages: python, rust
+Ecosystems: python, rust
 Intents: 4 compiled, 1 dropped
-Validators: 2 of 4 compiled intents have a validator for the detected languages
+Validators: 2 of 4 compiled intents have a validator for the workspace's ecosystems
 Stale records: 1
 Missing records: 1
 ";
@@ -740,10 +835,11 @@ Missing records: 1
                 head_revision: None,
                 verified_against: VerifiedAgainst::Head,
                 moved: false,
+                sensors: false,
             },
             exists: false,
         };
-        report.languages = vec![];
+        report.ecosystems = Ecosystems::Detected(vec![]);
         report.coverage = None;
         let text = report.to_string();
         assert!(text.contains("Atlas: /gone (missing, resolved by manifest path)\n"), "{text}");
@@ -751,8 +847,21 @@ Missing records: 1
         assert!(text.contains("Pinned revision: unavailable\n"), "{text}");
         assert!(text.contains("HEAD revision: unavailable\n"), "{text}");
         assert!(text.contains("Verified against: working tree (HEAD)\n"), "{text}");
-        assert!(text.contains("Languages: none detected\n"), "{text}");
+        assert!(text.contains("Ecosystems: none detected\n"), "{text}");
         assert!(text.ends_with("Validators: unknown (atlas not scanned)\n"), "{text}");
+
+        report.ecosystems = Ecosystems::Undetectable;
+        assert!(
+            report.to_string().contains(
+                "Ecosystems: none (atlas declares no sensors; set ecosystems in cmv.toml to override)\n"
+            ),
+            "{report}"
+        );
+        report.ecosystems = Ecosystems::Overridden(vec!["rust".to_string()]);
+        assert!(
+            report.to_string().contains("Ecosystems: rust (cmv.toml override)\n"),
+            "{report}"
+        );
     }
 
     #[test]
@@ -786,14 +895,15 @@ Missing records: 1
         assert_eq!(value["atlas"]["verified_against"], "pinned");
         assert_eq!(value["atlas"]["moved"], false);
         assert_eq!(value["coverage"]["with_validator"], 2);
-        assert_eq!(value["languages"], json!(["python", "rust"]));
+        assert_eq!(value["ecosystems"], json!(["python", "rust"]));
+        assert_eq!(value["atlas"]["sensors"], true);
     }
 
     fn explain_report() -> ExplainReport {
         ExplainReport {
             schema: 1,
             atlas: atlas(),
-            languages: vec!["rust".to_string()],
+            ecosystems: rust(),
             intent: IntentExplanation {
                 key: "rust/isolate-functional-core".to_string(),
                 id: Some("kb.intent.isolate-functional-core".to_string()),
@@ -834,7 +944,8 @@ Missing records: 1
                         description: "No rules beside clients.".to_string(),
                         would_run: false,
                         skipped: Some(
-                            "language python is not among the workspace's [rust]".to_string(),
+                            "language python is not among the workspace's ecosystems [rust]"
+                                .to_string(),
                         ),
                         argv: Some(
                             [
@@ -866,13 +977,13 @@ Compiled: yes
 Dropped: no
 Stale: yes (record or validator changed at HEAD since compile)
 Atlas: /kb (resolved by cmx source, verified against pinned revision)
-Languages: rust
+Ecosystems: rust
 Config: {\"business_rule_minimum_matches\":2}
 Validators:
   rust  checks/rust/isolate.sh  (required)  would run
     No rules beside I/O.
     /kb/checks/rust/isolate.sh --workspace /project --config <scratch>/1.json
-  python  checks/python/isolate.py  (optional)  skipped: language python is not among the workspace's [rust]
+  python  checks/python/isolate.py  (optional)  skipped: language python is not among the workspace's ecosystems [rust]
     No rules beside clients.
     /kb/checks/python/isolate.py --workspace /project --config <scratch>/1.json
 ";
@@ -949,6 +1060,7 @@ Validators:
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["schema"], 1);
         assert_eq!(value["atlas"]["resolved_by"], "source");
+        assert_eq!(value["ecosystems"], json!(["rust"]));
         assert_eq!(value["intent"]["resolution"], "key");
         assert_eq!(value["intent"]["validators"][1]["would_run"], false);
         assert_eq!(value["intent"]["config"], json!({ "business_rule_minimum_matches": 2 }));

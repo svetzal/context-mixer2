@@ -4,6 +4,8 @@
 //! into the in-memory gateways at a fixed root, with a fake git checkout, a
 //! fake clock, and a cmx sources registry naming the root — so the serialized
 //! manifest is fully deterministic and pinned by `expected-manifest.json`.
+//! The fixture's `ecosystems.toml` is validated against the scanned catalog
+//! on every build, as cmf does at scan time; it never reaches the manifest.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -13,6 +15,7 @@ use chrono::{TimeZone, Utc};
 use cmf::assembly::assemble;
 use cmf::catalog::{self, Intent};
 use cmf::manifest;
+use cmf::sensors;
 use cmx_core::config;
 use cmx_core::context::AppContext;
 use cmx_core::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
@@ -51,6 +54,10 @@ fn fixture() -> Fixture {
     for sub in ["intents", "profiles"] {
         load_fixture_tree(&fixture_dir().join(sub), &root.join(sub), &fs);
     }
+    fs.add_file(
+        root.join(sensors::SENSOR_FILE_NAME),
+        fs::read(fixture_dir().join(sensors::SENSOR_FILE_NAME)).expect("fixture sensor file"),
+    );
     fs.add_file(root.join(".git/HEAD"), "ref: refs/heads/main\n");
     fs.add_file(root.join(".git/refs/heads/main"), format!("{HEAD_COMMIT}\n"));
 
@@ -69,6 +76,10 @@ fn build_manifest(fixture: &Fixture) -> (manifest::Manifest, BTreeMap<String, In
     let (profile, _) =
         cmf::profile::load(root, Path::new("rust-shipping"), &fixture.fs).expect("profile loads");
     let intents = catalog::scan(root, &fixture.fs).expect("catalog scans");
+    let sensors = sensors::load_validated(root, &intents, &fixture.fs)
+        .expect("fixture sensors validate against the catalog")
+        .expect("fixture declares sensors");
+    assert_eq!(sensors.len(), 2, "python and rust");
     let assembly = assemble(&profile, &intents).expect("profile assembles");
     let git = FakeGitClient::new();
     let clock = FakeClock::at(Utc.with_ymd_and_hms(2026, 9, 5, 14, 2, 11).unwrap());
