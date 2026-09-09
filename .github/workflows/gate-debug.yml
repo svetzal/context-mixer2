@@ -1,0 +1,56 @@
+name: Gate Debug
+
+# Diagnostic twin of the release quality gate. Push a `debug-*` tag at any
+# commit to run the all-features tests exactly as a tag-triggered run sees
+# them, but single-threaded, uncaptured, and under a hard timeout, so a test
+# that hangs names itself in the live log instead of taking the runner down.
+# Publishes nothing.
+
+on:
+  push:
+    tags: ["debug-*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  all-features-tests:
+    name: All-features tests (diagnostic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.94.0"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: quality-gate
+          save-if: false
+
+      - name: Environment
+        run: |
+          echo "ref=$GITHUB_REF type=$GITHUB_REF_TYPE"
+          nproc; free -m; df -h / | tail -1
+          git rev-parse HEAD; git status --short | head
+
+      - name: Build test binaries
+        run: timeout 900 cargo test --all-features --no-run
+
+      - name: Run tests one at a time, uncaptured
+        env:
+          RUST_BACKTRACE: 1
+        run: timeout 600 cargo test --all-features -- --test-threads=1 --nocapture 2>&1 | tee tests.log | tail -c 200000
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gate-debug-tests-log
+          path: tests.log
+          retention-days: 3
