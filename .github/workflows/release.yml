@@ -14,6 +14,12 @@ jobs:
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Two parallel rustc jobs instead of one per core: the all-features test
+      # build links tokio + mojentic and has starved hosted runners into being
+      # declared lost. Slower is fine here; the gate must finish with a log.
+      CARGO_BUILD_JOBS: 2
     steps:
       - uses: actions/checkout@v5
 
@@ -23,6 +29,14 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # Restore the cache ci.yml saves on main (caches from the default
+          # branch are visible to tag runs). Without this the tag build starts
+          # cold and the all-features test step has to codegen the whole llm
+          # dependency tree on the runner, which has starved hosted runners into
+          # being declared lost (v3.3.0, twice). Never save from here.
+          shared-key: quality-gate
+          save-if: false
 
       - name: Check formatting
         run: cargo fmt --check

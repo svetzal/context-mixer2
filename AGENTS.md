@@ -123,6 +123,15 @@ Releasing is three distinct steps:
 
 Conventions and gotchas:
 
+- **The release quality gate is bounded and memory-capped.** It restores the
+  cache `ci.yml` saves on `main` (`Swatinem/rust-cache` `shared-key:
+  quality-gate`, `save-if: false`), runs with `CARGO_BUILD_JOBS: 2`, and has
+  `timeout-minutes: 30`. Tagging v3.3.0 twice produced a job that died in the
+  all-features test step after ~45 minutes with no step log and the annotation
+  "The hosted runner lost communication with the server", while `ci.yml` ran
+  the identical step on the identical commit in 22 seconds. The bound exists so
+  a recurrence fails as a cancelled step with its log intact instead of a lost
+  runner; if you see that symptom, read the step log before re-tagging.
 - **Sequence releases — never push two `v*` tags concurrently.** The Homebrew
   job overwrites the single tap formula with whichever run finishes last, so two
   in-flight releases can leave the tap pinned to the wrong (older) version. Push
