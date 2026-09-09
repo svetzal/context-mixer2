@@ -20,6 +20,7 @@
 - [Bringing a System Under Control](./guide/under-control.md)
 - [Diffing with LLM Analysis](./guide/diffing.md)
 - [Configuration](./guide/configuration.md)
+- [Compiling and Verifying Intents](./guide/compiling-and-verifying.md)
 
 # Creating Artifacts
 
@@ -44,3 +45,4 @@
 
 - [Multi-Tool Platform Support](./design/multi-tool-platform-support.md)
 - [Canonical Home & Doctor](./design/canonical-home-and-doctor.md)
+- [Deterministic Verification of Intents](./design/deterministic-verification.md)

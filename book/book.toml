@@ -1,7 +1,7 @@
 [book]
-title = "cmx — Package Manager for Curated Agentic Context"
+title = "Context Mixer — Curated Agentic Context"
 authors = ["Stacey Vetzal"]
-description = "Manage agents and skills across AI coding assistants"
+description = "Manage agents, skills, and the engineering intents behind them across AI coding assistants"
 language = "en"
 src = "src"
 

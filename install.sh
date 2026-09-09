@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# install.sh — install cmx and cmf locally from this checkout via `cargo install`.
+# install.sh — install cmx, cmf, and cmv locally from this checkout via `cargo install`.
 #
 # cmx is installed WITH the `llm` feature so LLM-backed commands (`cmx skill
 # info` summaries, `cmx diff`) work; it pulls tokio + mojentic and needs the
 # configured gateway's credentials (e.g. OPENAI_API_KEY) at runtime.
-# cmf stays lean (default features).
+# cmf stays lean (default features); cmv has no features at all.
 #
 # Run from a checkout at the version you want installed (the tagged commit, or
 # `main` at the same version). `--force` overwrites previously installed binaries.
@@ -21,6 +21,9 @@ cargo install --path "$SCRIPT_DIR/cmx" --features llm --force
 
 echo "Installing cmf (lean)..."
 cargo install --path "$SCRIPT_DIR/cmf" --force
+
+echo "Installing cmv (lean)..."
+cargo install --path "$SCRIPT_DIR/cmv" --force
 
 ZSH_COMPLETION_DIR="${CMX_ZSH_COMPLETION_DIR:-$HOME/.zfunc}"
 ZSH_COMPLETION_PATH="$ZSH_COMPLETION_DIR/_cmx"
@@ -43,3 +46,4 @@ echo
 echo "Installed:"
 cmx --version
 cmf --version
+cmv --version

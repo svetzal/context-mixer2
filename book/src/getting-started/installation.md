@@ -17,11 +17,12 @@ Download the latest binary for your platform from [GitHub Releases](https://gith
 | macOS (Intel) | `cmx-darwin-x64.tar.gz` |
 | Linux (x64) | `cmx-linux-x64.tar.gz` |
 
-Extract and place `cmx` somewhere on your `PATH`:
+The archive holds all three binaries. Extract and place them somewhere on
+your `PATH`:
 
 ```bash
 tar xzf cmx-darwin-arm64.tar.gz
-sudo mv cmx /usr/local/bin/
+sudo mv cmx cmf cmv /usr/local/bin/
 ```
 
 ## From source
@@ -32,8 +33,9 @@ cd context-mixer2
 ./install.sh
 ```
 
-`install.sh` installs `cmx` with the `llm` feature, installs `cmf` lean, and
-refreshes zsh completions at `~/.zfunc/_cmx` when `~/.zfunc/` already exists.
+`install.sh` installs `cmx` with the `llm` feature, installs `cmf` and `cmv`
+lean (cmv has no features at all; it is deterministic by construction and never
+talks to a model), and refreshes zsh completions at `~/.zfunc/_cmx` when `~/.zfunc/` already exists.
 
 ## Shell completions
 
@@ -59,4 +61,6 @@ cmx completions bash | sudo tee /etc/bash_completion.d/cmx >/dev/null
 
 ```bash
 cmx --version
+cmf --version
+cmv --version
 ```
