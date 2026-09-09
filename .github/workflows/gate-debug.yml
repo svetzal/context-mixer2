@@ -42,10 +42,29 @@ jobs:
       - name: Build test binaries
         run: timeout 900 cargo test --all-features --no-run
 
-      - name: Run tests one at a time, uncaptured
+      - name: Run tests exactly as the release gate does, with a watchdog
         env:
           RUST_BACKTRACE: 1
-        run: timeout 600 cargo test --all-features -- --test-threads=1 --nocapture 2>&1 | tee tests.log | tail -c 200000
+        run: |
+          set +e
+          # Same command as release.yml's "Tests (all features)" step. cargo
+          # prints "Running <binary>" before each test binary, so a hang names
+          # the binary; the watchdog then dumps what is still alive.
+          timeout 600 cargo test --all-features 2>&1 | tee tests.log | tail -c 200000
+          code=${PIPESTATUS[0]}
+          if [ "$code" = "124" ]; then
+            echo "=== TIMED OUT after 600s; processes still alive:" | tee -a tests.log
+            ps -eo pid,ppid,pgid,etime,stat,command --forest | tee -a tests.log
+            exit 124
+          fi
+          exit $code
+
+      - name: Re-run the last binary single-threaded if the gate hung
+        if: failure()
+        run: |
+          bin=$(grep -oE 'Running (unittests )?\S+ \(\S+\)' tests.log | tail -1 | grep -oE '\(\S+\)' | tr -d '()')
+          echo "last test binary: $bin"
+          [ -n "$bin" ] && timeout 300 "$bin" --test-threads=1 --nocapture 2>&1 | tee -a tests.log | tail -c 100000 || true
 
       - name: Upload log
         if: always()
