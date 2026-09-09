@@ -11,7 +11,10 @@ capability = "Domain values remain stable after validation and can be reasoned a
 threat = "In-place mutation creates action-at-a-distance and invalidates assumptions made when a model was constructed."
 expectation = "Validated domain objects will be shared across functions and layers over nontrivial lifetimes."
 strategy = "Configure Pydantic domain models with `ConfigDict(frozen=True)`."
-evidence = [{ type = "test", description = "A model test confirms post-construction field assignment is rejected, and review finds frozen configuration on domain models.", required = true }]
+evidence = [
+  { type = "test", description = "A model test confirms post-construction field assignment is rejected, and review finds frozen configuration on domain models.", required = true },
+  { type = "static-check", language = "python", run = "checks/python/immutable-domain-models.py", description = "Every Pydantic model, dataclass, or NamedTuple in production code is declared frozen.", required = true },
+]
 tradeoff = "Updates require creating replacement instances and can be awkward for workflows that naturally accumulate state."
 scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
 sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#data-structures", summary = "The source specifically prescribes frozen Pydantic configuration for immutable models.", confidence = 1.0 }]

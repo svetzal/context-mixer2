@@ -11,7 +11,10 @@ capability = "Maintainers can immediately find a module's tests and see when a m
 threat = "A distant tests hierarchy lets code and tests drift and obscures missing module-level coverage."
 expectation = "The package hierarchy will grow and be reorganized over time."
 strategy = "Place one `module_spec.py` beside each `module.py` and configure pytest to discover `*_spec.py` files."
-evidence = [{ type = "gate", description = "Pytest collection recognizes the configured `*_spec.py` convention and every production module requiring tests has a colocated spec file.", required = true }]
+evidence = [
+  { type = "gate", description = "Pytest collection recognizes the configured `*_spec.py` convention and every production module requiring tests has a colocated spec file.", required = true },
+  { type = "static-check", language = "python", run = "checks/python/colocated-module-specifications.py", description = "Pytest `python_files` names the `*_spec.py` convention, every spec module sits in the package directory of the module it specifies, and no test module lives in a separate tests directory.", required = true },
+]
 tradeoff = "Production package directories contain test modules, which can clutter navigation and packaging configuration."
 scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
 sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#test-co-location", summary = "The source explicitly rejects a separate tests directory in favor of colocated module specs and supplies pytest discovery settings.", confidence = 1.0 }]

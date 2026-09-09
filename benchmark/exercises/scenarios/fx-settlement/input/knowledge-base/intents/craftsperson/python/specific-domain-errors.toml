@@ -11,7 +11,10 @@ capability = "Callers can distinguish, handle, and understand expected failure m
 threat = "Generic or swallowed exceptions erase meaning and can accidentally intercept process-control signals."
 expectation = "New failure modes and recovery policies will be added as domain behavior expands."
 strategy = "Raise specific exceptions, define custom classes for domain errors, document raised exceptions, and catch only expected exception types."
-evidence = [{ type = "review", description = "Public failure paths document and raise named exception types, and static search finds no bare `except` or generic `raise Exception` in production code.", required = true }]
+evidence = [
+  { type = "review", description = "Public failure paths document and raise named exception types, and static search finds no bare `except` or generic `raise Exception` in production code.", required = true },
+  { type = "static-check", language = "python", run = "checks/python/specific-domain-errors.py", description = "Production code defines named exception classes and contains no bare `except` clause and no `raise Exception(...)`.", required = true },
+]
 tradeoff = "A richer exception taxonomy adds public API surface and requires callers to maintain more handling branches."
 scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
 sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#error-handling", summary = "The source requires specific and domain exceptions, documented failure contracts, and demonstrates why bare except is unsafe.", confidence = 1.0 }]

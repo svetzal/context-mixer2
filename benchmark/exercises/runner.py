@@ -6,18 +6,26 @@ The harness takes three inputs:
 1. agent and model parameters, named from `agents.toml`
 2. a scenario skeleton — a real project and a task written against a fixed
    public contract
-3. an AGENTS.md that cmf assembled from a slice of the intent corpus
+3. an AGENTS.md that cmf assembled from the intent atlas (`--atlas`, or
+   `CMF_ATLAS`), through the scenario's own profile
 
 It produces two things the assembly benchmark cannot: whether the finished code
 satisfies a hidden acceptance suite, and whether it exhibits each named intent.
 Running the same scenario with and without the guidance is what turns those into
 a measurement of the guidance rather than of the model.
 
+The adherence verdicts come from cmv. cmf writes a compile manifest naming the
+intents it composed; every trial workspace receives that manifest and a
+`cmv.toml` once the agent has finished, and `cmv check --json` runs the
+validators the atlas keeps beside those intents. The harness owns no checks of
+its own — see `scoring.py` for how the report becomes `metrics.json`.
+
 This module only *collects*. Turning trials into rates, intervals, and
 model-to-model comparisons is `aggregate.py`'s job, so re-analysis never needs a
 re-run — which matters, because the scoring rules change more often than the
 evidence does.
 
+    export CMF_ATLAS=~/Work/Projects/Personal/guidelines
     ./run.sh --scenario rate-card --agent claude-opus-5 --trials 10 --concurrency 4
     ./run.sh --scenario rate-card --agent codex-gpt-5-6 --trials 10
     python3 aggregate.py --scenario rate-card
@@ -41,11 +49,10 @@ import tomllib
 import xml.etree.ElementTree as ElementTree
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import adherence
+import scoring
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent.parent
-RUSTFACTS = HERE / "rustfacts"
 
 # Workspaces live OUTSIDE the repository. Some agent CLIs resolve a project root
 # by walking up to the enclosing git repository, which put this repo's own
@@ -301,50 +308,6 @@ def parse_telemetry(agent, command, stdout):
 # --------------------------------------------------------------------------
 
 
-def build_rustfacts():
-    """Build the syn-based fact extractor the Rust checks read from."""
-    binary = RUSTFACTS / "target" / "release" / "rustfacts"
-    outcome = run(
-        ["cargo", "build", "--release", "--quiet", "--manifest-path", str(RUSTFACTS / "Cargo.toml")],
-        cwd=RUSTFACTS,
-        timeout=900,
-    )
-    if outcome["exit_code"] != 0:
-        raise SystemExit(f"could not build rustfacts:\n{outcome['stderr']}")
-    return binary
-
-
-def assemble_guidance(scenario):
-    """Input three, assembled once per invocation rather than once per trial.
-
-    The artifact is deterministic for a scenario, and running cargo inside the
-    repo contends on one target-directory lock — so N concurrent trials
-    assembling the same bytes would serialize on it for no reason.
-    """
-    outcome = run(
-        [
-            "cargo",
-            "run",
-            "--quiet",
-            "--manifest-path",
-            str(REPO_ROOT / "Cargo.toml"),
-            "-p",
-            "cmf",
-            "--",
-            "--root",
-            str(scenario / "input" / "knowledge-base"),
-            "assemble",
-            str(scenario / "input" / "profile.toml"),
-            "--explain",
-        ],
-        cwd=REPO_ROOT,
-        timeout=900,
-    )
-    if outcome["exit_code"] != 0:
-        raise SystemExit(f"cmf assemble failed:\n{outcome['stderr']}")
-    return outcome["stdout"], outcome["stderr"]
-
-
 def warm_up(agent, agent_name):
     """Send one throwaway request so trial 1 is not paying a cold model load.
 
@@ -363,20 +326,6 @@ def warm_up(agent, agent_name):
     announce(f"warming {agent_name} (a cold local model can take minutes)")
     outcome = run(command, cwd=HERE, env=os.environ | declared, timeout=1800)
     announce(f"warm-up finished in {outcome['seconds']}s (exit {outcome['exit_code']})")
-
-
-def selected_from_explain(explanation):
-    keys = []
-    capturing = False
-    for line in explanation.splitlines():
-        if line.startswith("selected intents ("):
-            capturing = True
-            continue
-        if capturing:
-            if not line.startswith("  "):
-                break
-            keys.append(line.strip())
-    return keys
 
 
 def isolation_for(agent, run_directory, isolate_home):
@@ -478,19 +427,20 @@ def run_trial(job):
     shutil.copy2(scenario / "TASK.md", workspace / "TASK.md")
 
     agent = job["agent"]
+    assembled = job["assembled"]
     guidance = {"present": False}
     if job["arm"] == "guided":
-        content, explanation = job["guidance"]
+        content = assembled["content"]
         for name in agent.get("guidance_files", ["AGENTS.md"]):
             (workspace / name).write_text(content, encoding="utf-8")
         (run_directory / "guidance.md").write_text(content, encoding="utf-8")
-        (run_directory / "explain.txt").write_text(explanation, encoding="utf-8")
+        (run_directory / "explain.txt").write_text(assembled["explanation"], encoding="utf-8")
         guidance = {
             "present": True,
             "files": agent.get("guidance_files", ["AGENTS.md"]),
             "bytes": len(content.encode("utf-8")),
             "approximate_tokens": -(-len(content) // 4),
-            "selected_intents": selected_from_explain(explanation),
+            "selected_intents": [item["key"] for item in assembled["manifest"]["intents"]],
         }
 
     home_env, isolation = isolation_for(agent, run_directory, job["isolate_home"])
@@ -521,7 +471,6 @@ def run_trial(job):
 
     expected = job["expected"]
     language = expected.get("language", "python")
-    rustfacts = job["rustfacts"]
 
     copied = copied_reference(workspace, reference_fingerprints(scenario))
     if copied and job["kind"] == "agent":
@@ -550,17 +499,25 @@ def run_trial(job):
     # Adherence is scored before acceptance is staged. A Rust integration test
     # has to live inside the crate to run at all, so copying the hidden suite in
     # first would let it count as the agent's own test layer.
-    check_config = dict(expected.get("check_config", {}))
-    check_config["baseline_root"] = str(scenario / "input" / "skeleton")
-    if rustfacts:
-        check_config["rustfacts_binary"] = str(rustfacts)
-    report = adherence.score(
-        workspace,
-        expected["scored_intents"],
-        check_config,
-        language=language,
-        rustfacts=rustfacts,
+    #
+    # The manifest and cmv.toml are staged only now, after the agent has
+    # finished. Both arms get them, because cmv needs them to verify anything;
+    # neither arm gets them while the agent works, because the manifest names
+    # the eight scored intents and a control-arm agent that could read it would
+    # know exactly what it was being scored on.
+    scoring.stage_verification(workspace, assembled["manifest_path"], scenario, expected)
+    cmv_run, cmv_report = scoring.check(workspace, job["atlas"], job["tools"])
+    scored = scoring.metrics_from_report(
+        cmv_report, expected["scored_intents"], cmv_run["exit_code"]
     )
+    (run_directory / "cmv-report.json").write_text(
+        json.dumps(cmv_report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    if scored["harness_faults"]:
+        announce(
+            f"{job['arm']} trial {job['trial']}: INVALID — cmv reached no verdict for "
+            f"{len(scored['harness_faults'])} intent(s): " + "; ".join(scored["harness_faults"])
+        )
 
     if language == "rust":
         staged = workspace / "tests"
@@ -608,10 +565,18 @@ def run_trial(job):
 
     metrics = {
         "acceptance": acceptance_results,
-        "adherence": report["adherence"],
+        "adherence": scored["adherence"],
         "agent": {"name": job["agent_name"], "description": agent.get("description", "")},
         "agent_run": agent_run,
         "arm": job["arm"],
+        # Which atlas the validators ran from, so a later correction to a
+        # validator can be told apart from the evidence it re-scored. `moved`
+        # is cmv noting that the atlas's HEAD had left the pinned revision;
+        # informational, since cmv verifies at the pin regardless.
+        "atlas_revision": assembled["manifest"]["atlas"].get("revision"),
+        "atlas_moved": (cmv_report or {}).get("atlas", {}).get("moved"),
+        "cmv_exit_code": cmv_run["exit_code"],
+        "cmv_report": cmv_report,
         "environment_sync": {"exit_code": sync["exit_code"]},
         "guidance": guidance,
         "implementation": job["implementation"],
@@ -621,7 +586,7 @@ def run_trial(job):
         "kind": job["kind"],
         "language": language,
         "own_tests": own_results,
-        "principles": report["principles"],
+        "principles": scored["principles"],
         "scenario": job["scenario_name"],
         "task_complete": acceptance_results["failed"] == 0
         and acceptance_results["errors"] == 0
@@ -633,15 +598,21 @@ def run_trial(job):
         # over a long unattended sweep.
         # A trial that reproduced the reference measured the filesystem, not the
         # model. It is not a low score to be reported; it is not an observation.
+        # And a trial cmv could not fully verify — an intent unchecked or
+        # unguided — measured the harness, not the agent: every scored intent
+        # has a validator, so a missing verdict is never the agent's doing.
         "copied_reference": copied,
-        "valid": job["kind"] == "calibration"
-        or bool(
-            not copied
-            and agent_run.get("exit_code") == 0
-            and not agent_run.get("timed_out")
-            and (agent_run.get("telemetry") or {}).get("parsed")
+        "harness_faults": scored["harness_faults"],
+        "valid": not scored["harness_faults"]
+        and (
+            job["kind"] == "calibration"
+            or bool(
+                not copied
+                and agent_run.get("exit_code") == 0
+                and not agent_run.get("timed_out")
+                and (agent_run.get("telemetry") or {}).get("parsed")
+            )
         ),
-        "workspace": report["workspace"],
         **extra,
     }
     (run_directory / "metrics.json").write_text(
@@ -701,6 +672,9 @@ def archive_trial(job, run_directory):
 
     bundle = destination / "evidence.tar.gz"
     with tarfile.open(bundle, "w:gz") as archive:
+        # The manifest and cmv.toml the verdicts were computed from travel
+        # inside workspace/, where cmv read them; the full cmv report is here
+        # too, so a verdict can be re-read without unpacking anything.
         for name in (
             "guidance.md",
             "explain.txt",
@@ -709,6 +683,7 @@ def archive_trial(job, run_directory):
             "acceptance-output.txt",
             "own-tests.xml",
             "acceptance.xml",
+            "cmv-report.json",
         ):
             path = run_directory / name
             if path.is_file():
@@ -868,6 +843,11 @@ def main():
         help="point the agent's config home at an empty scratch directory; removes ambient "
         "guidance and memory, and requires credentials the agent can still reach",
     )
+    parser.add_argument(
+        "--atlas",
+        help="intent atlas root cmf assembles from and cmv verifies against; "
+        "defaults to $CMF_ATLAS",
+    )
     arguments = parser.parse_args()
 
     scenario = HERE / "scenarios" / arguments.scenario
@@ -880,7 +860,10 @@ def main():
     agent = agents[arguments.agent]
 
     expected = json.loads((scenario / "expected.json").read_text(encoding="utf-8"))
-    rustfacts = build_rustfacts() if expected.get("language") == "rust" else None
+    atlas = scoring.atlas_from(arguments.atlas)
+    # Before anything runs: the snapshot must still describe the atlas's records.
+    scoring.snapshot_guard(scenario, atlas, expected["scored_intents"])
+    tools = scoring.build_tools()
 
     calibration = arguments.skip_agent or arguments.implementation
     kind = "calibration" if calibration else "agent"
@@ -899,8 +882,16 @@ def main():
 
     if arguments.fresh and agent_root.exists():
         shutil.rmtree(agent_root)
+    agent_root.mkdir(parents=True, exist_ok=True)
 
-    guidance = assemble_guidance(scenario) if "guided" in arms else None
+    # Assembled once per invocation, whichever arms run: the control arm never
+    # sees the artifact, but its workspace is verified against the same
+    # manifest, so the manifest has to exist either way. The artifact is
+    # deterministic for a scenario and atlas revision, so once is also enough.
+    assembled = scoring.assemble(scenario, atlas, tools, agent_root / "cmf-manifest.json")
+    scoring.warm_validators(
+        scenario, atlas, tools, assembled["manifest_path"], expected, agent_root
+    )
 
     jobs = []
     for arm in arms:
@@ -911,20 +902,21 @@ def main():
                     "agent": agent,
                     "agent_name": agent_label,
                     "arm": arm,
+                    "assembled": assembled,
+                    "atlas": atlas,
                     "expected": expected,
-                    "guidance": guidance,
                     "implementation": arguments.implementation,
                     "isolate_home": arguments.isolate_agent_home,
                     "keep_workspace": arguments.keep_workspace,
                     "kind": kind,
                     "run_directory": agent_root / arm / f"trial-{index:02d}",
-                    "rustfacts": rustfacts,
                     "scenario": scenario,
                     "scenario_name": arguments.scenario,
                     # A local model that needs longer than the cap produces no
                     # measurement at all, only a discarded hour. Uncapped is the
                     # honest setting when the runtime is what is being found out.
                     "timeout": arguments.timeout or None,
+                    "tools": tools,
                     "trial": index,
                 }
             )
@@ -964,11 +956,13 @@ def main():
                 )
                 continue
             completed.append(metrics)
+            adherence = metrics["adherence"]
+            aside = f" (+{len(adherence['not_applicable'])} n/a)" if adherence["not_applicable"] else ""
             announce(
                 f"{metrics['arm']} trial {metrics['trial']}: "
                 f"acceptance {metrics['acceptance']['passed']}/{metrics['acceptance']['collected']}, "
-                f"adherence {metrics['adherence']['followed_count']}"
-                f"/{metrics['adherence']['applicable_count']} applicable"
+                f"adherence {adherence['followed_count']}"
+                f"/{adherence['applicable_count']} applicable{aside}"
             )
 
     if EXHAUSTED.is_set():

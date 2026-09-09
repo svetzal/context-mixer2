@@ -432,22 +432,24 @@ overlap say nothing about whether guidance changes work; these do.
 
 - `benchmark/exercises/run.sh` — wrapper over `runner.py`
 - `benchmark/exercises/aggregate.py` — reads every `metrics.json` and reports rates with Wilson intervals, lift with Newcombe intervals, and per-model cost; analysis never re-runs an agent
-- `benchmark/exercises/runner.py` — takes agent parameters, a scenario skeleton, and a cmf-assembled AGENTS.md; runs both arms and reports per-intent lift
-- `benchmark/exercises/adherence.py` — workspace partitioning and orchestration; never asks a model, never reads the agent transcript
-- `benchmark/exercises/checks.py` — one check per intent, taking `(workspace, config)`
-- `benchmark/exercises/predicates.py` — the traversals checks share: symbol use, syntactic containment, construct shape, declared tool config
-- `benchmark/exercises/rustfacts/` — standalone `syn` binary emitting the same facts for Rust as JSON; built on demand, excluded from the cmx workspace
+- `benchmark/exercises/runner.py` — takes agent parameters, a scenario skeleton, and the AGENTS.md cmf assembles from the intent atlas (`--atlas <path>`, or `CMF_ATLAS`) through the scenario's profile; runs both arms and scores each finished workspace with cmv
+- `benchmark/exercises/scoring.py` — the benchmark as a consumer of cmf and cmv: builds both once per invocation (`cargo build -p cmf -p cmv`, binaries located through `cargo metadata`), guards that the scenario's intent snapshot still matches the atlas byte for byte, runs `cmf assemble --manifest`, stages `.context-mixer/cmf-manifest.json` and `cmv.toml` into a trial workspace, runs `cmv check --json`, and maps the report onto the `adherence`/`principles` blocks `aggregate.py` reads; an `unchecked` or `unguided` intent is a harness fault that invalidates the trial
+- `benchmark/exercises/rescore.py` — `cmv check` over each archived workspace against the current atlas; `--dry-run` writes nothing, `--compare` prints per-trial verdict deltas against the stored `metrics.json`
 - `benchmark/exercises/agents.toml` — argv, guidance file locations, and isolation flags per agent CLI
 - `benchmark/exercises/scenarios/<name>/` — `TASK.md`, neutral `input/skeleton/`, intent snapshot and profile, hidden `acceptance/`, and a `reference/` solution that proves the targets are jointly reachable
 
-Scenario-specific knowledge lives in `expected.json` under `check_config`, never
-in `checks.py`. A constant that would have to change per scenario — which
-literals mark the business rules, which symbols count as blocking — belongs to
-the exercise that knows it.
+The harness owns no adherence checks. The validators live in the intent atlas
+beside the records they verify, and cmv runs them. Scenario-specific knowledge
+lives in `expected.json` under `check_config` — which literals mark the
+business rules, which symbols count as blocking — and the runner renders it into
+the trial's `cmv.toml` as one `[intent."<key>"]` table per scored intent (plus
+`baseline_root`, the untouched skeleton). A constant that would have to change
+per scenario belongs to the exercise that knows it, never to a validator.
 
 Validate harness changes against both ends of *every* scenario before trusting
 a run: `--implementation reference` must score full marks and `--skip-agent`
-must score zero. A check that cannot fail is not measuring anything.
+must score zero, both through cmv. A validator that cannot fail is not
+measuring anything.
 
 Three scenarios: `fx-settlement` (Python; structure, naming, typing),
 `probe-fanout` (Python; concurrency and resource lifetime), and `rate-card`
@@ -455,9 +457,9 @@ Three scenarios: `fx-settlement` (Python; structure, naming, typing),
 disjoint. A scenario names its `language` in `expected.json`.
 
 `benchmark/exercises` is in the root `workspace.exclude` list. The Rust scenario
-skeleton, its reference solution, every generated run workspace, and the fact
-extractor are fixtures and tooling — they must stay out of `--workspace` builds,
-the rustdoc gate, and `cargo deny`.
+skeleton, its reference solution, and every generated run workspace are
+fixtures — they must stay out of `--workspace` builds, the rustdoc gate, and
+`cargo deny`.
 
 ## cmv — Context Mixer Verify
 

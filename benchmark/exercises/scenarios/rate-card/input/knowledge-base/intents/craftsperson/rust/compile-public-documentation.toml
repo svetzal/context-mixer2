@@ -11,7 +11,10 @@ capability = "Users can generate and navigate the crate's public API documentati
 threat = "API changes leave rustdoc with broken references, invalid documentation attributes, or documentation-only build failures that ordinary tests miss."
 expectation = "Public types and documentation references will evolve alongside implementation."
 strategy = "Run cargo doc --no-deps as an independent documentation build gate."
-evidence = [{ type = "documentation_gate", description = "cargo doc --no-deps completes successfully without project-owned rustdoc failures.", required = true }]
+evidence = [
+  { type = "documentation_gate", description = "cargo doc --no-deps completes successfully without project-owned rustdoc failures.", required = true },
+  { type = "static-check", language = "rust", run = "checks/rust/compile-public-documentation.py", description = "Every pub item in the library carries a doc comment, or is a module documented by its own //! header, so rustdoc has nothing undocumented to report.", required = true },
+]
 tradeoff = "Building documentation adds CI time and may surface warnings that require work unrelated to runtime behavior."
 scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
 sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#mandatory-quality-gates-default-set-if-repo-doesnt-specify-its-own", summary = "Includes cargo doc --no-deps in the mandatory default Rust quality gate.", confidence = 1.0 }]

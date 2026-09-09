@@ -15,9 +15,15 @@ between the two runs is the measurement.
    argv, guidance file locations, and isolation flags for each CLI.
 2. **A scenario skeleton** — a runnable project plus a `TASK.md` written
    against a fixed public contract.
-3. **An assembled `AGENTS.md`** — produced by running `cmf assemble` over the
-   scenario's own intent snapshot and profile, at run time, so the artifact
-   under test is always the current algorithm's output.
+3. **An assembled `AGENTS.md`** — produced by running `cmf assemble` against
+   the intent atlas (`--atlas <path>`, or `CMF_ATLAS`) through the scenario's
+   own profile, at run time, so the artifact under test is always the current
+   algorithm's output over the current records. The scenario keeps a snapshot
+   of those records under `input/knowledge-base/` as the fixture that documents
+   the slice; before any trial the runner checks every scored record in it
+   against the atlas byte for byte and aborts, naming the keys, if they differ
+   — a drift there means the guidance under test changed, and trials from
+   before and after would not be measuring the same thing.
 
 ## Run
 
@@ -25,6 +31,9 @@ Collecting and analysing are separate commands, on purpose. The scoring rules
 have changed repeatedly; re-analysis must never cost another agent invocation.
 
 ```bash
+# Every collect or re-score needs the intent atlas; --atlas or this.
+export CMF_ATLAS=~/Work/Projects/Personal/guidelines
+
 # Collect. Trials accumulate — asking for 10 when 6 exist runs 4.
 ./benchmark/exercises/run.sh --scenario rate-card --agent claude-opus-5 \
     --arm both --trials 10 --concurrency 4
@@ -45,14 +54,31 @@ never having been run. A run at a different `--confidence` replaces the file
 outright instead of merging, since intervals at two levels must not sit in one
 report claiming a single confidence.
 
-Validate the harness itself without spending an agent invocation:
+Validate the harness itself without spending an agent invocation — both runs
+go through cmv exactly as a real trial does:
 
 ```bash
 # The ceiling: a checked-in solution that satisfies everything.
-./benchmark/exercises/run.sh --implementation reference --arm guided
+./benchmark/exercises/run.sh --scenario rate-card --implementation reference --arm guided
 
 # The floor: score the untouched skeleton.
-./benchmark/exercises/run.sh --skip-agent --arm guided
+./benchmark/exercises/run.sh --scenario rate-card --skip-agent --arm guided
+```
+
+The reference must score full marks and the skeleton zero, in every scenario. A
+conditional intent the skeleton reads as not applicable is a legitimate zero
+(`0/7 (+1 n/a)`); an `unchecked` intent is not — it is a harness fault and the
+run exits nonzero.
+
+When a validator in the atlas is corrected, re-score what is already banked
+rather than collecting again:
+
+```bash
+# Show, per archived trial, which intents would change verdict; write nothing.
+python3 benchmark/exercises/rescore.py --scenario rate-card --compare
+
+# Rewrite the adherence blocks (and the atlas revision they were scored at).
+python3 benchmark/exercises/rescore.py --scenario rate-card
 ```
 
 ## Durability
@@ -160,9 +186,15 @@ files, and would score zero for a reason that has nothing to do with guidance.
 
 **Concurrency.** Trials are independent and workspace-isolated, so
 `--concurrency N` runs N at once; two trials complete in roughly the time of
-one. The cmf assembly runs once per invocation rather than per trial, because
-concurrent `cargo run` in the repo would serialize on a single target-directory
-lock for bytes that are identical anyway.
+one. cmf and cmv are built once per invocation (`cargo build -p cmf -p cmv`,
+binaries found through `cargo metadata`) and then run as plain binaries, so
+trials never wait on cargo's target-directory lock. The cmf assembly likewise
+runs once per invocation: the manifest depends only on the profile and the
+atlas, and the control arm is verified against the same one. Before the pool
+opens, cmv runs once over the untouched skeleton — the Rust validators build
+their fact extractor into a content-addressed cache on first use, with no lock
+around the build, and a run whose validators cannot answer should fail before
+any agent time is spent.
 
 ## What each trial measures
 
@@ -173,11 +205,34 @@ inspects no module layout whatsoever, so any structure can pass it. This is the
 control against the obvious failure mode of a style benchmark: guidance that
 improves adherence while breaking the software.
 
-**Adherence.** `adherence.py` decides, per intent, whether the finished code
-exhibits it — by parsing the code, never by asking a model and never by reading
-the agent's transcript. What an agent said it would do is not evidence that it
-did. Each verdict ships with the signals behind it, so a `false` distinguishes
-"the guidance never arrived" from "it arrived and was partly applied".
+**Adherence.** cmv decides, per intent, whether the finished code exhibits it,
+by running the validator the intent atlas keeps beside that intent's record —
+parsing the code, never asking a model and never reading the agent's
+transcript. What an agent said it would do is not evidence that it did. Each
+verdict ships with the validator's signals, evidence, and `path:line`
+locations, so a `false` distinguishes "the guidance never arrived" from "it
+arrived and was partly applied".
+
+For cmv to verify a workspace it needs two files a real project would keep:
+`.context-mixer/cmf-manifest.json`, the manifest `cmf assemble --manifest`
+wrote naming the intents it composed, and `cmv.toml`, which the runner renders
+from the scenario's `expected.json` — one `[intent."<key>"]` table per scored
+intent carrying its `check_config` plus `baseline_root`, the untouched skeleton
+whose public items the documentation validator subtracts. Both arms receive
+both files, but only after the agent has finished: the manifest names the
+scored intents, and a control-arm agent that could read it would know what it
+was being scored on. No `ecosystems` override is written; the atlas's sensors
+detect the language from the skeleton's `Cargo.toml` or `pyproject.toml`.
+
+cmv's report is mapped onto the `adherence` and `principles` blocks the
+aggregator has always read: `pass` is applicable and followed, `fail` applicable
+and not, `not_applicable` neither. `unchecked` and `unguided` are not verdicts —
+every scored intent has a validator for its scenario's language, so either one
+means the harness failed, not the agent, and the trial is marked invalid with
+the reason under `harness_faults`, exactly as a failed agent invocation is.
+Each `metrics.json` also records `atlas_revision`, `cmv_exit_code`, and the
+full `cmv_report`, so a later validator correction can be told apart from the
+evidence it re-scored.
 
 Verdicts have three states, not two. Some intents are conditional: "mock only
 owned boundaries" binds code that mocks something. An agent that tested
@@ -211,58 +266,37 @@ against the `signals`, not as a finding.
 
 And do not re-score a finished workspace by hand without accounting for staging.
 The Rust hidden suite is copied into `workspace/tests/` after adherence has run;
-re-running `adherence.py` over that directory afterwards counts the harness's own
-file as the agent's integration test layer. Delete the staged file first, or
-trust the `metrics.json` the run wrote.
+running cmv over that directory afterwards counts the harness's own file as the
+agent's integration test layer. `rescore.py` removes the staged file before it
+scores; do the same, or trust the `metrics.json` the run wrote.
 
-## How the checks are built
+## Where the checks live
 
-Four modules, split along the line between what generalizes and what does not.
+Not here. The validators are part of the intent atlas — `checks/<language>/<slug>.py`
+beside the record each one verifies, declared on the record as a `static-check`
+evidence entry, with a calibration gate of their own — and cmv runs them. The
+harness is one more caller of cmv; `scoring.py` is the whole of its
+involvement: build the tools, guard the snapshot, assemble, stage, check, map.
 
-`predicates.py` holds the traversals. They are question forms, not answers:
-*is a symbol used at all* (`calls_to`, `references`, `imported_roots`), *is it
-used there* (`guarded_by_call`, `in_async_context`, `within`), *what shape does
-this construct have* (`defaults`, `keyword_map`, `decorator_names`,
-`class_shape`), and *what did the project declare* (`tool_config`, which finds
-a setting in `pyproject.toml`, `pytest.ini`, `setup.cfg`, or `tox.ini` without
-the caller caring which).
-
-`checks.py` holds one function per intent. Each takes `(workspace, config)` and
-returns a verdict, its signals, and evidence.
-
-`expected.json` holds `check_config` — the facts only one exercise knows. Which
-literals mark its business rules, which symbols count as blocking for its
-domain, which operations must be bounded. A constant that would have to change
-per scenario belongs there. When the first scenario's fee-tier regex was
+What stayed with the exercise is `expected.json`'s `check_config` — the facts
+only one exercise knows. Which literals mark its business rules, which symbols
+count as blocking for its domain, which operations must be bounded. A constant
+that would have to change per scenario belongs there, rendered into the trial's
+`cmv.toml`, never in a validator. When the first scenario's fee-tier regex was
 sitting in the shared scorer, the scorer was not shared; it was one scenario's
 scorer with a second scenario's checks bolted on.
 
-The split was not designed up front. It came out of writing the second
-scenario, where three questions the first had never asked — containment,
-syntactic context, and argument shape — would otherwise have grown three more
-bespoke walks.
-
-`rustfacts/` is a small `syn` binary that emits the same facts for Rust as JSON,
-because Python's `ast` does not reach that far. The runner builds it on demand
-and only for Rust scenarios.
-
-### What a language change does and does not cost
-
-The Rust exercise was built to find out. The four question forms survived, as
-did every structural decision: the check signature, the three-state verdict, the
-`check_config` split, and the calibration discipline. The traversals did not
-survive at all.
-
-Three assumptions turned out to belong to Python rather than to the intents.
-Test scope is a directory in Python and an attribute in Rust, so the
-production/test partition is per module there and per *item* here. Panicking is
-a call in Python and a macro in Rust, invisible to anything that only walks call
-expressions. Substituting a collaborator is patching a name in Python and
-implementing a trait in Rust — a relationship between two definitions rather
-than a string argument.
-
-The lesson for a fourth language: budget for a fact extractor and for the
-partition rule, not for redesigning the checks.
+The checks were written here first, across three scenarios and two languages,
+before they moved. Two lessons from that survive in how the atlas organizes
+them. The split between question forms that generalize (is a symbol used, is it
+used *there*, what shape does a construct have, what did the project declare)
+and the one function per intent that asks them came out of writing the second
+scenario, not out of a design. And a language change costs a fact extractor and
+a partition rule, not a redesign: the Rust exercise kept every structural
+decision — the check signature, the three-state verdict, the `check_config`
+split, the calibration discipline — and none of the traversals, because test
+scope, panicking, and substitution are each a different kind of thing in Rust
+than in Python.
 
 ## Scenario contract
 
@@ -273,8 +307,12 @@ Each directory under `scenarios/` contains:
   scored decision: no existing tests, no domain models, no gateway, and default
   pytest configuration. A skeleton that demonstrates the conventions measures
   whether an agent can copy, not whether guidance works.
-- `input/knowledge-base/` and `input/profile.toml` — the intents cmf sees and
-  the slice requested from them.
+- `input/profile.toml` — the slice requested from the atlas: explicit keys,
+  and the ecosystem the exercise targets so the ecosystem signals can fire.
+- `input/knowledge-base/` — a snapshot of the records the profile selects, kept
+  as the fixture that documents the slice. Scoring reads the atlas, not this;
+  the runner refuses to start if a scored record here no longer matches the
+  atlas's, because that means the guidance under test has changed.
 - `acceptance/` — hidden checks, never present while the agent works.
 - `reference/` — a solution satisfying every acceptance check and every scored
   intent. Its purpose is to prove the targets are simultaneously reachable; a
@@ -305,5 +343,8 @@ discover `*_spec.py`" can. Prefer intents whose behaviour is both specific and
 not what a model does by default — an intent every model already follows
 measures nothing, however true it is.
 
-Write the reference solution before running any agent. If it cannot pass both
-the acceptance suite and every adherence check, the scenario is not ready.
+Every scored intent must carry a validator in the atlas for the scenario's
+language; the runner treats an intent cmv cannot check as a harness fault, not
+as a violation. Write the reference solution before running any agent. If it
+cannot pass both the acceptance suite and every validator, the scenario is not
+ready.

@@ -16,5 +16,10 @@
   "note": "Copied from the elixir-phoenix-craftsperson scenario's catalogue snapshot. The eight python records are the scored slice and are disjoint from fx-settlement's; the four universal records are their specialization parents.",
   "source_scenario": "benchmark/scenarios/elixir-phoenix-craftsperson/input/knowledge-base",
   "skeleton_origin": "written for this exercise; not derived from any existing project",
-  "task_origin": "Scenario task seeded from the DeepSWE benchmark (https://deepswe.datacurve.ai), Datacurve's from-scratch SWE suite, chosen for recency: older suites are increasingly present in model pretraining data, which would measure recall rather than judgement. The task premise comes from DeepSWE; the skeleton does not, per skeleton_origin."
+  "task_origin": "Scenario task seeded from the DeepSWE benchmark (https://deepswe.datacurve.ai), Datacurve's from-scratch SWE suite, chosen for recency: older suites are increasingly present in model pretraining data, which would measure recall rather than judgement. The task premise comes from DeepSWE; the skeleton does not, per skeleton_origin.",
+  "refreshed_from_atlas": {
+    "revision": "32f77ffb3d7fb5ffd4fa95c6e4b6e0aa78de49",
+    "date": "2026-09-08",
+    "note": "On 2026-09-08 the scored records were refreshed from the guidelines intent atlas at revision 32f77ffb3d7fb5ffd4fa95c6e4b6e0aa78de49 to include their static-check evidence entries (the codified validators cmv runs); cmf renders each entry's description into the assembled Require clause, so guided artifacts assembled after this date carry one extra sentence per scored intent compared with the archived trials. The unscored parent records were unchanged."
+  }
 }

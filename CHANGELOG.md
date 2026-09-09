@@ -65,6 +65,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The behavioural-exercise benchmark scores through cmv against the intent
+  atlas.** `benchmark/exercises/runner.py` and `run.sh` take `--atlas <path>`
+  (or `CMF_ATLAS`); cmf assembles each scenario's own profile against that
+  atlas with `--manifest`, every trial workspace receives the manifest at
+  `.context-mixer/cmf-manifest.json` and a `cmv.toml` rendered from the
+  scenario's `check_config` (one `[intent."<key>"]` table per scored intent,
+  plus `baseline_root`), and `cmv check --json` after the agent finishes is
+  the scorer. The new `scoring.py` maps cmv's report onto the `metrics.json`
+  shape `aggregate.py` already reads (`aggregate.py` is unchanged) and
+  additionally records `atlas_revision`, `atlas_moved`, `cmv_exit_code`, and
+  the full `cmv_report`; an `unchecked` or `unguided` intent marks the trial
+  invalid as a harness fault rather than counting as a violation. Before any
+  trial the runner checks every scored record in the scenario's
+  `input/knowledge-base/` snapshot against the atlas byte for byte and aborts,
+  naming the keys, on drift. `rescore.py` is now cmv over each archived
+  workspace (un-staging the Rust hidden suite first), keeps `--dry-run`, and
+  gains `--compare`, which writes nothing and prints per-trial verdict deltas.
+  cmf and cmv are built once per invocation and run as binaries.
+- **The three exercise profiles declare their ecosystem** (`[select]
+  ecosystems = ["python"]` for fx-settlement and probe-fanout, `["rust"]` for
+  rate-card). The explicit keys already fix the selection, so the assembled
+  AGENTS.md is byte-identical; the declaration only lets cmf's mismatch warning
+  and cmv's `profile_mismatch` fire.
 - **The intent atlas has its own crate.** Catalog scanning, profile loading,
   selection (`intent_atlas::selection::select`), and the compile-manifest
   types moved out of cmf into the new `intent-atlas` workspace member — the
@@ -83,6 +106,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   --knowledge-base <path>` is renamed `--atlas <path>`; the old spelling still
   parses as a hidden alias for one release. Nothing shipped with the old
   manifest key, so there is no read-side alias for it.
+
+### Removed
+
+- **The benchmark's own adherence scorer and check library.**
+  `benchmark/exercises/adherence.py`, `checks.py`, `predicates.py`, and the
+  `rustfacts/` fact-extractor crate are gone; the validators live in the
+  intent atlas beside the records they verify (with their own calibration
+  gate) and cmv runs them. The harness no longer builds the extractor — the
+  atlas's validators locate or build it through their own content-addressed
+  cache.
 
 ### Fixed
 

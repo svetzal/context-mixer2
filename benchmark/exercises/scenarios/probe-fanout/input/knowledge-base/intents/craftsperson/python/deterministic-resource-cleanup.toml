@@ -11,7 +11,10 @@ capability = "Files, connections, locks, and dynamic resource groups are reliabl
 threat = "Exceptions, early returns, and cancellation bypass manual cleanup and leak scarce resources."
 expectation = "Resource-using code will gain more branches and failure paths over time."
 strategy = "Manage resources with `with`, custom context managers, `contextlib.suppress`, and ExitStack where resource sets are dynamic."
-evidence = [{ type = "test", description = "Success and exception-path tests verify each acquired resource is released, and review finds no manually paired acquire/release where a context manager applies.", required = true }]
+evidence = [
+  { type = "test", description = "Success and exception-path tests verify each acquired resource is released, and review finds no manually paired acquire/release where a context manager applies.", required = true },
+  { type = "static-check", language = "python", run = "checks/python/deterministic-resource-cleanup.py", description = "Every acquisition of a configured resource symbol (HTTP clients, sessions, files, sockets) happens under a `with` block, a `try`/`finally`, or a context-manager function, and none is left unmanaged.", required = true },
+]
 tradeoff = "Context-manager wrappers add ceremony and can hide the exact point at which cleanup occurs."
 scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
 sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#context-managers", summary = "The source requires context managers for all resources and names tools for custom, suppressed, and dynamic cleanup.", confidence = 1.0 }]

@@ -9,6 +9,9 @@ budget_tokens = 4000
 # eight named behaviours reach the agent's output, so the slice under test must
 # be exactly those eight records and nothing else.
 [select]
+# The explicit keys already fix the selection; declaring the ecosystem only
+# lets the ecosystem signals fire (cmf's mismatch warning, cmv's profile_mismatch).
+ecosystems = ["python"]
 keys = [
   "craftsperson/python/colocated-module-specifications",
   "craftsperson/python/functional-core-imperative-shell",

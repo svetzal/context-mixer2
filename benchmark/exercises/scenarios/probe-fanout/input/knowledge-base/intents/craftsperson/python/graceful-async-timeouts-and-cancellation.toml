@@ -11,7 +11,10 @@ capability = "Asynchronous operations stop within expected bounds and release re
 threat = "Unbounded waits and mishandled cancellation leave requests hung, resources retained, or partial work running."
 expectation = "Networks and upstream services will stall, and application shutdowns or request deadlines will cancel tasks."
 strategy = "Apply explicit asyncio timeouts and handle task cancellation so cleanup and propagation occur correctly."
-evidence = [{ type = "test", description = "Timeout and cancellation tests prove the coroutine terminates within its bound, releases acquired resources, and does not swallow cancellation.", required = true }]
+evidence = [
+  { type = "test", description = "Timeout and cancellation tests prove the coroutine terminates within its bound, releases acquired resources, and does not swallow cancellation.", required = true },
+  { type = "static-check", language = "python", run = "checks/python/graceful-async-timeouts-and-cancellation.py", description = "An explicit timeout bounds every configured awaited operation, and no handler catches `CancelledError` or a bare exception without re-raising it.", required = true },
+]
 tradeoff = "Timeout values can reject slow but valid work, and cancellation-safe cleanup complicates coroutine implementations."
 scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
 sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#asyncawait-best-practices", summary = "The source requires graceful cancellation and illustrates timeout handling with asyncio.timeout.", confidence = 1.0 }]

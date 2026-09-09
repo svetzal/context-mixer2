@@ -23,7 +23,9 @@ vocabulary and file layout. These ask "is this call inside that construct" and
 
 ## What it added to the checker
 
-Writing these eight is what produced `predicates.py`. The fx-settlement checks
+Writing these eight is what produced `predicates.py` (now
+`checks/lib/adherence/predicates.py` in the intent atlas, where the validators
+live). The fx-settlement checks
 each grew their own traversal, which was tolerable at eight and would not have
 been at sixteen. Three primitives were genuinely new:
 

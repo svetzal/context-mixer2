@@ -4,8 +4,10 @@
 > (cmv check, status, explain; source-registry resolution; pinned revision;
 > Rust validators live in the guidelines intent atlas with calibration
 > fixtures; the `intent-atlas` crate is extracted; sensors drive ecosystem
-> detection in cmf and cmv). Phases 5–6 pending. Companion to [CHARTER.md](CHARTER.md),
-> [SPEC.md](SPEC.md), and [SETS.md](SETS.md).
+> detection in cmf and cmv). Phases 5–6 are implemented: all twenty-four
+> validators live in the atlas and the benchmark scores through cmf and cmv.
+> Companion to [CHARTER.md](CHARTER.md), [SPEC.md](SPEC.md), and
+> [SETS.md](SETS.md).
 
 ## Motivation
 
@@ -572,9 +574,11 @@ intent atlas is unchanged and now also covers validators.
    intent atlas with `reference/` and `skeleton/` as their fixtures. cmv on
    the reference scores full marks; on the skeleton, zero. This is the first
    end-to-end proof.
-5. **Python validators migrate.** Sixteen checks, two scenarios.
-6. **Benchmark switches over.** `runner.py` calls cmf and cmv; `rescore.py`
-   reduces to cmv over archives; `adherence.py` retired.
+5. **Python validators migrate.** Done. Sixteen checks, two scenarios, two
+   fixture sets; calibration runs all twenty-four validators.
+6. **Benchmark switches over.** Done. `runner.py` calls cmf and cmv against
+   `--atlas`; `rescore.py` is cmv over archives with `--compare`;
+   `adherence.py`, `checks.py`, `predicates.py`, and `rustfacts/` retired.
 7. **The `intent-atlas` crate.** Done. A pure move: catalog, profile, selection,
    and manifest types leave `cmf/src/` for the new workspace member; cmv's
    dependency on cmf is replaced; the manifest's `knowledge_base` block and

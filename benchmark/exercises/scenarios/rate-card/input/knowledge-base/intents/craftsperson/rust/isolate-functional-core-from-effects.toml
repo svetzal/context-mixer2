@@ -11,7 +11,10 @@ capability = "Business logic can be understood and tested without databases, net
 threat = "I/O and mutation spread through domain logic and make behavior expensive or nondeterministic to test."
 expectation = "Infrastructure integrations and delivery mechanisms will change independently from core policy."
 strategy = "Keep business logic pure and push mutation and side effects to a thin imperative shell."
-evidence = [{ type = "test", description = "Core business tests run without real I/O, runtime services, or external infrastructure.", required = true }]
+evidence = [
+  { type = "test", description = "Core business tests run without real I/O, runtime services, or external infrastructure.", required = true },
+  { type = "static-check", language = "rust", run = "checks/rust/isolate-functional-core-from-effects.py", description = "Modules that hold the business rules perform no filesystem, network, process, or environment access, and the effectful read lives in a module of its own.", required = true },
+]
 tradeoff = "Separating core and shell introduces mapping and orchestration code that can be excessive for simple CRUD."
 scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
 sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#engineering-practices", summary = "Requires a functional core and imperative shell with effects at system boundaries.", confidence = 1.0 }]

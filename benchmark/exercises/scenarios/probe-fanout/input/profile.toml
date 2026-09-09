@@ -9,6 +9,9 @@ budget_tokens = 4000
 # the two exercises measure different guidance rather than the same guidance
 # twice.
 [select]
+# The explicit keys already fix the selection; declaring the ecosystem only
+# lets the ecosystem signals fire (cmf's mismatch warning, cmv's profile_mismatch).
+ecosystems = ["python"]
 keys = [
   "craftsperson/python/deterministic-resource-cleanup",
   "craftsperson/python/graceful-async-timeouts-and-cancellation",

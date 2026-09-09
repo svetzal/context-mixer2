@@ -33,7 +33,8 @@ rule that a check parses code rather than asking a model.
 ## What did not
 
 The traversals, entirely. Python's `ast` has no counterpart reachable from
-Python, so `rustfacts/` — a small `syn` binary — emits the facts as JSON and the
+Python, so `rustfacts/` — a small `syn` binary, now `checks/rustfacts/` in the
+intent atlas — emits the facts as JSON and the
 checks read that instead of a tree.
 
 Three assumptions baked into the Python checks turned out to be Python's, not

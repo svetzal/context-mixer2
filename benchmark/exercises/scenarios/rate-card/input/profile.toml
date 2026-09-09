@@ -7,6 +7,9 @@ budget_tokens = 4000
 
 # Explicit keys. Eight Rust intents, disjoint from both Python exercises.
 [select]
+# The explicit keys already fix the selection; declaring the ecosystem only
+# lets the ecosystem signals fire (cmf's mismatch warning, cmv's profile_mismatch).
+ecosystems = ["rust"]
 keys = [
   "craftsperson/rust/centralize-curated-lint-policy",
   "craftsperson/rust/compile-public-documentation",

@@ -11,7 +11,10 @@ capability = "Tests remain deterministic while exercising meaningful behavior th
 threat = "Mocks of internal or third-party implementation details make tests brittle and reward the current structure rather than behavior."
 expectation = "Core behavior will need controlled substitutes for databases, networks, clocks, and external services."
 strategy = "Prefer in-memory fakes; when mocking is necessary, mock only gateway traits after wrapping third-party crates."
-evidence = [{ type = "test_review", description = "Test doubles implement project-owned edge contracts and do not intercept library internals.", required = true }]
+evidence = [
+  { type = "test_review", description = "Test doubles implement project-owned edge contracts and do not intercept library internals.", required = true },
+  { type = "static-check", language = "rust", run = "checks/rust/prefer-fakes-at-boundaries.py", description = "Tests substitute a collaborator by implementing a project-owned trait with an in-memory fake rather than intercepting library internals.", required = true },
+]
 tradeoff = "Maintaining realistic fakes can require substantial code and behavioral alignment with production adapters."
 scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
 sources = [{ type = "document", ref = "plugins/rust-ecosystem/agents/rust-craftsperson.md#testing-strategy", summary = "Prefers fakes and restricts mocks to gateway traits at the edges.", confidence = 1.0 }]

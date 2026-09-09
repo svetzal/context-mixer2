@@ -11,7 +11,10 @@ capability = "Each function invocation receives independent default mutable stat
 threat = "Python evaluates mutable default arguments once, causing state to leak across calls."
 expectation = "Functions with optional collections will be called repeatedly over long-lived process execution."
 strategy = "Use an immutable sentinel such as None and allocate the mutable value inside the function."
-evidence = [{ type = "test", description = "Two calls that omit the mutable argument return or mutate independent objects, and linting reports no mutable defaults.", required = true }]
+evidence = [
+  { type = "test", description = "Two calls that omit the mutable argument return or mutate independent objects, and linting reports no mutable defaults.", required = true },
+  { type = "static-check", language = "python", run = "checks/python/no-shared-mutable-defaults.py", description = "Functions declare default arguments, and none of those defaults is a mutable literal or a mutable constructor call.", required = true },
+]
 tradeoff = "Sentinel handling adds a branch and can blur the semantic difference between an omitted value and an explicit None."
 scope = { project = "guidelines", paths = ["plugins/python-ecosystem/agents/python-craftsperson.md"] }
 sources = [{ type = "document", ref = "plugins/python-ecosystem/agents/python-craftsperson.md#common-mistakes-to-avoid", summary = "The source identifies shared mutable defaults as a bug and prescribes a None sentinel.", confidence = 1.0 }]
