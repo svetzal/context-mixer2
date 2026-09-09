@@ -15,11 +15,6 @@ jobs:
     name: Quality Gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      # Two parallel rustc jobs instead of one per core: the all-features test
-      # build links tokio + mojentic and has starved hosted runners into being
-      # declared lost. Slower is fine here; the gate must finish with a log.
-      CARGO_BUILD_JOBS: 2
     steps:
       - uses: actions/checkout@v5
 
@@ -51,7 +46,29 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Tests (all features)
-        run: cargo test --all-features
+        env:
+          RUST_BACKTRACE: 1
+        run: |
+          set +e
+          # Streamed through tee and bounded: three tag runs of this step took
+          # the runner down with no log. If it happens again, the watchdog
+          # names the test binary and dumps what is still alive, and the log
+          # is uploaded below regardless of outcome.
+          timeout 600 cargo test --all-features 2>&1 | tee all-features-tests.log | tail -c 200000
+          code=${PIPESTATUS[0]}
+          if [ "$code" = "124" ]; then
+            echo "=== TIMED OUT after 600s; processes still alive:" | tee -a all-features-tests.log
+            ps -eo pid,ppid,pgid,etime,stat,command --forest | tee -a all-features-tests.log
+          fi
+          exit $code
+
+      - name: Upload all-features test log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: quality-gate-all-features-tests-log
+          path: all-features-tests.log
+          retention-days: 7
 
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked
