@@ -130,6 +130,9 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
+          # Only the binary archives; the quality gate's test log is an
+          # artifact too and must not become a release asset.
+          pattern: cmx-*.tar.gz
           path: artifacts
           merge-multiple: true
 
@@ -150,6 +153,9 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
+          # Only the binary archives; the quality gate's test log is an
+          # artifact too and must not become a release asset.
+          pattern: cmx-*.tar.gz
           path: artifacts
           merge-multiple: true
 
