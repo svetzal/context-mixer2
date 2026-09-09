@@ -252,8 +252,8 @@ state directory beside the local lock file.
 
 The manifest is the `--explain` output made durable and given a contract.
 The block was named `knowledge_base` when Phase 1 shipped; it is renamed
-`atlas` with the crate extraction (Phase 7). Nothing has been released, so the
-schema number stays at 1.
+`atlas` with the crate extraction (Phase 7). cmv 3.2.x shipped the old key, so
+the reader accepts both spellings and the schema number stays at 1.
 
 Phase 1 shipped the manifest as specified above, with three concrete details.
 It lives at `.context-mixer/cmf-manifest.json`, written by

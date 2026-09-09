@@ -38,7 +38,9 @@ pub struct Manifest {
     pub schema: u32,
     /// RFC 3339 instant the artifact was compiled, from the `Clock` gateway.
     pub compiled_at: String,
-    /// Where the intent records were read from.
+    /// Where the intent records were read from. Manifests written by cmf
+    /// 3.2.x named this block `knowledge_base`; they still load.
+    #[serde(alias = "knowledge_base")]
     pub atlas: Atlas,
     /// The profile that drove selection.
     pub profile: ProfileRef,
@@ -606,5 +608,30 @@ mod tests {
         let manifest = local_manifest_path(&paths);
         assert_eq!(manifest, PathBuf::from(".context-mixer/cmf-manifest.json"));
         assert_eq!(manifest.parent(), paths.lock_path(InstallScope::Local).parent());
+    }
+
+    #[test]
+    fn manifests_written_before_the_atlas_rename_still_load() {
+        let old = r#"{
+  "schema": 1,
+  "compiled_at": "2026-09-06T00:00:00+00:00",
+  "knowledge_base": { "path": "/kb", "revision": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678" },
+  "profile": { "id": "shipping", "version": "0.1.0" },
+  "artifact": { "name": "AGENTS", "surface": "agent", "checksum": "sha256:00" },
+  "intents": [],
+  "dropped": []
+}"#;
+        let manifest: Manifest = serde_json::from_str(old).expect("3.2.x manifest loads");
+        assert_eq!(manifest.atlas.path, PathBuf::from("/kb"));
+        assert_eq!(manifest.atlas.revision.as_deref(), Some(HASH));
+        assert!(
+            manifest.profile.ecosystems.is_empty(),
+            "absent ecosystems read as none declared"
+        );
+        let rewritten = manifest.to_json().unwrap();
+        assert!(
+            rewritten.contains("\"atlas\"") && !rewritten.contains("knowledge_base"),
+            "{rewritten}"
+        );
     }
 }

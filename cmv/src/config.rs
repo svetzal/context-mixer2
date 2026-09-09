@@ -25,8 +25,9 @@ pub const DEFAULT_VALIDATOR_TIMEOUT_SECONDS: u64 = 60;
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
     /// Ecosystems to verify as, replacing the atlas's sensor detection
-    /// entirely when present.
-    #[serde(default)]
+    /// entirely when present. cmv 3.2.x called this key `languages`; it still
+    /// parses.
+    #[serde(default, alias = "languages")]
     pub ecosystems: Option<Vec<String>>,
     /// Per-validator timeout; [`DEFAULT_VALIDATOR_TIMEOUT_SECONDS`] when absent.
     #[serde(default)]
@@ -144,5 +145,13 @@ blocking_symbols = ["time.sleep"]
     fn malformed_toml_is_rejected_with_the_path() {
         let error = load_with("ecosystems = [\n").unwrap_err();
         assert!(format!("{error:#}").contains("could not parse /project/cmv.toml"));
+    }
+
+    #[test]
+    fn languages_key_from_cmv_3_2_still_parses_as_ecosystems() {
+        let fs = FakeFilesystem::new();
+        fs.add_file("/project/cmv.toml", "languages = [\"rust\"]\n");
+        let config = load(Path::new("/project"), &fs).unwrap();
+        assert_eq!(config.ecosystems.as_deref(), Some(&["rust".to_string()][..]));
     }
 }

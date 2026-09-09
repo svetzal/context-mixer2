@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validator-bearing intent `unchecked` with `atlas declares no sensors; set
   ecosystems in cmv.toml to override`, which `status` and `explain` echo.
   Renamed accordingly: `cmv.toml`'s `languages` is now `ecosystems` (no
-  alias; nothing shipped), the `check`/`status`/`explain` reports carry
+  alias kept: `languages` still parses), the `check`/`status`/`explain` reports carry
   `ecosystems` where they carried `languages`, and the unchecked reason
   reads `no validator for ecosystems [..]`. `check` gains `profile_mismatch`
   (the manifest profile's ecosystems detection did not find) with an
@@ -104,8 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "knowledge base" — `atlas has moved: …`, the `Atlas:` line in `cmv status`,
   `cmv explain`, and `cmf status`, and `record not in atlas`. `cmv
   --knowledge-base <path>` is renamed `--atlas <path>`; the old spelling still
-  parses as a hidden alias for one release. Nothing shipped with the old
-  manifest key, so there is no read-side alias for it.
+  parses as a hidden alias for one release, and a manifest written by cmf 3.2.x
+  with the old `knowledge_base` key still loads (read-side alias); cmf writes
+  `atlas` from now on.
 
 ### Removed
 
