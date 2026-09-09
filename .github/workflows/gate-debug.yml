@@ -11,7 +11,7 @@ on:
     tags: ["debug-*"]
 
 permissions:
-  contents: read
+  contents: write # mirror release.yml exactly; this workflow still writes nothing
 
 env:
   CARGO_TERM_COLOR: always
@@ -39,8 +39,22 @@ jobs:
           nproc; free -m; df -h / | tail -1
           git rev-parse HEAD; git status --short | head
 
-      - name: Build test binaries
-        run: timeout 900 cargo test --all-features --no-run
+      # The preceding steps of release.yml's quality gate, in the same order;
+      # the hang only reproduces after them.
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy (default features)
+        run: timeout 900 cargo clippy --all-targets -- -D warnings
+
+      - name: Tests (default features)
+        run: timeout 900 cargo test 2>&1 | tail -c 100000
+
+      - name: Processes left behind by the default test run
+        run: ps -eo pid,ppid,pgid,etime,stat,command --forest | grep -vE 'ps -eo|grep|Runner|bash|node' | tail -20
+
+      - name: Clippy (all features)
+        run: timeout 900 cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Run tests exactly as the release gate does, with a watchdog
         env:
