@@ -32,12 +32,14 @@ multiple-versions = "warn"
 # These are tracked explicitly so `cargo deny check` stays warning-free while
 # we retain duplicate detection for anything newly introduced.
 skip = [
+    { crate = "base64", reason = "reqwest 0.13 uses base64 0.23 while hyper-util (via hyper-rustls) still uses 0.22, all under mojentic" },
     { crate = "block-buffer", reason = "sha1 and sha2 currently pull different major lines via mojentic's websocket stack" },
     { crate = "core-foundation", reason = "reqwest's TLS stack currently mixes transitive macOS crates across versions" },
     { crate = "cpufeatures", reason = "sha1 and sha2 currently pull different major lines via mojentic's websocket stack" },
     { crate = "crypto-common", reason = "sha1 and sha2 currently pull different major lines via mojentic's websocket stack" },
     { crate = "digest", reason = "sha1 and sha2 currently pull different major lines via mojentic's websocket stack" },
     { crate = "getrandom", reason = "runtime, build, and test-only dependencies currently require separate major lines" },
+    { crate = "syn", reason = "proc-macro ecosystem is mid-migration from syn 2 to syn 3 (clap_derive/async-trait on 3, others on 2)" },
     { crate = "r-efi", reason = "pulled only through the split getrandom major versions in the transitive graph" },
 ]
 
