@@ -26,3 +26,9 @@ missing_panics_doc = "allow"
 [workspace.lints.rust]
 unsafe_code = "deny"
 missing_docs = "warn"
+
+# Dependencies build without debug info; our own crates keep it. Backtraces
+# and debuggers still work in our code, but dependency frames lose line
+# numbers. This cuts target/debug by about 40% on macOS.
+[profile.dev.package."*"]
+debug = false
