@@ -1,1 +1,3 @@
 /results/
+# Cargo build output from scenario references, skeletons and tooling
+target/
