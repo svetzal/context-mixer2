@@ -299,3 +299,77 @@ fn sync_uninstalled_skill_errors() {
     .unwrap_err();
     assert!(err.to_string().contains("not installed"));
 }
+
+// --- sync carries the winner's source baseline to same-source losers ---
+
+/// Track `name` for `platform` at global scope from `repo`, with the given
+/// recorded `source_checksum`.
+fn track_from(t: &TestContext, platform: Platform, name: &str, repo: &str, source_checksum: &str) {
+    let mut entry = make_lock_entry_builder(ArtifactKind::Skill, repo, name);
+    entry.source_checksum = source_checksum.to_string();
+    save_lock_with_entry(
+        &t.fs,
+        &t.paths.with_platform(platform),
+        name,
+        entry,
+        InstallScope::Global,
+    );
+}
+
+fn recorded_source_checksum(t: &TestContext, platform: Platform, name: &str) -> String {
+    let pv = t.paths.with_platform(platform);
+    crate::lockfile::load(InstallScope::Global, &t.fs, &pv).unwrap().packages[name]
+        .source_checksum
+        .clone()
+}
+
+fn sync_newest(t: &TestContext, name: &str) {
+    sync(name, ArtifactKind::Skill, InstallScope::Global, None, RunMode::Apply, &t.ctx()).unwrap();
+}
+
+#[test]
+fn sync_carries_the_winners_source_baseline_to_a_loser_tracking_the_same_source() {
+    // The loser now holds the winner's content, so it descends from the
+    // source state the winner was installed from — not its own old one.
+    let t = TestContext::new();
+    place_skill(&t, Platform::Claude, "voice", "1.3.0");
+    place_skill(&t, Platform::Codex, "voice", "1.2.0");
+    track_from(&t, Platform::Claude, "voice", "guidelines", "sha256:src-1.3.0");
+    track_from(&t, Platform::Codex, "voice", "guidelines", "sha256:src-1.2.0");
+
+    sync_newest(&t, "voice");
+
+    assert_eq!(recorded_source_checksum(&t, Platform::Codex, "voice"), "sha256:src-1.3.0");
+    assert_eq!(recorded_source_checksum(&t, Platform::Claude, "voice"), "sha256:src-1.3.0");
+}
+
+#[test]
+fn sync_leaves_the_source_baseline_of_a_loser_tracking_another_source() {
+    let t = TestContext::new();
+    place_skill(&t, Platform::Claude, "voice", "1.3.0");
+    place_skill(&t, Platform::Codex, "voice", "1.2.0");
+    track_from(&t, Platform::Claude, "voice", "guidelines", "sha256:src-1.3.0");
+    track_from(&t, Platform::Codex, "voice", "marketplace", "sha256:market");
+
+    sync_newest(&t, "voice");
+
+    assert_eq!(recorded_source_checksum(&t, Platform::Codex, "voice"), "sha256:market");
+}
+
+#[test]
+fn sync_leaves_source_baselines_alone_when_the_winners_own_entries_disagree() {
+    // Codex and Pi share ~/.agents/skills: one winning copy, two baselines.
+    // With no single answer to "which source state is this?", carry nothing.
+    let t = TestContext::new();
+    set_managed(&t, &[Platform::Claude, Platform::Codex, Platform::Pi]);
+    place_skill(&t, Platform::Codex, "voice", "1.3.0");
+    place_skill(&t, Platform::Claude, "voice", "1.2.0");
+    track_from(&t, Platform::Codex, "voice", "guidelines", "sha256:src-a");
+    track_from(&t, Platform::Pi, "voice", "guidelines", "sha256:src-b");
+    track_from(&t, Platform::Claude, "voice", "guidelines", "sha256:src-1.2.0");
+
+    sync_newest(&t, "voice");
+
+    assert_eq!(recorded_source_checksum(&t, Platform::Claude, "voice"), "sha256:src-1.2.0");
+    assert_eq!(recorded_source_checksum(&t, Platform::Pi, "voice"), "sha256:src-b");
+}

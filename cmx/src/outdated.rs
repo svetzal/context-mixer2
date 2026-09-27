@@ -12,7 +12,7 @@ use crate::local_modification;
 use crate::scope_alias;
 use crate::source_iter;
 use crate::source_iter::SourceArtifactInfo;
-use crate::types::{ArtifactKind, InstallScope, LockFile};
+use crate::types::{ArtifactKind, InstallScope, LockEntry, LockFile};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -97,6 +97,36 @@ pub fn outdated(ctx: &AppContext<'_>) -> Result<OutdatedReport> {
     Ok(OutdatedReport(rows))
 }
 
+/// Is the install recorded by `entry` behind its source's current content?
+/// The one staleness decision behind `cmx outdated` and `cmx list`.
+///
+/// This is [`source_outdated`] (no entry → untracked; the recorded
+/// `source_checksum` moved; a version newly present in the source) with one
+/// exception: an entry whose recorded `installed_checksum` equals the source's
+/// current checksum is current. What it installed already *is* the source's
+/// current content, so a stale `source_checksum` beside it (written by an older
+/// cmx, or by an install that read transient files in the source clone) is
+/// bookkeeping, not staleness.
+///
+/// The exception cannot misfire for Codex agents: their `installed_checksum`
+/// is that of the generated TOML projection, which never equals the Markdown
+/// source's checksum, so they are always decided by the plain rule.
+///
+/// `cmx-core`'s `source_outdated` is left as is — it is part of the conformance
+/// contract shared with the TypeScript port — and `install --all`/`update
+/// --all` keep using it to decide what to reinstall, which repairs such a
+/// stale baseline as a side effect.
+pub(crate) fn behind_source(
+    entry: Option<&LockEntry>,
+    source_checksum: &str,
+    source_version: Option<&str>,
+) -> bool {
+    if entry.is_some_and(|entry| entry.installed_checksum == source_checksum) {
+        return false;
+    }
+    source_outdated(entry, source_checksum, source_version)
+}
+
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
@@ -163,11 +193,8 @@ fn compare_versions(
         for source_info in source_infos {
             let available_v = source_info.version.clone();
 
-            if !source_outdated(
-                ia.lock_entry,
-                &source_info.checksum,
-                source_info.version.as_deref(),
-            ) {
+            if !behind_source(ia.lock_entry, &source_info.checksum, source_info.version.as_deref())
+            {
                 continue;
             }
 
@@ -200,8 +227,53 @@ mod tests {
         save_lock_with_entry, setup_empty_sources, setup_source_with_versioned_agent,
         setup_sources, versioned_agent_content,
     };
-    use crate::types::{ArtifactKind, InstallScope, InstalledArtifact, LockFile};
+    use crate::types::{ArtifactKind, InstallScope, InstalledArtifact, LockEntry, LockFile};
     use std::collections::{BTreeMap, HashMap};
+
+    // --- behind_source ---
+
+    fn entry(source_checksum: &str, installed_checksum: &str, version: Option<&str>) -> LockEntry {
+        let mut entry = make_lock_entry_with_checksum(
+            ArtifactKind::Skill,
+            version,
+            "guidelines",
+            "voice",
+            source_checksum,
+        );
+        entry.installed_checksum = installed_checksum.to_string();
+        entry
+    }
+
+    #[test]
+    fn behind_source_untracked_is_behind() {
+        assert!(behind_source(None, "sha256:now", Some("1.0.0")));
+    }
+
+    #[test]
+    fn behind_source_matching_baseline_is_current() {
+        let e = entry("sha256:now", "sha256:now", Some("1.0.0"));
+        assert!(!behind_source(Some(&e), "sha256:now", Some("1.0.0")));
+    }
+
+    #[test]
+    fn behind_source_source_edited_without_version_bump_is_behind() {
+        let e = entry("sha256:then", "sha256:then", Some("1.0.0"));
+        assert!(behind_source(Some(&e), "sha256:now", Some("1.0.0")));
+    }
+
+    #[test]
+    fn behind_source_stale_source_baseline_over_current_content_is_current() {
+        let e = entry("sha256:stale", "sha256:now", Some("1.3.0"));
+        assert!(!behind_source(Some(&e), "sha256:now", Some("1.3.0")));
+    }
+
+    #[test]
+    fn behind_source_version_newly_in_source_is_behind_unless_content_is_current() {
+        let old = entry("sha256:now", "sha256:then", None);
+        assert!(behind_source(Some(&old), "sha256:now", Some("1.0.0")));
+        let current = entry("sha256:now", "sha256:now", None);
+        assert!(!behind_source(Some(&current), "sha256:now", Some("1.0.0")));
+    }
 
     #[test]
     fn compare_versions_emits_outdated_row_when_checksum_differs() {

@@ -145,10 +145,10 @@ pub struct DoctorArtifact {
     /// The source it came from (lock provenance), when all copies agree.
     pub source: Option<String>,
     /// The lock entry's recorded `source_checksum`, when all copies agree;
-    /// `None` if they differ or no copy is tracked. Feeds `cmx list`'s
-    /// checksum-aware outdated decision (`artifact_status::source_outdated`),
-    /// the same content-based comparison `cmx install`/`cmx outdated` use,
-    /// rather than a bare installed-vs-available version-string comparison.
+    /// `None` if they differ or no copy is tracked. Not a staleness signal:
+    /// per-platform baselines may legitimately disagree over current content,
+    /// so `cmx list` judges each tracked platform's lock entry instead (via
+    /// `outdated::behind_source`).
     pub source_checksum: Option<String>,
     /// The distinct install locations it occupies.
     pub locations: Vec<PathBuf>,

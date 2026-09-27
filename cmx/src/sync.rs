@@ -273,9 +273,14 @@ fn gather_copies(
 /// Overwrite each diverging copy with the winner's content, then refresh every
 /// tracked lock entry (winner + targets) so they agree on checksum and version.
 /// Copies with no lock entry (external) are left untracked — only their files
-/// are equalized. Unlike `promote`'s equivalent, `source_checksum` is left
-/// untouched: sync reconciles installed copies against one another, not
-/// against the source.
+/// are equalized.
+///
+/// `source_checksum` follows the content only where provenance is unambiguous:
+/// a copy that now holds the winner's content descends from the source state
+/// the winner was installed from, so an entry tracking the **same source repo**
+/// takes the winner's recorded `source_checksum` (see
+/// [`winner_source_baseline`]). Entries tracking another repo, and every entry
+/// when the winner's baseline is unknown or ambiguous, keep theirs.
 fn apply_winner(
     name: &str,
     kind: ArtifactKind,
@@ -295,18 +300,76 @@ fn apply_winner(
         .chain(std::iter::once(&winner))
         .flat_map(|copy_| copy_.platforms.iter().copied())
         .collect();
-    crate::lock_baseline::refresh_baseline(
-        name,
-        scope,
-        &platforms,
-        &crate::lock_baseline::BaselineUpdate {
-            checksum: &winner_checksum,
-            version: winner.version.as_deref(),
-            source_checksum: None,
-            now: &now,
-        },
-        ctx,
-    )
+
+    let baseline = winner_source_baseline(name, kind, scope, winner, ctx)?;
+    let mut same_source = Vec::new();
+    let mut other = Vec::new();
+    for platform in platforms {
+        let repo = lock_entry(name, kind, scope, platform, ctx)?.map(|entry| entry.source.repo);
+        match (&baseline, repo) {
+            (Some((winner_repo, _)), Some(repo)) if *winner_repo == repo => {
+                same_source.push(platform);
+            }
+            _ => other.push(platform),
+        }
+    }
+
+    let winner_source_checksum = baseline.as_ref().map(|(_, checksum)| checksum.as_str());
+    for (group, source_checksum) in [(&same_source, winner_source_checksum), (&other, None)] {
+        crate::lock_baseline::refresh_baseline(
+            name,
+            scope,
+            group,
+            &crate::lock_baseline::BaselineUpdate {
+                checksum: &winner_checksum,
+                version: winner.version.as_deref(),
+                source_checksum,
+                now: &now,
+            },
+            ctx,
+        )?;
+    }
+    Ok(())
+}
+
+/// The source baseline the winning copy descends from, as `(repo,
+/// source_checksum)`: known only when every lock entry tracking the winner's
+/// location agrees on both. `None` when nothing tracks it (an external copy)
+/// or when platforms sharing its directory disagree — there is then no single
+/// answer to carry.
+fn winner_source_baseline(
+    name: &str,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    winner: &Copy,
+    ctx: &AppContext<'_>,
+) -> Result<Option<(String, String)>> {
+    let mut baselines = std::collections::BTreeSet::new();
+    for &platform in &winner.platforms {
+        if let Some(entry) = lock_entry(name, kind, scope, platform, ctx)? {
+            baselines.insert((entry.source.repo, entry.source_checksum));
+        }
+    }
+    Ok(if baselines.len() == 1 {
+        baselines.pop_first()
+    } else {
+        None
+    })
+}
+
+/// `name`'s lock entry of `kind` for `platform` at `scope`, if any.
+fn lock_entry(
+    name: &str,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    platform: Platform,
+    ctx: &AppContext<'_>,
+) -> Result<Option<crate::types::LockEntry>> {
+    let pv = ctx.paths.with_platform(platform);
+    Ok(crate::lockfile::load(scope, ctx.fs, &pv)?
+        .packages
+        .remove(name)
+        .filter(|entry| entry.artifact_type == kind))
 }
 
 // ---------------------------------------------------------------------------

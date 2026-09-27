@@ -4,13 +4,13 @@ use crate::error::Result;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-use crate::artifact_status;
 use crate::context::AppContext;
 use crate::doctor::{self, ArtifactState};
 use crate::flags::SurveyScope;
+use crate::outdated;
 use crate::source_iter::{self, SourceArtifactInfo};
 use crate::table::Table;
-use crate::types::{ArtifactKind, InstallScope, LockEntry, LockSource};
+use crate::types::{ArtifactKind, InstallScope, LockEntry};
 
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -154,19 +154,21 @@ fn display_source(source: Option<&str>) -> String {
 /// Decide `Ok` vs `Outdated` (and the other status arms) for one artifact.
 ///
 /// `Ok` is a **content** claim, not just a version-string match: it is
-/// decided via [`artifact_status::source_outdated`], the same checksum-aware
-/// comparison `cmx install`/`cmx outdated` use, so a source artifact edited
-/// without a version bump is correctly reported `Outdated` here too, instead
-/// of a bare `installed == available` string comparison that would miss it.
-/// `lock_source_checksum` is the checksum recorded at install time (from the
-/// lock entry, via [`crate::doctor::DoctorArtifact::source_checksum`]);
+/// decided per tracked lock entry via [`outdated::behind_source`], the same
+/// checksum-aware decision `cmx outdated` makes, so a source artifact edited
+/// without a version bump is reported `Outdated` here too.
+///
+/// `tracked` holds the lock entry of every platform tracking the artifact at
+/// its scope; the artifact is `Outdated` when **any** of them is behind. The
+/// entries are judged one by one, never through an aggregate, because
+/// per-platform baselines may legitimately disagree (one platform's stale
+/// `source_checksum` over content that is current is not staleness). With no
+/// tracked entry the artifact is untracked, which reads as `Outdated`.
 /// `current_source_checksum` is the source's checksum right now.
 fn list_status(
-    installed: Option<&str>,
     available: &AvailableVersion,
     deprecated: bool,
-    kind: ArtifactKind,
-    lock_source_checksum: Option<&str>,
+    tracked: &[&LockEntry],
     current_source_checksum: Option<&str>,
 ) -> ListStatus {
     if deprecated {
@@ -185,27 +187,15 @@ fn list_status(
         return ListStatus::Outdated;
     };
 
-    // A synthetic lock entry carrying just the two fields `source_outdated`
-    // reads (`version`, `source_checksum`) — `DoctorArtifact` aggregates
-    // across install locations rather than preserving the underlying
-    // `LockEntry`, so this reconstructs an equivalent view instead of
-    // re-deriving the outdated rule inline.
-    let lock_entry = lock_source_checksum.map(|checksum| {
-        LockEntry::new(
-            kind,
-            installed.map(str::to_string),
-            LockSource::new(String::new(), String::new()),
-            checksum.to_string(),
-            String::new(),
-            String::new(),
-        )
-    });
-
-    if artifact_status::source_outdated(
-        lock_entry.as_ref(),
-        current_checksum,
-        Some(available_version),
-    ) {
+    let behind = |entry: Option<&LockEntry>| {
+        outdated::behind_source(entry, current_checksum, Some(available_version))
+    };
+    let is_behind = if tracked.is_empty() {
+        behind(None)
+    } else {
+        tracked.iter().any(|&entry| behind(Some(entry)))
+    };
+    if is_behind {
         ListStatus::Outdated
     } else {
         ListStatus::Ok
@@ -246,6 +236,11 @@ fn rows_by_scope(
 ) -> Result<BTreeMap<InstallScope, Vec<Row>>> {
     let report = doctor::survey(SurveyScope::GlobalAndLocal, ctx)?;
     let source_versions = source_iter::all_with_checksums(ctx)?;
+    let locks = doctor::load_all_locks(
+        ctx,
+        &InstallScope::ALL,
+        &crate::config::managed_or_all_platforms(ctx.fs, ctx.paths)?,
+    )?;
 
     let mut by_scope: BTreeMap<InstallScope, Vec<Row>> = BTreeMap::new();
     for a in report
@@ -258,6 +253,13 @@ fn rows_by_scope(
         let preferred = preferred_source_info(infos, a.source.as_deref());
         let deprecated = preferred.is_some_and(|i| i.deprecated);
         let current_source_checksum = preferred.map(|i| i.checksum.as_str());
+        let tracked: Vec<&LockEntry> = a
+            .tools
+            .iter()
+            .filter_map(|&platform| locks.get(&(platform, a.scope)))
+            .filter_map(|lock| lock.packages.get(&a.name))
+            .filter(|entry| entry.artifact_type == a.kind)
+            .collect();
 
         by_scope.entry(a.scope).or_default().push(Row {
             name: a.name.clone(),
@@ -268,14 +270,7 @@ fn rows_by_scope(
             },
             source: a.source.clone(),
             platforms: a.tools.iter().map(ToString::to_string).collect(),
-            status: list_status(
-                a.version.as_deref(),
-                &available,
-                deprecated,
-                a.kind,
-                a.source_checksum.as_deref(),
-                current_source_checksum,
-            ),
+            status: list_status(&available, deprecated, &tracked, current_source_checksum),
         });
     }
     Ok(by_scope)
@@ -314,6 +309,7 @@ fn available_version(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::platform::Platform;
     use crate::test_support::{TestContext, setup_source, versioned_skill_content};
 
     fn make_row(name: &str) -> Row {
@@ -373,61 +369,44 @@ mod tests {
 
     // --- list_status ---
 
+    fn tracked_entry(source_checksum: &str, installed_checksum: &str) -> LockEntry {
+        let mut entry = crate::test_support::make_lock_entry_with_checksum(
+            ArtifactKind::Agent,
+            Some("1.0"),
+            "guidelines",
+            "agents/a.md",
+            source_checksum,
+        );
+        entry.installed_checksum = installed_checksum.to_string();
+        entry
+    }
+
+    fn version(v: &str) -> AvailableVersion {
+        AvailableVersion::Version(v.to_string())
+    }
+
     #[test]
     fn list_status_distinguishes_ok_outdated_unversioned_missing_and_deprecated() {
+        let same = tracked_entry("sha256:same", "sha256:same");
+        let old = tracked_entry("sha256:old", "sha256:old");
         assert_eq!(
-            list_status(
-                Some("1.0"),
-                &AvailableVersion::Version("1.0".to_string()),
-                false,
-                ArtifactKind::Agent,
-                Some("sha256:same"),
-                Some("sha256:same"),
-            ),
+            list_status(&version("1.0"), false, &[&same], Some("sha256:same")),
             ListStatus::Ok
         );
         assert_eq!(
-            list_status(
-                Some("1.0"),
-                &AvailableVersion::Version("2.0".to_string()),
-                false,
-                ArtifactKind::Agent,
-                Some("sha256:old"),
-                Some("sha256:new"),
-            ),
+            list_status(&version("2.0"), false, &[&old], Some("sha256:new")),
             ListStatus::Outdated
         );
         assert_eq!(
-            list_status(
-                Some("1.0"),
-                &AvailableVersion::Unversioned,
-                false,
-                ArtifactKind::Agent,
-                None,
-                None,
-            ),
+            list_status(&AvailableVersion::Unversioned, false, &[], None),
             ListStatus::Unversioned
         );
         assert_eq!(
-            list_status(
-                Some("1.0"),
-                &AvailableVersion::SourceMissing,
-                false,
-                ArtifactKind::Agent,
-                None,
-                None,
-            ),
+            list_status(&AvailableVersion::SourceMissing, false, &[], None),
             ListStatus::SourceMissing
         );
         assert_eq!(
-            list_status(
-                Some("1.0"),
-                &AvailableVersion::Version("1.0".to_string()),
-                true,
-                ArtifactKind::Agent,
-                Some("sha256:same"),
-                Some("sha256:same"),
-            ),
+            list_status(&version("1.0"), true, &[&same], Some("sha256:same")),
             ListStatus::Deprecated
         );
     }
@@ -436,17 +415,36 @@ mod tests {
     fn list_status_outdated_when_checksum_differs_despite_matching_version_string() {
         // Regression: `list_status` used to compare version strings only, so a
         // source edited without a version bump incorrectly reported `Ok`.
+        let old = tracked_entry("sha256:old", "sha256:old");
         assert_eq!(
-            list_status(
-                Some("1.0"),
-                &AvailableVersion::Version("1.0".to_string()),
-                false,
-                ArtifactKind::Agent,
-                Some("sha256:old"),
-                Some("sha256:new"),
-            ),
+            list_status(&version("1.0"), false, &[&old], Some("sha256:new")),
             ListStatus::Outdated,
             "matching version strings with a changed checksum must be Outdated, not Ok"
+        );
+    }
+
+    #[test]
+    fn list_status_untracked_is_outdated() {
+        assert_eq!(
+            list_status(&version("1.0"), false, &[], Some("sha256:x")),
+            ListStatus::Outdated
+        );
+    }
+
+    #[test]
+    fn list_status_judges_each_tracked_entry_rather_than_an_aggregate() {
+        let current = tracked_entry("sha256:now", "sha256:now");
+        let stale_baseline = tracked_entry("sha256:stale", "sha256:now");
+        let behind = tracked_entry("sha256:then", "sha256:then");
+        assert_eq!(
+            list_status(&version("1.0"), false, &[&current, &stale_baseline], Some("sha256:now")),
+            ListStatus::Ok,
+            "disagreeing baselines over current content are not outdated"
+        );
+        assert_eq!(
+            list_status(&version("1.0"), false, &[&current, &behind], Some("sha256:now")),
+            ListStatus::Outdated,
+            "any tracked entry really behind makes the artifact outdated"
         );
     }
 
@@ -494,8 +492,6 @@ mod tests {
 
     #[test]
     fn list_shows_platforms_and_clean_source_across_platforms() {
-        use crate::platform::Platform;
-
         let t = TestContext::new();
         setup_source(&t.fs, &t.paths, "guidelines", "/src");
         t.fs.add_file("/src/shared/SKILL.md", versioned_skill_content("s", "1.0.0"));
@@ -541,7 +537,6 @@ mod tests {
 
     #[test]
     fn list_reads_codex_agent_version_from_preserved_frontmatter() {
-        use crate::platform::Platform;
         use crate::test_support::metadata_versioned_agent_content;
         use std::path::Path;
 
@@ -601,8 +596,6 @@ mod tests {
 
     #[test]
     fn list_reports_outdated_when_source_content_changes_without_version_bump() {
-        use crate::platform::Platform;
-
         let t = TestContext::new();
         setup_source(&t.fs, &t.paths, "guidelines", "/src");
         t.fs.add_file("/src/shared/SKILL.md", versioned_skill_content("s", "1.0.0"));
@@ -638,8 +631,6 @@ mod tests {
 
     #[test]
     fn list_excludes_external_artifacts() {
-        use crate::platform::Platform;
-
         let t = TestContext::new();
         crate::test_support::setup_empty_sources(&t.fs, &t.paths);
         let mine = t
@@ -669,5 +660,90 @@ mod tests {
         let names_all: Vec<&str> =
             out_all.rows.values().flatten().map(|r| r.name.as_str()).collect();
         assert!(names_all.contains(&"apple"), "list --all includes external");
+    }
+
+    // --- per-platform baselines that disagree ---
+
+    /// Put byte-identical copies of `/src/voice` in each platform's global
+    /// skill dir, tracked with the given `(source_checksum, installed_checksum)`.
+    fn install_voice_copies(t: &TestContext, baselines: &[(Platform, &str, &str)]) {
+        for &(platform, source_checksum, installed_checksum) in baselines {
+            let pv = t.paths.with_platform(platform);
+            let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Global).unwrap();
+            t.fs.add_file(
+                dir.join("voice").join("SKILL.md"),
+                versioned_skill_content("v", "1.3.0"),
+            );
+            let mut entry = crate::test_support::make_lock_entry_with_checksum(
+                ArtifactKind::Skill,
+                Some("1.3.0"),
+                "guidelines",
+                "voice",
+                source_checksum,
+            );
+            entry.installed_checksum = installed_checksum.to_string();
+            crate::lockfile::mutate(InstallScope::Global, &t.fs, &pv, |l| {
+                l.packages.insert("voice".to_string(), entry);
+            })
+            .unwrap();
+        }
+    }
+
+    fn voice_source(t: &TestContext) -> String {
+        setup_source(&t.fs, &t.paths, "guidelines", "/src");
+        t.fs.add_file("/src/voice/SKILL.md", versioned_skill_content("v", "1.3.0"));
+        crate::checksum::checksum_dir(std::path::Path::new("/src/voice"), &t.fs).unwrap()
+    }
+
+    fn voice_status(t: &TestContext) -> ListStatus {
+        let out = list_kind(ArtifactKind::Skill, false, &t.ctx()).unwrap();
+        out.rows[&InstallScope::Global]
+            .iter()
+            .find(|r| r.name == "voice")
+            .expect("listed")
+            .status
+    }
+
+    #[test]
+    fn list_and_outdated_agree_a_stale_source_baseline_over_current_content_is_ok() {
+        // Regression from real data: claude's baseline is current; codex's and
+        // hermes' recorded source_checksum is stale, but the content they
+        // installed is the source's current content.
+        let t = TestContext::new();
+        let current = voice_source(&t);
+        install_voice_copies(
+            &t,
+            &[
+                (Platform::Claude, &current, &current),
+                (Platform::Codex, "sha256:e5ef-stale", &current),
+                (Platform::Hermes, "sha256:e5ef-stale", &current),
+            ],
+        );
+
+        assert_eq!(voice_status(&t), ListStatus::Ok);
+        for platform in [Platform::Claude, Platform::Codex, Platform::Hermes] {
+            let pv = t.paths.with_platform(platform);
+            let report = crate::outdated::outdated(&t.ctx().with_paths(&pv)).unwrap();
+            assert!(
+                report.0.iter().all(|r| r.name != "voice"),
+                "{platform}: outdated must omit it: {:?}",
+                report.0
+            );
+        }
+    }
+
+    #[test]
+    fn list_reports_outdated_when_one_disagreeing_copy_is_really_behind() {
+        let t = TestContext::new();
+        let current = voice_source(&t);
+        install_voice_copies(
+            &t,
+            &[
+                (Platform::Claude, &current, &current),
+                (Platform::Codex, "sha256:old-source", "sha256:old-install"),
+            ],
+        );
+
+        assert_eq!(voice_status(&t), ListStatus::Outdated);
     }
 }

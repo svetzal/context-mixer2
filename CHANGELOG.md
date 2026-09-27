@@ -48,6 +48,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scope.`). Near-miss suggestions are unchanged. This applies to every command
   that reports a not-installed artifact (`update`, `uninstall`, `promote`,
   `sync`, `diff`, `info`, `set add`).
+- **`cmx list` no longer reports a skill `outdated` that `cmx outdated`
+  omits.** `list` judged staleness from one `source_checksum` aggregated
+  across platforms, which is dropped whenever the platforms' lock baselines
+  disagree — and a missing baseline read as untracked, so `outdated`. It now
+  judges each tracking platform's own lock entry and reports `outdated` only
+  when one of them is really behind. Both `list` and `outdated` also share one
+  staleness rule: an entry whose recorded `installed_checksum` equals the
+  source's current checksum is current, since what it installed already is
+  the source's current content — a stale `source_checksum` beside it (from an
+  older install) is bookkeeping, not staleness. Relatedly, `cmx skill sync
+  --apply` now carries the winning copy's `source_checksum` to every entry
+  tracking the same source repo, since those copies now descend from the
+  winner's source state; it carries nothing when the winner's own baselines
+  disagree.
 
 ## [3.3.0] - 2026-09-08
 

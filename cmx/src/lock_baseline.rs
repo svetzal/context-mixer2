@@ -1,18 +1,22 @@
 //! Shared primitive for refreshing lock-entry install baselines after
 //! reconciling installed content back in line with a canonical copy.
 //!
-//! Both `cmx skill promote` (canonicalizing an edited installed copy into the
-//! home) and `cmx skill sync` (equalizing diverged installed copies to a
-//! winner) need to, for a set of platforms that share a lock scope, rewrite
-//! each tracked lock entry's `installed_checksum`/`version`/`installed_at` to
-//! match freshly-written content. This primitive holds that per-platform
-//! mutate loop.
+//! `cmx skill promote` (canonicalizing an edited installed copy into the
+//! home), `cmx skill sync` (equalizing diverged installed copies to a winner),
+//! and install/update (following a copy shared by several platforms' install
+//! directories) all need to, for a set of platforms that share a lock scope,
+//! rewrite each tracked lock entry's `installed_checksum`/`version`/
+//! `installed_at` to match freshly-written content. This primitive holds that
+//! per-platform mutate loop.
 //!
 //! Callers differ only in whether `source_checksum` is also updated: promote
 //! does (the home *is* the source for a home-provenance artifact, so
 //! canonicalizing the installed copy into it means the source now matches
-//! too); sync does not (it reconciles installed copies against one another,
-//! not against the source, so the source baseline is left untouched).
+//! too); install/update does for siblings tracking the same source repo (they
+//! now hold exactly what was installed from it); sync does only for entries
+//! tracking the same source repo as an unambiguous winner (the copy now
+//! descends from the source state the winner was installed from), and leaves
+//! every other source baseline untouched.
 //!
 //! A platform whose lock file has no entry for `name` at `scope` is skipped
 //! rather than mutated, so this never creates a lock entry — only refreshes

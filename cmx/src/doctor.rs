@@ -30,6 +30,10 @@ pub use types::{
     ArtifactState, DoctorArtifact, DoctorReport, DoctorRow, MissingRow, Representation, StateCounts,
 };
 
+/// Lock loading shared with `cmx list`, which reads the per-platform lock
+/// entries behind each surveyed artifact to decide whether it is outdated.
+pub(crate) use locations::load_all_locks;
+
 // Re-export private survey helpers for the test suite.
 #[cfg(test)]
 pub(crate) use aggregate::{collect_missing, group_rows, state_severity};
