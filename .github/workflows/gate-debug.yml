@@ -8,7 +8,8 @@ name: Gate Debug
 # can't say what hung. This splits the all-features test run into one job per
 # test target: the jobs that finish keep their logs, and the one that dies
 # names the culprit. Output streams straight to the log (never through `tail`,
-# which holds everything back until EOF), tests run single-threaded, and a
+# which holds everything back until EOF), tests run single-threaded or with the default
+# thread count, and a
 # heartbeat prints memory and process counts every 30s so a runaway shows in
 # the log before the runner goes.
 
@@ -24,7 +25,7 @@ env:
 
 jobs:
   all-features-tests:
-    name: ${{ matrix.target.name }}
+    name: ${{ matrix.target.name }} (${{ matrix.threads }} threads)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -39,6 +40,12 @@ jobs:
           - { name: "cmv", args: "-p cmv --lib --bins --tests" }
           - { name: "intent-atlas", args: "-p intent-atlas --lib --tests" }
           - { name: "doctests", args: "--doc" }
+          - { name: "workspace (one command)", args: "" }
+          - { name: "workspace after the gate's earlier steps", args: "", gate: true }
+        threads: ["default"]
+        include:
+          - target: { name: "workspace (one command)", args: "" }
+            threads: "1"
     steps:
       - uses: actions/checkout@v5
 
@@ -57,17 +64,25 @@ jobs:
           nproc; free -m; df -h / | tail -1
           env | grep -iE 'proxy|openai|ollama' || true
 
+      - name: The gate's earlier steps
+        if: matrix.target.gate
+        run: |
+          cargo fmt --check
+          timeout 900 cargo clippy --all-targets -- -D warnings
+          timeout 900 cargo test
+          timeout 900 cargo clippy --all-targets --all-features -- -D warnings
+
       - name: Build (all features)
         run: timeout 900 cargo test --all-features --no-run
 
-      - name: Run (all features, single-threaded, watchdog)
+      - name: Run (all features, ${{ matrix.threads }} test threads, watchdog)
         env:
           RUST_BACKTRACE: 1
         run: |
           set +e
           ( while sleep 30; do echo "--- heartbeat $(date -u +%T): $(free -m | awk '/Mem:/{print $3"MB used"}'), $(ps -e --no-headers | wc -l) procs"; done ) &
           hb=$!
-          timeout --kill-after=10 480 cargo test --all-features ${{ matrix.target.args }} -- --test-threads=1
+          timeout --kill-after=10 480 cargo test --all-features ${{ matrix.target.args }} -- ${{ matrix.threads == '1' && '--test-threads=1' || '' }}
           code=$?
           kill $hb
           if [ "$code" = "124" ] || [ "$code" = "137" ]; then
