@@ -347,6 +347,7 @@ dependencies = [
  "clap",
  "cmx-core",
  "intent-atlas",
+ "rustix",
  "serde",
  "serde_json",
  "tempfile",

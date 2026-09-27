@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A cmv validator timeout can no longer kill every process you own.** On
+  timeout cmv killed the validator's process group by running the external
+  `kill -KILL -<pid>`. Implementations of `kill(1)` parse that argument
+  differently: the one first on `PATH` on GitHub's ubuntu runners read
+  `-6771` as `-6`, so once pids reached five digits a child pid starting with
+  1 became `kill(-1, SIGKILL)` — every process of the user, the CI runner
+  agent included, which is why CI and release runs died without a log. cmv
+  now signals the group through the `kill(2)` syscall (via `rustix`, still
+  without `unsafe`), and refuses any process-group id of 0 or 1, or one that
+  does not fit a positive `i32`, so a bad value can never widen the signal
+  beyond the validator's own group.
+
 ## [3.3.1] - 2026-09-26
 
 ### Fixed

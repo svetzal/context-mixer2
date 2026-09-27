@@ -138,23 +138,44 @@ fn drain<R: Read + Send + 'static>(pipe: Option<R>) -> thread::JoinHandle<String
 
 /// Kill the child and, on unix, every process in its group.
 ///
-/// The group is signalled through `kill(1)` because the workspace denies
-/// `unsafe_code`, which a direct `libc::kill` would need; `kill` is part of
-/// POSIX and present wherever `/bin/sh` is. The direct `Child::kill` follows
-/// as a fallback so the child itself dies even if `kill(1)` is unavailable,
-/// and `wait` reaps it.
+/// The child was spawned with `process_group(0)`, so its process-group id is
+/// its own pid. The group is signalled with `SIGKILL` through the `kill(2)`
+/// syscall via `rustix` — a safe API, so the workspace's `unsafe_code = "deny"`
+/// holds — after [`group_to_signal`] has refused any id that would widen the
+/// signal beyond that group.
+///
+/// This used to shell out to `kill -KILL -<pid>`. Argument parsing of the
+/// external `kill(1)` differs between implementations, and the one first on
+/// `PATH` on GitHub's ubuntu runners read `-6771` as `-6`; once pids reached
+/// five digits, a child pid starting with 1 became `kill(-1, SIGKILL)`, which
+/// kills every process the user owns — the CI runner agent included.
+///
+/// The direct `Child::kill` follows as a fallback so the child itself dies
+/// even if the group signal fails, and `wait` reaps it.
 fn kill_process_group(child: &mut Child) {
     #[cfg(unix)]
-    {
-        let _ = Command::new("kill")
-            .args(["-KILL", &format!("-{}", child.id())])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
+    if let Some(group) = group_to_signal(child.id()) {
+        let _ = rustix::process::kill_process_group(group, rustix::process::Signal::KILL);
     }
     let _ = child.kill();
     let _ = child.wait();
+}
+
+/// The process group to signal for a child spawned as its own group leader,
+/// or `None` when `child_pid` could not safely name one.
+///
+/// `kill(2)` gives special meaning to the ids this refuses: a group id of 0
+/// means the caller's own group, and `kill(-1, …)` signals every process the
+/// caller may signal. A value that does not fit a positive `i32` would wrap
+/// into those ranges. No real child has any of these pids, so refusing them
+/// costs nothing and guarantees a bad value can never become "signal
+/// everything".
+#[cfg(unix)]
+fn group_to_signal(child_pid: u32) -> Option<rustix::process::Pid> {
+    i32::try_from(child_pid)
+        .ok()
+        .filter(|&raw| raw > 1)
+        .and_then(rustix::process::Pid::from_raw)
 }
 
 /// In-memory runner scripted by executable path; records every request so
@@ -276,18 +297,94 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn real_runner_kills_on_timeout_even_with_a_lingering_grandchild() {
+        let scratch = tempfile::tempdir().unwrap();
+        let pid_file = scratch.path().join("grandchild.pid");
         let started = Instant::now();
         let outcome = RealProcessRunner.run(&ProcessRequest {
             program: PathBuf::from("/bin/sh"),
-            args: ["-c", "sleep 30 & sleep 30"].iter().map(OsString::from).collect(),
+            args: vec![
+                OsString::from("-c"),
+                OsString::from("sleep 30 & echo $! > \"$1\"; sleep 30"),
+                OsString::from("sh"),
+                pid_file.clone().into_os_string(),
+            ],
             cwd: std::env::temp_dir(),
-            timeout: Duration::from_millis(200),
+            timeout: Duration::from_millis(500),
         });
         assert_eq!(outcome, ProcessOutcome::TimedOut);
         assert!(
             started.elapsed() < Duration::from_secs(10),
             "timeout must not wait for the grandchild"
         );
+
+        let grandchild: i32 = std::fs::read_to_string(&pid_file)
+            .expect("the script records its background sleep's pid before the timeout")
+            .trim()
+            .parse()
+            .unwrap();
+        assert!(grandchild > 1, "recorded pid {grandchild} is a real process id");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !is_gone(grandchild) && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(20));
+        }
+        assert!(is_gone(grandchild), "grandchild {grandchild} survived the group kill");
+    }
+
+    /// Whether process `pid` no longer runs: `kill(pid, 0)` (which sends no
+    /// signal) finds no such process, or — on Linux, where an orphan may sit
+    /// as a zombie until a reaper collects it — it is a zombie.
+    #[cfg(unix)]
+    fn is_gone(pid: i32) -> bool {
+        let Some(pid) = rustix::process::Pid::from_raw(pid) else {
+            return true;
+        };
+        match rustix::process::test_kill_process(pid) {
+            Err(rustix::io::Errno::SRCH) => true,
+            _ => is_zombie(pid.as_raw_nonzero().get()),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn is_zombie(pid: i32) -> bool {
+        // /proc/<pid>/stat is `pid (comm) state …`; comm may contain spaces,
+        // so read the state after the last ')'.
+        std::fs::read_to_string(format!("/proc/{pid}/stat")).is_ok_and(|stat| {
+            stat.rsplit_once(')')
+                .is_some_and(|(_, rest)| rest.trim_start().starts_with('Z'))
+        })
+    }
+
+    #[cfg(all(unix, not(target_os = "linux")))]
+    fn is_zombie(_pid: i32) -> bool {
+        false
+    }
+
+    // --- group_to_signal: the guard between a child pid and kill(2) ---
+
+    #[cfg(unix)]
+    #[test]
+    fn group_to_signal_accepts_an_ordinary_child_pid() {
+        let pid = group_to_signal(6771).expect("an ordinary pid names a process group");
+        assert_eq!(pid.as_raw_nonzero().get(), 6771);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn group_to_signal_refuses_zero_which_would_signal_our_own_group() {
+        assert!(group_to_signal(0).is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn group_to_signal_refuses_one_which_would_signal_every_process() {
+        assert!(group_to_signal(1).is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn group_to_signal_refuses_values_that_do_not_fit_a_positive_i32() {
+        assert!(group_to_signal(u32::try_from(i32::MAX).unwrap() + 1).is_none());
+        assert!(group_to_signal(u32::MAX).is_none(), "u32::MAX would wrap to -1");
     }
 
     #[test]
