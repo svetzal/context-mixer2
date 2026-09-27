@@ -69,10 +69,11 @@ Compare your installed copy against the *current* source. If they're identical
 stale install-time snapshot. Re-sync:
 
 ```bash
-cmx skill update <name> --force
+cmx skill update <name>
 ```
 
-This is safe: there are no local edits to lose.
+A copy that already matches the source isn't treated as a local edit, so no
+`--force` is needed; the update just refreshes the lock entry.
 
 > **Watch for relocations.** A source repo restructure can *move* a skill (e.g.
 > from `skills/x` to `plugins/foo/skills/x`) without removing it. `cmx search
@@ -88,7 +89,8 @@ see exactly what you added. You have two good options:
 
 - **Push it upstream** (preferred when the source is yours or accepts
   contributions): copy your version into the source repo, commit and push, then
-  `cmx skill update <name> --force` re-syncs cleanly and the drift disappears —
+  `cmx skill update <name>` re-syncs cleanly (no `--force` needed once your copy
+  matches the source) and the drift disappears —
   with your work now shared.
 - **Keep it local**: leave it as-is for now, or canonicalize it (see *orphaned*
   below — though adopt currently targets orphans, not drifted artifacts).

@@ -105,7 +105,9 @@ Help text marks the boundary: `[Mutates]` = writes immediately,
 `[Mutates with --apply]` = plans by default. Unmarked commands are read-only.
 
 Errors teach the next step — argument mistakes print a `try: <exact command>`
-line, unknown artifact names suggest near-matches (`Did you mean 'cli-ux'?`),
+line, unknown artifact names suggest near-matches (`Did you mean 'cli-ux'?`)
+or, when the name is installed elsewhere, name the platform/scope to re-run
+with (`It is installed for claude. Re-run with '--platform claude'.`),
 and LLM/gateway failures degrade to a one-line note (never a hard failure of
 the surrounding command). Trust stderr guidance; don't guess flags.
 
@@ -197,6 +199,11 @@ cmx skill update <name> --force # overwrite even if locally modified (lists disc
 Without `--platform`, `update` targets only the default platform (Claude); `--all`
 means all artifacts, not all platforms. To converge sibling install copies across
 platforms, use `sync`, not `update`.
+
+`update` replaces a tracked copy with the source's (files the source dropped are
+removed). A copy whose files already match the source is not "locally
+modified", and platforms sharing one install dir (Codex + Hermes use
+`.agents/skills` at project scope) are refreshed together.
 
 Check `cmx info <name> --json | jq .locally_modified` before updating a
 single artifact — a `true` means plain `update` will refuse and you must

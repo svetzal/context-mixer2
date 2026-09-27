@@ -36,7 +36,7 @@ operation to one platform (which also onboards a new tool on install). See
 | `cmx agent install --all` | Install all available agents |
 | `cmx agent install <name> --local` | Install into current project |
 | `cmx agent install <name> --platform cursor` | Install to Cursor |
-| `cmx agent update <name>` | Update an agent from its source (pulls the source over the installed copy) |
+| `cmx agent update <name>` | Update an agent from its source (replaces the installed copy with the source's) |
 | `cmx agent update --all` | Update all tracked agents |
 | `cmx agent promote <name>` | Push in-place edits of the installed copy back into the canonical home — the mirror of `update` |
 | `cmx agent uninstall <name>...` | Uninstall one or more agents; sweeps every platform unless `--platform` is given |
@@ -62,6 +62,13 @@ removes from just that one and leaves the others intact.
 `update` is intentionally different: without `--platform`, it targets only the
 default platform (Claude). `cmx <kind> update --all` means all tracked artifacts
 on that one platform, not all platforms.
+
+An update **replaces** a tracked installed copy with the source's, so files the
+source has dropped are removed rather than left behind. Platforms that share one
+install directory (for example Codex and Hermes, which both use `.agents/skills`
+at project scope) are kept in step: updating on one refreshes the others' lock
+entries, so the next platform's update doesn't mistake the shared files for
+local edits.
 
 ## Skill management
 

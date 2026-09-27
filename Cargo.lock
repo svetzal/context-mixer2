@@ -326,7 +326,7 @@ dependencies = [
 
 [[package]]
 name = "cmf"
-version = "3.3.0"
+version = "3.3.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -341,7 +341,7 @@ dependencies = [
 
 [[package]]
 name = "cmv"
-version = "3.3.0"
+version = "3.3.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -355,7 +355,7 @@ dependencies = [
 
 [[package]]
 name = "cmx"
-version = "3.3.0"
+version = "3.3.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1053,7 +1053,7 @@ dependencies = [
 
 [[package]]
 name = "intent-atlas"
-version = "3.3.0"
+version = "3.3.1"
 dependencies = [
  "anyhow",
  "chrono",
