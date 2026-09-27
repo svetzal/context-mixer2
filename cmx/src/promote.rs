@@ -185,17 +185,19 @@ fn select_agent_copy(
     name: &str,
     ctx: &AppContext<'_>,
 ) -> Result<(PathBuf, Vec<Platform>, InstallScope, Vec<Platform>)> {
-    let (installed_path, scope) = config::find_installed_path(
-        name,
-        ArtifactKind::Agent,
-        ctx.fs,
-        ctx.paths,
-    )
-    .ok_or_else(|| CliError::ArtifactNotInstalledOnDisk {
-        kind: ArtifactKind::Agent,
-        name: name.to_string(),
-        hint: crate::suggestions::installed_artifact_hint(name, Some(ArtifactKind::Agent), ctx),
-    })?;
+    let (installed_path, scope) =
+        config::find_installed_path(name, ArtifactKind::Agent, ctx.fs, ctx.paths).ok_or_else(
+            || CliError::ArtifactNotInstalledOnDisk {
+                kind: ArtifactKind::Agent,
+                name: name.to_string(),
+                hint: crate::suggestions::installed_artifact_hint(
+                    name,
+                    Some(ArtifactKind::Agent),
+                    crate::suggestions::SearchedScope::Both,
+                    ctx,
+                ),
+            },
+        )?;
     let home_tracked = home_tracked_platforms(name, ArtifactKind::Agent, scope, ctx)?;
     if home_tracked.is_empty() {
         return Err(CliError::Message(non_home_guidance(name, ArtifactKind::Agent, scope, ctx)?));
@@ -222,6 +224,7 @@ fn select_skill_copy(
                 hint: crate::suggestions::installed_artifact_hint(
                     name,
                     Some(ArtifactKind::Skill),
+                    crate::suggestions::SearchedScope::Both,
                     ctx,
                 ),
             })?;

@@ -394,7 +394,12 @@ pub fn sync(
     if copies.is_empty() {
         return Err(CliError::SyncNotInstalled {
             name: name.to_string(),
-            hint: crate::suggestions::installed_artifact_hint(name, Some(ArtifactKind::Skill), ctx),
+            hint: crate::suggestions::installed_artifact_hint(
+                name,
+                Some(ArtifactKind::Skill),
+                crate::suggestions::SearchedScope::Only(scope),
+                ctx,
+            ),
         });
     }
 

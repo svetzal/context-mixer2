@@ -282,7 +282,12 @@ pub fn update(
         return Err(CliError::ArtifactNotInstalled {
             kind,
             name: name.to_string(),
-            hint: crate::suggestions::installed_artifact_hint(name, Some(kind), ctx),
+            hint: crate::suggestions::installed_artifact_hint(
+                name,
+                Some(kind),
+                crate::suggestions::SearchedScope::Both,
+                ctx,
+            ),
         });
     };
     let updated = install_resolved(Some(&entry.source.repo), name, kind, scope, force, ctx)?;
@@ -458,8 +463,7 @@ fn commit_install(
     ctx: &AppContext<'_>,
 ) -> Result<String> {
     if decision.replace_existing {
-        let existing =
-            kind.installed_path(&plan.artifact_name, &plan.dest_dir, ArtifactKind::HOME_AGENT_EXT);
+        let existing = installed_copy_path(plan, kind, ctx.paths.platform);
         if ctx.fs.exists(&existing) {
             crate::uninstall::remove_installed(kind, &existing, ctx.fs)?;
         }
@@ -544,6 +548,19 @@ fn refresh_shared_copy_baselines(
         }
     }
     refresh_baseline(&plan.artifact_name, scope, &same_source, update, ctx)
+}
+
+/// Where `plan`'s artifact lives once installed on `platform`: the file or
+/// directory an install writes and, when replacing, removes first. Inside
+/// `plan.dest_dir`, with the platform's own agent extension — `.toml` for a
+/// platform that transforms agents to Codex TOML — so it is the same path
+/// [`ConfigPaths::installed_artifact_path`] resolves for that platform.
+pub(crate) fn installed_copy_path(
+    plan: &InstallPlan,
+    kind: ArtifactKind,
+    platform: Platform,
+) -> PathBuf {
+    kind.installed_path(&plan.artifact_name, &plan.dest_dir, platform.agent_extension())
 }
 
 /// Compute the destination directory and relative source path for an install.

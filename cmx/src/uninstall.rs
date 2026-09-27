@@ -130,7 +130,12 @@ pub fn uninstall(
             name: name.to_string(),
             scope: scope.label().to_string(),
             where_: where_.clone(),
-            hint: crate::suggestions::installed_artifact_hint(name, Some(kind), ctx),
+            hint: crate::suggestions::installed_artifact_hint(
+                name,
+                Some(kind),
+                crate::suggestions::SearchedScope::Only(scope),
+                ctx,
+            ),
         }
     })
 }
@@ -152,7 +157,12 @@ pub fn uninstall_many(
             Some(r) => Partitioned::Kept(r),
             None => Partitioned::Excluded((
                 name.to_string(),
-                crate::suggestions::installed_artifact_hint(name, Some(kind), ctx),
+                crate::suggestions::installed_artifact_hint(
+                    name,
+                    Some(kind),
+                    crate::suggestions::SearchedScope::Only(scope),
+                    ctx,
+                ),
             )),
         })
     })?;
@@ -549,6 +559,77 @@ mod tests {
         assert!(
             claude_lock.packages.contains_key("my-agent"),
             "an unmanaged platform is left untouched"
+        );
+    }
+
+    #[test]
+    fn uninstall_hint_for_another_platforms_local_copy_gives_a_rerun_that_succeeds() {
+        let t = TestContext::new();
+        let codex = t.paths.with_platform(Platform::Codex);
+        crate::test_support::install_skill_on_disk(
+            &t.fs,
+            &codex,
+            "focus",
+            &crate::test_support::skill_content("f"),
+            InstallScope::Local,
+        );
+        let mut entry = sample_lock_entry();
+        entry.artifact_type = ArtifactKind::Skill;
+        crate::test_support::save_lock_with_entry(
+            &t.fs,
+            &codex,
+            "focus",
+            entry,
+            InstallScope::Local,
+        );
+
+        let err = uninstall(
+            "focus",
+            ArtifactKind::Skill,
+            InstallScope::Global,
+            Some(Platform::Claude),
+            &t.ctx(),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            err.ends_with(
+                "It is installed for codex at local scope. Re-run with '--platform codex --local'."
+            ),
+            "{err}"
+        );
+
+        // The suggested re-run: `--platform codex --local`.
+        let codex_ctx = t.ctx().with_paths(&codex);
+        let removed = uninstall(
+            "focus",
+            ArtifactKind::Skill,
+            InstallScope::Local,
+            Some(Platform::Codex),
+            &codex_ctx,
+        );
+        assert!(removed.is_ok(), "{removed:?}");
+    }
+
+    #[test]
+    fn uninstall_hint_for_the_active_platforms_global_copy_says_drop_local() {
+        let t = TestContext::new();
+        let mut entry = sample_lock_entry();
+        entry.artifact_type = ArtifactKind::Skill;
+        crate::test_support::save_lock_with_entry(
+            &t.fs,
+            &t.paths,
+            "focus",
+            entry,
+            InstallScope::Global,
+        );
+
+        let err = uninstall("focus", ArtifactKind::Skill, InstallScope::Local, None, &t.ctx())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.ends_with("It is installed for claude at global scope. Re-run without '--local'."),
+            "{err}"
         );
     }
 }

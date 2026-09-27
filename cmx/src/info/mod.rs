@@ -114,7 +114,12 @@ pub fn info(name: &str, ctx: &AppContext<'_>) -> Result<ArtifactInfo> {
 
     Err(CliError::ArtifactNotFound {
         name: name.to_string(),
-        hint: crate::suggestions::installed_artifact_hint(name, None, ctx),
+        hint: crate::suggestions::installed_artifact_hint(
+            name,
+            None,
+            crate::suggestions::SearchedScope::Both,
+            ctx,
+        ),
     })
 }
 
@@ -126,7 +131,12 @@ pub fn info_for_kind(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>) -> Re
         None => Err(CliError::ArtifactNotInstalled {
             kind,
             name: name.to_string(),
-            hint: crate::suggestions::installed_artifact_hint(name, Some(kind), ctx),
+            hint: crate::suggestions::installed_artifact_hint(
+                name,
+                Some(kind),
+                crate::suggestions::SearchedScope::Both,
+                ctx,
+            ),
         }),
     }
 }

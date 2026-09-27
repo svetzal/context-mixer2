@@ -373,3 +373,32 @@ fn sync_leaves_source_baselines_alone_when_the_winners_own_entries_disagree() {
     assert_eq!(recorded_source_checksum(&t, Platform::Claude, "voice"), "sha256:src-1.2.0");
     assert_eq!(recorded_source_checksum(&t, Platform::Pi, "voice"), "sha256:src-b");
 }
+
+#[test]
+fn sync_hint_for_a_copy_at_the_other_scope_says_add_local() {
+    let t = TestContext::new();
+    let pv = t.paths.with_platform(Platform::Claude);
+    let dir = pv.install_dir(ArtifactKind::Skill, InstallScope::Local).unwrap();
+    t.fs.add_file(dir.join("voice").join("SKILL.md"), versioned_skill_content("v", "1.0.0"));
+    let entry = make_lock_entry_builder(ArtifactKind::Skill, "guidelines", "voice");
+    save_lock_with_entry(&t.fs, &pv, "voice", entry, InstallScope::Local);
+
+    let err = sync(
+        "voice",
+        ArtifactKind::Skill,
+        InstallScope::Global,
+        None,
+        RunMode::Plan,
+        &t.ctx(),
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert!(
+        err.ends_with("It is installed for claude at local scope. Re-run with '--local'."),
+        "{err}"
+    );
+    let rerun =
+        sync("voice", ArtifactKind::Skill, InstallScope::Local, None, RunMode::Plan, &t.ctx());
+    assert!(rerun.is_ok(), "{rerun:?}");
+}

@@ -287,10 +287,7 @@ fn build_activation_targets(
     for &platform in targets {
         let pv = ctx.paths.with_platform(platform);
         let plan = install::plan_install(&member.name, member.kind, scope, &found, &pv)?;
-        let target_path =
-            member
-                .kind
-                .installed_path(&member.name, &plan.dest_dir, ArtifactKind::HOME_AGENT_EXT);
+        let target_path = install::installed_copy_path(&plan, member.kind, platform);
         plans.push(MemberActivateTarget {
             platform,
             source_path: found.artifact.path.clone(),
@@ -567,6 +564,40 @@ mod tests {
         // At least one resolvable member installed, so the set is still marked Active.
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert_eq!(sets.sets.get("rust-work").unwrap().state, SetState::Active);
+    }
+
+    #[test]
+    fn activate_plan_names_the_codex_toml_as_an_agent_target() {
+        let t = TestContext::for_platform(Platform::Codex);
+        crate::test_support::setup_source_with_agent(
+            &t.fs,
+            &t.paths,
+            "guidelines",
+            "/src",
+            "rust-craftsperson",
+        );
+        let ctx = t.ctx();
+        crate::sets::create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
+        seed_members(
+            "rust-work",
+            vec![pinned_agent("rust-craftsperson", "guidelines")],
+            InstallScope::Global,
+            &ctx,
+        );
+        let config = crate::types::CmxConfig {
+            platforms: vec![Platform::Codex],
+            ..Default::default()
+        };
+        config::save_config(&config, &t.fs, &t.paths).unwrap();
+
+        let result = activate("rust-work", RunMode::Plan, InstallScope::Global, &ctx).unwrap();
+
+        let target = &result.members[0].targets[0];
+        assert_eq!(target.platform, Platform::Codex);
+        assert_eq!(
+            target.target_path,
+            std::path::PathBuf::from("/home/testuser/.codex/agents/rust-craftsperson.toml")
+        );
     }
 
     #[test]

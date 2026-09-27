@@ -94,7 +94,12 @@ pub(super) fn resolve_member(arg: &str, ctx: &AppContext<'_>) -> Result<SetMembe
     if candidates.is_empty() {
         return Err(CliError::ArtifactNotInLockfile {
             name: name.to_string(),
-            hint: crate::suggestions::installed_artifact_hint(name, hint, ctx),
+            hint: crate::suggestions::installed_artifact_hint(
+                name,
+                hint,
+                crate::suggestions::SearchedScope::Both,
+                ctx,
+            ),
         });
     }
 
@@ -351,5 +356,28 @@ mod tests {
         };
         let chars = member_description_chars(&member, &ctx);
         assert!(chars.is_none(), "unresolvable member must return None");
+    }
+
+    #[test]
+    fn resolve_member_hint_names_the_platform_tracking_it_at_any_scope() {
+        let t = TestContext::new();
+        let codex = t.paths.with_platform(crate::platform::Platform::Codex);
+        save_lock_with_entry(
+            &t.fs,
+            &codex,
+            "focus",
+            make_lock_entry_builder(ArtifactKind::Skill, "guidelines", "focus"),
+            InstallScope::Local,
+        );
+
+        let Err(err) = resolve_member("focus", &t.ctx()) else {
+            panic!("focus is not tracked for the active platform");
+        };
+        let err = err.to_string();
+
+        assert!(
+            err.ends_with("It is installed for codex. Re-run with '--platform codex'."),
+            "{err}"
+        );
     }
 }

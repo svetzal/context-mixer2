@@ -42,12 +42,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installed only for Claude, printed `Did you mean
   'uv-python-craftsperson'?`, because the "did you mean" candidates spanned
   every managed platform's lock files. When the exact name is tracked on other
-  platforms the hint now names them — `It is installed for claude. Re-run with
-  '--platform claude'.` — or, when only the active platform tracks it at the
-  other scope, says which scope (`It is installed for claude at local
-  scope.`). Near-miss suggestions are unchanged. This applies to every command
-  that reports a not-installed artifact (`update`, `uninstall`, `promote`,
-  `sync`, `diff`, `info`, `set add`).
+  platforms the hint now names them and gives a re-run that finds it —
+  `It is installed for claude. Re-run with '--platform claude'.` Commands that
+  look in one scope chosen by `--local` (`uninstall`, `sync`) also account for
+  scope: a copy only at the other scope reads `It is installed for codex at
+  local scope. Re-run with '--platform codex --local'.` (or `Re-run with
+  '--local'.` / `Re-run without '--local'.` when it is the active platform's
+  copy). Commands that search both scopes themselves (`update`, `promote`,
+  `diff`, `info`, `set add`) never mention scope. Near-miss suggestions are
+  unchanged.
+- **Replacing a Codex agent removes the installed `.toml`, not a `.md` beside
+  it.** The replace step of `install --force` (and of an update over a tracked
+  copy) looked for the existing copy under the canonical `.md` name, so on
+  Codex it deleted a `<name>.md` in `~/.codex/agents` that cmx never installed
+  there, while the `.toml` was merely overwritten. It now resolves the
+  platform's own installed path. `cmx set activate`'s plan likewise names
+  the `.toml` a Codex agent will be written to instead of a `.md`.
 - **`cmx list` no longer reports a skill `outdated` that `cmx outdated`
   omits.** `list` judged staleness from one `source_checksum` aggregated
   across platforms, which is dropped whenever the platforms' lock baselines

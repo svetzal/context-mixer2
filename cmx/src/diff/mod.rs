@@ -198,7 +198,12 @@ pub(crate) fn gather_diff_with(
         return Err(CliError::ArtifactNotInstalledOnDisk {
             kind,
             name: name.to_string(),
-            hint: crate::suggestions::installed_artifact_hint(name, Some(kind), ctx),
+            hint: crate::suggestions::installed_artifact_hint(
+                name,
+                Some(kind),
+                crate::suggestions::SearchedScope::Both,
+                ctx,
+            ),
         });
     }
 
@@ -758,5 +763,31 @@ mod tests {
         assert!(note.contains("--full"), "{note}");
         assert!(note.contains("configured to fail"), "condensed reason present: {note}");
         assert!(!note.contains('\n'), "no raw multi-line error body: {note}");
+    }
+
+    #[test]
+    fn diff_hint_for_an_agent_on_another_platform_names_only_the_platform() {
+        // Agent diff looks at both scopes of the active platform, so a local
+        // copy on claude needs only `--platform claude` from codex.
+        let t = crate::test_support::TestContext::new();
+        crate::test_support::setup_source_with_agent(&t.fs, &t.paths, "src", "/src", "reviewer");
+        crate::install::install(
+            "reviewer",
+            ArtifactKind::Agent,
+            InstallScope::Local,
+            crate::flags::Force::No,
+            &t.ctx(),
+        )
+        .unwrap();
+
+        let codex = t.paths.with_platform(Platform::Codex);
+        let err = gather_diff_with("reviewer", ArtifactKind::Agent, &t.ctx().with_paths(&codex))
+            .unwrap_err()
+            .to_string();
+
+        assert!(
+            err.ends_with("It is installed for claude. Re-run with '--platform claude'."),
+            "{err}"
+        );
     }
 }

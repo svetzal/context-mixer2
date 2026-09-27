@@ -1642,3 +1642,65 @@ fn update_on_a_platform_that_does_not_track_it_names_the_platform_that_does() {
          It is installed for claude. Re-run with '--platform claude'."
     );
 }
+
+// --- Replace path targets the platform's real installed file ---
+
+#[test]
+fn codex_agent_update_replaces_the_toml_and_leaves_an_unrelated_md_alone() {
+    // Codex installs agents as `<name>.toml`. The replace step must remove
+    // that file — not a `<name>.md` beside it, which cmx never installed there.
+    let t = TestContext::for_platform(Platform::Codex);
+    setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
+    let ctx = t.ctx();
+    install("my-agent", ArtifactKind::Agent, InstallScope::Global, Force::No, &ctx).unwrap();
+    let notes = PathBuf::from("/home/testuser/.codex/agents/my-agent.md");
+    t.fs.add_file(&notes, "hand-written notes, not the installed copy");
+    t.fs.add_file(
+        "/sources/my-source/agents/my-agent.md",
+        crate::test_support::versioned_agent_content("my-agent", "Updated agent", "2.0.0"),
+    );
+
+    update("my-agent", ArtifactKind::Agent, Force::No, &ctx).unwrap();
+
+    assert!(t.fs.file_exists(&notes), "replace must not delete a file it did not install");
+    let toml =
+        t.fs.read_to_string(Path::new("/home/testuser/.codex/agents/my-agent.toml"))
+            .unwrap();
+    assert!(toml.contains("Updated agent"), "got: {toml}");
+}
+
+#[test]
+fn replaced_path_is_the_platforms_installed_path_inside_the_plan_dest_dir() {
+    let paths = crate::test_support::test_paths_for(Platform::Codex);
+    let found = make_source_artifact(ArtifactKind::Agent, "my-agent", None);
+    let plan = plan_install("my-agent", ArtifactKind::Agent, InstallScope::Global, &found, &paths)
+        .unwrap();
+
+    let replaced = installed_copy_path(&plan, ArtifactKind::Agent, Platform::Codex);
+
+    assert_eq!(
+        Some(replaced.clone()),
+        paths.installed_artifact_path(ArtifactKind::Agent, "my-agent", InstallScope::Global)
+    );
+    assert_eq!(replaced.parent(), Some(plan.dest_dir.as_path()));
+    assert_eq!(replaced.extension().and_then(|e| e.to_str()), Some("toml"));
+}
+
+#[test]
+fn update_hint_names_only_the_platform_even_when_that_copy_is_local() {
+    // `update` finds the lock entry at either scope itself, so the re-run
+    // needs only the platform.
+    let t = TestContext::new();
+    setup_source_with_agent(&t.fs, &t.paths, "src", "/src", "reviewer");
+    install("reviewer", ArtifactKind::Agent, InstallScope::Local, Force::No, &t.ctx()).unwrap();
+
+    let codex_paths = t.paths.with_platform(Platform::Codex);
+    let err = update("reviewer", ArtifactKind::Agent, Force::No, &t.ctx().with_paths(&codex_paths))
+        .unwrap_err()
+        .to_string();
+
+    assert!(
+        err.ends_with("It is installed for claude. Re-run with '--platform claude'."),
+        "{err}"
+    );
+}
