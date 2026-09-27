@@ -43,6 +43,24 @@ pub(crate) struct LocalModification {
     pub disk_checksum: Option<String>,
 }
 
+impl LocalModification {
+    /// Whether this modification must stop an install that would write content
+    /// checksumming to `install_checksum`.
+    ///
+    /// A copy whose bytes already equal what the install would write is not a
+    /// hand edit worth protecting, even when its lock baseline is stale — the
+    /// usual cause is another platform that shares the same physical install
+    /// directory having updated the files under its own lock file. Such a copy
+    /// does not conflict; the install proceeds and refreshes the baseline.
+    /// `None` (nothing is about to be written) keeps the plain answer.
+    ///
+    /// Deliberately separate from [`for_path`]: `info` and `outdated` report
+    /// drift from the recorded baseline, which is still true of such a copy.
+    pub(crate) fn conflicts_with_install(&self, install_checksum: Option<&str>) -> bool {
+        self.modified && self.disk_checksum.as_deref() != install_checksum
+    }
+}
+
 /// Resolve `name`'s installed path for `(kind, scope)` under the active
 /// platform, then answer [`for_path`] against it.
 ///
@@ -180,6 +198,38 @@ mod tests {
         let result = for_path(&path, ArtifactKind::Agent, Some(&entry), &ctx).unwrap();
         assert!(result.modified);
         assert!(result.disk_checksum.is_some());
+    }
+
+    fn modified_with(disk_checksum: &str) -> LocalModification {
+        LocalModification {
+            modified: true,
+            disk_checksum: Some(disk_checksum.to_string()),
+        }
+    }
+
+    #[test]
+    fn a_modified_copy_conflicts_with_an_install_writing_different_bytes() {
+        assert!(modified_with("sha256:edited").conflicts_with_install(Some("sha256:source")));
+    }
+
+    #[test]
+    fn a_modified_copy_matching_what_the_install_writes_does_not_conflict() {
+        assert!(!modified_with("sha256:source").conflicts_with_install(Some("sha256:source")));
+    }
+
+    #[test]
+    fn a_modified_copy_conflicts_when_nothing_is_about_to_be_written() {
+        assert!(modified_with("sha256:edited").conflicts_with_install(None));
+    }
+
+    #[test]
+    fn an_unmodified_copy_never_conflicts() {
+        let clean = LocalModification {
+            modified: false,
+            disk_checksum: None,
+        };
+        assert!(!clean.conflicts_with_install(Some("sha256:source")));
+        assert!(!clean.conflicts_with_install(None));
     }
 
     #[test]

@@ -321,8 +321,14 @@ fn member_deactivate_targets(
         |artifact_path, platforms| {
             let platform_paths = ctx.paths.with_platform(platforms[0]);
             let pctx = ctx.with_paths(&platform_paths);
-            let facts =
-                install::gather_install_facts(&member.name, member.kind, scope, Force::No, &pctx)?;
+            let facts = install::gather_install_facts(
+                &member.name,
+                member.kind,
+                scope,
+                Force::No,
+                None,
+                &pctx,
+            )?;
             if !facts.already_installed {
                 return Ok(None);
             }

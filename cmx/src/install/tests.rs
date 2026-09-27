@@ -13,28 +13,38 @@ use std::collections::BTreeMap;
 
 // --- decide_install (pure) ---
 
+fn facts(already_installed: bool, locally_modified: bool, tracked: bool) -> InstallFacts {
+    InstallFacts {
+        locally_modified,
+        already_installed,
+        tracked,
+    }
+}
+
 #[test]
 fn decide_install_clean_fresh_install_not_blocked_and_rolls_back() {
-    let d = decide_install(false, false, Force::No);
+    let d = decide_install(&facts(false, false, false), Force::No);
     assert!(!d.blocked, "clean install must not be blocked");
     assert!(d.rollback_on_lock_fail, "fresh install must roll back on lock failure");
+    assert!(!d.replace_existing, "nothing on disk to replace");
 }
 
 #[test]
 fn decide_install_locally_modified_without_force_is_blocked() {
-    let d = decide_install(false, true, Force::No);
+    let d = decide_install(&facts(true, true, true), Force::No);
     assert!(d.blocked, "locally modified without --force must be blocked");
 }
 
 #[test]
 fn decide_install_locally_modified_with_force_is_not_blocked() {
-    let d = decide_install(false, true, Force::Yes);
+    let d = decide_install(&facts(true, true, true), Force::Yes);
     assert!(!d.blocked, "--force must override local modification block");
+    assert!(d.replace_existing, "--force replaces the existing copy");
 }
 
 #[test]
 fn decide_install_fresh_install_lock_fail_rolls_back() {
-    let d = decide_install(false, false, Force::No);
+    let d = decide_install(&facts(false, false, false), Force::No);
     assert!(
         d.rollback_on_lock_fail,
         "fresh install (already_installed=false) must roll back"
@@ -43,11 +53,31 @@ fn decide_install_fresh_install_lock_fail_rolls_back() {
 
 #[test]
 fn decide_install_existing_install_lock_fail_does_not_roll_back() {
-    let d = decide_install(true, false, Force::No);
+    let d = decide_install(&facts(true, false, true), Force::No);
     assert!(
         !d.rollback_on_lock_fail,
         "reinstall (already_installed=true) must keep existing copy"
     );
+}
+
+#[test]
+fn decide_install_replaces_a_clean_tracked_copy_without_force() {
+    let d = decide_install(&facts(true, false, true), Force::No);
+    assert!(!d.blocked);
+    assert!(d.replace_existing, "a tracked copy is replaced so dropped files are pruned");
+}
+
+#[test]
+fn decide_install_overlays_an_untracked_copy_without_force() {
+    let d = decide_install(&facts(true, false, false), Force::No);
+    assert!(!d.blocked);
+    assert!(!d.replace_existing, "no baseline: extra files must not be deleted");
+}
+
+#[test]
+fn decide_install_replaces_an_untracked_copy_with_force() {
+    let d = decide_install(&facts(true, false, false), Force::Yes);
+    assert!(d.replace_existing);
 }
 
 // --- build_lock_entry (pure, no gateway fakes needed) ---
@@ -1283,4 +1313,332 @@ fn install_newer_installed_than_source_is_refused() {
     // With --force, the install proceeds (downgrade allowed).
     let forced = install("my-skill", ArtifactKind::Skill, InstallScope::Global, Force::Yes, &ctx);
     assert!(forced.is_ok(), "--force must allow downgrade, got: {:?}", forced.err());
+}
+
+// --- Update over a tracked copy replaces it, pruning files the source dropped ---
+
+/// A skill whose source ships npm manifests under `scripts/`, installed from
+/// source `src` at `/src`, with an npm-installed `node_modules/` added to the
+/// installed copy afterwards.
+fn install_skill_with_scripts(t: &TestContext, name: &str) -> PathBuf {
+    setup_source_with_skill(&t.fs, &t.paths, "src", "/src", name, "1.0.0");
+    t.fs.add_file(format!("/src/{name}/scripts/generate.js"), "console.log('gen');");
+    t.fs.add_file(format!("/src/{name}/scripts/package.json"), "{\"name\":\"gen\"}");
+    t.fs.add_file(format!("/src/{name}/scripts/package-lock.json"), "{\"lockfileVersion\":3}");
+
+    install(name, ArtifactKind::Skill, InstallScope::Global, Force::No, &t.ctx()).unwrap();
+
+    let installed = t
+        .paths
+        .installed_artifact_path(ArtifactKind::Skill, name, InstallScope::Global)
+        .unwrap();
+    t.fs.add_file(installed.join("scripts/node_modules/left-pad/index.js"), "module.exports=1;");
+    installed
+}
+
+/// The source drops the npm manifests and bumps its version.
+fn drop_npm_manifests_from_source(t: &TestContext, name: &str) {
+    t.fs.remove_file(Path::new(&format!("/src/{name}/scripts/package.json")))
+        .unwrap();
+    t.fs.remove_file(Path::new(&format!("/src/{name}/scripts/package-lock.json")))
+        .unwrap();
+    t.fs.add_file(
+        format!("/src/{name}/SKILL.md"),
+        crate::test_support::versioned_skill_content("A test skill", "2.0.0"),
+    );
+}
+
+#[test]
+fn update_prunes_files_the_source_removed() {
+    let t = TestContext::new();
+    let name = "presentation-image-generator";
+    let installed = install_skill_with_scripts(&t, name);
+    drop_npm_manifests_from_source(&t, name);
+
+    let ctx = t.ctx();
+    update(name, ArtifactKind::Skill, Force::No, &ctx).unwrap();
+
+    assert!(!t.fs.exists(&installed.join("scripts/package.json")), "dropped file lingers");
+    assert!(
+        !t.fs.exists(&installed.join("scripts/package-lock.json")),
+        "dropped file lingers"
+    );
+    assert!(!t.fs.exists(&installed.join("scripts/node_modules")), "node_modules lingers");
+    assert!(t.fs.exists(&installed.join("scripts/generate.js")), "kept file must remain");
+
+    let disk_cs =
+        crate::checksum::checksum_artifact(&installed, ArtifactKind::Skill, &t.fs).unwrap();
+    let source_cs = crate::checksum::checksum_artifact(
+        Path::new(&format!("/src/{name}")),
+        ArtifactKind::Skill,
+        &t.fs,
+    )
+    .unwrap();
+    let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
+    let entry = lock.packages.get(name).unwrap();
+    assert_eq!(entry.installed_checksum, disk_cs, "lock must checksum what is on disk");
+    assert_eq!(disk_cs, source_cs, "installed copy must equal the source");
+
+    let modification = local_modification::for_artifact(
+        name,
+        ArtifactKind::Skill,
+        InstallScope::Global,
+        Some(entry),
+        &ctx,
+    )
+    .unwrap();
+    assert!(!modification.modified, "a freshly updated copy must read as clean");
+}
+
+#[test]
+fn update_still_refuses_a_locally_modified_tracked_skill_without_force() {
+    let t = TestContext::new();
+    let name = "presentation-image-generator";
+    let installed = install_skill_with_scripts(&t, name);
+    t.fs.add_file(installed.join("SKILL.md"), "hand edited");
+    drop_npm_manifests_from_source(&t, name);
+
+    let result = update(name, ArtifactKind::Skill, Force::No, &t.ctx());
+
+    assert!(
+        matches!(result, Err(CliError::LocallyModified { .. })),
+        "expected LocallyModified, got: {result:?}"
+    );
+    assert_eq!(
+        t.fs.read_to_string(&installed.join("SKILL.md")).unwrap(),
+        "hand edited",
+        "a refused update must not touch the copy"
+    );
+    assert!(t.fs.exists(&installed.join("scripts/package.json")));
+}
+
+#[test]
+fn install_over_an_untracked_copy_without_force_keeps_its_extra_files() {
+    // No lock entry means no baseline: cmx cannot prove the extra file is safe
+    // to delete, so a non-forced install overlays rather than replaces.
+    let t = TestContext::new();
+    setup_source_with_skill(&t.fs, &t.paths, "src", "/src", "my-skill", "1.0.0");
+    let installed = t
+        .paths
+        .installed_artifact_path(ArtifactKind::Skill, "my-skill", InstallScope::Global)
+        .unwrap();
+    t.fs.add_file(installed.join("SKILL.md"), "hand authored");
+    t.fs.add_file(installed.join("notes.md"), "precious");
+
+    install("my-skill", ArtifactKind::Skill, InstallScope::Global, Force::No, &t.ctx()).unwrap();
+
+    assert!(t.fs.exists(&installed.join("notes.md")), "untracked extra file must survive");
+}
+
+// --- Platforms sharing one physical install directory (local: codex + hermes) ---
+
+fn install_shared_local_skill(t: &TestContext, name: &str) {
+    set_managed_platforms(t, &[Platform::Claude, Platform::Codex, Platform::Hermes]);
+    setup_source_with_skill(&t.fs, &t.paths, "src", "/src", name, "1.0.0");
+    for platform in [Platform::Codex, Platform::Hermes] {
+        let pv = t.paths.with_platform(platform);
+        install(
+            name,
+            ArtifactKind::Skill,
+            InstallScope::Local,
+            Force::No,
+            &t.ctx().with_paths(&pv),
+        )
+        .unwrap();
+    }
+    let codex_dir = t
+        .paths
+        .with_platform(Platform::Codex)
+        .installed_artifact_path(ArtifactKind::Skill, name, InstallScope::Local)
+        .unwrap();
+    let hermes_dir = t
+        .paths
+        .with_platform(Platform::Hermes)
+        .installed_artifact_path(ArtifactKind::Skill, name, InstallScope::Local)
+        .unwrap();
+    assert_eq!(codex_dir, hermes_dir, "precondition: codex and hermes share the local dir");
+}
+
+fn bump_source_skill(t: &TestContext, name: &str, version: &str) {
+    t.fs.add_file(
+        format!("/src/{name}/SKILL.md"),
+        crate::test_support::versioned_skill_content("A test skill", version),
+    );
+}
+
+fn local_lock_entry(t: &TestContext, platform: Platform, name: &str) -> LockEntry {
+    let pv = t.paths.with_platform(platform);
+    lockfile::load(InstallScope::Local, &t.fs, &pv)
+        .unwrap()
+        .packages
+        .get(name)
+        .cloned()
+        .unwrap()
+}
+
+fn shared_local_checksum(t: &TestContext, name: &str) -> String {
+    let dir = t
+        .paths
+        .with_platform(Platform::Codex)
+        .installed_artifact_path(ArtifactKind::Skill, name, InstallScope::Local)
+        .unwrap();
+    crate::checksum::checksum_artifact(&dir, ArtifactKind::Skill, &t.fs).unwrap()
+}
+
+#[test]
+fn update_on_one_platform_refreshes_the_baseline_of_a_platform_sharing_its_dir() {
+    let t = TestContext::new();
+    install_shared_local_skill(&t, "shared-skill");
+    bump_source_skill(&t, "shared-skill", "2.0.0");
+
+    let codex_paths = t.paths.with_platform(Platform::Codex);
+    let codex = t.ctx().with_paths(&codex_paths);
+    let result = update("shared-skill", ArtifactKind::Skill, Force::No, &codex).unwrap();
+
+    let disk_cs = shared_local_checksum(&t, "shared-skill");
+    let hermes_entry = local_lock_entry(&t, Platform::Hermes, "shared-skill");
+    assert_eq!(hermes_entry.installed_checksum, disk_cs);
+    assert_eq!(hermes_entry.version.as_deref(), Some("2.0.0"));
+    assert_eq!(
+        hermes_entry.source_checksum,
+        local_lock_entry(&t, Platform::Codex, "shared-skill").source_checksum,
+        "same source repo: source baseline refreshed too"
+    );
+    assert!(
+        !result.sibling_drifted_platforms.contains(&Platform::Hermes),
+        "a platform reading the very files just written has not drifted: {result:?}"
+    );
+
+    let hermes_paths = t.paths.with_platform(Platform::Hermes);
+    let hermes = t.ctx().with_paths(&hermes_paths);
+    let again = update("shared-skill", ArtifactKind::Skill, Force::No, &hermes);
+    assert!(again.is_ok(), "hermes update must not claim local modifications: {again:?}");
+    assert_eq!(
+        local_lock_entry(&t, Platform::Hermes, "shared-skill").installed_checksum,
+        disk_cs
+    );
+}
+
+#[test]
+fn update_proceeds_over_a_stale_baseline_whose_files_already_match_the_source() {
+    // The already-broken state: codex updated the shared files before the
+    // baseline refresh existed, leaving hermes' lock pointing at the old bytes.
+    let t = TestContext::new();
+    install_shared_local_skill(&t, "shared-skill");
+    let stale = local_lock_entry(&t, Platform::Hermes, "shared-skill");
+    bump_source_skill(&t, "shared-skill", "2.0.0");
+    let codex_paths = t.paths.with_platform(Platform::Codex);
+    update(
+        "shared-skill",
+        ArtifactKind::Skill,
+        Force::No,
+        &t.ctx().with_paths(&codex_paths),
+    )
+    .unwrap();
+    let hermes_paths = t.paths.with_platform(Platform::Hermes);
+    crate::test_support::save_lock_with_entry(
+        &t.fs,
+        &hermes_paths,
+        "shared-skill",
+        stale,
+        InstallScope::Local,
+    );
+
+    let hermes = t.ctx().with_paths(&hermes_paths);
+    let result = update("shared-skill", ArtifactKind::Skill, Force::No, &hermes);
+
+    assert!(
+        result.is_ok(),
+        "files match the source, so this is not a local edit: {result:?}"
+    );
+    let entry = local_lock_entry(&t, Platform::Hermes, "shared-skill");
+    assert_eq!(entry.installed_checksum, shared_local_checksum(&t, "shared-skill"));
+    assert_eq!(entry.version.as_deref(), Some("2.0.0"));
+}
+
+#[test]
+fn baseline_refresh_leaves_a_sibling_tracking_a_different_source_alone() {
+    // Hermes tracks the shared copy from another source: silently re-pointing
+    // its baseline would launder a cross-source overwrite into "clean".
+    let t = TestContext::new();
+    install_shared_local_skill(&t, "shared-skill");
+    let hermes_paths = t.paths.with_platform(Platform::Hermes);
+    let mut foreign = local_lock_entry(&t, Platform::Hermes, "shared-skill");
+    foreign.source.repo = "other-source".to_string();
+    crate::test_support::save_lock_with_entry(
+        &t.fs,
+        &hermes_paths,
+        "shared-skill",
+        foreign.clone(),
+        InstallScope::Local,
+    );
+    bump_source_skill(&t, "shared-skill", "2.0.0");
+
+    let codex_paths = t.paths.with_platform(Platform::Codex);
+    let result = update(
+        "shared-skill",
+        ArtifactKind::Skill,
+        Force::No,
+        &t.ctx().with_paths(&codex_paths),
+    )
+    .unwrap();
+
+    let after = local_lock_entry(&t, Platform::Hermes, "shared-skill");
+    assert_eq!(after.installed_checksum, foreign.installed_checksum);
+    assert_eq!(after.source_checksum, foreign.source_checksum);
+    assert_eq!(after.version, foreign.version);
+    assert_eq!(after.installed_at, foreign.installed_at);
+    assert!(result.sibling_drifted_platforms.contains(&Platform::Hermes), "{result:?}");
+}
+
+#[test]
+fn install_many_across_platforms_sharing_a_dir_updates_both_without_force() {
+    let t = TestContext::new();
+    install_shared_local_skill(&t, "shared-skill");
+    bump_source_skill(&t, "shared-skill", "2.0.0");
+
+    let result = install_many(
+        &["shared-skill".to_string()],
+        ArtifactKind::Skill,
+        InstallScope::Local,
+        Force::No,
+        &[Platform::Codex, Platform::Hermes],
+        &t.ctx(),
+    )
+    .unwrap();
+
+    assert!(result.failed.is_empty(), "{:?}", result.failed);
+    assert_eq!(result.installed.len(), 2);
+}
+
+// --- Not-found hint when the artifact is tracked on another platform ---
+
+#[test]
+fn update_on_a_platform_that_does_not_track_it_names_the_platform_that_does() {
+    let t = TestContext::new();
+    setup_source_with_agent(&t.fs, &t.paths, "src", "/src", "uv-python-craftsperson");
+    install(
+        "uv-python-craftsperson",
+        ArtifactKind::Agent,
+        InstallScope::Global,
+        Force::No,
+        &t.ctx(),
+    )
+    .unwrap();
+
+    let codex_paths = t.paths.with_platform(Platform::Codex);
+    let err = update(
+        "uv-python-craftsperson",
+        ArtifactKind::Agent,
+        Force::No,
+        &t.ctx().with_paths(&codex_paths),
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert_eq!(
+        err,
+        "No installed agent named 'uv-python-craftsperson' found. \
+         It is installed for claude. Re-run with '--platform claude'."
+    );
 }

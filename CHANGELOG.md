@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`cmx {skill,agent} update` now prunes files the source dropped.** A
+  non-forced update over a tracked copy overlaid the source onto it, so a file
+  the source had removed (and anything generated beside it, such as an
+  npm-installed `node_modules/`) stayed on disk, and the lock's
+  `installed_checksum` was computed over the leftovers — after hand-deleting
+  them, `cmx info` reported the copy as locally modified. An install or update
+  over a copy the lock tracks (one that passed the local-modification check
+  against a real baseline) now replaces it, exactly as `--force` did, so the
+  result equals the source and the lock checksums only what was installed. An
+  untracked copy that happens to be on disk is still overlaid without
+  `--force`: with no baseline, cmx cannot prove its extra files are safe to
+  delete.
+- **Platforms that share an install directory no longer trip each other's
+  local-modification guard.** Codex and Hermes (and, globally, Codex, Pi and
+  the other `.agents`-standard tools) install skills into the same directory
+  but keep separate lock files, so `cmx --platform codex skill update X`
+  rewrote the shared files and only codex's baseline, and a following
+  `cmx --platform hermes skill update X` refused with "has local
+  modifications" although `diff` said it matched the source. Two fixes: an
+  installed copy whose bytes already equal what the install would write (the
+  source's checksum, or its Codex TOML projection for a Codex agent) is no
+  longer treated as locally modified — the install proceeds and refreshes the
+  stale baseline, which also repairs lock files already in that state; and a
+  successful install or update now refreshes the baseline of every other
+  managed platform that reads the same physical copy and tracks it from the
+  same source, so it is not reported as a drifted sibling either. A sibling
+  tracking the copy from a different source is left alone, and still reported
+  as drifted.
+- **The not-installed hint no longer suggests the very name you typed.**
+  `cmx --platform codex agent update uv-python-craftsperson`, for an agent
+  installed only for Claude, printed `Did you mean
+  'uv-python-craftsperson'?`, because the "did you mean" candidates spanned
+  every managed platform's lock files. When the exact name is tracked on other
+  platforms the hint now names them — `It is installed for claude. Re-run with
+  '--platform claude'.` — or, when only the active platform tracks it at the
+  other scope, says which scope (`It is installed for claude at local
+  scope.`). Near-miss suggestions are unchanged. This applies to every command
+  that reports a not-installed artifact (`update`, `uninstall`, `promote`,
+  `sync`, `diff`, `info`, `set add`).
+
 ## [3.3.0] - 2026-09-08
 
 ### Added

@@ -62,6 +62,25 @@ pub(crate) fn copy_artifact(
     Ok(dest_path)
 }
 
+/// The checksum the installed copy will have once [`copy_artifact`] writes
+/// `artifact_path` for the active platform: the source's own checksum, except
+/// for an agent the platform transforms to Codex TOML, whose installed bytes
+/// are that projection.
+pub(crate) fn installed_checksum_for(
+    artifact_path: &Path,
+    kind: ArtifactKind,
+    artifact_name: &str,
+    source_checksum: &str,
+    ctx: &AppContext<'_>,
+) -> Result<String> {
+    if kind == ArtifactKind::Agent && ctx.paths.platform.transforms_agent_to_toml() {
+        let markdown = ctx.fs.read_to_string(artifact_path)?;
+        let toml = crate::codex_agent::markdown_to_codex_toml(&markdown, artifact_name);
+        return Ok(crate::checksum::checksum_bytes(toml.as_bytes()));
+    }
+    Ok(source_checksum.to_string())
+}
+
 /// Read a markdown agent, transform it into codex subagent TOML, and write it to
 /// `<dest_dir>/<name>.toml`. Returns the written path.
 fn transform_agent_to_codex_toml(
@@ -232,5 +251,38 @@ mod tests {
 
         assert!(result.is_ok(), "agent copy should succeed without SKILL.md: {:?}", result.err());
         assert!(t.fs.file_exists(Path::new("/dest/agents/my-agent.md")));
+    }
+
+    /// Copy `source` for `kind` with the context's platform and check that
+    /// `installed_checksum_for` predicted the checksum of what landed.
+    fn assert_prediction_matches_copy(t: &TestContext, source: &Path, kind: ArtifactKind) {
+        let ctx = t.ctx();
+        let source_cs = crate::checksum::checksum_artifact(source, kind, &t.fs).unwrap();
+        let predicted = installed_checksum_for(source, kind, "my-art", &source_cs, &ctx).unwrap();
+        let dest = copy_artifact(source, Path::new("/dest"), kind, "my-art", &ctx).unwrap();
+        let actual = crate::checksum::checksum_artifact(&dest, kind, &t.fs).unwrap();
+        assert_eq!(predicted, actual);
+    }
+
+    #[test]
+    fn installed_checksum_for_a_skill_is_the_source_checksum() {
+        let t = TestContext::new();
+        add_skill(&t.fs, "/source", "my-art", "A skill");
+        t.fs.add_file("/source/my-art/node_modules/dep/index.js", "transient");
+        assert_prediction_matches_copy(&t, Path::new("/source/my-art"), ArtifactKind::Skill);
+    }
+
+    #[test]
+    fn installed_checksum_for_a_codex_agent_is_the_toml_projection() {
+        let t = TestContext::for_platform(crate::platform::Platform::Codex);
+        t.fs.add_file(
+            "/source/agents/my-art.md",
+            "---\nname: my-art\ndescription: An agent\n---\nBody\n",
+        );
+        assert_prediction_matches_copy(
+            &t,
+            Path::new("/source/agents/my-art.md"),
+            ArtifactKind::Agent,
+        );
     }
 }

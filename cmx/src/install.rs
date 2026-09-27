@@ -10,6 +10,7 @@ use crate::context::AppContext;
 use crate::copy;
 use crate::diff::file_changes_between;
 use crate::local_modification;
+use crate::lock_baseline::{BaselineUpdate, refresh_baseline};
 use crate::lockfile;
 use crate::paths::ConfigPaths;
 use crate::platform::Platform;
@@ -120,8 +121,16 @@ fn install_resolved(
     let plan = plan_install(artifact_name, kind, scope, &found, ctx.paths)?;
     ctx.fs.create_dir_all(&plan.dest_dir)?;
     let source_checksum = checksum::checksum_artifact(&found.artifact.path, kind, ctx.fs)?;
+    let install_checksum = copy::installed_checksum_for(
+        &found.artifact.path,
+        kind,
+        artifact_name,
+        &source_checksum,
+        ctx,
+    )?;
 
-    let facts = gather_install_facts(artifact_name, kind, scope, force, ctx)?;
+    let facts =
+        gather_install_facts(artifact_name, kind, scope, force, Some(&install_checksum), ctx)?;
 
     // Version guard: refuse to downgrade a newer-installed copy unless forced.
     if facts.already_installed && !force.is_yes() {
@@ -140,7 +149,7 @@ fn install_resolved(
         }
     }
 
-    let decision = decide_install(facts.already_installed, facts.locally_modified, force);
+    let decision = decide_install(&facts, force);
     if decision.blocked {
         return Err(CliError::LocallyModified {
             name: artifact_name.to_string(),
@@ -158,7 +167,27 @@ fn install_resolved(
         Vec::new()
     };
 
-    commit_install(&plan, kind, scope, &found.artifact.path, source_checksum, &decision, ctx)?;
+    let installed_checksum = commit_install(
+        &plan,
+        kind,
+        scope,
+        &found.artifact.path,
+        source_checksum.clone(),
+        &decision,
+        ctx,
+    )?;
+    refresh_shared_copy_baselines(
+        &plan,
+        kind,
+        scope,
+        &BaselineUpdate {
+            checksum: &installed_checksum,
+            version: plan.version.as_deref(),
+            source_checksum: Some(&source_checksum),
+            now: &ctx.clock.now().to_rfc3339(),
+        },
+        ctx,
+    )?;
 
     Ok(InstallResult {
         artifact_name: artifact_name.to_string(),
@@ -378,38 +407,47 @@ pub fn update_all(
 /// same drift/already-installed detection install itself uses, rather than
 /// reimplementing it.
 pub(crate) struct InstallFacts {
+    /// The installed copy holds edits an install would overwrite (see
+    /// [`LocalModification::conflicts_with_install`](crate::local_modification::LocalModification::conflicts_with_install)).
     pub(crate) locally_modified: bool,
+    /// Something is on disk at the artifact's install path.
     pub(crate) already_installed: bool,
+    /// The active platform's lock file at this scope records this artifact
+    /// (of this kind) — a known baseline the on-disk copy was checked against.
+    pub(crate) tracked: bool,
 }
 
 /// Gather the I/O facts needed to decide whether an install should proceed.
 /// All filesystem access for the decision lives here; the caller passes the
 /// result to the pure [`decide_install`].
+///
+/// `install_checksum` is the checksum the install is about to write; a copy
+/// already equal to it is not treated as locally modified. Pass `None` when
+/// nothing is about to be written (e.g. `cmx set deactivate` probing drift).
 pub(crate) fn gather_install_facts(
     artifact_name: &str,
     kind: ArtifactKind,
     scope: InstallScope,
     force: Force,
+    install_checksum: Option<&str>,
     ctx: &AppContext<'_>,
 ) -> Result<InstallFacts> {
     let lock = lockfile::load(scope, ctx.fs, ctx.paths)?;
-    let locally_modified = local_modification::for_artifact(
-        artifact_name,
-        kind,
-        scope,
-        lock.packages.get(artifact_name),
-        ctx,
-    )?
-    .modified;
+    let lock_entry = lock.packages.get(artifact_name);
+    let locally_modified =
+        local_modification::for_artifact(artifact_name, kind, scope, lock_entry, ctx)?
+            .conflicts_with_install(install_checksum);
     let already_installed = ctx.paths.is_installed(kind, artifact_name, scope, ctx.fs);
     Ok(InstallFacts {
         locally_modified: locally_modified && (!force.is_yes() || already_installed),
         already_installed,
+        tracked: lock_entry.is_some_and(|entry| entry.artifact_type == kind),
     })
 }
 
 /// Copy the artifact, checksum the installed copy, write the lock entry, and
 /// roll back the copy if the lockfile write fails (fresh installs only).
+/// Returns the installed copy's checksum.
 fn commit_install(
     plan: &InstallPlan,
     kind: ArtifactKind,
@@ -418,7 +456,7 @@ fn commit_install(
     source_checksum: String,
     decision: &InstallDecision,
     ctx: &AppContext<'_>,
-) -> Result<PathBuf> {
+) -> Result<String> {
     if decision.replace_existing {
         let existing =
             kind.installed_path(&plan.artifact_name, &plan.dest_dir, ArtifactKind::HOME_AGENT_EXT);
@@ -437,7 +475,7 @@ fn commit_install(
                 plan,
                 kind,
                 source_checksum,
-                installed_checksum,
+                installed_checksum.clone(),
                 ctx.clock.now().to_rfc3339(),
             ),
         );
@@ -454,7 +492,58 @@ fn commit_install(
         return Err(lock_err.into());
     }
 
-    Ok(dest_path)
+    Ok(installed_checksum)
+}
+
+/// After installing onto the active platform, refresh the lock baseline of
+/// every other managed platform that reads the **same physical copy** (e.g.
+/// Codex and Hermes both install local skills to `.agents/skills`) and already
+/// tracks this artifact at `scope` from the same source — its files were just
+/// rewritten under it, so its baseline must follow or its next update would
+/// refuse the copy as locally modified.
+///
+/// A sibling whose lock entry names a different source repo is left alone:
+/// rewriting its baseline would silently launder a cross-source overwrite into
+/// "clean". It stays drifted, which `update` then reports.
+fn refresh_shared_copy_baselines(
+    plan: &InstallPlan,
+    kind: ArtifactKind,
+    scope: InstallScope,
+    update: &BaselineUpdate<'_>,
+    ctx: &AppContext<'_>,
+) -> Result<()> {
+    let active = ctx.paths.platform;
+    let mut candidates = crate::config::managed_or_all_platforms(ctx.fs, ctx.paths)?;
+    if !candidates.contains(&active) {
+        candidates.push(active);
+    }
+    let siblings: Vec<Platform> = crate::platform_copies::gather_platform_copies(
+        &candidates,
+        kind,
+        &plan.artifact_name,
+        scope,
+        ctx,
+        |_, platforms| {
+            Ok(platforms.contains(&active).then(|| {
+                platforms.into_iter().filter(|&platform| platform != active).collect::<Vec<_>>()
+            }))
+        },
+    )?
+    .into_iter()
+    .flatten()
+    .collect();
+
+    let mut same_source = Vec::new();
+    for platform in siblings {
+        let pv = ctx.paths.with_platform(platform);
+        if let Some(entry) = lockfile::load(scope, ctx.fs, &pv)?.packages.get(&plan.artifact_name)
+            && entry.artifact_type == kind
+            && entry.source.repo == plan.source_name
+        {
+            same_source.push(platform);
+        }
+    }
+    refresh_baseline(&plan.artifact_name, scope, &same_source, update, ctx)
 }
 
 /// Compute the destination directory and relative source path for an install.
@@ -488,25 +577,25 @@ pub(crate) struct InstallDecision {
     /// the ghost we're trying to prevent.
     pub rollback_on_lock_fail: bool,
     /// True when the existing on-disk copy should be removed before copying the
-    /// replacement, so local-only files do not linger after `--force`.
+    /// replacement, so files the source no longer ships (and local-only files
+    /// after `--force`) do not linger.
     pub replace_existing: bool,
 }
 
 /// Pure decision function: given pre-gathered facts, return the install decisions.
 /// No gateway access — all I/O must happen in the shell before calling this.
 ///
-/// `already_installed` and `locally_modified` are value-carrying state
-/// predicates and stay as `bool`; `force` is an intent flag and takes
-/// [`Force`] to avoid boolean blindness at call sites.
-pub(crate) fn decide_install(
-    already_installed: bool,
-    locally_modified: bool,
-    force: Force,
-) -> InstallDecision {
+/// An existing copy is replaced (removed, then copied fresh) when `--force` is
+/// passed or when it is tracked: a tracked copy that is not blocked has been
+/// proven to match a known baseline, so every file in it is one cmx put there
+/// and removing files the source dropped loses nothing. An untracked copy has
+/// no baseline, so without `--force` the install overlays it and leaves any
+/// extra files in place rather than risk deleting hand-authored work.
+pub(crate) fn decide_install(facts: &InstallFacts, force: Force) -> InstallDecision {
     InstallDecision {
-        blocked: locally_modified && !force.is_yes(),
-        rollback_on_lock_fail: !already_installed,
-        replace_existing: force.is_yes() && already_installed,
+        blocked: facts.locally_modified && !force.is_yes(),
+        rollback_on_lock_fail: !facts.already_installed,
+        replace_existing: facts.already_installed && (force.is_yes() || facts.tracked),
     }
 }
 

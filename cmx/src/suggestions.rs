@@ -1,23 +1,37 @@
 //! Suggestion helpers for commands.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config;
 use crate::context::AppContext;
 use crate::lockfile;
+use crate::platform::Platform;
 use crate::source_iter;
 use crate::types::{ArtifactKind, InstallScope};
 
-/// Build a "did you mean" hint for a name that wasn't found among installed
-/// artifacts, falling back to a generic pointer to `cmx list` when no close
-/// match exists.
+/// Where each installed name is tracked: name → every `(platform, scope)` whose
+/// lock file records it, in managed-platform then scope order.
+type TrackedLocations = BTreeMap<String, Vec<(Platform, InstallScope)>>;
+
+/// Build a hint for a name that wasn't found among installed artifacts.
+///
+/// When the exact name *is* tracked — just not where the command looked — the
+/// hint says where: the other platform(s) tracking it (suggesting
+/// `--platform <first>`), or, when only the active platform tracks it, the
+/// scope it lives at. Otherwise it offers a "did you mean" for a near miss
+/// (never the identical name), falling back to a generic pointer to
+/// `cmx list`.
 pub fn installed_artifact_hint(
     name: &str,
     kind: Option<ArtifactKind>,
     ctx: &AppContext<'_>,
 ) -> String {
-    let candidates = installed_candidates(kind, ctx).unwrap_or_default();
-    hint_from_candidates(name, &candidates).unwrap_or_else(|| match kind {
+    let tracked = installed_candidates(kind, ctx).unwrap_or_default();
+    if let Some(locations) = tracked.get(name) {
+        return tracked_elsewhere_hint(locations, ctx.paths.platform);
+    }
+    let names: BTreeSet<String> = tracked.into_keys().collect();
+    hint_from_candidates(name, &names).unwrap_or_else(|| match kind {
         Some(kind) => format!("See 'cmx {kind} list'."),
         None => "See 'cmx list'.".to_string(),
     })
@@ -31,23 +45,47 @@ pub fn source_artifact_hint(name: &str, kind: ArtifactKind, ctx: &AppContext<'_>
     hint_from_candidates(name, &candidates).unwrap_or_else(|| format!("See 'cmx search {name}'."))
 }
 
+/// Say where an exactly-named artifact is tracked, given every location
+/// tracking it. Other platforms come first — they are why a command on the
+/// active platform found nothing. Only when the active platform alone tracks
+/// it (at a scope the command did not look in) does the hint name the scope.
+fn tracked_elsewhere_hint(locations: &[(Platform, InstallScope)], active: Platform) -> String {
+    let mut others: Vec<Platform> = Vec::new();
+    for &(platform, _) in locations {
+        if platform != active && !others.contains(&platform) {
+            others.push(platform);
+        }
+    }
+    if let Some(first) = others.first() {
+        let list = others.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+        return format!("It is installed for {list}. Re-run with '--platform {first}'.");
+    }
+    let mut scopes: Vec<&str> = Vec::new();
+    for &(_, scope) in locations {
+        if !scopes.contains(&scope.label()) {
+            scopes.push(scope.label());
+        }
+    }
+    format!("It is installed for {active} at {} scope.", scopes.join(" and "))
+}
+
 fn installed_candidates(
     kind: Option<ArtifactKind>,
     ctx: &AppContext<'_>,
-) -> crate::error::Result<BTreeSet<String>> {
-    let mut names = BTreeSet::new();
+) -> crate::error::Result<TrackedLocations> {
+    let mut tracked = TrackedLocations::new();
     for platform in config::managed_or_all_platforms(ctx.fs, ctx.paths)? {
         let paths = ctx.paths.with_platform(platform);
         for scope in InstallScope::ALL {
             let lock = lockfile::load(scope, ctx.fs, &paths)?;
             for (name, entry) in lock.packages {
                 if kind.is_none_or(|expected| entry.artifact_type == expected) {
-                    names.insert(name);
+                    tracked.entry(name).or_default().push((platform, scope));
                 }
             }
         }
     }
-    Ok(names)
+    Ok(tracked)
 }
 
 fn source_candidates(
@@ -102,7 +140,7 @@ fn levenshtein(left: &str, right: &str) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{installed_artifact_hint, levenshtein};
+    use super::{installed_artifact_hint, levenshtein, tracked_elsewhere_hint};
     use crate::config;
     use crate::lockfile;
     use crate::platform::Platform;
@@ -164,5 +202,90 @@ mod tests {
 
         let hint = installed_artifact_hint("focus-skll", Some(ArtifactKind::Skill), &t.ctx());
         assert_eq!(hint, "See 'cmx skill list'.");
+    }
+
+    #[test]
+    fn tracked_elsewhere_hint_names_both_scopes_on_the_active_platform() {
+        let hint = tracked_elsewhere_hint(
+            &[
+                (Platform::Claude, InstallScope::Global),
+                (Platform::Claude, InstallScope::Local),
+            ],
+            Platform::Claude,
+        );
+        assert_eq!(hint, "It is installed for claude at global and local scope.");
+    }
+
+    fn track(
+        t: &TestContext,
+        platform: Platform,
+        scope: InstallScope,
+        name: &str,
+        kind: ArtifactKind,
+    ) {
+        let pv = t.paths.with_platform(platform);
+        let mut lock = lockfile::load(scope, &t.fs, &pv).unwrap();
+        let mut entry = sample_lock_entry();
+        entry.artifact_type = kind;
+        lock.packages.insert(name.to_string(), entry);
+        lockfile::save(&lock, scope, &t.fs, &pv).unwrap();
+    }
+
+    fn hint_on(
+        t: &TestContext,
+        active: Platform,
+        name: &str,
+        kind: Option<ArtifactKind>,
+    ) -> String {
+        let pv = t.paths.with_platform(active);
+        installed_artifact_hint(name, kind, &t.ctx().with_paths(&pv))
+    }
+
+    #[test]
+    fn installed_hint_names_the_platform_tracking_the_exact_name() {
+        let t = TestContext::new();
+        track(&t, Platform::Claude, InstallScope::Global, "uv-python", ArtifactKind::Agent);
+
+        let hint = hint_on(&t, Platform::Codex, "uv-python", Some(ArtifactKind::Agent));
+        assert_eq!(hint, "It is installed for claude. Re-run with '--platform claude'.");
+    }
+
+    #[test]
+    fn installed_hint_lists_every_platform_tracking_the_exact_name() {
+        let t = TestContext::new();
+        track(&t, Platform::Claude, InstallScope::Global, "focus", ArtifactKind::Skill);
+        track(&t, Platform::Cursor, InstallScope::Local, "focus", ArtifactKind::Skill);
+        track(&t, Platform::Claude, InstallScope::Local, "focus", ArtifactKind::Skill);
+
+        let hint = hint_on(&t, Platform::Codex, "focus", Some(ArtifactKind::Skill));
+        assert_eq!(hint, "It is installed for claude, cursor. Re-run with '--platform claude'.");
+    }
+
+    #[test]
+    fn installed_hint_ignores_an_exact_name_of_another_kind() {
+        let t = TestContext::new();
+        track(&t, Platform::Claude, InstallScope::Global, "focus", ArtifactKind::Agent);
+
+        let hint = hint_on(&t, Platform::Codex, "focus", Some(ArtifactKind::Skill));
+        assert_eq!(hint, "See 'cmx skill list'.");
+    }
+
+    #[test]
+    fn installed_hint_names_the_scope_when_only_the_active_platform_tracks_it() {
+        let t = TestContext::new();
+        track(&t, Platform::Claude, InstallScope::Local, "focus", ArtifactKind::Skill);
+
+        let hint = hint_on(&t, Platform::Claude, "focus", Some(ArtifactKind::Skill));
+        assert_eq!(hint, "It is installed for claude at local scope.");
+    }
+
+    #[test]
+    fn installed_hint_never_suggests_the_identical_name() {
+        let t = TestContext::new();
+        track(&t, Platform::Claude, InstallScope::Global, "focus-skill", ArtifactKind::Skill);
+        track(&t, Platform::Claude, InstallScope::Global, "focus-skil", ArtifactKind::Skill);
+
+        let hint = hint_on(&t, Platform::Codex, "focus-skill", Some(ArtifactKind::Skill));
+        assert!(!hint.contains("Did you mean"), "{hint}");
     }
 }
