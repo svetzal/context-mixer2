@@ -1,26 +1,44 @@
 name: Gate Debug
 
-# Diagnostic twin of the release quality gate. Push a `debug-*` tag at any
-# commit to run the all-features tests exactly as a tag-triggered run sees
-# them, but single-threaded, uncaptured, and under a hard timeout, so a test
-# that hangs names itself in the live log instead of taking the runner down.
-# Publishes nothing.
+# Diagnostic twin of the quality gate's all-features test step. Push a
+# `debug-*` tag at any commit to run it. Publishes nothing.
+#
+# When that step hangs, the hosted runner stops responding and GitHub keeps no
+# log for the whole job — not even for the steps that passed — so a single job
+# can't say what hung. This splits the all-features test run into one job per
+# test target: the jobs that finish keep their logs, and the one that dies
+# names the culprit. Output streams straight to the log (never through `tail`,
+# which holds everything back until EOF), tests run single-threaded, and a
+# heartbeat prints memory and process counts every 30s so a runaway shows in
+# the log before the runner goes.
 
 on:
   push:
     tags: ["debug-*"]
 
 permissions:
-  contents: write # mirror release.yml exactly; this workflow still writes nothing
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   all-features-tests:
-    name: All-features tests (diagnostic)
+    name: ${{ matrix.target.name }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { name: "cmx lib", args: "-p cmx --lib" }
+          - { name: "cmx bin", args: "-p cmx --bins" }
+          - { name: "cmx integration tests", args: "-p cmx --test '*'" }
+          - { name: "cmx-core", args: "-p cmx-core --lib --bins --tests" }
+          - { name: "cmf", args: "-p cmf --lib --bins --tests" }
+          - { name: "cmv", args: "-p cmv --lib --bins --tests" }
+          - { name: "intent-atlas", args: "-p intent-atlas --lib --tests" }
+          - { name: "doctests", args: "--doc" }
     steps:
       - uses: actions/checkout@v5
 
@@ -37,53 +55,23 @@ jobs:
         run: |
           echo "ref=$GITHUB_REF type=$GITHUB_REF_TYPE"
           nproc; free -m; df -h / | tail -1
-          git rev-parse HEAD; git status --short | head
+          env | grep -iE 'proxy|openai|ollama' || true
 
-      # The preceding steps of release.yml's quality gate, in the same order;
-      # the hang only reproduces after them.
-      - name: Check formatting
-        run: cargo fmt --check
+      - name: Build (all features)
+        run: timeout 900 cargo test --all-features --no-run
 
-      - name: Clippy (default features)
-        run: timeout 900 cargo clippy --all-targets -- -D warnings
-
-      - name: Tests (default features)
-        run: timeout 900 cargo test 2>&1 | tail -c 100000
-
-      - name: Processes left behind by the default test run
-        run: ps -eo pid,ppid,pgid,etime,stat,command --forest | grep -vE 'ps -eo|grep|Runner|bash|node' | tail -20
-
-      - name: Clippy (all features)
-        run: timeout 900 cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Run tests exactly as the release gate does, with a watchdog
+      - name: Run (all features, single-threaded, watchdog)
         env:
           RUST_BACKTRACE: 1
         run: |
           set +e
-          # Same command as release.yml's "Tests (all features)" step. cargo
-          # prints "Running <binary>" before each test binary, so a hang names
-          # the binary; the watchdog then dumps what is still alive.
-          timeout 600 cargo test --all-features 2>&1 | tee tests.log | tail -c 200000
-          code=${PIPESTATUS[0]}
-          if [ "$code" = "124" ]; then
-            echo "=== TIMED OUT after 600s; processes still alive:" | tee -a tests.log
-            ps -eo pid,ppid,pgid,etime,stat,command --forest | tee -a tests.log
-            exit 124
+          ( while sleep 30; do echo "--- heartbeat $(date -u +%T): $(free -m | awk '/Mem:/{print $3"MB used"}'), $(ps -e --no-headers | wc -l) procs"; done ) &
+          hb=$!
+          timeout --kill-after=10 480 cargo test --all-features ${{ matrix.target.args }} -- --test-threads=1
+          code=$?
+          kill $hb
+          if [ "$code" = "124" ] || [ "$code" = "137" ]; then
+            echo "=== TIMED OUT after 480s; processes still alive:"
+            ps -eo pid,ppid,pgid,etime,stat,command --forest | grep -vE 'Runner|node' | tail -40
           fi
           exit $code
-
-      - name: Re-run the last binary single-threaded if the gate hung
-        if: failure()
-        run: |
-          bin=$(grep -oE 'Running (unittests )?\S+ \(\S+\)' tests.log | tail -1 | grep -oE '\(\S+\)' | tr -d '()')
-          echo "last test binary: $bin"
-          [ -n "$bin" ] && timeout 300 "$bin" --test-threads=1 --nocapture 2>&1 | tee -a tests.log | tail -c 100000 || true
-
-      - name: Upload log
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: gate-debug-tests-log
-          path: tests.log
-          retention-days: 3
