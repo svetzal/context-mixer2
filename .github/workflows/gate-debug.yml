@@ -7,9 +7,9 @@ name: Gate Debug
 # the whole workspace at once, but takes the runner down (no log survives for
 # the job) when it follows the gate's earlier steps. These variants run it
 # after different subsets of those steps, record what the earlier steps left
-# behind (processes, files under $HOME and /tmp), and confine the test run to
-# a systemd scope with memory and task caps so a runaway fails loudly in the
-# log instead of killing the machine.
+# behind (processes, files under $HOME and /tmp), and watch free disk, free
+# memory, and the process count during the run, killing it (after recording
+# what was growing) before a runaway takes the machine down with its log.
 
 on:
   push:
@@ -77,22 +77,35 @@ jobs:
       - name: Build (all features)
         run: timeout 900 cargo test --all-features --no-run
 
-      - name: Run (all features, capped)
+      - name: Run (all features, resource watchdog)
         env:
           RUST_BACKTRACE: 1
         run: |
           set +e
-          ( while sleep 20; do
-              echo "--- heartbeat $(date -u +%T): $(free -m | awk '/Mem:/{print $3"MB used"}'), $(ps -e --no-headers | wc -l) procs"
-              ps -eo rss,comm --sort=-rss --no-headers | head -5 | tr '\n' ';'; echo
-              ps -eo comm --no-headers | sort | uniq -c | sort -rn | head -5 | tr '\n' ';'; echo
-            done ) &
-          hb=$!
-          sudo systemd-run --scope --quiet -p MemoryMax=10G -p TasksMax=2000 -- \
-            sudo -u "$(id -un)" env "HOME=$HOME" "PATH=$PATH" CARGO_TERM_COLOR=always RUST_BACKTRACE=1 \
-            timeout --kill-after=10 480 cargo test --all-features
+          # Not time-bounded alone: a watchdog kills the run as soon as free
+          # disk, free memory, or the process count crosses a line, after
+          # recording what was growing, so the runner survives to upload this log.
+          setsid timeout --kill-after=10 600 cargo test --all-features &
+          pid=$!
+          while kill -0 $pid 2>/dev/null; do
+            sleep 10
+            disk=$(df --output=avail -m / | tail -1 | tr -d ' ')
+            mem=$(free -m | awk '/Mem:/{print $7}')
+            procs=$(ps -e --no-headers | wc -l)
+            echo "--- $(date -u +%T) disk_free=${disk}MB mem_avail=${mem}MB procs=$procs"
+            if [ "$disk" -lt 4000 ] || [ "$mem" -lt 2000 ] || [ "$procs" -gt 1500 ]; then
+              echo "=== THRESHOLD CROSSED"
+              ps -eo pid,ppid,pgid,etime,stat,rss,command --forest | grep -vE 'Runner\.|node ' | tail -60
+              ps -eo comm --no-headers | sort | uniq -c | sort -rn | head -10
+              sudo du -xm --max-depth=3 / 2>/dev/null | sort -rn | head -25
+              sudo lsof -nP +L1 2>/dev/null | head -10
+              kill -KILL -- -$pid 2>/dev/null
+              break
+            fi
+          done
+          wait $pid
           code=$?
-          kill $hb
           echo "=== exit $code; processes still alive:"
           ps -eo pid,ppid,pgid,etime,stat,rss,command --forest | grep -vE 'Runner\.|node |ps -eo|grep ' | tail -40
+          df -h / | tail -1
           exit $code
