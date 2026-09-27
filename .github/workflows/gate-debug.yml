@@ -56,8 +56,8 @@ jobs:
         run: |
           set +e
           cargo test -p cmv --no-run --message-format=json 2>/dev/null \
-            | jq -r 'select(.profile.test == true and .executable != null) | .executable' > bins.txt
-          cat bins.txt
+            | jq -r 'select(.profile.test == true and .executable != null) | .executable' > "$RUNNER_TEMP/bins.txt"
+          cat "$RUNNER_TEMP/bins.txt"
           cd cmv
           while read -r bin; do
             name=$(basename "$bin")
@@ -70,6 +70,6 @@ jobs:
             grep -E 'kill\(' "/tmp/trace-$name.txt" | head -20
             echo "--- execs:"
             grep -oE 'execve\("[^"]+", \[[^]]{0,160}' "/tmp/trace-$name.txt" | sort | uniq -c | sort -rn | head -15
-          done < bins.txt
+          done < "$RUNNER_TEMP/bins.txt"
           echo "=================== runner-user processes still alive"
           ps -eo pid,user,pgid,etime,command --forest | grep -vE 'node ' | tail -30
