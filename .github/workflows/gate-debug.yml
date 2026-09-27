@@ -1,15 +1,18 @@
 name: Gate Debug
 
-# Diagnostic twin of the quality gate's all-features test step. Push a
-# `debug-*` tag at any commit to run it. Publishes nothing.
+# Diagnostic for the quality gate's all-features test step. Push a `debug-*`
+# tag at any commit to run it. Publishes nothing.
 #
-# The all-features test run passes on a fresh runner, one target at a time or
-# the whole workspace at once, but takes the runner down (no log survives for
-# the job) when it follows the gate's earlier steps. These variants run it
-# after different subsets of those steps, record what the earlier steps left
-# behind (processes, files under $HOME and /tmp), and watch free disk, free
-# memory, and the process count during the run, killing it (after recording
-# what was growing) before a runaway takes the machine down with its log.
+# Bisected so far: the runner dies (no log survives for the job) whenever
+# cmv's tests run a second time on the same machine — `cargo test` twice, or
+# the default run followed by the all-features one. Every other crate's tests
+# pass a second run. The death is instant and ignores memory/task caps, which
+# looks like something signalling every process the runner user owns.
+#
+# So after a normal first pass, this runs each cmv test binary again as a
+# separate unprivileged user under a root-owned strace that records every
+# kill/execve. If a test signals everything its user owns, only that user's
+# processes die; the runner and strace survive, and the trace names the call.
 
 on:
   push:
@@ -22,95 +25,51 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  all-features-tests:
-    name: ${{ matrix.variant.name }}
+  cmv-second-pass:
+    name: cmv second pass under strace
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          - { name: "default tests, then cmx lib", default_tests: true, clippy: false, args: "--all-features -p cmx --lib" }
-          - { name: "default tests, then cmx bin", default_tests: true, clippy: false, args: "--all-features -p cmx --bins" }
-          - { name: "default tests, then cmx integration tests", default_tests: true, clippy: false, args: "--all-features -p cmx --test '*'" }
-          - { name: "default tests, then cmx-core", default_tests: true, clippy: false, args: "--all-features -p cmx-core --lib --bins --tests" }
-          - { name: "default tests, then cmf", default_tests: true, clippy: false, args: "--all-features -p cmf --lib --bins --tests" }
-          - { name: "default tests, then cmv", default_tests: true, clippy: false, args: "--all-features -p cmv --lib --bins --tests" }
-          - { name: "default tests, then intent-atlas and doctests", default_tests: true, clippy: false, args: "--all-features -p intent-atlas" }
-          - { name: "default tests twice", default_tests: true, clippy: false, args: "" }
     steps:
       - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.94.0"
-          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: quality-gate
           save-if: false
 
-      - name: Environment
-        run: |
-          nproc; free -m; df -h / | tail -1
-          touch "$RUNNER_TEMP/marker"
-          ps -e --no-headers | wc -l
-
-      - name: Clippy (default features)
-        if: matrix.variant.clippy
-        run: timeout 900 cargo clippy --all-targets -- -D warnings
-
-      - name: Tests (default features)
-        if: matrix.variant.default_tests
+      - name: First pass (default features)
         run: timeout 900 cargo test
 
-      - name: Clippy (all features)
-        if: matrix.variant.clippy
-        run: timeout 900 cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: What the earlier steps left behind
+      - name: Prepare an unprivileged user and strace
         run: |
-          echo "=== processes (excluding runner plumbing)"
-          ps -eo pid,ppid,pgid,etime,stat,rss,command --forest | grep -vE 'Runner\.|node |ps -eo|grep ' | tail -60
-          echo "=== files under \$HOME newer than the job start (excluding caches)"
-          find "$HOME" -newer "$RUNNER_TEMP/marker" -not -path "*/.cargo/*" -not -path "*/.rustup/*" -not -path "*/work/*" 2>/dev/null | head -60
-          echo "=== /tmp"
-          ls -la /tmp | head -40
-          free -m; df -h / | tail -1
+          sudo apt-get install -y -qq strace >/dev/null
+          sudo useradd -m tester
+          chmod -R a+rwX "$GITHUB_WORKSPACE"
+          chmod a+x "$HOME" "$(dirname "$GITHUB_WORKSPACE")" "$(dirname "$(dirname "$GITHUB_WORKSPACE")")"
+          ps -eo pid,user,pgid,etime,command --forest | grep -vE 'Runner\.|node ' | tail -30
 
-      - name: Build (all features)
-        run: timeout 900 cargo test --all-features --no-run
-
-      - name: Run (resource watchdog)
-        env:
-          RUST_BACKTRACE: 1
+      - name: Second pass of each cmv test binary, as tester, traced
         run: |
           set +e
-          # Not time-bounded alone: a watchdog kills the run as soon as free
-          # disk, free memory, or the process count crosses a line, after
-          # recording what was growing, so the runner survives to upload this log.
-          setsid timeout --kill-after=10 600 cargo test ${{ matrix.variant.args }} &
-          pid=$!
-          while kill -0 $pid 2>/dev/null; do
-            sleep 10
-            disk=$(df --output=avail -m / | tail -1 | tr -d ' ')
-            mem=$(free -m | awk '/Mem:/{print $7}')
-            procs=$(ps -e --no-headers | wc -l)
-            echo "--- $(date -u +%T) disk_free=${disk}MB mem_avail=${mem}MB procs=$procs"
-            if [ "$disk" -lt 4000 ] || [ "$mem" -lt 2000 ] || [ "$procs" -gt 1500 ]; then
-              echo "=== THRESHOLD CROSSED"
-              ps -eo pid,ppid,pgid,etime,stat,rss,command --forest | grep -vE 'Runner\.|node ' | tail -60
-              ps -eo comm --no-headers | sort | uniq -c | sort -rn | head -10
-              sudo du -xm --max-depth=3 / 2>/dev/null | sort -rn | head -25
-              sudo lsof -nP +L1 2>/dev/null | head -10
-              kill -KILL -- -$pid 2>/dev/null
-              break
-            fi
-          done
-          wait $pid
-          code=$?
-          echo "=== exit $code; processes still alive:"
-          ps -eo pid,ppid,pgid,etime,stat,rss,command --forest | grep -vE 'Runner\.|node |ps -eo|grep ' | tail -40
-          df -h / | tail -1
-          exit $code
+          cargo test -p cmv --no-run --message-format=json 2>/dev/null \
+            | jq -r 'select(.profile.test == true and .executable != null) | .executable' > bins.txt
+          cat bins.txt
+          cd cmv
+          while read -r bin; do
+            name=$(basename "$bin")
+            echo "=================== $name"
+            sudo strace -f -qq -e trace=kill,tkill,tgkill,execve -e signal=none \
+              -o "/tmp/trace-$name.txt" -u tester \
+              env HOME=/home/tester PATH="/usr/local/bin:/usr/bin:/bin" \
+              timeout --kill-after=5 120 "$bin" --test-threads=1 2>&1 | tail -15
+            echo "--- exit ${PIPESTATUS[0]}; kill-family calls:"
+            grep -E 'kill\(' "/tmp/trace-$name.txt" | head -20
+            echo "--- execs:"
+            grep -oE 'execve\("[^"]+", \[[^]]{0,160}' "/tmp/trace-$name.txt" | sort | uniq -c | sort -rn | head -15
+          done < bins.txt
+          echo "=================== runner-user processes still alive"
+          ps -eo pid,user,pgid,etime,command --forest | grep -vE 'node ' | tail -30
