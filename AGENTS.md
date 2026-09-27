@@ -127,12 +127,18 @@ Conventions and gotchas:
   cache `ci.yml` saves on `main` (`Swatinem/rust-cache` `shared-key:
   quality-gate`, `save-if: false`), has `timeout-minutes: 30`, and runs the
   all-features tests under a 600s watchdog with the output streamed to a log
-  that is uploaded as an artifact whatever the outcome. Three tag runs of
-  v3.3.0 died in that step after ~45 minutes with no step log ("The hosted
-  runner lost communication with the server") while `ci.yml` and the
-  diagnostic twin `gate-debug.yml` (push a `debug-*` tag) ran the identical
-  steps on the identical commit in seconds. If the symptom recurs, read the
-  uploaded log before re-tagging.
+  that is uploaded as an artifact whatever the outcome.
+- **A job that vanishes with no log means something killed the runner's own
+  processes.** From v3.3.0 until 3.3.1, CI and release runs died that way
+  ("lost communication", or the 30-minute limit, with no log even for steps
+  that passed; watchdogs and memory/task caps never fired). The cause was
+  cmv's timeout path shelling out to `kill -KILL -<pid>`: the `kill` first on
+  `PATH` on ubuntu runners read `-6771` as `-6`, so once pids passed 10000 (the
+  second test pass on a runner) a pid starting with 1 became
+  `kill(-1, SIGKILL)` and took the runner agent with it. If the symptom comes
+  back, bisect with `gate-debug.yml` (push a `debug-*` tag) — split the work
+  across jobs, since only the job that dies loses its log — and trace signals
+  with `strace` running a second pass as another user, so the runner survives.
 - **Sequence releases — never push two `v*` tags concurrently.** The Homebrew
   job overwrites the single tap formula with whichever run finishes last, so two
   in-flight releases can leave the tap pinned to the wrong (older) version. Push

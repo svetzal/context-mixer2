@@ -1,32 +1,24 @@
 name: Gate Debug
 
-# Diagnostic for the quality gate's all-features test step. Push a `debug-*`
-# tag at any commit to run it. Publishes nothing.
-#
-# Bisected so far: the runner dies (no log survives for the job) whenever
-# cmv's tests run a second time on the same machine — `cargo test` twice, or
-# the default run followed by the all-features one. Every other crate's tests
-# pass a second run. The death is instant and ignores memory/task caps, which
-# looks like something signalling every process the runner user owns.
-#
-# So after a normal first pass, this runs each cmv test binary again as a
-# separate unprivileged user under a root-owned strace that records every
-# kill/execve. If a test signals everything its user owns, only that user's
-# processes die; the runner and strace survive, and the trace names the call.
+# Diagnostic twin of the release quality gate. Push a `debug-*` tag at any
+# commit to run the all-features tests exactly as a tag-triggered run sees
+# them, but single-threaded, uncaptured, and under a hard timeout, so a test
+# that hangs names itself in the live log instead of taking the runner down.
+# Publishes nothing.
 
 on:
   push:
     tags: ["debug-*"]
 
 permissions:
-  contents: read
+  contents: write # mirror release.yml exactly; this workflow still writes nothing
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  cmv-second-pass:
-    name: cmv second pass under strace
+  all-features-tests:
+    name: All-features tests (diagnostic)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -41,35 +33,57 @@ jobs:
           shared-key: quality-gate
           save-if: false
 
-      - name: First pass (default features)
-        run: timeout 900 cargo test
-
-      - name: Prepare an unprivileged user and strace
+      - name: Environment
         run: |
-          sudo apt-get install -y -qq strace >/dev/null
-          sudo useradd -m tester
-          chmod -R a+rwX "$GITHUB_WORKSPACE"
-          chmod a+x "$HOME" "$(dirname "$GITHUB_WORKSPACE")" "$(dirname "$(dirname "$GITHUB_WORKSPACE")")"
-          ps -eo pid,user,pgid,etime,command --forest | grep -vE 'Runner\.|node ' | tail -30
+          echo "ref=$GITHUB_REF type=$GITHUB_REF_TYPE"
+          nproc; free -m; df -h / | tail -1
+          git rev-parse HEAD; git status --short | head
 
-      - name: Second pass of each cmv test binary, as tester, traced
+      # The preceding steps of release.yml's quality gate, in the same order;
+      # the hang only reproduces after them.
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy (default features)
+        run: timeout 900 cargo clippy --all-targets -- -D warnings
+
+      - name: Tests (default features)
+        run: timeout 900 cargo test 2>&1 | tail -c 100000
+
+      - name: Processes left behind by the default test run
+        run: ps -eo pid,ppid,pgid,etime,stat,command --forest | grep -vE 'ps -eo|grep|Runner|bash|node' | tail -20
+
+      - name: Clippy (all features)
+        run: timeout 900 cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests exactly as the release gate does, with a watchdog
+        env:
+          RUST_BACKTRACE: 1
         run: |
           set +e
-          cargo test -p cmv --no-run --message-format=json 2>/dev/null \
-            | jq -r 'select(.profile.test == true and .executable != null) | .executable' > "$RUNNER_TEMP/bins.txt"
-          cat "$RUNNER_TEMP/bins.txt"
-          cd cmv
-          while read -r bin; do
-            name=$(basename "$bin")
-            echo "=================== $name"
-            sudo strace -f -qq -e trace=kill,tkill,tgkill,execve -e signal=none \
-              -o "/tmp/trace-$name.txt" -u tester \
-              env HOME=/home/tester PATH="/usr/local/bin:/usr/bin:/bin" \
-              timeout --kill-after=5 120 "$bin" --test-threads=1 2>&1 | tail -15
-            echo "--- exit ${PIPESTATUS[0]}; kill-family calls:"
-            grep -E 'kill\(' "/tmp/trace-$name.txt" | head -20
-            echo "--- execs:"
-            grep -oE 'execve\("[^"]+", \[[^]]{0,160}' "/tmp/trace-$name.txt" | sort | uniq -c | sort -rn | head -15
-          done < "$RUNNER_TEMP/bins.txt"
-          echo "=================== runner-user processes still alive"
-          ps -eo pid,user,pgid,etime,command --forest | grep -vE 'node ' | tail -30
+          # Same command as release.yml's "Tests (all features)" step. cargo
+          # prints "Running <binary>" before each test binary, so a hang names
+          # the binary; the watchdog then dumps what is still alive.
+          timeout 600 cargo test --all-features 2>&1 | tee tests.log | tail -c 200000
+          code=${PIPESTATUS[0]}
+          if [ "$code" = "124" ]; then
+            echo "=== TIMED OUT after 600s; processes still alive:" | tee -a tests.log
+            ps -eo pid,ppid,pgid,etime,stat,command --forest | tee -a tests.log
+            exit 124
+          fi
+          exit $code
+
+      - name: Re-run the last binary single-threaded if the gate hung
+        if: failure()
+        run: |
+          bin=$(grep -oE 'Running (unittests )?\S+ \(\S+\)' tests.log | tail -1 | grep -oE '\(\S+\)' | tr -d '()')
+          echo "last test binary: $bin"
+          [ -n "$bin" ] && timeout 300 "$bin" --test-threads=1 --nocapture 2>&1 | tee -a tests.log | tail -c 100000 || true
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gate-debug-tests-log
+          path: tests.log
+          retention-days: 3

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-09-27
+
 ### Fixed
 
 - **A cmv validator timeout can no longer kill every process you own.** On
@@ -20,10 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without `unsafe`), and refuses any process-group id of 0 or 1, or one that
   does not fit a positive `i32`, so a bad value can never widen the signal
   beyond the validator's own group.
-
-## [3.3.1] - 2026-09-26
-
-### Fixed
 
 - **`cmx {skill,agent} update` now prunes files the source dropped.** A
   non-forced update over a tracked copy overlaid the source onto it, so a file
