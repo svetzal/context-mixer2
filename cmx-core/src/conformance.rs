@@ -981,6 +981,8 @@ struct TargetResolveCase {
 #[derive(Serialize)]
 struct TargetResolveInput {
     scope: String,
+    kind: String,
+    selector: Option<String>,
     config_platforms: Vec<String>,
     non_empty_locks: Vec<String>,
 }
@@ -991,6 +993,8 @@ struct TargetResolveExpected {
 }
 
 fn observe_target_resolution(
+    kind: ArtifactKind,
+    selector: Option<Platform>,
     config_platforms: &[Platform],
     non_empty_locks: &[Platform],
 ) -> Result<Vec<String>> {
@@ -1017,8 +1021,7 @@ fn observe_target_resolution(
         lockfile::save(&lock, InstallScope::Global, &test.fs, &paths)?;
     }
 
-    let resolved =
-        targets::resolve_targets(None, ArtifactKind::Skill, InstallScope::Global, &test.ctx())?;
+    let resolved = targets::resolve_targets(selector, kind, InstallScope::Global, &test.ctx())?;
     Ok(resolved.into_iter().map(|platform| platform.to_string()).collect())
 }
 
@@ -1031,29 +1034,70 @@ fn generate_target_resolve_fixtures(out: &Path) -> Result<()> {
             "With no managed set and no non-empty locks, installs target Claude only.",
             vec![],
             vec![],
+            ArtifactKind::Skill,
+            None,
         ),
         (
             "explicit-config-set",
             "A non-empty managed config set overrides inferred locks.",
             vec![Platform::Codex, Platform::Gemini],
             vec![Platform::Claude, Platform::Hermes],
+            ArtifactKind::Skill,
+            None,
         ),
         (
             "unmanaged-nonempty-lock-inference",
             "Without a managed config, installs target every platform whose lockfile is already non-empty.",
             vec![],
             vec![Platform::Codex, Platform::Hermes],
+            ArtifactKind::Skill,
+            None,
+        ),
+        (
+            "explicit-codex-agent",
+            "Explicit Codex agent target overrides a managed Claude set.",
+            vec![Platform::Claude],
+            vec![],
+            ArtifactKind::Agent,
+            Some(Platform::Codex),
+        ),
+        (
+            "explicit-codex-skill",
+            "Explicit Codex skill target overrides a managed Claude set.",
+            vec![Platform::Claude],
+            vec![],
+            ArtifactKind::Skill,
+            Some(Platform::Codex),
+        ),
+        (
+            "implicit-agent-keeps-config",
+            "Without a selector, agent installation retains managed Claude resolution.",
+            vec![Platform::Claude],
+            vec![],
+            ArtifactKind::Agent,
+            None,
+        ),
+        (
+            "implicit-skill-keeps-config",
+            "Without a selector, skill installation retains managed Claude resolution.",
+            vec![Platform::Claude],
+            vec![],
+            ArtifactKind::Skill,
+            None,
         ),
     ];
 
     let mut cases = Vec::new();
-    for (name, description, config_platforms, non_empty_locks) in fixtures {
-        let expected = observe_target_resolution(&config_platforms, &non_empty_locks)?;
+    for (name, description, config_platforms, non_empty_locks, kind, selector) in fixtures {
+        let expected =
+            observe_target_resolution(kind, selector, &config_platforms, &non_empty_locks)?;
         cases.push(TargetResolveCase {
             name: name.to_string(),
             description: description.to_string(),
             input: TargetResolveInput {
                 scope: InstallScope::Global.label().to_string(),
+                kind: kind.to_string(),
+                selector: selector.map(|platform| platform.to_string()),
                 config_platforms: config_platforms
                     .into_iter()
                     .map(|platform| platform.to_string())
@@ -1578,6 +1622,8 @@ Schema:
       "description": "human-readable note",
       "input": {
         "scope": "global",
+        "kind": "skill",
+        "selector": null,
         "config_platforms": [],
         "non_empty_locks": []
       },
@@ -1589,7 +1635,11 @@ Schema:
 }
 ```
 
-`non_empty_locks` lists the platforms whose scope-specific lockfiles were pre-populated before resolution.
+`selector` is `null` for inferred targets or a platform name for an explicit
+target. `kind` is `agent` or `skill`. `non_empty_locks` lists the platforms
+whose scope-specific lockfiles were pre-populated before resolution. The
+explicit and implicit Codex cases are also replayed through both artifact
+installers' plan/apply APIs.
 
 ### `install-e2e/manifest.json`
 
@@ -1719,6 +1769,10 @@ fn assert_fixture_tree_matches(expected_root: &Path, actual_root: &Path) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::artifact_install::{
+        ArtifactIdentity, ArtifactInstallPlan, ArtifactInstaller, BundledArtifact,
+    };
+    use crate::gateway::Filesystem;
 
     #[test]
     fn agent_transform_cases_replay_against_the_committed_manifest() {
@@ -1735,6 +1789,78 @@ mod tests {
                 "case `{}` drifted from the committed expectation",
                 case.name
             );
+        }
+    }
+
+    #[test]
+    fn explicit_and_implicit_installer_targets_replay_shared_fixtures() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("conformance/target-resolve/manifest.json");
+        let manifest: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+        for case in manifest["cases"].as_array().unwrap() {
+            let name = case["name"].as_str().unwrap();
+            if !name.starts_with("explicit-codex-") && !name.starts_with("implicit-") {
+                continue;
+            }
+            let test = TestContext::at(fixed_time());
+            config::save_config(
+                &CmxConfig {
+                    platforms: vec![Platform::Claude],
+                    ..Default::default()
+                },
+                &test.fs,
+                &test.paths,
+            )
+            .unwrap();
+            let kind = case["input"]["kind"].as_str().unwrap();
+            let selector = case["input"]["selector"].as_str().map(|_| Platform::Codex);
+            let bundle = if kind == "agent" {
+                BundledArtifact::agent("---\nname: helper\ndescription: Helps\n---\nBe helpful.\n")
+            } else {
+                BundledArtifact::skill_md("---\nname: helper\ndescription: Helps\n---\n# Helper\n")
+            };
+            let installer = ArtifactInstaller::new(ArtifactIdentity::new("helper", "1.0.0"));
+            let plan = installer
+                .plan_for_platform(&bundle, Scope::Global, false, selector, &test.ctx())
+                .unwrap();
+            let platforms: Vec<String> = match &plan {
+                ArtifactInstallPlan::Agent(plan) => {
+                    plan.targets.iter().map(|t| t.platform.to_string()).collect()
+                }
+                ArtifactInstallPlan::Skill(plan) => {
+                    plan.targets.iter().map(|t| t.platform.to_string()).collect()
+                }
+            };
+            assert_eq!(
+                platforms,
+                vec![case["expected"]["resolved_platforms"][0].as_str().unwrap()],
+                "{name}"
+            );
+            installer.apply(&bundle, &plan, &test.ctx()).unwrap();
+            let platform = selector.unwrap_or(Platform::Claude);
+            let kind = if kind == "agent" {
+                ArtifactKind::Agent
+            } else {
+                ArtifactKind::Skill
+            };
+            let dest = test
+                .paths
+                .with_platform(platform)
+                .require_installed_artifact_path(kind, "helper", InstallScope::Global)
+                .unwrap();
+            assert!(test.fs.exists(&dest), "{name}");
+            if kind == ArtifactKind::Agent && platform == Platform::Codex {
+                assert!(
+                    test.fs
+                        .read_to_string(&dest)
+                        .unwrap()
+                        .contains("developer_instructions = \"Be helpful.\"")
+                );
+            }
+            let lock =
+                lockfile::load(InstallScope::Global, &test.fs, &test.paths.with_platform(platform))
+                    .unwrap();
+            assert!(lock.packages.contains_key("helper"), "{name}");
         }
     }
 

@@ -6,6 +6,8 @@
       "description": "With no managed set and no non-empty locks, installs target Claude only.",
       "input": {
         "scope": "global",
+        "kind": "skill",
+        "selector": null,
         "config_platforms": [],
         "non_empty_locks": []
       },
@@ -20,6 +22,8 @@
       "description": "A non-empty managed config set overrides inferred locks.",
       "input": {
         "scope": "global",
+        "kind": "skill",
+        "selector": null,
         "config_platforms": [
           "codex",
           "gemini"
@@ -41,6 +45,8 @@
       "description": "Without a managed config, installs target every platform whose lockfile is already non-empty.",
       "input": {
         "scope": "global",
+        "kind": "skill",
+        "selector": null,
         "config_platforms": [],
         "non_empty_locks": [
           "codex",
@@ -51,6 +57,78 @@
         "resolved_platforms": [
           "codex",
           "hermes"
+        ]
+      }
+    },
+    {
+      "name": "explicit-codex-agent",
+      "description": "Explicit Codex agent target overrides a managed Claude set.",
+      "input": {
+        "scope": "global",
+        "kind": "agent",
+        "selector": "codex",
+        "config_platforms": [
+          "claude"
+        ],
+        "non_empty_locks": []
+      },
+      "expected": {
+        "resolved_platforms": [
+          "codex"
+        ]
+      }
+    },
+    {
+      "name": "explicit-codex-skill",
+      "description": "Explicit Codex skill target overrides a managed Claude set.",
+      "input": {
+        "scope": "global",
+        "kind": "skill",
+        "selector": "codex",
+        "config_platforms": [
+          "claude"
+        ],
+        "non_empty_locks": []
+      },
+      "expected": {
+        "resolved_platforms": [
+          "codex"
+        ]
+      }
+    },
+    {
+      "name": "implicit-agent-keeps-config",
+      "description": "Without a selector, agent installation retains managed Claude resolution.",
+      "input": {
+        "scope": "global",
+        "kind": "agent",
+        "selector": null,
+        "config_platforms": [
+          "claude"
+        ],
+        "non_empty_locks": []
+      },
+      "expected": {
+        "resolved_platforms": [
+          "claude"
+        ]
+      }
+    },
+    {
+      "name": "implicit-skill-keeps-config",
+      "description": "Without a selector, skill installation retains managed Claude resolution.",
+      "input": {
+        "scope": "global",
+        "kind": "skill",
+        "selector": null,
+        "config_platforms": [
+          "claude"
+        ],
+        "non_empty_locks": []
+      },
+      "expected": {
+        "resolved_platforms": [
+          "claude"
         ]
       }
     }

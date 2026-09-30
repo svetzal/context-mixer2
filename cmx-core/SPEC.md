@@ -66,7 +66,7 @@ Everything else in the frontmatter (`metadata.version` above all) is
 entries removed (an entry is a column-0 line plus its blank and indented
 continuation lines), then leading and trailing blank lines trimmed. When
 anything remains, the document opens with two fixed prose header lines,
-`# ---`, each preserved line prefixed with `# ` (a blank line becomes a bare
+`# ---`, each preserved line prefixed with `#` (a blank line becomes a bare
 `#`), and `# ---`. When nothing remains, or the source has no frontmatter,
 there is no header and no block — the document starts at `name =`. Frontmatter
 lines are split on `\n` with one trailing `\r` stripped; the output uses `\n`
@@ -78,12 +78,12 @@ the first non-blank line, chomping indicators accepted and ignored, folded
 lines joined with a space, blank lines kept as newlines, more-indented lines
 keeping their breaks); double-quoted scalars (YAML escapes, line breaks
 folded, an escaped break joining with nothing); single-quoted scalars (`''` is
-the only escape); and plain scalars (a ` #` comment stripped per line,
+the only escape); and plain scalars (a `#` comment stripped per line,
 continuation lines folded). Every value is finally trimmed of surrounding
 whitespace. The `agent-transform` fixtures pin the exact bytes.
 
 `agent::preserved_frontmatter(toml)` reads the block back: the lines between
-the first `# ---` and the next, with `# ` (or a bare `#`) stripped, joined with
+the first `# ---` and the next, with `#` (or a bare `#`) stripped, joined with
 `\n` plus a trailing `\n` — the frontmatter inner text, ready for a version
 reader. It yields nothing when there is no block, no closing `# ---`, or a
 non-comment line inside the block.
@@ -364,7 +364,16 @@ checksum, and the `force` flag — `plan` assigns each target one action:
 
 ### 8.1 Which platforms an install targets
 
-Given no explicit `--platform` selector (the companion-skill case):
+`ArtifactInstaller::plan_for_platform` (Rust) and
+`ArtifactInstaller.planForPlatform` (TypeScript) accept an optional platform for
+both agent and skill bundles. An explicit Codex selector targets Codex alone,
+even when the configured managed set names other platforms. Planning does not
+write files; applying that plan installs a Codex agent as TOML or a Codex skill
+under `.agents/skills`, and records only the selected platform's lock entry.
+The same version, drift, and source-checksum guards apply to explicit plans.
+
+When the selector is omitted, `plan` and `plan_for_platform` / `planForPlatform`
+use the existing resolution order:
 
 1. If `config.json` has a **non-empty** `platforms` list → target exactly those
    (filtered to those supporting skills = all of them).

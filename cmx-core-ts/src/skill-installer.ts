@@ -303,13 +303,23 @@ export class SkillInstaller {
     force: boolean,
     context: InstallerContext,
   ): Promise<InstallPlan> {
+    return this.planForPlatform(skill, scope, force, undefined, context);
+  }
+
+  public async planForPlatform(
+    skill: BundledSkill,
+    scope: Scope,
+    force: boolean,
+    platform: Platform | undefined,
+    context: InstallerContext,
+  ): Promise<InstallPlan> {
     if (!skill.hasSkillMd()) {
       throw new Error(`BundledSkill for '${this.tool.name}' is missing SKILL.md`);
     }
 
     const files = reconcileSkillVersion(skill.files, this.tool.version);
     const sourceChecksum = checksumBundled(files);
-    const targets = await resolveTargets(undefined, "skill", scope, context);
+    const targets = await resolveTargets(platform, "skill", scope, context);
     const managed = await managedPlatforms(context.fs, context.paths);
     const cmxManaged = managed !== undefined;
     const cmxPresent =

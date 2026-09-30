@@ -99,17 +99,30 @@ export class ArtifactInstaller {
     force: boolean,
     context: InstallerContext,
   ): Promise<ArtifactInstallPlan> {
+    return this.planForPlatform(bundle, scope, force, undefined, context);
+  }
+
+  public async planForPlatform(
+    bundle: BundledArtifact,
+    scope: InstallScope,
+    force: boolean,
+    platform: Platform | undefined,
+    context: InstallerContext,
+  ): Promise<ArtifactInstallPlan> {
     if (bundle.kind === "skill") {
       if (bundle.skill === undefined) throw new Error("skill bundle is missing");
       const installer = new SkillInstaller(
         new ToolIdentity(this.artifact.name, this.artifact.version),
       );
-      return { kind: "skill", plan: await installer.plan(bundle.skill, scope, force, context) };
+      return {
+        kind: "skill",
+        plan: await installer.planForPlatform(bundle.skill, scope, force, platform, context),
+      };
     }
     if (bundle.agentMarkdown === undefined) throw new Error("agent markdown is missing");
     const source = reconcileDocumentVersion(bundle.agentMarkdown, this.artifact.version);
     const sourceChecksum = checksumBytes(encoder.encode(source));
-    const platforms = await resolveTargets(undefined, "agent", scope, context);
+    const platforms = await resolveTargets(platform, "agent", scope, context);
     const cmxManaged = (await managedPlatforms(context.fs, context.paths)) !== undefined;
     const targets: AgentTargetPlan[] = [];
 

@@ -2,6 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import path from "node:path";
 
 import {
+  ArtifactIdentity,
+  ArtifactInstaller,
+  BundledArtifact,
   BundledSkill,
   canonicalFiles,
   checksumBundled,
@@ -101,6 +104,8 @@ const targetResolveManifest = await loadFixtureJson<{
     name: string;
     input: {
       scope: InstallScope;
+      kind: "agent" | "skill";
+      selector: Platform | null;
       config_platforms: string[];
       non_empty_locks: string[];
     };
@@ -294,8 +299,49 @@ describe("target resolve fixtures", () => {
         );
       }
 
-      const resolved = await resolveTargets(undefined, "skill", fixture.input.scope, { fs, paths });
+      const resolved = await resolveTargets(
+        fixture.input.selector ?? undefined,
+        fixture.input.kind,
+        fixture.input.scope,
+        { fs, paths },
+      );
       expect([...resolved] as string[]).toEqual([...fixture.expected.resolved_platforms]);
+
+      if (fixture.name.startsWith("explicit-codex-") || fixture.name.startsWith("implicit-")) {
+        const bundle =
+          fixture.input.kind === "agent"
+            ? BundledArtifact.agent("---\nname: helper\ndescription: Helps\n---\nBe helpful.\n")
+            : BundledArtifact.skillMd("---\nname: helper\ndescription: Helps\n---\n# Helper\n");
+        const installer = new ArtifactInstaller(new ArtifactIdentity("helper", "1.0.0"));
+        const context = { fs, paths, clock: new FixedClock() };
+        const plan = await installer.planForPlatform(
+          bundle,
+          fixture.input.scope,
+          false,
+          fixture.input.selector ?? undefined,
+          context,
+        );
+        const targets = plan.plan.targets;
+        expect(targets.map((target) => target.platform) as string[]).toEqual(
+          fixture.expected.resolved_platforms,
+        );
+        expect(targets.map((target) => target.action.kind)).toEqual(["install"]);
+        await installer.apply(bundle, plan, context);
+        const platform = fixture.expected.resolved_platforms[0] as Platform;
+        const dest = paths
+          .withPlatform(platform)
+          .installedArtifactPath(fixture.input.kind, "helper", fixture.input.scope);
+        expect(dest).not.toBeNull();
+        expect(await fs.exists(dest ?? "")).toBe(true);
+        if (fixture.input.kind === "agent") {
+          const contents = await fs.readText(dest ?? "");
+          expect(contents).toContain(
+            platform === "codex" ? 'developer_instructions = "Be helpful."' : "Be helpful.",
+          );
+        }
+        const lock = await snapshotLocks(fs, paths, fixture.input.scope);
+        expect(JSON.stringify(lock)).toContain('"helper"');
+      }
     });
   }
 });

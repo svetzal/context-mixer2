@@ -514,4 +514,78 @@ mod tests {
         assert!(path.ends_with("helper.toml"));
         assert!(contents.contains("developer_instructions = \"Be helpful.\""));
     }
+
+    #[test]
+    fn explicit_codex_preserves_preview_drift_and_version_guards() {
+        for kind in [ArtifactKind::Agent, ArtifactKind::Skill] {
+            let t = TestContext::new();
+            config::save_config(
+                &CmxConfig {
+                    platforms: vec![Platform::Claude],
+                    ..Default::default()
+                },
+                &t.fs,
+                &t.paths,
+            )
+            .unwrap();
+            let bundle = if kind == ArtifactKind::Agent {
+                BundledArtifact::agent("---\nname: helper\ndescription: Helps\n---\nBe helpful.\n")
+            } else {
+                BundledArtifact::skill_md("---\nname: helper\ndescription: Helps\n---\n# Helper\n")
+            };
+            let newer = ArtifactInstaller::new(ArtifactIdentity::new("helper", "2.0.0"));
+            let first = newer
+                .plan_for_platform(&bundle, Scope::Global, false, Some(Platform::Codex), &t.ctx())
+                .unwrap();
+            let codex = t.paths.with_platform(Platform::Codex);
+            let dest = codex
+                .require_installed_artifact_path(kind, "helper", InstallScope::Global)
+                .unwrap();
+            assert!(!t.fs.exists(&dest));
+            let changed = if kind == ArtifactKind::Agent {
+                BundledArtifact::agent("---\nname: helper\ndescription: Helps\n---\nChanged.\n")
+            } else {
+                BundledArtifact::skill_md("---\nname: helper\ndescription: Helps\n---\n# Changed\n")
+            };
+            assert!(newer.apply(&changed, &first, &t.ctx()).is_err());
+            assert!(!t.fs.exists(&dest));
+            newer.apply(&bundle, &first, &t.ctx()).unwrap();
+            let current = newer
+                .plan_for_platform(&bundle, Scope::Global, false, Some(Platform::Codex), &t.ctx())
+                .unwrap();
+            match &current {
+                ArtifactInstallPlan::Agent(plan) => {
+                    assert!(matches!(plan.targets[0].action, TargetAction::Skip));
+                }
+                ArtifactInstallPlan::Skill(plan) => {
+                    assert!(matches!(plan.targets[0].action, TargetAction::Skip));
+                }
+            }
+            let older = ArtifactInstaller::new(ArtifactIdentity::new("helper", "1.0.0"));
+            let blocked = older
+                .plan_for_platform(&bundle, Scope::Global, false, Some(Platform::Codex), &t.ctx())
+                .unwrap();
+            assert!(blocked.is_blocked());
+            assert!(older.apply(&bundle, &blocked, &t.ctx()).is_err());
+            let file = if kind == ArtifactKind::Agent {
+                dest
+            } else {
+                dest.join("SKILL.md")
+            };
+            t.fs.write(&file, "edited locally").unwrap();
+            let drifted = newer
+                .plan_for_platform(&bundle, Scope::Global, false, Some(Platform::Codex), &t.ctx())
+                .unwrap();
+            match &drifted {
+                ArtifactInstallPlan::Agent(plan) => {
+                    assert!(matches!(plan.targets[0].action, TargetAction::DriftedSkip { .. }));
+                }
+                ArtifactInstallPlan::Skill(plan) => {
+                    assert!(matches!(plan.targets[0].action, TargetAction::DriftedSkip { .. }));
+                }
+            }
+            newer.apply(&bundle, &drifted, &t.ctx()).unwrap();
+            assert_eq!(t.fs.read_to_string(&file).unwrap(), "edited locally");
+        }
+    }
 }

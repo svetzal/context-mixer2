@@ -206,6 +206,8 @@ Schema:
       "description": "human-readable note",
       "input": {
         "scope": "global",
+        "kind": "skill",
+        "selector": null,
         "config_platforms": [],
         "non_empty_locks": []
       },
@@ -217,7 +219,11 @@ Schema:
 }
 ```
 
-`non_empty_locks` lists the platforms whose scope-specific lockfiles were pre-populated before resolution.
+`selector` is `null` for inferred targets or a platform name for an explicit
+target. `kind` is `agent` or `skill`. `non_empty_locks` lists the platforms
+whose scope-specific lockfiles were pre-populated before resolution. The
+explicit and implicit Codex cases are also replayed through both artifact
+installers' plan/apply APIs.
 
 ### `install-e2e/manifest.json`
 
