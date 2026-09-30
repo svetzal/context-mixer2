@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **TypeScript port builds on TypeScript 7.** The `typescript` devDependency in
+  `cmx-core-ts` moves from `^6.0.3` to `^7.0.2`. No source changes were needed:
+  `tsc --noEmit`, the declaration-emitting build, Biome, and `bun test` are all
+  green on 7.0.2.
+
 ## [0.4.0] - 2026-09-06
 
 ### Added
