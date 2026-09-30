@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use cmf::cli::{Cli, Commands, SurfaceArg};
+use cmx_core::platform::Platform;
 
 #[test]
 fn parses_assemble_with_explanation() {
@@ -46,6 +47,8 @@ fn parses_install_preview_and_apply_controls() {
         "--surface",
         "agent",
         "--local",
+        "--platform",
+        "codex",
         "--apply",
         "--force",
     ])
@@ -55,11 +58,19 @@ fn parses_install_preview_and_apply_controls() {
         Commands::Install {
             surface: Some(SurfaceArg::Agent),
             local: true,
+            platform: Some(Platform::Codex),
             apply: true,
             force: true,
             ..
         }
     ));
+}
+
+#[test]
+fn omitted_install_platform_keeps_default_target_resolution() {
+    let cli =
+        Cli::try_parse_from(["cmf", "install", "dependency-change"]).expect("install should parse");
+    assert!(matches!(cli.command, Commands::Install { platform: None, .. }));
 }
 
 #[test]

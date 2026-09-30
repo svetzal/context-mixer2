@@ -160,15 +160,28 @@ impl ArtifactInstaller {
         force: bool,
         ctx: &AppContext<'_>,
     ) -> Result<ArtifactInstallPlan> {
+        self.plan_for_platform(bundle, scope, force, None, ctx)
+    }
+
+    /// Compute a dry-run plan for one platform, or use configured targets
+    /// when `platform` is `None`.
+    pub fn plan_for_platform(
+        &self,
+        bundle: &BundledArtifact,
+        scope: Scope,
+        force: bool,
+        platform: Option<Platform>,
+        ctx: &AppContext<'_>,
+    ) -> Result<ArtifactInstallPlan> {
         match bundle {
             BundledArtifact::Skill(skill) => {
                 SkillInstaller::new(ToolIdentity::new(&self.artifact.name, &self.artifact.version))
-                    .plan(skill, scope, force, ctx)
+                    .plan_for_platform(skill, scope, force, platform, ctx)
                     .map(ArtifactInstallPlan::Skill)
             }
-            BundledArtifact::Agent(markdown) => {
-                self.plan_agent(markdown, scope, force, ctx).map(ArtifactInstallPlan::Agent)
-            }
+            BundledArtifact::Agent(markdown) => self
+                .plan_agent(markdown, scope, force, platform, ctx)
+                .map(ArtifactInstallPlan::Agent),
         }
     }
 
@@ -198,12 +211,14 @@ impl ArtifactInstaller {
         markdown: &str,
         scope: Scope,
         force: bool,
+        platform: Option<Platform>,
         ctx: &AppContext<'_>,
     ) -> Result<AgentInstallPlan> {
         let source = frontmatter::reconcile_document_version(markdown, &self.artifact.version);
         let source_checksum = checksum::checksum_bytes(source.as_bytes());
         let install_scope = scope.to_install_scope();
-        let platforms = targets::resolve_targets(None, ArtifactKind::Agent, install_scope, ctx)?;
+        let platforms =
+            targets::resolve_targets(platform, ArtifactKind::Agent, install_scope, ctx)?;
         let cmx_managed = config::managed_platforms(ctx.fs, ctx.paths)?.is_some();
         let mut target_plans = Vec::new();
 

@@ -8,6 +8,7 @@ use crate::context::AppContext;
 use crate::frontmatter;
 use crate::fs_util;
 use crate::lockfile;
+use crate::platform::Platform;
 use crate::platform_iter;
 use crate::skill_fs::{self, SkillFile};
 use crate::targets;
@@ -33,6 +34,19 @@ impl SkillInstaller {
         force: bool,
         ctx: &AppContext<'_>,
     ) -> Result<InstallPlan> {
+        self.plan_for_platform(skill, scope, force, None, ctx)
+    }
+
+    /// Compute a dry-run plan for one platform, or use the configured targets
+    /// when `platform` is `None`.
+    pub fn plan_for_platform(
+        &self,
+        skill: &BundledSkill,
+        scope: Scope,
+        force: bool,
+        platform: Option<Platform>,
+        ctx: &AppContext<'_>,
+    ) -> Result<InstallPlan> {
         if !skill.has_skill_md() {
             return Err(CmxError::MissingSkillMd {
                 skill: self.tool.name.clone(),
@@ -47,7 +61,7 @@ impl SkillInstaller {
         let install_scope = scope.to_install_scope();
 
         let platform_targets =
-            targets::resolve_targets(None, ArtifactKind::Skill, install_scope, ctx)?;
+            targets::resolve_targets(platform, ArtifactKind::Skill, install_scope, ctx)?;
 
         let cmx_managed = config::managed_platforms(ctx.fs, ctx.paths)?.is_some();
         let cmx_present = cmx_managed || {

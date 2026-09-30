@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
+use cmx_core::platform::Platform;
 
 #[derive(Parser)]
 #[command(
@@ -64,6 +65,9 @@ pub enum Commands {
         /// compile manifest in `.context-mixer/cmf-manifest.json`.
         #[arg(long)]
         local: bool,
+        /// Target one assistant (for example, `codex`); omitted uses cmx target resolution.
+        #[arg(long, value_enum, value_name = "PLATFORM")]
+        platform: Option<Platform>,
         /// Apply the displayed plan (and, with --local, write the manifest).
         #[arg(long)]
         apply: bool,

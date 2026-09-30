@@ -42,6 +42,12 @@ almost always the wrong profile. When the plan looks right:
 cmf --root ~/atlas install profiles/rust-service --local --apply
 ```
 
+To install for Codex alone, add `--platform codex` to both the preview and
+apply commands. An agent profile then writes a generated TOML agent under
+`.codex/agents/`; a skill profile writes `SKILL.md` under `.agents/skills/`.
+Your project's existing `AGENTS.md` stays as it is. Without `--platform`,
+cmf continues to use the platforms resolved from cmx configuration and locks.
+
 Two things land:
 
 - The assembled agent or skill, installed into the project-local locations of

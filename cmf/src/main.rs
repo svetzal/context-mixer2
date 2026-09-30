@@ -62,6 +62,7 @@ fn main() -> Result<ExitCode> {
             profile,
             surface,
             local,
+            platform,
             apply,
             force,
         } => {
@@ -80,7 +81,7 @@ fn main() -> Result<ExitCode> {
             let production = ProductionContext::claude()?;
             let ctx = production.ctx();
             let scope = if local { Scope::Local } else { Scope::Global };
-            let plan = installer.plan(&bundle, scope, force, &ctx)?;
+            let plan = installer.plan_for_platform(&bundle, scope, force, platform, &ctx)?;
             // Only a project-local install has one repository to verify, so only
             // it records a manifest (see CMV.md, "Open decisions").
             let manifest_path = local.then(|| manifest::local_manifest_path(ctx.paths));

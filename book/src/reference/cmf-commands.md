@@ -15,6 +15,7 @@ an explicit profile path can live elsewhere.
 | `cmf assemble <profile>` | Write an assembled agent or `SKILL.md` document to stdout |
 | `cmf install <profile>` | Preview platform-aware installation through cmx-core |
 | `cmf install <profile> --apply` | Apply the displayed installation plan |
+| `cmf install <profile> --platform codex` | Preview installation for Codex only |
 | `cmf status` | Count structured intents, materialization profiles, and declared sensors |
 
 `assemble --explain` writes selected intent keys, graph traversals, and the
@@ -26,7 +27,12 @@ path.
 `install` is global by default. Use `--local` for project scope and `--force`
 to replace drifted or newer installed guidance. Target platforms come from
 cmx configuration and existing lock state; cmf does not duplicate their path
-or format rules. A local install also records the compile manifest at
+or format rules. Pass `--platform codex` to target only Codex, including when
+Codex is not yet in the managed set. Codex agents are transformed from the
+assembled Markdown into `.codex/agents/<name>.toml`; skills are installed as
+`.agents/skills/<name>/SKILL.md`. Neither target replaces a project's
+hand-authored `AGENTS.md`. Omitting `--platform` preserves the existing
+cmx target resolution. A local install also records the compile manifest at
 `.context-mixer/cmf-manifest.json`, beside the local lock file: the preview
 says so, and `--apply` writes it. Global installs write no manifest.
 
