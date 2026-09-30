@@ -14,7 +14,7 @@ use std::process::{Command, Output};
 use tempfile::TempDir;
 
 fn fixture_kb() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/manifest-kb")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../reference-atlas")
 }
 
 fn copy_tree(from: &Path, to: &Path) {

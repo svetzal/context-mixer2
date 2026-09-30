@@ -30,7 +30,7 @@ The project rests on two pillars of equal weight:
 
 - Deriving guidance from a repository's existing structure or code (that is what hone does). cmf compiles explicitly authored intent records; it does not infer policy from a codebase
 - Running a live guidance-selection harness. cmf may produce data and artifacts for dynamic harnesses, but session-time sensing, injection, leasing, and retraction belong to the harness
-- Authoring, validating, or maintaining the intent atlas, including the sensors and validators that live beside its records. A separate tool owns those TOML documents and scripts; cmf and cmv consume them read-only
+- Operating or maintaining a production intent atlas. This repository owns a small reference atlas and its test cases to prove the cmf-to-cmv contract; production records, sensors, and validators remain externally maintained. cmf and cmv consume every atlas read-only
 - Judging adherence with a model. cmv parses; it never asks
 - Publishing plugins, marketplaces, or platform manifests. cmf installs assembled artifacts directly through cmx-core
 - Hosting a centralized registry or marketplace service

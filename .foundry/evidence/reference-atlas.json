@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "change": "project-owned reference atlas and real-binary cmf-to-cmv adoption contract",
+  "worktree_base": "357bd8b07ab257021f1baec00fc5fa37aa8057b5",
+  "atlas": {
+    "path": "reference-atlas",
+    "profile": "rust-shipping",
+    "ecosystems": [
+      "rust",
+      "python"
+    ],
+    "selected_intents": [
+      "craftsperson/rust/isolate-functional-core",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/compile-public-documentation"
+    ],
+    "executable_validators": [
+      "checks/rust/isolate_functional_core.sh",
+      "checks/rust/put_gateways_at_effect_boundaries.sh"
+    ],
+    "source_cases": [
+      "cases/compliant",
+      "cases/violation"
+    ],
+    "golden_and_compatibility_fixtures": "kept separate under cmf/tests/fixtures and cmv/tests/fixtures"
+  },
+  "covered_cases": [
+    "Codex preview writes neither project/home artifact nor manifest and preserves hand-authored AGENTS.md",
+    "apply installs Codex TOML, lock, and manifest with selected keys and git pin",
+    "compliant source exits 0 with required pass verdicts",
+    "required violation exits 1; correction exits 0",
+    "strict unchecked evidence exits 1",
+    "moved atlas HEAD retains pinned passing verdict"
+  ],
+  "reproduce": [
+    "cargo build -p cmf -p cmv",
+    "cargo test -p cmv --test adoption_loop"
+  ],
+  "checks": {
+    "focused_adoption": "passed after final pin HEAD assertion",
+    "focused_cmf_codex_and_sensing": "passed",
+    "cargo_fmt_check": "passed",
+    "cargo_clippy_default_all_targets": "passed",
+    "cargo_test_default": "passed",
+    "cargo_clippy_all_targets_all_features": "passed",
+    "cargo_test_all_features": "passed",
+    "rustdoc_workspace_deny_warnings": "passed",
+    "cargo_deny_check": "passed",
+    "typescript_typecheck_lint_test": "passed (96 tests)",
+    "coverage": "passed: cargo tarpaulin --fail-under 80; 94.74% (8910/9405 lines)",
+    "cargo_audit": "passed; one yanked transitive yoke-derive warning"
+  },
+  "ci": {
+    "workflow": ".github/workflows/ci.yml",
+    "job": "quality-gate",
+    "adoption_step": "Real-binary reference atlas adoption loop",
+    "coverage_step": "Coverage (at least 80%)",
+    "trunk_result": "pending Foundry finalization and delivered-trunk CI"
+  }
+}

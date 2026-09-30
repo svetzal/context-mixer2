@@ -88,6 +88,11 @@ the first `# ---` and the next, with `#` (or a bare `#`) stripped, joined with
 reader. It yields nothing when there is no block, no closing `# ---`, or a
 non-comment line inside the block.
 
+The prefix removal consumes exactly one separator space after `#`, when
+present. Further spaces are significant: `#  nested: value` becomes
+` nested: value`, while `#` becomes an empty line. This preserves indentation
+in nested frontmatter rather than normalizing it.
+
 Agent lock entries use `type = "agent"` and
 `source.path = "agents/<name>.md"`. `source_checksum` hashes the reconciled
 portable Markdown. `installed_checksum` hashes the actual platform bytes, so

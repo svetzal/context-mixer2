@@ -29,7 +29,7 @@ impl Project {
     }
 
     fn run(&self, surface: &str, apply: bool) -> Output {
-        let atlas = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/manifest-kb");
+        let atlas = Path::new(env!("CARGO_MANIFEST_DIR")).join("../reference-atlas");
         let mut command = Command::new(env!("CARGO_BIN_EXE_cmf"));
         command
             .arg("--root")
@@ -57,7 +57,11 @@ impl Project {
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(stdout.contains(&format!("codex → {} (install)", planned.display())), "{stdout}");
         assert!(stdout.contains("Re-run with --apply"), "{stdout}");
-        assert!(!planned.exists(), "preview must not write the artifact");
+        assert!(!self.root.join(planned).exists(), "preview must not write the project artifact");
+        assert!(
+            !self.tmp.path().join("home").join(planned).exists(),
+            "preview must not write a home artifact"
+        );
         assert!(
             !self.root.join(".context-mixer").exists(),
             "preview must not write locks or manifest"

@@ -1,8 +1,10 @@
 # cmf Command Reference
 
-cmf is a read-only consumer of a structured intent atlas. Another
-tool owns authoring and validation of the TOML records; cmf scans them to
-assemble and install agent-facing guidance.
+cmf is a read-only consumer of a structured intent atlas. Production atlas
+records are maintained outside this project; the small
+[`reference-atlas`](../../../reference-atlas/README.md) belongs to this project
+and exercises the cmf-to-cmv contract. cmf scans an atlas to assemble and
+install agent-facing guidance.
 
 Run commands from the atlas root, or pass `--root <path>`. Intent
 records live below `intents/`. Named profiles resolve below `profiles/`, while

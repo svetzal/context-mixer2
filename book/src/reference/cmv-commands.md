@@ -10,6 +10,10 @@ project code: given the same workspace, manifest, atlas, and
 
 Run it from the project root, or pass `--root <project>`.
 
+The repository's [reference atlas](../../../reference-atlas/README.md)
+contains representative records, sensors, validators, and source cases for
+testing this workflow. Production atlases are maintained separately.
+
 ## Commands
 
 ```text
