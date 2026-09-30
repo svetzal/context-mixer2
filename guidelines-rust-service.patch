@@ -1,0 +1,220 @@
+diff --git a/checks/lib/adherence/checks.py b/checks/lib/adherence/checks.py
+index 78e9623..8486a19 100644
+--- a/checks/lib/adherence/checks.py
++++ b/checks/lib/adherence/checks.py
+@@ -1225,8 +1225,16 @@ def check_rust_test_layers(workspace, config):
+ 
+ def check_rust_lint_policy(workspace, config):
+     manifest = cargo_manifest(workspace.root)
+-    lints = manifest.get("lints", {})
++    lints = manifest.get("workspace", {}).get("lints", {}) or manifest.get("lints", {})
+     declared = sorted(lints.keys())
++    members = manifest.get("workspace", {}).get("members", [])
++    missing_inheritance = sorted(
++        str(path.relative_to(workspace.root))
++        for pattern in members
++        for path in workspace.root.glob(pattern)
++        if (path / "Cargo.toml").is_file()
++        and cargo_manifest(path).get("lints", {}).get("workspace") is not True
++    ) if manifest.get("workspace", {}).get("lints") else []
+ 
+     crate_level = [
+         attribute
+@@ -1237,18 +1245,21 @@ def check_rust_lint_policy(workspace, config):
+ 
+     evidence = []
+     if not lints:
+-        evidence.append("Cargo.toml declares no [lints] policy")
++        evidence.append("Cargo.toml declares no [lints] or [workspace.lints] policy")
+         if crate_level:
+             evidence.append(
+                 f"{len(crate_level)} crate-level lint attribute(s) instead of a central policy"
+             )
++    if missing_inheritance:
++        evidence.append(f"{len(missing_inheritance)} workspace member(s) do not inherit the lint policy")
+ 
+     return result(
+-        bool(lints),
++        bool(lints) and not missing_inheritance,
+         {
+             "cargo_lint_tables": declared,
+             "cargo_lints": {key: sorted(value) for key, value in lints.items() if isinstance(value, dict)},
+             "crate_level_lint_attributes": crate_level,
++            "members_without_lint_inheritance": missing_inheritance,
+         },
+         evidence,
+     )
+diff --git a/checks/lib/adherence/workspace.py b/checks/lib/adherence/workspace.py
+index e3f9275..c95154d 100644
+--- a/checks/lib/adherence/workspace.py
++++ b/checks/lib/adherence/workspace.py
+@@ -1,6 +1,8 @@
+ """A finished workspace, partitioned into the modules the checks read."""
+ 
+-from .predicates import collect, collect_rust
++from pathlib import Path
++
++from .predicates import cargo_manifest, collect, collect_rust
+ 
+ 
+ class Workspace:
+@@ -16,7 +18,27 @@ class Workspace:
+         self.root = root
+         self.language = language
+         if language == "rust":
+-            self.modules = collect_rust(root, rustfacts)
++            modules = collect_rust(root, rustfacts)
++            manifest = cargo_manifest(root)
++            members = manifest.get("workspace", {}).get("members", [])
++            crate_roots = [Path(".")] if "package" in manifest else []
++            crate_roots.extend(
++                member.relative_to(root)
++                for pattern in members
++                for member in root.glob(pattern)
++                if (member / "Cargo.toml").is_file()
++            )
++            self.modules = []
++            for module in modules:
++                path = Path(module.relative)
++                for crate_root in crate_roots:
++                    if not path.is_relative_to(crate_root):
++                        continue
++                    parts = path.relative_to(crate_root).parts
++                    if parts and parts[0] in {"src", "tests", "benches"}:
++                        module.parts = parts
++                        self.modules.append(module)
++                        break
+             self.production = [module for module in self.modules if module.is_source]
+             self.tests = [module for module in self.modules if module.is_test]
+         else:
+diff --git a/checks/rust/centralize-curated-lint-policy.py b/checks/rust/centralize-curated-lint-policy.py
+index 52d1763..14f84c5 100755
+--- a/checks/rust/centralize-curated-lint-policy.py
++++ b/checks/rust/centralize-curated-lint-policy.py
+@@ -1,8 +1,8 @@
+ #!/usr/bin/env python3
+ """Validator for craftsperson/rust/centralize-curated-lint-policy.
+ 
+-Cargo.toml declares a [lints] table, so the lint policy lives in the manifest
+-rather than in scattered crate-level attributes.
++Cargo.toml declares [lints] or [workspace.lints], with every workspace member
++inheriting the shared policy.
+ 
+ A thin entry point: the check itself lives in ../lib/adherence/checks.py and
+ the invocation protocol in ../README.md.
+diff --git a/intents/craftsperson/rust/centralize-curated-lint-policy.toml b/intents/craftsperson/rust/centralize-curated-lint-policy.toml
+index 9ffa4b4..03f3965 100644
+--- a/intents/craftsperson/rust/centralize-curated-lint-policy.toml
++++ b/intents/craftsperson/rust/centralize-curated-lint-policy.toml
+@@ -13,7 +13,7 @@ expectation = "Workspaces will add crates, contributors, and CI entry points tha
+ strategy = "Declare lint policy in Cargo.toml through lints and workspace.lints and curate groups instead of enabling clippy::restriction wholesale."
+ evidence = [
+   { type = "manifest_review", description = "Workspace lint configuration is centralized and every enabled restriction lint has an intentional rationale.", required = true },
+-  { type = "static-check", language = "rust", run = "checks/rust/centralize-curated-lint-policy.py", description = "Cargo.toml declares a [lints] table, so the lint policy lives in the manifest rather than in scattered crate-level attributes.", required = true },
++  { type = "static-check", language = "rust", run = "checks/rust/centralize-curated-lint-policy.py", description = "Cargo.toml declares [lints] or [workspace.lints], with every workspace member inheriting the shared policy.", required = true },
+ ]
+ tradeoff = "A curated policy requires ongoing maintenance as Clippy adds or changes lints."
+ scope = { project = "guidelines", paths = ["plugins/rust-ecosystem/agents/rust-craftsperson.md"] }
+diff --git a/checks/fixtures/rust/workspace-lints/expected.json b/checks/fixtures/rust/workspace-lints/expected.json
+new file mode 100644
+index 0000000..656c5a0
+--- /dev/null
++++ b/checks/fixtures/rust/workspace-lints/expected.json
+@@ -0,0 +1,9 @@
++{
++  "check_config": {},
++  "validators": {
++    "centralize-curated-lint-policy": {
++      "pass": { "applicable": true, "followed": true },
++      "fail": { "applicable": true, "followed": false }
++    }
++  }
++}
+diff --git a/checks/fixtures/rust/workspace-lints/fail/Cargo.toml b/checks/fixtures/rust/workspace-lints/fail/Cargo.toml
+new file mode 100644
+index 0000000..e72300e
+--- /dev/null
++++ b/checks/fixtures/rust/workspace-lints/fail/Cargo.toml
+@@ -0,0 +1,6 @@
++[workspace]
++members = ["service"]
++resolver = "3"
++
++[workspace.lints.rust]
++unsafe_code = "deny"
+diff --git a/checks/fixtures/rust/workspace-lints/fail/service/Cargo.toml b/checks/fixtures/rust/workspace-lints/fail/service/Cargo.toml
+new file mode 100644
+index 0000000..4c916e8
+--- /dev/null
++++ b/checks/fixtures/rust/workspace-lints/fail/service/Cargo.toml
+@@ -0,0 +1,7 @@
++[package]
++name = "service"
++version = "0.1.0"
++edition = "2024"
++
++[lints.rust]
++unsafe_code = "deny"
+diff --git a/checks/fixtures/rust/workspace-lints/fail/service/src/lib.rs b/checks/fixtures/rust/workspace-lints/fail/service/src/lib.rs
+new file mode 100644
+index 0000000..db5141d
+--- /dev/null
++++ b/checks/fixtures/rust/workspace-lints/fail/service/src/lib.rs
+@@ -0,0 +1 @@
++//! A member with a local policy that does not inherit the workspace policy.
+diff --git a/checks/fixtures/rust/workspace-lints/pass/Cargo.toml b/checks/fixtures/rust/workspace-lints/pass/Cargo.toml
+new file mode 100644
+index 0000000..e72300e
+--- /dev/null
++++ b/checks/fixtures/rust/workspace-lints/pass/Cargo.toml
+@@ -0,0 +1,6 @@
++[workspace]
++members = ["service"]
++resolver = "3"
++
++[workspace.lints.rust]
++unsafe_code = "deny"
+diff --git a/checks/fixtures/rust/workspace-lints/pass/service/Cargo.toml b/checks/fixtures/rust/workspace-lints/pass/service/Cargo.toml
+new file mode 100644
+index 0000000..e70b383
+--- /dev/null
++++ b/checks/fixtures/rust/workspace-lints/pass/service/Cargo.toml
+@@ -0,0 +1,7 @@
++[package]
++name = "service"
++version = "0.1.0"
++edition = "2024"
++
++[lints]
++workspace = true
+diff --git a/checks/fixtures/rust/workspace-lints/pass/service/src/lib.rs b/checks/fixtures/rust/workspace-lints/pass/service/src/lib.rs
+new file mode 100644
+index 0000000..d26ba1c
+--- /dev/null
++++ b/checks/fixtures/rust/workspace-lints/pass/service/src/lib.rs
+@@ -0,0 +1 @@
++//! A member that inherits the workspace lint policy.
+diff --git a/profiles/rust-service.toml b/profiles/rust-service.toml
+new file mode 100644
+index 0000000..8067695
+--- /dev/null
++++ b/profiles/rust-service.toml
+@@ -0,0 +1,18 @@
++id = "rust-service"
++name = "rust-service"
++version = "0.1.0"
++description = "Use when maintaining a Rust service with workspace lint policy, test layers, and effect boundaries."
++surface = "agent"
++budget_tokens = 1200
++
++[select]
++ecosystems = ["rust"]
++keys = [
++  "craftsperson/rust/centralize-curated-lint-policy",
++  "craftsperson/rust/prefer-fakes-at-boundaries",
++  "craftsperson/rust/put-gateways-at-effect-boundaries",
++  "craftsperson/rust/use-purpose-specific-test-layers",
++]
++
++[content]
++include = ["guidance", "evidence"]
