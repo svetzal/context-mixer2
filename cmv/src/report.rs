@@ -338,6 +338,7 @@ impl fmt::Display for StatusReport {
 impl fmt::Display for ExplainReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let intent = &self.intent;
+        writeln!(f, "Artifact: {} ({})", self.artifact.name, surface_name(self.artifact.surface))?;
         writeln!(f, "Intent: {}", intent.key)?;
         writeln!(f, "Id: {}", intent.id.as_deref().unwrap_or("unknown"))?;
         match (intent.resolution, &intent.resolution_detail) {
@@ -902,6 +903,7 @@ Missing records: 1
     fn explain_report() -> ExplainReport {
         ExplainReport {
             schema: 1,
+            artifact: manifest().artifact,
             atlas: atlas(),
             ecosystems: rust(),
             intent: IntentExplanation {
@@ -968,6 +970,7 @@ Missing records: 1
     #[test]
     fn explain_lines_name_every_fact() {
         let expected = "\
+Artifact: AGENTS (agent)
 Intent: rust/isolate-functional-core
 Id: kb.intent.isolate-functional-core
 Record: resolved by key

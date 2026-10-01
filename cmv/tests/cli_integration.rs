@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use cmv::cli::{Cli, Commands, LocationArgs};
+use cmv::cli::{ArtifactArgs, Cli, Commands, LocationArgs};
 
 #[test]
 fn parses_bare_check_with_defaults() {
@@ -57,6 +57,7 @@ fn parses_status_with_location_and_json() {
         cli.command,
         Commands::Status {
             json: true,
+            artifact: ArtifactArgs::default(),
             location: LocationArgs {
                 root: Some(PathBuf::from("proj")),
                 manifest: None,
@@ -74,6 +75,7 @@ fn status_accepts_at_head() {
         cli.command,
         Commands::Status {
             json: false,
+            artifact: ArtifactArgs::default(),
             location: LocationArgs {
                 at_head: true,
                 ..LocationArgs::default()
@@ -112,6 +114,7 @@ fn parses_explain_with_an_intent_and_every_flag() {
         Commands::Explain {
             intent: "craftsperson/rust/put-gateways-at-effect-boundaries".to_string(),
             json: true,
+            artifact: ArtifactArgs::default(),
             location: LocationArgs {
                 root: Some(PathBuf::from("proj")),
                 manifest: None,

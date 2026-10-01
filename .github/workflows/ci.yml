@@ -53,6 +53,18 @@ jobs:
           cargo test -p cmv --test multi_profile
           cargo test -p cmv --test manifest_compatibility
 
+      - name: Independent-pin real-binary lifecycle
+        run: |
+          proof_dir=$(mktemp -d)
+          python3 .foundry/evidence/multi_profile_probe.py . "$proof_dir" prepare
+          set +e
+          python3 .foundry/evidence/multi_profile_probe.py . "$proof_dir" rejecting > "$proof_dir/rejecting.log"
+          rejection_code=$?
+          set -e
+          test "$rejection_code" -eq 1
+          grep -q 'rejecting artifact-attributed JSON and human reports confirmed' "$proof_dir/rejecting.log"
+          python3 .foundry/evidence/multi_profile_probe.py . "$proof_dir" corrected
+
       - name: Docs (workspace, all features)
         # cmx-core denies missing_docs (see cmx-core/Cargo.toml); cmx/cmf still
         # warn on missing per-item docs, so this step doesn't use -D warnings

@@ -15,7 +15,7 @@ use std::path::Path;
 use anyhow::{Result, bail};
 use cmx_core::gateway::Filesystem;
 use intent_atlas::catalog::{Intent, Validator};
-use intent_atlas::manifest::{DroppedIntent, IntentRef, Manifest};
+use intent_atlas::manifest::{ArtifactRef, DroppedIntent, IntentRef, Manifest};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -58,6 +58,8 @@ pub struct ExplainRequest<'a> {
 pub struct ExplainReport {
     /// Report schema version.
     pub schema: u32,
+    /// The compilation whose intent is explained.
+    pub artifact: ArtifactRef,
     /// Where the records came from and which tree was used.
     pub atlas: AtlasReport,
     /// The ecosystems the workspace verifies as, and where they came from.
@@ -156,6 +158,7 @@ pub fn explain(
     };
     Ok(ExplainReport {
         schema: crate::report::SCHEMA_VERSION,
+        artifact: request.manifest.artifact.clone(),
         atlas: request.atlas.clone(),
         ecosystems: request.ecosystems.clone(),
         intent,

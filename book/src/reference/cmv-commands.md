@@ -16,8 +16,9 @@ resolves the atlas or runs any validator. Default `check` verifies every
 artifact in a collection, each against its own pinned atlas revision, and
 returns nonzero if any artifact fails. JSON output contains an `artifacts`
 array with each artifact identity and its own check report; schema-1 output
-keeps its original shape. `status` and `explain` currently inspect the first
-record in a collection.
+keeps its original shape. Default `status` reports every compilation at its
+own pin. `explain` requires `--artifact <name>` when a collection contains
+multiple compilations; add `--surface agent|skill` when the name is shared.
 
 The repository's [reference atlas](../../../reference-atlas/README.md)
 contains representative records, sensors, validators, and source cases for
@@ -27,8 +28,8 @@ testing this workflow. Production atlases are maintained separately.
 
 ```text
 cmv check            [--json] [--strict] [--root <project>] [--manifest <path>] [--atlas <path>] [--at-head]
-cmv status           [--json]            [--root <project>] [--manifest <path>] [--atlas <path>] [--at-head]
-cmv explain <intent> [--json]            [--root <project>] [--manifest <path>] [--atlas <path>] [--at-head]
+cmv status           [--json] [--artifact <name> [--surface agent|skill]] [--root <project>] [--manifest <path>] [--atlas <path>] [--at-head]
+cmv explain <intent> [--json] [--artifact <name> [--surface agent|skill]] [--root <project>] [--manifest <path>] [--atlas <path>] [--at-head]
 ```
 
 | Command | Description |
@@ -351,16 +352,22 @@ and no temporary path, so it is byte-stable across runs.
 `dropped`, and `coverage` (`with_validator`, `missing`, `stale`), with
 `coverage` `null` when the atlas could not be scanned. The human form
 adds `HEAD revision` and `Verified against` lines after `Pinned revision`, and
-the `atlas has moved` line at the end when `moved`.
+the `atlas has moved` line at the end when `moved`. For a schema-2 collection,
+default JSON wraps these per-artifact reports in `{ "schema": 2, "artifacts": [...] }`.
+Use `--artifact` to get one report. Each artifact is scanned against its own
+pinned atlas revision.
 
 ## Explaining one intent
 
 `cmv explain <intent>` answers "what would `check` do with this one?" without
 running anything. The argument is a catalog key, or a record `id` when it
 contains a `.`. cmv exits `2` when the manifest neither compiled nor dropped
-the intent.
+the intent. For a collection with multiple artifacts, cmv exits `2` with the
+available identities until you select one with `--artifact`. If two surfaces
+share the name, also pass `--surface`.
 
 ```text
+Artifact: AGENTS (agent)
 Intent: craftsperson/rust/isolate-functional-core
 Id: guidelines.intent.isolate-functional-core
 Record: resolved by key
@@ -396,7 +403,7 @@ Validators:
 - A dropped intent shows `Dropped: yes (<reason>)`; its validators are listed
   but marked skipped, because the guidance never reached the artifact.
 
-`cmv explain <intent> --json` emits `schema`, `atlas`, `ecosystems`,
+`cmv explain <intent> --json` emits `schema`, `artifact`, `atlas`, `ecosystems`,
 and `intent` (`key`, `id`, `resolution`, `title`, `status`, `compiled`,
 `dropped`, `drop_reason`, `stale`, `config`, and `validators`, each with
 `language`, `run`, `required`, `description`, `would_run`, `skipped`, and

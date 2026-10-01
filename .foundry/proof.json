@@ -1,21 +1,19 @@
 {
   "kind": "behavioral",
-  "source_change": "cmv/tests/multi_profile.rs; .foundry/evidence/multi_profile_probe.py",
+  "source_change": "cmv/src/main.rs; cmv/src/cli.rs; cmv/src/explain.rs; cmv/tests/multi_profile.rs; .foundry/evidence/multi_profile_probe.py",
   "preparation": {
-    "command": "foundry capture -- python3 .foundry/evidence/multi_profile_probe.py . /tmp/cmx-multi-proof.z3NBRL prepare",
+    "command": "foundry capture -- python3 .foundry/evidence/multi_profile_probe.py . /tmp/cmx-multi-proof.LmFcqv prepare",
     "exit_code": 0,
-    "log": "/Users/svetzal/.foundry/tool-logs/69561-1790858018919262000.stdout.log"
+    "log": "/Users/svetzal/.foundry/tool-logs/37270-1790859427870335000.stdout.log"
   },
   "rejecting": {
-    "command": "foundry capture -- python3 .foundry/evidence/multi_profile_probe.py . /tmp/cmx-multi-proof.z3NBRL rejecting",
+    "command": "foundry capture -- python3 .foundry/evidence/multi_profile_probe.py . /tmp/cmx-multi-proof.LmFcqv rejecting",
     "exit_code": 1,
-    "log": "/Users/svetzal/.foundry/tool-logs/71143-1790858118565284000.stdout.log",
-    "stderr_log": "/Users/svetzal/.foundry/tool-logs/71143-1790858118565284000.stderr.log"
+    "log": "/Users/svetzal/.foundry/tool-logs/37723-1790859435408639000.stdout.log"
   },
   "corrected": {
-    "command": "foundry capture -- python3 .foundry/evidence/multi_profile_probe.py . /tmp/cmx-multi-proof.z3NBRL corrected",
+    "command": "foundry capture -- python3 .foundry/evidence/multi_profile_probe.py . /tmp/cmx-multi-proof.LmFcqv corrected",
     "exit_code": 0,
-    "log": "/Users/svetzal/.foundry/tool-logs/71387-1790858125861171000.stdout.log",
-    "stderr_log": "/Users/svetzal/.foundry/tool-logs/71387-1790858125861171000.stderr.log"
+    "log": "/Users/svetzal/.foundry/tool-logs/37984-1790859441493720000.stdout.log"
   }
 }

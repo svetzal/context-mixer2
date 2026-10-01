@@ -36,9 +36,12 @@ if stage == "prepare":
     home.mkdir()
     profile_path = atlas / "profiles/rust-shipping.toml"
     original = profile_path.read_text()
-    agent = original.replace(f'  "{CORE}",\n', "")
-    assert agent != original
-    profile_path.write_text(agent)
+    profile_path.write_text(original)
+    core_path = atlas / "intents/craftsperson/rust/isolate-functional-core.toml"
+    core_record = core_path.read_text()
+    alternate = core_record.replace("checks/rust/isolate_functional_core.sh", "checks/rust/put_gateways_at_effect_boundaries.sh")
+    assert alternate != core_record
+    core_path.write_text(alternate)
     gateway_path = atlas / "intents/craftsperson/rust/put-gateways-at-effect-boundaries.toml"
     gateway_record = gateway_path.read_text()
     without_relation = gateway_record.replace('relations = [\n  { type = "related-to", target = "craftsperson/rust/isolate-functional-core" },\n]\n', "")
@@ -49,6 +52,7 @@ if stage == "prepare":
     git("commit", "-qm", "Agent selects gateway and documentation")
     first = git("rev-parse", "HEAD")
     assert run("cmf", "--root", atlas, "install", "rust-shipping", "--local", "--platform", "codex", "--apply").returncode == 0
+    core_path.write_text(core_record)
     skill = original.replace('id = "rust-shipping"', 'id = "rust-skill"').replace('name = "AGENTS"', 'name = "rust-skill"').replace('surface = "agent"', 'surface = "skill"')
     skill = skill.replace(f'  "{GATEWAY}",\n', "").replace(f'  "{DOCS}",\n', "")
     (atlas / "profiles/rust-skill.toml").write_text(skill)
@@ -61,8 +65,31 @@ if stage == "prepare":
     entries = manifest["artifacts"]
     assert manifest["schema"] == 2 and len(entries) == 2
     assert [(e["artifact"]["name"], e["artifact"]["surface"], e["atlas"]["revision"]) for e in entries] == [("AGENTS", "agent", first), ("rust-skill", "skill", second)]
-    assert [[i["key"] for i in e["intents"]] for e in entries] == [[DOCS, GATEWAY], [CORE]]
+    assert [[i["key"] for i in e["intents"]] for e in entries] == [[DOCS, CORE, GATEWAY], [CORE]]
+    assert entries[0]["intents"][1]["checksum"] != entries[1]["intents"][0]["checksum"]
     assert all(i["id"] and i["checksum"].startswith("sha256:") for e in entries for i in e["intents"])
+    status = run("cmv", "status", "--json", "--atlas", atlas)
+    assert status.returncode == 0
+    statuses = json.loads(status.stdout)["artifacts"]
+    assert [(e["artifact"]["name"], e["atlas"]["pinned_revision"]) for e in statuses] == [("AGENTS", first), ("rust-skill", second)]
+    assert run("cmv", "status", "--json", "--atlas", atlas).stdout == status.stdout
+    human_status = run("cmv", "status", "--atlas", atlas)
+    assert human_status.returncode == 0 and "Artifact: AGENTS" in human_status.stdout and "Artifact: rust-skill" in human_status.stdout
+    assert run("cmv", "status", "--atlas", atlas).stdout == human_status.stdout
+    ambiguous = run("cmv", "explain", CORE, "--atlas", atlas)
+    assert ambiguous.returncode == 2 and "--artifact" in ambiguous.stderr
+    for name, revision, validator in [("AGENTS", first, "put_gateways_at_effect_boundaries.sh"), ("rust-skill", second, "isolate_functional_core.sh")]:
+        selected = run("cmv", "status", "--json", "--atlas", atlas, "--artifact", name)
+        assert selected.returncode == 0 and json.loads(selected.stdout)["atlas"]["pinned_revision"] == revision
+        explained = run("cmv", "explain", CORE, "--json", "--atlas", atlas, "--artifact", name)
+        assert explained.returncode == 0
+        detail = json.loads(explained.stdout)
+        assert detail["artifact"]["name"] == name and detail["atlas"]["pinned_revision"] == revision
+        assert detail["intent"]["validators"][0]["run"].endswith(validator)
+        assert run("cmv", "explain", CORE, "--json", "--atlas", atlas, "--artifact", name).stdout == explained.stdout
+        human = run("cmv", "explain", CORE, "--atlas", atlas, "--artifact", name)
+        assert human.returncode == 0 and f"Artifact: {name} (" in human.stdout
+        assert run("cmv", "explain", CORE, "--atlas", atlas, "--artifact", name).stdout == human.stdout
     print("independent pins, identities, selected keys, and obligations confirmed", flush=True)
 elif stage in ("rejecting", "corrected"):
     source = atlas / "cases" / ("violation" if stage == "rejecting" else "compliant") / "src/core.rs"
@@ -76,7 +103,7 @@ elif stage in ("rejecting", "corrected"):
     entries = report["artifacts"]
     assert [e["artifact"]["name"] for e in entries] == ["AGENTS", "rust-skill"]
     assert [e["check"]["manifest"]["atlas"]["revision"] for e in entries] == [git("rev-list", "--max-parents=0", "HEAD"), git("rev-parse", "HEAD")]
-    assert [[i["key"] for i in e["check"]["intents"]] for e in entries] == [[DOCS, GATEWAY], [CORE]]
+    assert [[i["key"] for i in e["check"]["intents"]] for e in entries] == [[DOCS, CORE, GATEWAY], [CORE]]
     assert [e["check"]["summary"]["exit_code"] for e in entries] == [0, expected]
     assert entries[0]["check"]["intents"][1]["required"] is True
     assert entries[0]["check"]["intents"][1]["state"] == "pass"
