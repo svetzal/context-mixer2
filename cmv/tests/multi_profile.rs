@@ -116,13 +116,14 @@ impl Project {
     }
 
     fn install_distinct_profiles(&self) -> (String, String) {
-        let agent_profile = self.atlas.join("profiles/rust-shipping.toml");
-        let original = fs::read_to_string(&agent_profile).unwrap();
-        fs::write(
-            &agent_profile,
-            original.replace("  \"craftsperson/rust/isolate-functional-core\",\n", ""),
-        )
-        .unwrap();
+        let core_record = self.atlas.join("intents/craftsperson/rust/isolate-functional-core.toml");
+        let core = fs::read_to_string(&core_record).unwrap();
+        let alternate = core.replace(
+            "checks/rust/isolate_functional_core.sh",
+            "checks/rust/put_gateways_at_effect_boundaries.sh",
+        );
+        assert_ne!(alternate, core);
+        fs::write(&core_record, alternate).unwrap();
         let gateway_record = self
             .atlas
             .join("intents/craftsperson/rust/put-gateways-at-effect-boundaries.toml");
@@ -139,6 +140,7 @@ impl Project {
         self.git(&["commit", "-qm", "Select independent agent obligations"]);
         let first = self.git(&["rev-parse", "HEAD"]);
         self.install("rust-shipping");
+        fs::write(&core_record, core).unwrap();
         let skill_profile = self.atlas.join("profiles/rust-skill.toml");
         let skill = fs::read_to_string(&skill_profile).unwrap();
         fs::write(
@@ -181,10 +183,12 @@ fn check_verifies_both_artifacts_at_independent_revisions_and_reports_each_failu
         keys(&entries[0]),
         [
             "craftsperson/rust/compile-public-documentation",
+            "craftsperson/rust/isolate-functional-core",
             "craftsperson/rust/put-gateways-at-effect-boundaries",
         ]
     );
     assert_eq!(keys(&entries[1]), ["craftsperson/rust/isolate-functional-core"]);
+    assert_ne!(entries[0]["intents"][1]["checksum"], entries[1]["intents"][0]["checksum"]);
     assert!(entries.iter().all(|entry| {
         entry["intents"]
             .as_array()
@@ -219,6 +223,7 @@ fn check_verifies_both_artifacts_at_independent_revisions_and_reports_each_failu
     );
     assert_eq!(artifacts[1]["check"]["intents"][0]["required"], true);
     assert_eq!(artifacts[1]["check"]["intents"][0]["state"], "fail");
+    assert_eq!(artifacts[0]["check"]["intents"][1]["state"], "pass");
     let human = project.run("cmv", &["check", "--atlas", project.atlas.to_str().unwrap()]);
     assert_eq!(human.status.code(), Some(1));
     let text = String::from_utf8(human.stdout).unwrap();
@@ -230,6 +235,89 @@ fn check_verifies_both_artifacts_at_independent_revisions_and_reports_each_failu
     )
     .unwrap();
     assert_eq!(project.check(0)["summary"]["exit_code"], 0);
+}
+
+#[test]
+fn status_reports_every_compilation_and_explain_requires_an_artifact() {
+    let project = Project::new();
+    let (first, second) = project.install_distinct_profiles();
+    let atlas = project.atlas.to_str().unwrap();
+    let status = project.run("cmv", &["status", "--json", "--atlas", atlas]);
+    assert_eq!(status.status.code(), Some(0));
+    let report: Value = serde_json::from_slice(&status.stdout).unwrap();
+    assert_eq!(report["schema"], 2);
+    assert_eq!(report["artifacts"][0]["atlas"]["pinned_revision"], first);
+    assert_eq!(report["artifacts"][1]["atlas"]["pinned_revision"], second);
+    let ambiguous = project.run(
+        "cmv",
+        &[
+            "explain",
+            "craftsperson/rust/isolate-functional-core",
+            "--atlas",
+            atlas,
+        ],
+    );
+    assert_eq!(ambiguous.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&ambiguous.stderr).contains("--artifact"));
+    for (name, revision) in [("AGENTS", first), ("rust-skill", second)] {
+        let selected =
+            project.run("cmv", &["status", "--json", "--atlas", atlas, "--artifact", name]);
+        assert_eq!(selected.status.code(), Some(0));
+        let selected: Value = serde_json::from_slice(&selected.stdout).unwrap();
+        assert_eq!(selected["atlas"]["pinned_revision"], revision);
+        let explained = project.run(
+            "cmv",
+            &[
+                "explain",
+                "craftsperson/rust/isolate-functional-core",
+                "--json",
+                "--atlas",
+                atlas,
+                "--artifact",
+                name,
+            ],
+        );
+        assert_eq!(
+            explained.status.code(),
+            Some(0),
+            "{}",
+            String::from_utf8_lossy(&explained.stderr)
+        );
+        let explained: Value = serde_json::from_slice(&explained.stdout).unwrap();
+        assert_eq!(explained["atlas"]["pinned_revision"], revision);
+    }
+}
+
+#[test]
+fn same_named_artifacts_require_surface_to_select_one() {
+    let project = Project::new();
+    let profile = project.atlas.join("profiles/rust-skill.toml");
+    let content = fs::read_to_string(&profile).unwrap();
+    fs::write(&profile, content.replace("name = \"rust-skill\"", "name = \"AGENTS\"")).unwrap();
+    project.git(&["add", "."]);
+    project.git(&["commit", "-qm", "Share artifact name across surfaces"]);
+    project.install("rust-shipping");
+    project.install("rust-skill");
+    let atlas = project.atlas.to_str().unwrap();
+    let ambiguous = project.run("cmv", &["status", "--artifact", "AGENTS", "--atlas", atlas]);
+    assert_eq!(ambiguous.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&ambiguous.stderr).contains("--surface agent|skill"));
+    let selected = project.run(
+        "cmv",
+        &[
+            "status",
+            "--json",
+            "--artifact",
+            "AGENTS",
+            "--surface",
+            "skill",
+            "--atlas",
+            atlas,
+        ],
+    );
+    assert_eq!(selected.status.code(), Some(0), "{}", String::from_utf8_lossy(&selected.stderr));
+    let report: Value = serde_json::from_slice(&selected.stdout).unwrap();
+    assert_eq!(report["artifact"]["surface"], "skill");
 }
 
 #[test]

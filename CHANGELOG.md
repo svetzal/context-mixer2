@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `cmv status` reports every schema-2 compilation at its own atlas pin.
+  `cmv explain` selects an artifact explicitly when several are present and
+  includes its identity in human and JSON output. The real-binary lifecycle
+  check now distinguishes different validators for the same intent key across
+  pinned revisions.
 - `cmf validate` continues across malformed records and profiles, reporting
   deterministic source paths and fields, including the scanned file path and
   missing field for malformed intent TOML; sensor tests use the atlas's actual

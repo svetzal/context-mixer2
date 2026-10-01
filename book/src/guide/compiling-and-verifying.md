@@ -157,21 +157,23 @@ of this changes the exit code. The remedy is always to recompile with
 `cmf install`, because a newer atlas may change *which* intents apply, and that
 decision belongs to cmf. cmv never re-pins on its own.
 
-`cmv status` shows the pin, the atlas's `HEAD`, which tree was verified, the
-detected ecosystems, and how many compiled intents have a validator, without
-running anything.
+`cmv status` shows each compiled artifact's pin, the atlas's `HEAD`, which tree
+was verified, the detected ecosystems, and how many compiled intents have a
+validator, without running anything. Use `--artifact <name>` to inspect one
+artifact in a multi-profile project.
 
 ## 6. Understanding one intent
 
 ```bash
-cmv explain craftsperson/rust/use-structured-tracing
+cmv explain craftsperson/rust/use-structured-tracing --artifact AGENTS
 ```
 
 shows how the manifest entry resolved to a record, every validator the record
 declares, which of them would run for the detected ecosystems and with exactly
 which command line, the configuration document they would receive, and
-whether the record is stale. Use it when a verdict surprises you, before
-changing either the code or the atlas.
+whether the record is stale. A project with multiple compiled artifacts must
+select one; cmv lists the available identities if the selection is ambiguous.
+Use it when a verdict surprises you, before changing either the code or the atlas.
 
 ## For validator authors
 

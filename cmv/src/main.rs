@@ -11,7 +11,7 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
-use cmv::cli::{Cli, Commands, LocationArgs};
+use cmv::cli::{ArtifactArgs, Cli, Commands, LocationArgs};
 use cmv::config::{self, ProjectConfig};
 use cmv::dispatch::{self, Catalog, CheckRequest, StatusRequest};
 use cmv::ecosystems::Ecosystems;
@@ -48,6 +48,12 @@ struct MultiSummary {
     exit_code: u8,
 }
 
+#[derive(Serialize)]
+struct MultiStatusReport {
+    schema: u32,
+    artifacts: Vec<dispatch::StatusReport>,
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match run(cli) {
@@ -67,45 +73,79 @@ fn run(cli: Cli) -> Result<ExitCode> {
             strict,
             location,
         } => run_check(location, OutputFormat::from_flag(json), Strictness::from_flag(strict), &fs),
-        Commands::Status { json, location } => {
+        Commands::Status {
+            json,
+            artifact,
+            location,
+        } => {
             let format = OutputFormat::from_flag(json);
-            let site = Site::resolve(location, &fs)?;
-            let scratch = Scratch::create(&fs)?;
-            let checkout = site.checkout(&scratch, &fs)?;
-            // `status` reports rather than fails when the atlas is absent or
-            // cannot be read.
-            let (catalog, sensors) = if fs.is_dir(&checkout.root) {
-                match site.scan_atlas(&checkout, &fs) {
-                    Ok((catalog, sensors)) => (Some(catalog), sensors),
-                    Err(error) => {
-                        eprintln!("warning: {error:#}");
-                        (None, None)
+            let sites = select_sites(Site::resolve_all(location, &fs)?, &artifact)?;
+            let legacy = sites.len() == 1 && sites[0].legacy_manifest;
+            let selected = artifact.artifact.is_some();
+            let mut reports = Vec::new();
+            for site in &sites {
+                let scratch = Scratch::create(&fs)?;
+                let checkout = site.checkout(&scratch, &fs)?;
+                // `status` reports rather than fails when the atlas is absent or
+                // cannot be read.
+                let (catalog, sensors) = if fs.is_dir(&checkout.root) {
+                    match site.scan_atlas(&checkout, &fs) {
+                        Ok((catalog, sensors)) => (Some(catalog), sensors),
+                        Err(error) => {
+                            eprintln!("warning: {error:#}");
+                            (None, None)
+                        }
+                    }
+                } else {
+                    (None, None)
+                };
+                let ecosystems = site.ecosystems(sensors.as_ref(), &fs);
+                let atlas = AtlasReport::new(&site.resolution, &checkout, sensors.as_ref());
+                let request = StatusRequest {
+                    manifest: &site.manifest,
+                    manifest_path: &site.manifest_path,
+                    catalog: catalog.as_ref(),
+                    ecosystems: &ecosystems,
+                    atlas: &atlas,
+                    trees: checkout.trees(),
+                };
+                reports.push(dispatch::status(&request, &fs)?);
+            }
+            if legacy || selected {
+                print!("{}", reports[0].render(format)?);
+            } else {
+                match format {
+                    OutputFormat::Json => println!(
+                        "{}",
+                        serde_json::to_string_pretty(&MultiStatusReport {
+                            schema: 2,
+                            artifacts: reports
+                        })?
+                    ),
+                    OutputFormat::Human => {
+                        for report in &reports {
+                            print!("{}", report.render(format)?);
+                        }
                     }
                 }
-            } else {
-                (None, None)
-            };
-            let ecosystems = site.ecosystems(sensors.as_ref(), &fs);
-            let atlas = AtlasReport::new(&site.resolution, &checkout, sensors.as_ref());
-            let request = StatusRequest {
-                manifest: &site.manifest,
-                manifest_path: &site.manifest_path,
-                catalog: catalog.as_ref(),
-                ecosystems: &ecosystems,
-                atlas: &atlas,
-                trees: checkout.trees(),
-            };
-            let report = dispatch::status(&request, &fs)?;
-            print!("{}", report.render(format)?);
+            }
             Ok(ExitCode::SUCCESS)
         }
         Commands::Explain {
             intent,
             json,
+            artifact,
             location,
         } => {
             let format = OutputFormat::from_flag(json);
-            let site = Site::resolve(location, &fs)?;
+            let sites = select_sites(Site::resolve_all(location, &fs)?, &artifact)?;
+            if sites.len() != 1 {
+                bail!(
+                    "manifest has multiple artifacts; pass --artifact <name> (and --surface agent|skill if names collide): {}",
+                    artifact_names(&sites)
+                );
+            }
+            let site = &sites[0];
             let scratch = Scratch::create(&fs)?;
             let checkout = site.checkout(&scratch, &fs)?;
             let (catalog, sensors) = site.scan_atlas(&checkout, &fs)?;
@@ -195,10 +235,6 @@ struct Site {
 }
 
 impl Site {
-    fn resolve(location: LocationArgs, fs: &dyn Filesystem) -> Result<Self> {
-        Ok(Self::resolve_all(location, fs)?.remove(0))
-    }
-
     fn resolve_all(location: LocationArgs, fs: &dyn Filesystem) -> Result<Vec<Self>> {
         let root = match location.root {
             Some(root) => root,
@@ -284,6 +320,46 @@ impl Site {
     fn ecosystems(&self, sensors: Option<&Sensors>, fs: &dyn Filesystem) -> Ecosystems {
         Ecosystems::resolve(self.config.ecosystems.as_deref(), sensors, &self.root, fs)
     }
+}
+
+fn select_sites(sites: Vec<Site>, selector: &ArtifactArgs) -> Result<Vec<Site>> {
+    if selector.artifact.is_none() && selector.surface.is_some() {
+        bail!("--surface requires --artifact <name>");
+    }
+    let available = artifact_names(&sites);
+    let selected: Vec<_> = sites
+        .into_iter()
+        .filter(|site| {
+            selector
+                .artifact
+                .as_ref()
+                .is_none_or(|name| site.manifest.artifact.name == *name)
+                && selector.surface.as_ref().is_none_or(|surface| {
+                    let actual = match site.manifest.artifact.surface {
+                        intent_atlas::profile::Surface::Agent => "agent",
+                        intent_atlas::profile::Surface::Skill => "skill",
+                    };
+                    surface == actual
+                })
+        })
+        .collect();
+    if selected.is_empty() {
+        bail!("artifact not found; available: {available}");
+    }
+    if selector.artifact.is_some() && selected.len() > 1 {
+        bail!("artifact name is ambiguous; pass --surface agent|skill; available: {available}");
+    }
+    Ok(selected)
+}
+
+fn artifact_names(sites: &[Site]) -> String {
+    sites
+        .iter()
+        .map(|site| {
+            format!("{} ({:?})", site.manifest.artifact.name, site.manifest.artifact.surface)
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Where `cmf install --local` writes the manifest: `.context-mixer/` under the

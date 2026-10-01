@@ -43,6 +43,17 @@ pub struct LocationArgs {
     pub at_head: bool,
 }
 
+/// Select one compilation from a schema-2 manifest.
+#[derive(Args, Debug, Clone, Default, PartialEq, Eq)]
+pub struct ArtifactArgs {
+    /// Name of the compiled artifact.
+    #[arg(long, value_name = "NAME")]
+    pub artifact: Option<String>,
+    /// Surface of the compiled artifact; use with --artifact when names collide.
+    #[arg(long, value_name = "SURFACE", value_parser = ["agent", "skill"])]
+    pub surface: Option<String>,
+}
+
 /// Supported `cmv` operations.
 #[derive(Subcommand, Debug, PartialEq, Eq)]
 pub enum Commands {
@@ -70,6 +81,9 @@ pub enum Commands {
         /// Emit the summary as JSON.
         #[arg(long)]
         json: bool,
+        /// Select one compiled artifact by name and, if needed, surface.
+        #[command(flatten)]
+        artifact: ArtifactArgs,
         /// Where the project, manifest, and atlas are.
         #[command(flatten)]
         location: LocationArgs,
@@ -87,6 +101,9 @@ pub enum Commands {
         /// Emit the explanation as JSON.
         #[arg(long)]
         json: bool,
+        /// Select the compilation whose intent should be explained.
+        #[command(flatten)]
+        artifact: ArtifactArgs,
         /// Where the project, manifest, and atlas are.
         #[command(flatten)]
         location: LocationArgs,

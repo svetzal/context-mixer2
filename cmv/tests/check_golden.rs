@@ -146,7 +146,9 @@ fn explain_names_the_validators_and_the_argv_without_running_anything() {
     assert_eq!(output.status.code(), Some(0), "{}", String::from_utf8_lossy(&output.stderr));
     let text = stdout(&output);
     assert!(
-        text.starts_with("Intent: craftsperson/rust/isolate-functional-core\n"),
+        text.starts_with(
+            "Artifact: AGENTS (agent)\nIntent: craftsperson/rust/isolate-functional-core\n"
+        ),
         "{text}"
     );
     assert!(text.contains("Record: resolved by key\n"), "{text}");
