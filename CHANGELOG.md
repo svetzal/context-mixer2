@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `cmf validate` checks the complete atlas read-only, including profiles,
+  selection budgets, sensors, and executable validator paths. Human and JSON
+  diagnostics name the file and field; invalid input exits with status 2.
 - A project-owned reference atlas for developing the cmf/cmv contract without an
   external guidelines checkout. It includes source-sensitive Rust and Python
   validators, compliant and violating source cases, and the existing golden

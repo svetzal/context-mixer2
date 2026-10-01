@@ -12,5 +12,6 @@
 pub mod assembly;
 pub mod cli;
 pub mod mismatch;
+pub mod validate;
 
 pub use intent_atlas::{catalog, manifest, profile, sensors};

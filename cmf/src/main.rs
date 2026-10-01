@@ -18,6 +18,7 @@ use cmf::manifest;
 use cmf::mismatch;
 use cmf::profile::{self, Surface};
 use cmf::sensors::{self, Detection, Sensors};
+use cmf::validate;
 use cmx_core::artifact_install::{ArtifactIdentity, ArtifactInstaller, BundledArtifact};
 use cmx_core::gateway::Filesystem;
 use cmx_core::gateway::real::RealFilesystem;
@@ -29,6 +30,9 @@ fn main() -> Result<ExitCode> {
     let root = cli.root.unwrap_or(env::current_dir()?);
     let fs = RealFilesystem;
     match cli.command {
+        Commands::Validate { json } => {
+            return validate_atlas(&root, &fs, json);
+        }
         Commands::Assemble {
             profile,
             surface,
@@ -113,20 +117,37 @@ fn main() -> Result<ExitCode> {
             }
         }
         Commands::Status => {
-            let (intents, sensors) = scan_atlas(&root, &fs)?;
-            let profiles = catalog::profile_count(&root, &fs)?;
-            println!("Atlas: {}", root.display());
-            println!("Structured intents: {}", intents.len());
-            println!("Materialization profiles: {profiles}");
-            println!("Sensors: {}", describe_sensors(sensors.as_ref()));
-            if profiles == 0 {
-                println!(
-                    "No profiles found; add TOML profiles under profiles/ to assemble guidance."
-                );
-            }
+            print_status(&root, &fs)?;
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn print_status(root: &Path, fs: &dyn Filesystem) -> Result<()> {
+    let (intents, sensors) = scan_atlas(root, fs)?;
+    let profiles = catalog::profile_count(root, fs)?;
+    println!("Atlas: {}", root.display());
+    println!("Structured intents: {}", intents.len());
+    println!("Materialization profiles: {profiles}");
+    println!("Sensors: {}", describe_sensors(sensors.as_ref()));
+    if profiles == 0 {
+        println!("No profiles found; add TOML profiles under profiles/ to assemble guidance.");
+    }
+    Ok(())
+}
+
+fn validate_atlas(root: &Path, fs: &dyn Filesystem, json: bool) -> Result<ExitCode> {
+    let report = validate::atlas(root, fs);
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        print!("{report}");
+    }
+    Ok(if report.valid {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(2)
+    })
 }
 
 /// Read the atlas: its catalog, then its sensors validated against that

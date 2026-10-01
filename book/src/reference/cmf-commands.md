@@ -19,6 +19,28 @@ an explicit profile path can live elsewhere.
 | `cmf install <profile> --apply` | Apply the displayed installation plan |
 | `cmf install <profile> --platform codex` | Preview installation for Codex only |
 | `cmf status` | Count structured intents, materialization profiles, and declared sensors |
+| `cmf validate [--json]` | Check every atlas record, sensor declaration, profile, selection, budget, and declared validator path without writing files |
+
+`validate` checks the whole atlas before installation. It parses intent records
+and ecosystem sensors, loads every TOML profile under `profiles/`, and assembles
+each profile using the same selection and token-budget rules as `install`.
+Every executable `static-check` must point to an executable file within the
+atlas; descriptive entries with neither `language` nor `run` remain valid.
+Validation never invokes a validator and does not write to the atlas, project,
+or home directory.
+
+```sh
+cmf --root ./reference-atlas validate
+cmf --root ./reference-atlas validate --json
+```
+
+Exit status `0` means valid, `2` means invalid atlas input (and also clap
+command-line usage errors). Human output names the source file and field for
+each failure. JSON output has stable `valid`, `intents`, `profiles`, and
+`diagnostics` fields; each diagnostic has `file`, `field`, and `message`.
+Records and profiles are visited in sorted path order, so repeated runs over
+the same atlas produce the same JSON bytes. The counts include successfully
+scanned intents and successfully assembled profiles.
 
 `assemble --explain` writes selected intent keys, graph traversals, and the
 estimated token count to stderr, leaving stdout safe for redirection.
