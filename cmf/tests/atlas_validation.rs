@@ -178,6 +178,45 @@ fn malformed_record_names_the_record_and_evidence_field() {
 }
 
 #[test]
+fn malformed_toml_keeps_catalog_path_and_names_missing_field() {
+    let case = Case::new();
+    let record = case.atlas.join("intents/craftsperson/rust/isolate-functional-core.toml");
+    let raw = fs::read_to_string(&record).unwrap();
+    fs::write(&record, raw.replace("title = \"Isolate the functional core\"\n", "")).unwrap();
+    let validator = case.atlas.join("checks/rust/isolate_functional_core.sh");
+    let marker = case.tmp.path().join("validator-ran");
+    fs::write(&validator, format!("#!/bin/sh\ntouch '{}'\n", marker.display())).unwrap();
+
+    let output = case.run(true);
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, case.run(true).stdout);
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["diagnostics"][0]["file"], record.to_str().unwrap());
+    assert_eq!(json["diagnostics"][0]["field"], "title");
+    assert!(!marker.exists());
+
+    fs::write(&record, raw).unwrap();
+    let corrected = case.run(true);
+    assert_eq!(corrected.status.code(), Some(0));
+    assert_eq!(corrected.stdout, case.run(true).stdout);
+    assert!(!marker.exists());
+}
+
+#[test]
+fn invalid_toml_syntax_keeps_catalog_path() {
+    let case = Case::new();
+    let record = case.atlas.join("intents/craftsperson/rust/isolate-functional-core.toml");
+    let raw = fs::read_to_string(&record).unwrap();
+    fs::write(&record, raw.replace("title = \"Isolate the functional core\"", "title = ["))
+        .unwrap();
+    let output = case.run(true);
+    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["diagnostics"][0]["file"], record.to_str().unwrap());
+    assert_eq!(json["diagnostics"][0]["field"], "record");
+}
+
+#[test]
 fn invalid_validator_traversal_names_the_run_field() {
     let case = Case::new();
     let record = case.atlas.join("intents/craftsperson/rust/isolate-functional-core.toml");
