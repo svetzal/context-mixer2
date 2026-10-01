@@ -27,7 +27,9 @@ fn parses_assemble_with_manifest_path() {
         Commands::Assemble { manifest, .. } => {
             assert_eq!(manifest, Some(PathBuf::from("out/cmf-manifest.json")));
         }
-        Commands::Install { .. } | Commands::Status => panic!("expected assemble"),
+        Commands::Install { .. } | Commands::Status | Commands::Validate { .. } => {
+            panic!("expected assemble")
+        }
     }
 }
 
@@ -75,7 +77,13 @@ fn omitted_install_platform_keeps_default_target_resolution() {
 
 #[test]
 fn legacy_publisher_commands_are_gone() {
-    for command in ["intent", "plugin", "manifest", "marketplace", "validate"] {
+    for command in ["intent", "plugin", "manifest", "marketplace"] {
         assert!(Cli::try_parse_from(["cmf", command]).is_err(), "{command} must stay removed");
     }
+}
+
+#[test]
+fn parses_read_only_atlas_validation() {
+    let cli = Cli::try_parse_from(["cmf", "validate", "--json"]).expect("validate should parse");
+    assert!(matches!(cli.command, Commands::Validate { json: true }));
 }

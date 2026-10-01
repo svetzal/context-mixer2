@@ -47,6 +47,7 @@ jobs:
       - name: Real-binary reference atlas adoption loop
         run: |
           cargo build -p cmf -p cmv
+          cargo test -p cmf --test atlas_validation
           cargo test -p cmv --test project_adoption
 
       - name: Docs (workspace, all features)

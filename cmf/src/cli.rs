@@ -33,6 +33,12 @@ pub enum SurfaceArg {
 /// Supported `cmf` operations.
 #[derive(Subcommand)]
 pub enum Commands {
+    /// Check the whole atlas without writing files or running validators.
+    Validate {
+        /// Print a deterministic JSON report.
+        #[arg(long)]
+        json: bool,
+    },
     /// Assemble a profile and write the artifact to stdout.
     Assemble {
         /// Profile path, or a name resolved below `<root>/profiles/`.
