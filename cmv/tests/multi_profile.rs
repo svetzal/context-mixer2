@@ -114,16 +114,52 @@ impl Project {
         );
         serde_json::from_slice(&output.stdout).unwrap()
     }
+
+    fn install_distinct_profiles(&self) -> (String, String) {
+        let agent_profile = self.atlas.join("profiles/rust-shipping.toml");
+        let original = fs::read_to_string(&agent_profile).unwrap();
+        fs::write(
+            &agent_profile,
+            original.replace("  \"craftsperson/rust/isolate-functional-core\",\n", ""),
+        )
+        .unwrap();
+        let gateway_record = self
+            .atlas
+            .join("intents/craftsperson/rust/put-gateways-at-effect-boundaries.toml");
+        let record = fs::read_to_string(&gateway_record).unwrap();
+        fs::write(
+            &gateway_record,
+            record.replace(
+                "relations = [\n  { type = \"related-to\", target = \"craftsperson/rust/isolate-functional-core\" },\n]\n",
+                "",
+            ),
+        )
+        .unwrap();
+        self.git(&["add", "."]);
+        self.git(&["commit", "-qm", "Select independent agent obligations"]);
+        let first = self.git(&["rev-parse", "HEAD"]);
+        self.install("rust-shipping");
+        let skill_profile = self.atlas.join("profiles/rust-skill.toml");
+        let skill = fs::read_to_string(&skill_profile).unwrap();
+        fs::write(
+            &skill_profile,
+            skill
+                .replace("  \"craftsperson/rust/put-gateways-at-effect-boundaries\",\n", "")
+                .replace("  \"craftsperson/rust/compile-public-documentation\",\n", ""),
+        )
+        .unwrap();
+        self.git(&["add", "."]);
+        self.git(&["commit", "-qm", "Select independent skill obligation"]);
+        let second = self.git(&["rev-parse", "HEAD"]);
+        self.install("rust-skill");
+        (first, second)
+    }
 }
 
 #[test]
 fn check_verifies_both_artifacts_at_independent_revisions_and_reports_each_failure() {
     let project = Project::new();
-    let first = project.git(&["rev-parse", "HEAD"]);
-    project.install("rust-shipping");
-    project.git(&["commit", "-qm", "Next atlas revision", "--allow-empty"]);
-    let second = project.git(&["rev-parse", "HEAD"]);
-    project.install("rust-skill");
+    let (first, second) = project.install_distinct_profiles();
 
     let manifest = project.manifest();
     assert_eq!(manifest["schema"], 2);
@@ -133,12 +169,36 @@ fn check_verifies_both_artifacts_at_independent_revisions_and_reports_each_failu
     assert_eq!(entries[1]["atlas"]["revision"], second);
     assert_eq!(entries[0]["artifact"]["surface"], "agent");
     assert_eq!(entries[1]["artifact"]["surface"], "skill");
-    assert_eq!(entries[0]["intents"].as_array().unwrap().len(), 3);
-    assert_eq!(entries[1]["intents"].as_array().unwrap().len(), 3);
+    let keys = |entry: &Value| {
+        entry["intents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|intent| intent["key"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        keys(&entries[0]),
+        [
+            "craftsperson/rust/compile-public-documentation",
+            "craftsperson/rust/put-gateways-at-effect-boundaries",
+        ]
+    );
+    assert_eq!(keys(&entries[1]), ["craftsperson/rust/isolate-functional-core"]);
+    assert!(entries.iter().all(|entry| {
+        entry["intents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|intent| intent["checksum"].as_str().unwrap().starts_with("sha256:"))
+    }));
 
     let passing = project.check(0);
     assert_eq!(passing["artifacts"].as_array().unwrap().len(), 2);
-    for artifact in passing["artifacts"].as_array().unwrap() {
+    for (artifact, revision) in
+        passing["artifacts"].as_array().unwrap().iter().zip([&first, &second])
+    {
+        assert_eq!(artifact["check"]["manifest"]["atlas"]["revision"], *revision);
         assert_eq!(artifact["check"]["summary"]["fail"], 0);
     }
     fs::copy(
@@ -148,15 +208,28 @@ fn check_verifies_both_artifacts_at_independent_revisions_and_reports_each_failu
     .unwrap();
     let failing = project.check(1);
     assert_eq!(failing["summary"]["exit_code"], 1);
-    for artifact in failing["artifacts"].as_array().unwrap() {
-        let intents = artifact["check"]["intents"].as_array().unwrap();
-        assert!(
-            intents
-                .iter()
-                .any(|intent| intent["key"] == "craftsperson/rust/isolate-functional-core"
-                    && intent["state"] == "fail")
-        );
-    }
+    let artifacts = failing["artifacts"].as_array().unwrap();
+    assert_eq!(artifacts[0]["artifact"]["name"], "AGENTS");
+    assert_eq!(artifacts[0]["check"]["summary"]["exit_code"], 0);
+    assert_eq!(artifacts[1]["artifact"]["name"], "rust-skill");
+    assert_eq!(artifacts[1]["check"]["summary"]["exit_code"], 1);
+    assert_eq!(
+        artifacts[1]["check"]["intents"][0]["key"],
+        "craftsperson/rust/isolate-functional-core"
+    );
+    assert_eq!(artifacts[1]["check"]["intents"][0]["required"], true);
+    assert_eq!(artifacts[1]["check"]["intents"][0]["state"], "fail");
+    let human = project.run("cmv", &["check", "--atlas", project.atlas.to_str().unwrap()]);
+    assert_eq!(human.status.code(), Some(1));
+    let text = String::from_utf8(human.stdout).unwrap();
+    assert!(text.contains("AGENTS (Agent)\nPASS"));
+    assert!(text.contains("rust-skill (Skill)\nFAIL"));
+    fs::copy(
+        project.atlas.join("cases/compliant/src/core.rs"),
+        project.root.join("src/core.rs"),
+    )
+    .unwrap();
+    assert_eq!(project.check(0)["summary"]["exit_code"], 0);
 }
 
 #[test]
