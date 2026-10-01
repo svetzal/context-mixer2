@@ -49,6 +49,7 @@ jobs:
           cargo build -p cmf -p cmv
           cargo test -p cmf --test atlas_validation
           cargo test -p cmv --test project_adoption
+          cargo test -p cmv --test manifest_schema
 
       - name: Docs (workspace, all features)
         # cmx-core denies missing_docs (see cmx-core/Cargo.toml); cmx/cmf still

@@ -26,8 +26,14 @@ use cmx_core::gateway::real::RealFilesystem;
 use cmx_core::paths::ConfigPaths;
 use cmx_core::platform::Platform;
 use intent_atlas::catalog;
-use intent_atlas::manifest::{LOCAL_MANIFEST_FILE_NAME, Manifest};
+use intent_atlas::manifest::{LOCAL_MANIFEST_FILE_NAME, Manifest, SCHEMA_VERSION};
 use intent_atlas::sensors::{self, Sensors};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct ManifestHeader {
+    schema: u64,
+}
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -158,6 +164,16 @@ impl Site {
         let raw = fs
             .read_to_string(&manifest_path)
             .with_context(|| format!("could not read manifest {}", manifest_path.display()))?;
+        let header: ManifestHeader = serde_json::from_str(&raw)
+            .with_context(|| format!("malformed manifest {}", manifest_path.display()))?;
+        if header.schema != u64::from(SCHEMA_VERSION) {
+            bail!(
+                "unsupported manifest schema {} in {}; supported schema is {}",
+                header.schema,
+                manifest_path.display(),
+                SCHEMA_VERSION
+            );
+        }
         let manifest: Manifest = serde_json::from_str(&raw)
             .with_context(|| format!("malformed manifest {}", manifest_path.display()))?;
         let config = config::load(&root, fs)?;

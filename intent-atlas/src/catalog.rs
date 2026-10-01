@@ -170,6 +170,19 @@ pub fn ecosystem_qualifiers(key: &str) -> Vec<&str> {
 /// Fails on the first record whose evidence entries break the validator
 /// schema (see [`STATIC_CHECK`]), naming the record and the entry.
 pub fn scan(root: &Path, fs: &dyn Filesystem) -> Result<BTreeMap<String, Intent>> {
+    let (intents, mut errors) = scan_all(root, fs)?;
+    if !errors.is_empty() {
+        return Err(errors.remove(0).1);
+    }
+    Ok(intents)
+}
+
+/// Scan every record, retaining valid records and source-located failures.
+/// Structural failures (such as an unreadable directory) still abort scanning.
+pub type ScanResult = (BTreeMap<String, Intent>, Vec<(PathBuf, anyhow::Error)>);
+
+/// Scan every record and return the valid records alongside record failures.
+pub fn scan_all(root: &Path, fs: &dyn Filesystem) -> Result<ScanResult> {
     let base = root.join("intents");
     if !fs.is_dir(&base) {
         bail!("{} has no intents/ directory", root.display());
@@ -178,11 +191,22 @@ pub fn scan(root: &Path, fs: &dyn Filesystem) -> Result<BTreeMap<String, Intent>
     walk(&base, fs, &mut paths)?;
     paths.sort();
     let mut intents = BTreeMap::new();
+    let mut errors = Vec::new();
     for path in paths {
-        let raw = fs.read_to_string(&path)?;
-        let record: IntentRecord = toml::from_str(&raw)
-            .with_context(|| format!("could not parse intent {}", path.display()))?;
-        validate_evidence(&path, &record)?;
+        let parsed = (|| -> Result<IntentRecord> {
+            let raw = fs.read_to_string(&path)?;
+            let record: IntentRecord = toml::from_str(&raw)
+                .with_context(|| format!("could not parse intent {}", path.display()))?;
+            validate_evidence(&path, &record)?;
+            Ok(record)
+        })();
+        let record = match parsed {
+            Ok(record) => record,
+            Err(error) => {
+                errors.push((path, error));
+                continue;
+            }
+        };
         let relative = path.strip_prefix(&base)?;
         let mut key = relative.to_path_buf();
         key.set_extension("");
@@ -201,7 +225,7 @@ pub fn scan(root: &Path, fs: &dyn Filesystem) -> Result<BTreeMap<String, Intent>
             bail!("duplicate intent key {key}");
         }
     }
-    Ok(intents)
+    Ok((intents, errors))
 }
 
 /// Count profile TOML files below `<root>/profiles/`.
