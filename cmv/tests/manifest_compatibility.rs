@@ -51,13 +51,13 @@ fn unsupported_schema_refuses_all_commands_before_atlas_resolution() {
     let project = temp.path();
     let manifest = project.join("manifest.json");
     // A later schema can change the rest of the document completely.
-    fs::write(&manifest, br#"{"schema":2,"future_field":true}"#).unwrap();
+    fs::write(&manifest, br#"{"schema":3,"future_field":true}"#).unwrap();
     let absent_atlas = project.join("absent-atlas");
     for verb in ["check", "status", "explain"] {
         let output = run(project, &manifest, verb, &absent_atlas);
         assert_eq!(output.status.code(), Some(2), "{verb}");
         let stderr = String::from_utf8(output.stderr).unwrap();
-        assert!(stderr.contains("unsupported manifest schema 2"), "{stderr}");
+        assert!(stderr.contains("unsupported manifest schema 3"), "{stderr}");
         assert!(stderr.contains(manifest.to_str().unwrap()));
         assert!(!stderr.contains("atlas at"), "{stderr}");
         assert!(output.stdout.is_empty());
@@ -80,6 +80,9 @@ fn schema_one_knowledge_base_manifest_still_loads() {
     let atlas = Path::new(env!("CARGO_MANIFEST_DIR")).join("../reference-atlas");
     let output = run(project, &manifest, "status", &atlas);
     assert_eq!(output.status.code(), Some(0), "{}", String::from_utf8_lossy(&output.stderr));
+    let check = run(project, &manifest, "check", &atlas);
+    assert_eq!(check.status.code(), Some(0), "{}", String::from_utf8_lossy(&check.stderr));
+    assert!(String::from_utf8_lossy(&check.stdout).contains("craftsperson/rust"));
 }
 
 #[test]

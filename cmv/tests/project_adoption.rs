@@ -85,7 +85,13 @@ fn report(output: &Output, expected_code: i32) -> Value {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    serde_json::from_slice(&output.stdout).expect("report JSON")
+    let value: Value = serde_json::from_slice(&output.stdout).expect("report JSON");
+    if value["schema"] == 2 {
+        assert_eq!(value["artifacts"].as_array().unwrap().len(), 1);
+        value["artifacts"][0]["check"].clone()
+    } else {
+        value
+    }
 }
 
 fn state<'a>(report: &'a Value, key: &str) -> &'a str {
@@ -99,10 +105,13 @@ fn state<'a>(report: &'a Value, key: &str) -> &'a str {
 }
 
 fn assert_manifest(project: &Path, atlas_arg: &str, pin: &str) {
-    let manifest: Value = serde_json::from_slice(
+    let document: Value = serde_json::from_slice(
         &fs::read(project.join(".context-mixer/cmf-manifest.json")).expect("manifest"),
     )
     .expect("manifest JSON");
+    assert_eq!(document["schema"], 2);
+    assert_eq!(document["artifacts"].as_array().unwrap().len(), 1);
+    let manifest = &document["artifacts"][0];
     assert_eq!(manifest["profile"]["id"], "rust-shipping");
     assert_eq!(manifest["artifact"]["surface"], "agent");
     assert_eq!(manifest["atlas"]["revision"], pin);

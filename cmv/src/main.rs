@@ -26,13 +26,26 @@ use cmx_core::gateway::real::RealFilesystem;
 use cmx_core::paths::ConfigPaths;
 use cmx_core::platform::Platform;
 use intent_atlas::catalog;
-use intent_atlas::manifest::{LOCAL_MANIFEST_FILE_NAME, Manifest, SCHEMA_VERSION};
+use intent_atlas::manifest::{LOCAL_MANIFEST_FILE_NAME, Manifest, ManifestCollection};
 use intent_atlas::sensors::{self, Sensors};
-use serde::Deserialize;
+use serde::Serialize;
 
-#[derive(Deserialize)]
-struct ManifestHeader {
-    schema: u64,
+#[derive(Serialize)]
+struct ArtifactCheckReport {
+    artifact: intent_atlas::manifest::ArtifactRef,
+    check: CheckReport,
+}
+
+#[derive(Serialize)]
+struct MultiCheckReport {
+    schema: u32,
+    artifacts: Vec<ArtifactCheckReport>,
+    summary: MultiSummary,
+}
+
+#[derive(Serialize)]
+struct MultiSummary {
+    exit_code: u8,
 }
 
 fn main() -> ExitCode {
@@ -53,30 +66,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             json,
             strict,
             location,
-        } => {
-            let format = OutputFormat::from_flag(json);
-            let strictness = Strictness::from_flag(strict);
-            let site = Site::resolve(location, &fs)?;
-            let scratch = Scratch::create(&fs)?;
-            let checkout = site.checkout(&scratch, &fs)?;
-            let (catalog, sensors) = site.scan_atlas(&checkout, &fs)?;
-            let ecosystems = site.ecosystems(sensors.as_ref(), &fs);
-            let request = CheckRequest {
-                manifest: &site.manifest,
-                catalog: &catalog,
-                config: &site.config,
-                ecosystems: &ecosystems,
-                trees: checkout.trees(),
-                workspace: &site.root,
-                scratch: &scratch.dir,
-            };
-            let outcomes = dispatch::check(&request, &fs, &RealProcessRunner)?;
-            let atlas = AtlasReport::new(&site.resolution, &checkout, sensors.as_ref());
-            drop(scratch);
-            let report = CheckReport::new(&site.manifest, atlas, ecosystems, outcomes, strictness);
-            print!("{}", report.render(format)?);
-            Ok(ExitCode::from(report.summary.exit_code))
-        }
+        } => run_check(location, OutputFormat::from_flag(json), Strictness::from_flag(strict), &fs),
         Commands::Status { json, location } => {
             let format = OutputFormat::from_flag(json);
             let site = Site::resolve(location, &fs)?;
@@ -137,6 +127,61 @@ fn run(cli: Cli) -> Result<ExitCode> {
     }
 }
 
+fn run_check(
+    location: LocationArgs,
+    format: OutputFormat,
+    strictness: Strictness,
+    fs: &dyn Filesystem,
+) -> Result<ExitCode> {
+    let sites = Site::resolve_all(location, fs)?;
+    let mut reports = Vec::new();
+    for site in &sites {
+        let scratch = Scratch::create(fs)?;
+        let checkout = site.checkout(&scratch, fs)?;
+        let (catalog, sensors) = site.scan_atlas(&checkout, fs)?;
+        let ecosystems = site.ecosystems(sensors.as_ref(), fs);
+        let request = CheckRequest {
+            manifest: &site.manifest,
+            catalog: &catalog,
+            config: &site.config,
+            ecosystems: &ecosystems,
+            trees: checkout.trees(),
+            workspace: &site.root,
+            scratch: &scratch.dir,
+        };
+        let outcomes = dispatch::check(&request, fs, &RealProcessRunner)?;
+        let atlas = AtlasReport::new(&site.resolution, &checkout, sensors.as_ref());
+        let report = CheckReport::new(&site.manifest, atlas, ecosystems, outcomes, strictness);
+        reports.push(ArtifactCheckReport {
+            artifact: site.manifest.artifact.clone(),
+            check: report,
+        });
+    }
+    if reports.len() == 1 && sites[0].legacy_manifest {
+        let report = &reports[0].check;
+        print!("{}", report.render(format)?);
+        return Ok(ExitCode::from(report.summary.exit_code));
+    }
+    let exit_code = reports.iter().map(|entry| entry.check.summary.exit_code).max().unwrap_or(0);
+    match format {
+        OutputFormat::Json => {
+            let report = MultiCheckReport {
+                schema: 2,
+                artifacts: reports,
+                summary: MultiSummary { exit_code },
+            };
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        OutputFormat::Human => {
+            for entry in &reports {
+                println!("{} ({:?})", entry.artifact.name, entry.artifact.surface);
+                print!("{}", entry.check.render(format)?);
+            }
+        }
+    }
+    Ok(ExitCode::from(exit_code))
+}
+
 /// The project as resolved from the command line: root, manifest, config,
 /// atlas, and whether to honour the pin.
 struct Site {
@@ -146,10 +191,15 @@ struct Site {
     config: ProjectConfig,
     resolution: Resolution,
     pin_policy: PinPolicy,
+    legacy_manifest: bool,
 }
 
 impl Site {
     fn resolve(location: LocationArgs, fs: &dyn Filesystem) -> Result<Self> {
+        Ok(Self::resolve_all(location, fs)?.remove(0))
+    }
+
+    fn resolve_all(location: LocationArgs, fs: &dyn Filesystem) -> Result<Vec<Self>> {
         let root = match location.root {
             Some(root) => root,
             None => env::current_dir().context("could not determine the current directory")?,
@@ -164,17 +214,11 @@ impl Site {
         let raw = fs
             .read_to_string(&manifest_path)
             .with_context(|| format!("could not read manifest {}", manifest_path.display()))?;
-        let header: ManifestHeader = serde_json::from_str(&raw)
-            .with_context(|| format!("malformed manifest {}", manifest_path.display()))?;
-        if header.schema != u64::from(SCHEMA_VERSION) {
-            bail!(
-                "unsupported manifest schema {} in {}; supported schema is {}",
-                header.schema,
-                manifest_path.display(),
-                SCHEMA_VERSION
-            );
-        }
-        let manifest: Manifest = serde_json::from_str(&raw)
+        let legacy_manifest = serde_json::from_str::<serde_json::Value>(&raw)
+            .ok()
+            .and_then(|value| value.get("schema").and_then(serde_json::Value::as_u64))
+            == Some(1);
+        let collection = ManifestCollection::from_json(&raw)
             .with_context(|| format!("malformed manifest {}", manifest_path.display()))?;
         let config = config::load(&root, fs)?;
         // The platform only affects install-directory resolution, which cmv
@@ -183,18 +227,26 @@ impl Site {
         // A relative path — from the command line, the registry, or the
         // manifest — is interpreted against cmv's working directory, exactly
         // as it would be on the command line.
-        let resolution = resolve::resolve(location.atlas.as_deref(), &manifest.atlas, fs, &paths)?;
-        if let Some(warning) = &resolution.warning {
-            eprintln!("warning: {warning}");
-        }
-        Ok(Self {
-            root,
-            manifest_path,
-            manifest,
-            config,
-            resolution,
-            pin_policy: PinPolicy::from_flag(location.at_head),
-        })
+        collection
+            .artifacts
+            .into_iter()
+            .map(|manifest| {
+                let resolution =
+                    resolve::resolve(location.atlas.as_deref(), &manifest.atlas, fs, &paths)?;
+                if let Some(warning) = &resolution.warning {
+                    eprintln!("warning: {warning}");
+                }
+                Ok(Self {
+                    root: root.clone(),
+                    manifest_path: manifest_path.clone(),
+                    manifest,
+                    config: config.clone(),
+                    resolution,
+                    pin_policy: PinPolicy::from_flag(location.at_head),
+                    legacy_manifest,
+                })
+            })
+            .collect()
     }
 
     /// Which tree to verify against, materializing the pinned revision under

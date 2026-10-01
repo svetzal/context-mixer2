@@ -9,10 +9,15 @@ project code: given the same workspace, manifest, atlas, and
 `cmv.toml`, its output is byte-identical.
 
 Run it from the project root, or pass `--root <project>`.
-`check`, `status`, and `explain` accept compile manifest schema `1` only.
-An unsupported schema exits `2` with the manifest path before cmv resolves
-the atlas or runs any validator, and leaves project state unchanged. Schema
-`1` also accepts the older `knowledge_base` block name.
+`check`, `status`, and `explain` accept standalone schema-1 manifests and
+schema-2 local collections. Schema 1 also accepts the older `knowledge_base`
+block name. An unsupported schema exits `2` with the manifest path before cmv
+resolves the atlas or runs any validator. Default `check` verifies every
+artifact in a collection, each against its own pinned atlas revision, and
+returns nonzero if any artifact fails. JSON output contains an `artifacts`
+array with each artifact identity and its own check report; schema-1 output
+keeps its original shape. `status` and `explain` currently inspect the first
+record in a collection.
 
 The repository's [reference atlas](../../../reference-atlas/README.md)
 contains representative records, sensors, validators, and source cases for
@@ -28,7 +33,7 @@ cmv explain <intent> [--json]            [--root <project>] [--manifest <path>] 
 
 | Command | Description |
 | --- | --- |
-| `cmv check` | Run every compiled intent's validators and report one verdict per intent |
+| `cmv check` | Run every artifact’s compiled validators and report attributed verdicts |
 | `cmv check --strict` | Also fail the run when any intent could not be checked |
 | `cmv check --json` | Emit the full per-intent report as JSON for CI |
 | `cmv status` | Summarize the manifest, pin, ecosystems, and validator coverage without running any validator |

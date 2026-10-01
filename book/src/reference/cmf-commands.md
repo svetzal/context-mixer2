@@ -65,7 +65,9 @@ assembled Markdown into `.codex/agents/<name>.toml`; skills are installed as
 hand-authored `AGENTS.md`. Omitting `--platform` preserves the existing
 cmx target resolution. A local install also records the compile manifest at
 `.context-mixer/cmf-manifest.json`, beside the local lock file: the preview
-says so, and `--apply` writes it. Global installs write no manifest.
+says so, and `--apply` writes it. Each successful local artifact write
+updates only that artifact’s compilation record; a preview or refused install
+leaves the manifest unchanged. Global installs write no manifest.
 
 A local install (preview and apply alike) also compares the profile's declared
 `[select] ecosystems` with what the atlas's [sensors](#sensors) detect in the
@@ -89,7 +91,8 @@ when the atlas has no sensor file).
 
 The manifest is cmf's second output: a JSON record of what was compiled, so a
 verifier can later hold the project to exactly those intents. It carries a
-`schema` version (`1`), the `compiled_at` instant, the `atlas` (its
+`schema` version (`1` for a standalone `assemble --manifest` record; local
+installs use a schema-2 `artifacts` array of these records), the `compiled_at` instant, the `atlas` (its
 `path`, plus its cmx `source` name and git `revision` when the root is a
 registered source or a git checkout — both omitted otherwise), the `profile`
 id, version, and declared `ecosystems` (always present, empty when the profile

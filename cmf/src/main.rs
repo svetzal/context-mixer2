@@ -19,7 +19,9 @@ use cmf::mismatch;
 use cmf::profile::{self, Surface};
 use cmf::sensors::{self, Detection, Sensors};
 use cmf::validate;
-use cmx_core::artifact_install::{ArtifactIdentity, ArtifactInstaller, BundledArtifact};
+use cmx_core::artifact_install::{
+    ArtifactIdentity, ArtifactInstallReport, ArtifactInstaller, BundledArtifact,
+};
 use cmx_core::gateway::Filesystem;
 use cmx_core::gateway::real::RealFilesystem;
 use cmx_core::production::ProductionContext;
@@ -97,7 +99,13 @@ fn main() -> Result<ExitCode> {
             if apply {
                 let report = installer.apply(&bundle, &plan, &ctx)?;
                 print!("{report}");
-                if let Some(manifest_path) = manifest_path {
+                let wrote_artifact = match &report {
+                    ArtifactInstallReport::Agent(report) => {
+                        report.targets.iter().any(|target| target.action.will_write())
+                    }
+                    ArtifactInstallReport::Skill(report) => report.applied().next().is_some(),
+                };
+                if let Some(manifest_path) = manifest_path.filter(|_| wrote_artifact) {
                     let manifest = manifest::build(
                         &root,
                         &profile,
@@ -106,7 +114,7 @@ fn main() -> Result<ExitCode> {
                         &intents,
                         &ctx,
                     )?;
-                    manifest::write(&manifest, &manifest_path, ctx.fs)?;
+                    manifest::upsert_local(manifest, &manifest_path, ctx.fs)?;
                     println!("Manifest written to {}", manifest_path.display());
                 }
             } else {
