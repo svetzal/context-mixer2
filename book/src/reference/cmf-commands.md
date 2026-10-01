@@ -38,6 +38,9 @@ Exit status `0` means valid, `2` means invalid atlas input (and also clap
 command-line usage errors). Human output names the source file and field for
 each failure. JSON output has stable `valid`, `intents`, `profiles`, and
 `diagnostics` fields; each diagnostic has `file`, `field`, and `message`.
+Validation continues after an invalid record or profile and reports each
+failure it can inspect in one run. A profile that selects an invalid record
+may also report a missing selection. Repair the record first, then rerun.
 Records and profiles are visited in sorted path order, so repeated runs over
 the same atlas produce the same JSON bytes. The counts include successfully
 scanned intents and successfully assembled profiles.

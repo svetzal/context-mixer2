@@ -1,0 +1,14 @@
+{
+  "kind": "behavioral",
+  "source_change": "cmf/src/validate.rs",
+  "rejecting": {
+    "command": "target/debug/cmf --root /private/tmp/cmf-validate-proof-905721 validate --json",
+    "exit_code": 2,
+    "log": "/Users/svetzal/.foundry/tool-logs/50568-1790817845994306000.stdout.log"
+  },
+  "corrected": {
+    "command": "target/debug/cmf --root /private/tmp/cmf-validate-proof-905721 validate --json",
+    "exit_code": 0,
+    "log": "/Users/svetzal/.foundry/tool-logs/50585-1790817851101569000.stdout.log"
+  }
+}

@@ -1,14 +1,16 @@
 {
   "kind": "behavioral",
-  "source_change": "cmf/src/validate.rs",
+  "source_change": "intent-atlas/src/catalog.rs; cmf/src/validate.rs",
   "rejecting": {
-    "command": "target/debug/cmf --root /private/tmp/cmf-validate-proof-905721 validate --json",
+    "command": "target/debug/cmf --root /private/tmp/cmf-cycle2-proof validate --json",
     "exit_code": 2,
-    "log": "/Users/svetzal/.foundry/tool-logs/50568-1790817845994306000.stdout.log"
+    "log": "/Users/svetzal/.foundry/tool-logs/18355-1790821041539183000.stdout.log",
+    "input": "Two malformed records, invalid sensors, and a broken profile."
   },
   "corrected": {
-    "command": "target/debug/cmf --root /private/tmp/cmf-validate-proof-905721 validate --json",
+    "command": "target/debug/cmf --root /private/tmp/cmf-cycle2-proof validate --json",
     "exit_code": 0,
-    "log": "/Users/svetzal/.foundry/tool-logs/50585-1790817851101569000.stdout.log"
+    "log": "/Users/svetzal/.foundry/tool-logs/18418-1790821054083942000.stdout.log",
+    "input": "The reference records, sensors, and profile restored."
   }
 }

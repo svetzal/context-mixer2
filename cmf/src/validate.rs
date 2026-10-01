@@ -64,13 +64,18 @@ pub fn atlas(root: &Path, fs: &dyn Filesystem) -> Report {
         profiles: 0,
         diagnostics: Vec::new(),
     };
-    let intents = match catalog::scan(root, fs) {
-        Ok(intents) => intents,
+    let (intents, record_errors) = match catalog::scan_all(root, fs) {
+        Ok(result) => result,
         Err(error) => {
-            report.diagnostics.push(record_error(root, &format!("{error:#}")));
+            report
+                .diagnostics
+                .push(record_error(&root.join("intents"), &format!("{error:#}")));
             return report;
         }
     };
+    for (path, error) in record_errors {
+        report.diagnostics.push(record_error(&path, &format!("{error:#}")));
+    }
     report.intents = intents.len();
     if let Err(error) = sensors::load_validated(root, &intents, fs) {
         report.diagnostics.push(Diagnostic {
@@ -86,11 +91,12 @@ pub fn atlas(root: &Path, fs: &dyn Filesystem) -> Report {
                 continue;
             };
             let path = root.join(validator.run);
-            let valid = root_canonical
-                .as_ref()
-                .ok()
-                .zip(std::fs::canonicalize(&path).ok())
-                .is_some_and(|(root, target)| target.starts_with(root) && executable(&target));
+            let valid = !validator.run.is_absolute()
+                && root_canonical
+                    .as_ref()
+                    .ok()
+                    .zip(std::fs::canonicalize(&path).ok())
+                    .is_some_and(|(root, target)| target.starts_with(root) && executable(&target));
             if !valid {
                 report.diagnostics.push(Diagnostic {
                     file: intent.path.clone(),
@@ -125,6 +131,8 @@ pub fn atlas(root: &Path, fs: &dyn Filesystem) -> Report {
                             } else {
                                 "select"
                             };
+                            // A malformed record can make a profile appear
+                            // unselectable; report both source failures.
                             report.diagnostics.push(Diagnostic {
                                 file: path,
                                 field: field.into(),
@@ -168,16 +176,21 @@ fn profile_field(message: &str) -> String {
     .into()
 }
 
-fn record_error(root: &Path, message: &str) -> Diagnostic {
-    let mut file = root.join("intents");
+fn record_error(path: &Path, message: &str) -> Diagnostic {
+    let mut file = path.to_path_buf();
     let mut field = "intents".to_string();
     if let Some(rest) = message.strip_prefix("intent ") {
         if let Some((path, entry)) = rest.split_once(" evidence entry ") {
             file = PathBuf::from(path);
             let number = entry.split_whitespace().next().unwrap_or("?");
-            let member = if message.contains("`run` is missing") {
+            let member = if message.contains("`run` is missing")
+                || message.contains("validator path")
+                || message.contains("`run` may only")
+            {
                 "run"
-            } else if message.contains("`language` is missing") {
+            } else if message.contains("`language` is missing")
+                || message.contains("`language` may only")
+            {
                 "language"
             } else {
                 "evidence"

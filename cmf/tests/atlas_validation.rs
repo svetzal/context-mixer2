@@ -134,7 +134,7 @@ fn broken_profile_selection_and_sensor_are_reported() {
     fs::write(&profile, raw.replace("budget_tokens = 400", "budget_tokens = 1")).unwrap();
     fs::write(
         case.atlas.join("ecosystems.toml"),
-        "[ecosystems.unknown]\nsignatures = [{ file = \"x\" }]\n",
+        "[unknown]\nsignatures = [{ file = \"x\" }]\n",
     )
     .unwrap();
     let output = case.run(true);
@@ -175,6 +175,54 @@ fn malformed_record_names_the_record_and_evidence_field() {
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["diagnostics"][0]["file"], record.to_str().unwrap());
     assert_eq!(json["diagnostics"][0]["field"], "evidence[1].run");
+}
+
+#[test]
+fn invalid_validator_traversal_names_the_run_field() {
+    let case = Case::new();
+    let record = case.atlas.join("intents/craftsperson/rust/isolate-functional-core.toml");
+    let raw = fs::read_to_string(&record).unwrap();
+    fs::write(&record, raw.replace("checks/rust/isolate_functional_core.sh", "../outside.sh"))
+        .unwrap();
+    let output = case.run(true);
+    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["diagnostics"][0]["file"], record.to_str().unwrap());
+    assert_eq!(json["diagnostics"][0]["field"], "evidence[1].run");
+}
+
+#[test]
+fn reports_every_broken_record_and_profile_in_path_order() {
+    let case = Case::new();
+    let first = case.atlas.join("intents/craftsperson/rust/isolate-functional-core.toml");
+    let second = case
+        .atlas
+        .join("intents/craftsperson/rust/put-gateways-at-effect-boundaries.toml");
+    for (path, field) in [
+        (&first, "run = \"checks/rust/isolate_functional_core.sh\", "),
+        (&second, "language = \"rust\", "),
+    ] {
+        fs::write(path, fs::read_to_string(path).unwrap().replace(field, "")).unwrap();
+    }
+    let profile = case.atlas.join("profiles/rust-shipping.toml");
+    fs::write(
+        &profile,
+        fs::read_to_string(&profile)
+            .unwrap()
+            .replace("budget_tokens = 400", "budget_tokens = 1"),
+    )
+    .unwrap();
+    let output = case.run(true);
+    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let diagnostics = json["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics[0]["file"], first.to_str().unwrap());
+    assert_eq!(diagnostics[0]["field"], "evidence[1].run");
+    assert_eq!(diagnostics[1]["file"], second.to_str().unwrap());
+    assert_eq!(diagnostics[1]["field"], "evidence[1].language");
+    assert_eq!(diagnostics[2]["file"], profile.to_str().unwrap());
+    assert_eq!(diagnostics[2]["field"], "select");
+    assert_eq!(output.stdout, case.run(true).stdout);
 }
 
 #[test]
