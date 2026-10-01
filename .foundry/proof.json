@@ -1,16 +1,15 @@
 {
   "kind": "behavioral",
-  "source_change": "cmf/src/validate.rs",
+  "source_change": "intent-atlas/src/manifest.rs",
   "rejecting": {
-    "command": "target/debug/cmf --root /private/tmp/cmf-acceptance-8ldiKF/atlas validate --json",
-    "exit_code": 2,
-    "log": "/Users/svetzal/.foundry/tool-logs/92778-1790823649853858000.stdout.log",
-    "input": "reference-atlas with title removed from intents/craftsperson/rust/isolate-functional-core.toml"
+    "command": "foundry capture -- python3 /tmp/cmx_multi_profile_proof.py $PWD",
+    "exit_code": 1,
+    "log": "/Users/svetzal/.foundry/tool-logs/98844-1790854133409457000.stdout.log"
   },
   "corrected": {
-    "command": "target/debug/cmf --root /private/tmp/cmf-acceptance-8ldiKF/atlas validate --json",
+    "command": "foundry capture -- python3 .foundry/evidence/multi_profile_probe.py $PWD",
     "exit_code": 0,
-    "log": "/Users/svetzal/.foundry/tool-logs/92792-1790823654058149000.stdout.log",
-    "input": "same atlas with title restored"
-  }
+    "log": "/Users/svetzal/.foundry/tool-logs/59894-1790857350317572000.stdout.log"
+  },
+  "probe_script": ".foundry/evidence/multi_profile_probe.py"
 }

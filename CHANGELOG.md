@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Local cmf installs retain independent agent and skill compilation records in
+  schema-2 manifests. Default cmv checks every artifact at its own atlas pin,
+  attributes verdicts by artifact, and fails if any required intent fails.
+  Schema-1 manifests and the legacy `knowledge_base` key remain readable.
+
 - `cmf validate` checks the complete atlas read-only, including profiles,
   selection budgets, sensors, and executable validator paths. Human and JSON
   diagnostics name the file and field; invalid input exits with status 2.

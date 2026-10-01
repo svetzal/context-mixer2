@@ -26,6 +26,9 @@ use crate::profile::{Profile, Surface};
 /// Manifest schema version written in the `schema` field.
 pub const SCHEMA_VERSION: u32 = 1;
 
+/// Schema for a local file containing independent compilation records.
+pub const COLLECTION_SCHEMA_VERSION: u32 = 2;
+
 /// File name of the manifest `cmf install --local --apply` writes beside the
 /// local lock file.
 pub const LOCAL_MANIFEST_FILE_NAME: &str = "cmf-manifest.json";
@@ -53,6 +56,65 @@ pub struct Manifest {
     /// present; empty until assembly learns to drop by budget instead of
     /// failing.
     pub dropped: Vec<DroppedIntent>,
+}
+
+/// The local compilation records, keyed by artifact identity on update.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ManifestCollection {
+    /// Collection schema version.
+    pub schema: u32,
+    /// Independent agent and skill compilation records in stable order.
+    pub artifacts: Vec<Manifest>,
+}
+
+impl ManifestCollection {
+    /// Read a current collection or a single legacy schema-1 manifest.
+    pub fn from_json(raw: &str) -> Result<Self> {
+        let value: serde_json::Value = serde_json::from_str(raw).context("malformed manifest")?;
+        let schema = value.get("schema").and_then(serde_json::Value::as_u64);
+        match schema {
+            Some(1) => Ok(Self {
+                schema: COLLECTION_SCHEMA_VERSION,
+                artifacts: vec![serde_json::from_value(value).context("malformed manifest")?],
+            }),
+            Some(2) => {
+                let collection: Self =
+                    serde_json::from_value(value).context("malformed manifest collection")?;
+                if collection.artifacts.is_empty() {
+                    bail!("manifest collection has no artifacts");
+                }
+                if collection.artifacts.iter().any(|manifest| manifest.schema != SCHEMA_VERSION) {
+                    bail!("manifest collection contains an unsupported artifact schema");
+                }
+                Ok(collection)
+            }
+            Some(other) => {
+                bail!("unsupported manifest schema {other}; supported schemas are 1 and 2")
+            }
+            None => bail!("manifest is missing a numeric schema"),
+        }
+    }
+
+    /// Replace only the record for this artifact and keep all other records.
+    pub fn upsert(&mut self, manifest: Manifest) {
+        if let Some(existing) = self.artifacts.iter_mut().find(|existing| {
+            existing.artifact.name == manifest.artifact.name
+                && existing.artifact.surface == manifest.artifact.surface
+        }) {
+            *existing = manifest;
+        } else {
+            self.artifacts.push(manifest);
+        }
+        self.artifacts.sort_by_key(|entry| {
+            (
+                entry.artifact.name.clone(),
+                match entry.artifact.surface {
+                    Surface::Agent => 0,
+                    Surface::Skill => 1,
+                },
+            )
+        });
+    }
 }
 
 /// The intent atlas a manifest was compiled from.
@@ -304,6 +366,29 @@ pub fn write(manifest: &Manifest, path: &Path, fs: &dyn Filesystem) -> Result<()
     }
     let tmp = json_file::tmp_path(path);
     fs.write(&tmp, &manifest.to_json()?)?;
+    fs.rename(&tmp, path)?;
+    Ok(())
+}
+
+/// Update one local compilation record without discarding other artifacts.
+pub fn upsert_local(manifest: Manifest, path: &Path, fs: &dyn Filesystem) -> Result<()> {
+    let mut collection = if fs.is_file(path) {
+        let raw = fs.read_to_string(path)?;
+        ManifestCollection::from_json(&raw)?
+    } else {
+        ManifestCollection {
+            schema: COLLECTION_SCHEMA_VERSION,
+            artifacts: Vec::new(),
+        }
+    };
+    collection.upsert(manifest);
+    if let Some(parent) = path.parent() {
+        fs.create_dir_all(parent)?;
+    }
+    let tmp = json_file::tmp_path(path);
+    let mut json = serde_json::to_string_pretty(&collection)?;
+    json.push('\n');
+    fs.write(&tmp, &json)?;
     fs.rename(&tmp, path)?;
     Ok(())
 }

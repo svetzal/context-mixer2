@@ -201,10 +201,19 @@ an ecosystem the project does not contain.
 
 ### The manifest
 
-Written by `cmf install`, committed with the project, read by cmv. JSON,
-because it is machine-written state, matching `cmx-lock.json` and `sets.json`
-and reusing cmx-core's `json_file` helpers. It lives in the project-local cmx
-state directory beside the local lock file.
+A local install writes schema 2: an `artifacts` array containing one schema-1
+compilation record per artifact identity (name and surface). Each record keeps
+its own atlas source, path, revision, selected intents, and dropped intents.
+Updating one artifact replaces only its record. A preview or refused install
+leaves the file unchanged. `cmv check` verifies every record at its own pin;
+its JSON output attributes each check report to an artifact and its exit code
+is nonzero if any artifact fails. Standalone `assemble --manifest` output
+remains schema 1, which cmv still reads, including `knowledge_base`.
+
+The schema-1 record below shows the fields inside each local compilation
+record. The manifest is JSON because it is machine-written state, like
+`cmx-lock.json` and `sets.json`. Local installs write it beside the local lock
+file in the project-local cmx state directory.
 
 ```json
 {
@@ -255,9 +264,10 @@ state directory beside the local lock file.
 The manifest is the `--explain` output made durable and given a contract.
 The block was named `knowledge_base` when Phase 1 shipped; it is renamed
 `atlas` with the crate extraction (Phase 7). cmv 3.2.x shipped the old key, so
-the reader accepts both spellings and the schema number stays at 1.
-The reader rejects every other schema version with exit `2` before atlas
-resolution or validator execution, including for `status` and `explain`.
+the reader accepts both spellings for schema-1 records.
+The reader accepts schema 2 collections and rejects unsupported schema
+versions with exit `2` before atlas resolution or validator execution,
+including for `status` and `explain`.
 
 Phase 1 shipped the manifest as specified above, with three concrete details.
 It lives at `.context-mixer/cmf-manifest.json`, written by
@@ -468,8 +478,9 @@ detected languages and with exactly which argv, the `--config` document from
 `cmv.toml`, the stale flag, and whether the manifest dropped the intent. It
 exits `2` when the intent is not in the manifest at all.
 
-All three commands accept manifest schema `1`, including the legacy
-`knowledge_base` block name. An unsupported schema exits `2` before atlas
+All three commands accept manifest schemas `1` and `2`; schema 1 includes
+the legacy `knowledge_base` block name. `check` verifies every record in a
+collection. `status` and `explain` currently inspect its first record. An unsupported schema exits `2` before atlas
 resolution or validator execution and leaves project state unchanged.
 
 All three commands accept `--atlas <path>` as an override of
