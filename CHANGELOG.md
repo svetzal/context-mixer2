@@ -24,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `cmf validate` continues across malformed records and profiles, reporting
-  deterministic source paths and fields; sensor tests use the atlas's actual
+  deterministic source paths and fields, including the scanned file path and
+  missing field for malformed intent TOML; sensor tests use the atlas's actual
   schema. `cmv check`, `status`, and `explain` reject unsupported compile
   manifest schemas with exit 2 before atlas resolution or validation, while
   schema 1 and the `knowledge_base` alias remain readable.

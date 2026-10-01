@@ -11,8 +11,8 @@ project code: given the same workspace, manifest, atlas, and
 Run it from the project root, or pass `--root <project>`.
 `check`, `status`, and `explain` accept compile manifest schema `1` only.
 An unsupported schema exits `2` with the manifest path before cmv resolves
-the atlas or runs any validator. Schema `1` also accepts the older
-`knowledge_base` block name.
+the atlas or runs any validator, and leaves project state unchanged. Schema
+`1` also accepts the older `knowledge_base` block name.
 
 The repository's [reference atlas](../../../reference-atlas/README.md)
 contains representative records, sensors, validators, and source cases for

@@ -111,9 +111,15 @@ fn schema_refusal_does_not_run_a_validator_or_write_project_files() {
     value["schema"] = 99.into();
     fs::write(&manifest, serde_json::to_vec(&value).unwrap()).unwrap();
     let before = fs::read(&manifest).unwrap();
-    let output = run(&project, &manifest, "check", &atlas);
-    assert_eq!(output.status.code(), Some(2));
-    assert!(!marker.exists());
-    assert_eq!(fs::read(&manifest).unwrap(), before);
-    assert!(!project.join(".context-mixer").exists());
+    for verb in ["check", "status", "explain"] {
+        let output = run(&project, &manifest, verb, &atlas);
+        assert_eq!(output.status.code(), Some(2), "{verb}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("unsupported manifest schema 99"),
+            "{verb}"
+        );
+        assert!(!marker.exists(), "{verb} ran a validator");
+        assert_eq!(fs::read(&manifest).unwrap(), before, "{verb} wrote manifest");
+        assert!(!project.join(".context-mixer").exists(), "{verb} wrote state");
+    }
 }

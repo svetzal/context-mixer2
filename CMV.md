@@ -468,6 +468,10 @@ detected languages and with exactly which argv, the `--config` document from
 `cmv.toml`, the stale flag, and whether the manifest dropped the intent. It
 exits `2` when the intent is not in the manifest at all.
 
+All three commands accept manifest schema `1`, including the legacy
+`knowledge_base` block name. An unsupported schema exits `2` before atlas
+resolution or validator execution and leaves project state unchanged.
+
 All three commands accept `--atlas <path>` as an override of
 source-registry resolution (the order is override, then the manifest's
 `source` in the cmx registry, then the manifest's recorded `path`; the report

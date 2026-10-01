@@ -38,6 +38,10 @@ Exit status `0` means valid, `2` means invalid atlas input (and also clap
 command-line usage errors). Human output names the source file and field for
 each failure. JSON output has stable `valid`, `intents`, `profiles`, and
 `diagnostics` fields; each diagnostic has `file`, `field`, and `message`.
+For malformed intent TOML, `file` is the scanned record path, even when the
+parser includes a location in its error message. A missing required field uses
+that field's name (for example, `title`); syntax errors without a field use
+`record`.
 Validation continues after an invalid record or profile and reports each
 failure it can inspect in one run. A profile that selects an invalid record
 may also report a missing selection. Repair the record first, then rerun.

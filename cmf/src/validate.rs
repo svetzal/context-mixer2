@@ -177,11 +177,9 @@ fn profile_field(message: &str) -> String {
 }
 
 fn record_error(path: &Path, message: &str) -> Diagnostic {
-    let mut file = path.to_path_buf();
     let mut field = "intents".to_string();
     if let Some(rest) = message.strip_prefix("intent ") {
-        if let Some((path, entry)) = rest.split_once(" evidence entry ") {
-            file = PathBuf::from(path);
+        if let Some((_, entry)) = rest.split_once(" evidence entry ") {
             let number = entry.split_whitespace().next().unwrap_or("?");
             let member = if message.contains("`run` is missing")
                 || message.contains("validator path")
@@ -197,12 +195,16 @@ fn record_error(path: &Path, message: &str) -> Diagnostic {
             };
             field = format!("evidence[{number}].{member}");
         }
-    } else if let Some(rest) = message.strip_prefix("could not parse intent ") {
-        file = PathBuf::from(rest.lines().next().unwrap_or_default());
-        field = "record".into();
+    } else if message.starts_with("could not parse intent ") {
+        field = message
+            .split("missing field `")
+            .nth(1)
+            .and_then(|rest| rest.split('`').next())
+            .unwrap_or("record")
+            .into();
     }
     Diagnostic {
-        file,
+        file: path.to_path_buf(),
         field,
         message: message.to_string(),
     }
