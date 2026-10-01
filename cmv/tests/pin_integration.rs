@@ -18,7 +18,7 @@ use std::process::{Command, Output};
 use tempfile::TempDir;
 
 fn fixtures() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../reference-atlas/regressions/verifier")
 }
 
 fn copy_tree(from: &Path, to: &Path) {

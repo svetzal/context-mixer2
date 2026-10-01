@@ -66,7 +66,7 @@ Everything else in the frontmatter (`metadata.version` above all) is
 entries removed (an entry is a column-0 line plus its blank and indented
 continuation lines), then leading and trailing blank lines trimmed. When
 anything remains, the document opens with two fixed prose header lines,
-`# ---`, each preserved line prefixed with `#` (a blank line becomes a bare
+`# ---`, each preserved line prefixed with `# ` (a blank line becomes a bare
 `#`), and `# ---`. When nothing remains, or the source has no frontmatter,
 there is no header and no block — the document starts at `name =`. Frontmatter
 lines are split on `\n` with one trailing `\r` stripped; the output uses `\n`
@@ -83,10 +83,15 @@ continuation lines folded). Every value is finally trimmed of surrounding
 whitespace. The `agent-transform` fixtures pin the exact bytes.
 
 `agent::preserved_frontmatter(toml)` reads the block back: the lines between
-the first `# ---` and the next, with `#` (or a bare `#`) stripped, joined with
+the first `# ---` and the next, with `# ` (or a bare `#`) stripped, joined with
 `\n` plus a trailing `\n` — the frontmatter inner text, ready for a version
 reader. It yields nothing when there is no block, no closing `# ---`, or a
 non-comment line inside the block.
+
+The prefix removal consumes exactly one separator space after `#`, when
+present. Further spaces are significant: `#  nested: value` becomes
+` nested: value`, while `#` becomes an empty line. This preserves indentation
+in nested frontmatter rather than normalizing it.
 
 Agent lock entries use `type = "agent"` and
 `source.path = "agents/<name>.md"`. `source_checksum` hashes the reconciled

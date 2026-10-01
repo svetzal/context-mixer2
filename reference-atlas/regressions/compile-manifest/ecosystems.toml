@@ -1,0 +1,13 @@
+# The fixture atlas's sensors, one per ecosystem directory below intents/.
+# `validate` runs against this file in the golden test; nothing here reaches
+# the manifest.
+
+[python]
+signatures = [
+  { file = "pyproject.toml" },
+  { file = "setup.py" },
+  { glob = "requirements*.txt" },
+]
+
+[rust]
+signatures = [{ file = "Cargo.toml" }]

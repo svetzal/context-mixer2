@@ -10,6 +10,10 @@ project code: given the same workspace, manifest, atlas, and
 
 Run it from the project root, or pass `--root <project>`.
 
+The repository's [reference atlas](../../../reference-atlas/README.md)
+contains representative records, sensors, validators, and source cases for
+testing this workflow. Production atlases are maintained separately.
+
 ## Commands
 
 ```text
@@ -327,7 +331,7 @@ and no temporary path, so it is byte-stable across runs.
   `unguided`; `reason` is present for the last two. `language` and
   `description` are `null` when no validator ran; `id` is `null` for a dropped
   intent whose record is no longer in the atlas. `language` and
-  `description` join several validators' values with `, ` and ` / `
+  `description` join several validators' values with `,` and ` / `
   respectively, and `signals` is then an object keyed by language.
 - `summary.adherence_rate` is `pass / (pass + fail)` rounded to four decimals,
   or `null` when nothing was applicable. `summary.exit_code` is the code cmv

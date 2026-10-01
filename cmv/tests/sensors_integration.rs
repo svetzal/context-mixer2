@@ -20,7 +20,7 @@ use tempfile::TempDir;
 const NO_SENSORS: &str = "atlas declares no sensors; set ecosystems in cmv.toml to override";
 
 fn fixtures() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../reference-atlas/regressions/verifier")
 }
 
 fn copy_tree(from: &Path, to: &Path) {
