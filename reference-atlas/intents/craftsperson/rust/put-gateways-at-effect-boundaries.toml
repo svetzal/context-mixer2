@@ -1,0 +1,16 @@
+id = "context-mixer.intent.put-gateways-at-effect-boundaries"
+title = "Put gateways at effect boundaries"
+category = "architecture"
+tags = ["rust", "testing"]
+status = "confirmed"
+capability = "Core logic runs against in-memory fakes."
+threat = "Vendor clients leak into business rules and tests need the network."
+expectation = "The reference shell compiles without std and accepts the project-owned Gateway."
+strategy = "Wrap filesystem, git, clock, and network access behind gateway traits injected at the boundary."
+tradeoff = "One more type per effect."
+relations = [
+  { type = "related-to", target = "craftsperson/rust/isolate-functional-core" },
+]
+evidence = [
+  { type = "static-check", language = "rust", run = "checks/rust/put_gateways_at_effect_boundaries.sh", description = "The reference shell load function accepts Gateway and compiles without direct std access.", required = true },
+]

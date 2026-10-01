@@ -24,13 +24,14 @@ The project rests on two pillars of equal weight:
 - Provide a tool-neutral canonical home for hand-authored private artifacts, with a full reconciliation lifecycle: a system-wide survey (`doctor`) that diagnoses a disorganized installation, adoption of orphaned artifacts, promotion of in-place edits back to the canonical copy, and synchronization of copies that have diverged across platforms — so a curated set survives both day-to-day assistant edits and migrating between coding assistants
 - Support explainable, context-budgeted materialization of structured intents into agent and skill delivery surfaces
 - Verify, from source alone, that a repository holds the intents its guidance was compiled from
+- Define and evolve the atlas contract with a small owned reference corpus and conformance tests
 - Offer LLM-powered diff analysis for understanding changes between installed and source versions
 
 ## Non-Goals
 
 - Deriving guidance from a repository's existing structure or code (that is what hone does). cmf compiles explicitly authored intent records; it does not infer policy from a codebase
 - Running a live guidance-selection harness. cmf may produce data and artifacts for dynamic harnesses, but session-time sensing, injection, leasing, and retraction belong to the harness
-- Authoring, validating, or maintaining the intent atlas, including the sensors and validators that live beside its records. A separate tool owns those TOML documents and scripts; cmf and cmv consume them read-only
+- Operating or maintaining external production intent atlases. Their records, profiles, sensors and validators have separate owners. cmf and cmv consume every atlas read-only
 - Judging adherence with a model. cmv parses; it never asks
 - Publishing plugins, marketplaces, or platform manifests. cmf installs assembled artifacts directly through cmx-core
 - Hosting a centralized registry or marketplace service

@@ -42,6 +42,7 @@ installs all three binaries (cmv from release 3.2.0). From a checkout,
   with the TypeScript port in `cmx-core-ts/`
 - `intent-atlas/` — the shared reader of an intent atlas that cmf and cmv use
 - `book/` — the mdBook source for the documentation site
+- `reference-atlas/` — the owned contract corpus, source cases and golden regressions
 - `benchmark/` — assembly benchmarks and behavioural exercises for cmf and cmv
 
 `CHARTER.md` states the project's purpose and non-goals; `AGENTS.md` holds the

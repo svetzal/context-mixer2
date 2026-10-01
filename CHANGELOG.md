@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A project-owned reference atlas for developing the cmf/cmv contract without an
+  external guidelines checkout. It includes source-sensitive Rust and Python
+  validators, compliant and violating source cases, and the existing golden
+  protocol fixtures.
+- An end-to-end CLI test for Codex installation and verification. It proves
+  preview performs no writes, source violations fail, corrections pass, invalid
+  source is unchecked, and verification retains a pinned atlas after HEAD moves.
+  CI runs the same loop.
+
+### Fixed
+
+- Codex preview tests now inspect the isolated project and home paths. The
+  frontmatter contract preserves the separator spaces used in Codex TOML.
+
 ## [3.3.1] - 2026-09-27
 
 ### Fixed
@@ -418,7 +434,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `LockEntry::new()` and `LockSource::new()` canonical constructors in `cmx-core/src/types.rs`; both `build_lock_entry` call sites updated.
   - Added `installed_is_newer(installed, source) -> bool` to `cmx-core/src/artifact_status.rs` (semver comparison, returns `false` for non-semver or absent versions).
   - Extracted `remove_artifact_across_platforms` shared primitive in `cmx-core/src/artifact_remove.rs`; `cmx/src/uninstall.rs::uninstall_one` and `cmx-core/src/skill_install/remove.rs::SkillInstaller::remove` both delegate to it.
-
 
 ## [3.1.3] - 2026-07-06
 

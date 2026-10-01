@@ -1,0 +1,17 @@
+id = "rust-shipping"
+name = "AGENTS"
+version = "0.3.0"
+description = "Use when shipping Rust code that must stay testable."
+surface = "agent"
+budget_tokens = 400
+
+[select]
+ecosystems = ["rust"]
+keys = [
+  "craftsperson/rust/put-gateways-at-effect-boundaries",
+  "craftsperson/rust/isolate-functional-core",
+  "craftsperson/rust/compile-public-documentation",
+]
+
+[content]
+include = ["guidance", "evidence"]

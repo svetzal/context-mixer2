@@ -23,7 +23,7 @@ use std::process::{Command, Output};
 use tempfile::TempDir;
 
 fn fixtures() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../reference-atlas/regressions/verifier")
 }
 
 /// Copy the fixture workspace (including its dot-directory) into a temp dir.

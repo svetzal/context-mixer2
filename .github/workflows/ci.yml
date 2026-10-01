@@ -44,6 +44,11 @@ jobs:
       - name: Tests (all features)
         run: cargo test --all-features
 
+      - name: Real-binary reference atlas adoption loop
+        run: |
+          cargo build -p cmf -p cmv
+          cargo test -p cmv --test project_adoption
+
       - name: Docs (workspace, all features)
         # cmx-core denies missing_docs (see cmx-core/Cargo.toml); cmx/cmf still
         # warn on missing per-item docs, so this step doesn't use -D warnings
@@ -63,3 +68,9 @@ jobs:
 
       - name: Cargo deny
         run: cargo deny check
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --locked
+
+      - name: Coverage (at least 80%)
+        run: cargo tarpaulin --fail-under 80

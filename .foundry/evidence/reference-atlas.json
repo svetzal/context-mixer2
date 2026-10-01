@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "change": "project-owned reference atlas and real-binary cmf-to-cmv adoption contract",
+  "worktree_base": "357bd8b07ab257021f1baec00fc5fa37aa8057b5",
+  "atlas": {
+    "path": "reference-atlas",
+    "profile": "rust-shipping",
+    "ecosystems": [
+      "rust",
+      "python"
+    ],
+    "selected_intents": [
+      "craftsperson/rust/isolate-functional-core",
+      "craftsperson/rust/put-gateways-at-effect-boundaries",
+      "craftsperson/rust/compile-public-documentation"
+    ],
+    "executable_validators": [
+      "checks/rust/isolate_functional_core.sh",
+      "checks/rust/put_gateways_at_effect_boundaries.sh",
+      "checks/python/type_public_boundaries.py"
+    ],
+    "source_cases": [
+      "cases/compliant",
+      "cases/violation",
+      "cases/gateway-violation",
+      "cases/python-compliant",
+      "cases/python-violation"
+    ],
+    "golden_and_compatibility_fixtures": "reference-atlas/regressions/compile-manifest and reference-atlas/regressions/verifier"
+  },
+  "covered_cases": [
+    "Codex preview writes neither project/home artifact nor manifest and preserves hand-authored AGENTS.md",
+    "apply installs Codex TOML, lock, and manifest with selected keys and git pin",
+    "compliant source exits 0 with required pass verdicts",
+    "required violation exits 1; correction exits 0",
+    "strict unchecked evidence exits 1",
+    "moved atlas HEAD retains pinned passing verdict",
+    "direct filesystem access in the shell fails while the pure core passes",
+    "invalid Rust source is unchecked, and strict verification fails",
+    "Python annotations pass, missing annotations fail, and repeated output is byte-identical"
+  ],
+  "reproduce": [
+    "cargo build -p cmf -p cmv",
+    "cargo test -p cmf --test manifest_golden --test codex_platform",
+    "cargo test -p cmv --test project_adoption --test check_golden"
+  ],
+  "checks": {
+    "fmt": {
+      "exit_code": 0,
+      "command": "cargo fmt --check"
+    },
+    "clippy_default": {
+      "exit_code": 0,
+      "command": "cargo clippy --all-targets -- -D warnings"
+    },
+    "test_default": {
+      "exit_code": 0,
+      "command": "cargo test"
+    },
+    "clippy_all_features": {
+      "exit_code": 0,
+      "command": "cargo clippy --all-targets --all-features -- -D warnings"
+    },
+    "test_all_features": {
+      "exit_code": 0,
+      "command": "cargo test --all-features"
+    },
+    "rustdoc": {
+      "exit_code": 0,
+      "command": "cargo doc --no-deps --workspace",
+      "environment": {
+        "RUSTDOCFLAGS": "-D warnings"
+      }
+    },
+    "deny": {
+      "exit_code": 0,
+      "command": "cargo deny check"
+    },
+    "coverage": {
+      "exit_code": 0,
+      "command": "cargo tarpaulin --fail-under 80",
+      "covered_percent": 94.75
+    },
+    "typescript": {
+      "typecheck": {
+        "exit_code": 0,
+        "command": "bun run typecheck"
+      },
+      "lint": {
+        "exit_code": 0,
+        "command": "bun run lint"
+      },
+      "test": {
+        "exit_code": 0,
+        "command": "bun test",
+        "tests_passed": 96
+      }
+    }
+  },
+  "ci": {
+    "workflow": ".github/workflows/ci.yml",
+    "job": "quality-gate",
+    "adoption_step": "Real-binary reference atlas adoption loop",
+    "coverage_step": "Coverage (at least 80%)",
+    "workflow_url": "https://github.com/svetzal/context-mixer2/actions/workflows/ci.yml",
+    "completion_requirement": "CI must succeed for the delivered commit; the run is recorded in the campaign completion event."
+  }
+}

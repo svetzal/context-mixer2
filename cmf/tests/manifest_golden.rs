@@ -1,6 +1,6 @@
 //! Golden test: the compile manifest, byte for byte.
 //!
-//! The fixture atlas under `tests/fixtures/manifest-kb/` is loaded
+//! The fixture atlas under `reference-atlas/regressions/compile-manifest/` is loaded
 //! into the in-memory gateways at a fixed root, with a fake git checkout, a
 //! fake clock, and a cmx sources registry naming the root — so the serialized
 //! manifest is fully deterministic and pinned by `expected-manifest.json`.
@@ -27,7 +27,7 @@ const KB_ROOT: &str = "/kb";
 const HEAD_COMMIT: &str = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678";
 
 fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/manifest-kb")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../reference-atlas/regressions/compile-manifest")
 }
 
 /// Mirror every fixture file into `fs` below `KB_ROOT`, preserving bytes.

@@ -56,8 +56,10 @@ of the same shape. Everything below that says *atlas* means this.
 | **cmf** (composes) | Selection and rendering | Intent atlas, profile | Guidance artifact, **manifest** |
 | **cmv** (verifies) | Dispatch, aggregation, exit code | Manifest, project config, workspace | Nothing |
 
-The intent atlas stays outside cmx/cmf/cmv, as the charter already requires.
-cmf's output grows from one artifact to two. cmv is read-only.
+Production intent atlases stay outside cmx/cmf/cmv. This repository owns a
+small `reference-atlas/` with source cases that exercise the contract between
+the two binaries; neither binary edits an atlas. cmf's output grows from one
+artifact to two. cmv is read-only.
 
 ## Design decisions (locked)
 
