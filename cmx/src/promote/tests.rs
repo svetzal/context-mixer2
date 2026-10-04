@@ -55,7 +55,7 @@ fn promote_copies_installed_into_home_and_refreshes_lock() {
 
     assert!(!r.already_current);
     assert_eq!(r.retracked, vec![Platform::Claude]);
-    assert!(r.still_divergent.is_empty());
+    assert!(r.still_divergent.is_empty(), "{:?}", r.still_divergent);
 
     // The home now holds the edited content.
     let home_md = home_skill_md(&t, "pf");
@@ -85,7 +85,7 @@ fn promote_is_a_noop_when_home_already_matches() {
     // A second promote finds the home already current.
     let r = promote("pf", ArtifactKind::Skill, None, RunMode::Plan, &t.ctx()).unwrap();
     assert!(r.already_current, "home already matches installed");
-    assert!(r.retracked.is_empty());
+    assert!(r.retracked.is_empty(), "{:?}", r.retracked);
 }
 
 #[test]

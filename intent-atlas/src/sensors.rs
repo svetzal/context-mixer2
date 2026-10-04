@@ -407,7 +407,7 @@ signatures = [
         let sensors = Sensors::parse(PYTHON_AND_UV).unwrap();
         assert_eq!(sensors.len(), 2);
         let python = sensors.get("python").unwrap();
-        assert!(python.implies.is_empty());
+        assert!(python.implies.is_empty(), "{:?}", python.implies);
         assert_eq!(
             python.signatures,
             vec![
@@ -539,7 +539,11 @@ signatures = [
         let raw = "[rust]\nsignatures = [{ file = \"Cargo.toml\" }]\n[swift]\nsignatures = [{ file = \"App.xcodeproj\" }]\n";
         assert_eq!(detect_in(raw, &project(&[("Cargo.toml", "")], &[])), ["rust"]);
         assert_eq!(detect_in(raw, &project(&[], &["App.xcodeproj"])), ["swift"]);
-        assert!(detect_in(raw, &project(&[("README.md", "")], &[])).is_empty());
+        assert!(
+            detect_in(raw, &project(&[("README.md", "")], &[])).is_empty(),
+            "{:?}",
+            detect_in(raw, &project(&[("README.md", "")], &[]))
+        );
     }
 
     #[test]
@@ -555,7 +559,11 @@ signatures = [
             detect_in(raw, &project(&[("mix.exs", "deps: [{:phoenix, \"~> 1.7\"}]")], &[])),
             ["phoenix"]
         );
-        assert!(detect_in(raw, &project(&[("mix.exs", "deps: []")], &[])).is_empty());
+        assert!(
+            detect_in(raw, &project(&[("mix.exs", "deps: []")], &[])).is_empty(),
+            "{:?}",
+            detect_in(raw, &project(&[("mix.exs", "deps: []")], &[]))
+        );
         assert!(detect_in(raw, &project(&[], &[])).is_empty(), "the file is absent");
         assert!(
             detect_in(raw, &project(&[], &["mix.exs"])).is_empty(),
@@ -571,8 +579,16 @@ signatures = [
         let raw = "[csharp]\nsignatures = [{ glob = \"*.sln\" }, { glob = \"*.csproj\" }]\n";
         assert_eq!(detect_in(raw, &project(&[("App.sln", "")], &[])), ["csharp"]);
         assert_eq!(detect_in(raw, &project(&[], &["App.csproj"])), ["csharp"]);
-        assert!(detect_in(raw, &project(&[("src/App.csproj", "")], &[])).is_empty());
-        assert!(detect_in(raw, &project(&[("App.sln.bak", "")], &[])).is_empty());
+        assert!(
+            detect_in(raw, &project(&[("src/App.csproj", "")], &[])).is_empty(),
+            "{:?}",
+            detect_in(raw, &project(&[("src/App.csproj", "")], &[]))
+        );
+        assert!(
+            detect_in(raw, &project(&[("App.sln.bak", "")], &[])).is_empty(),
+            "{:?}",
+            detect_in(raw, &project(&[("App.sln.bak", "")], &[]))
+        );
     }
 
     #[test]
@@ -585,9 +601,17 @@ signatures = [
 
     #[test]
     fn nothing_is_detected_in_an_empty_or_missing_root() {
-        assert!(detect_in(PYTHON_AND_UV, &project(&[], &[])).is_empty());
+        assert!(
+            detect_in(PYTHON_AND_UV, &project(&[], &[])).is_empty(),
+            "{:?}",
+            detect_in(PYTHON_AND_UV, &project(&[], &[]))
+        );
         let sensors = Sensors::parse(PYTHON_AND_UV).unwrap();
-        assert!(detect(&sensors, Path::new("/nowhere"), &FakeFilesystem::new()).is_empty());
+        assert!(
+            detect(&sensors, Path::new("/nowhere"), &FakeFilesystem::new()).is_empty(),
+            "{:?}",
+            detect(&sensors, Path::new("/nowhere"), &FakeFilesystem::new())
+        );
     }
 
     #[test]
@@ -628,8 +652,12 @@ signatures = [
         let declared = ["rust".to_string(), "python".to_string(), "uv".to_string()];
         let detected = ["python".to_string()];
         assert_eq!(undetected(&declared, &detected), ["rust", "uv"]);
-        assert!(undetected(&declared, &declared).is_empty());
-        assert!(undetected(&[], &detected).is_empty());
+        assert!(
+            undetected(&declared, &declared).is_empty(),
+            "{:?}",
+            undetected(&declared, &declared)
+        );
+        assert!(undetected(&[], &detected).is_empty(), "{:?}", undetected(&[], &detected));
     }
 
     // ---- validate -------------------------------------------------------

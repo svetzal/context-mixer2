@@ -58,7 +58,7 @@ mod tests {
         let fs = FakeFilesystem::new();
         fs.add_dir("/repo");
         let result = collect_files_recursive(Path::new("/repo"), &fs).unwrap();
-        assert!(result.is_empty());
+        assert!(result.is_empty(), "{result:?}");
     }
 
     #[test]

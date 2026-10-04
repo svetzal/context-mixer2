@@ -191,7 +191,7 @@ mod tests {
         fs.add_file("/repo/.claude-plugin/marketplace.json", r#"{"name":"test","plugins":[]}"#);
         let (artifacts, warnings) = run(&fs, "/repo", "/repo/.claude-plugin/marketplace.json");
         assert!(artifacts.is_empty());
-        assert!(warnings.is_empty());
+        assert!(warnings.is_empty(), "{warnings:?}");
     }
 
     #[test]
@@ -200,7 +200,7 @@ mod tests {
         fs.add_file("/repo/.claude-plugin/marketplace.json", r#"{"name":"test"}"#);
         let (artifacts, warnings) = run(&fs, "/repo", "/repo/.claude-plugin/marketplace.json");
         assert!(artifacts.is_empty());
-        assert!(warnings.is_empty());
+        assert!(warnings.is_empty(), "{warnings:?}");
     }
 
     #[test]
@@ -217,7 +217,7 @@ mod tests {
         let (artifacts, warnings) = run(&fs, "/repo", "/repo/.claude-plugin/marketplace.json");
         assert_eq!(artifacts.len(), 1);
         assert_eq!(artifacts[0].name, "reviewer");
-        assert!(warnings.is_empty());
+        assert!(warnings.is_empty(), "{warnings:?}");
     }
 
     #[test]
@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(artifacts.len(), 1);
         assert_eq!(artifacts[0].name, "my-agent");
         assert_eq!(artifacts[0].kind, ArtifactKind::Agent);
-        assert!(warnings.is_empty());
+        assert!(warnings.is_empty(), "{warnings:?}");
     }
 
     #[test]
@@ -288,7 +288,7 @@ mod tests {
         assert_eq!(artifacts.len(), 1);
         assert_eq!(artifacts[0].name, "my-skill");
         assert_eq!(artifacts[0].kind, ArtifactKind::Skill);
-        assert!(warnings.is_empty());
+        assert!(warnings.is_empty(), "{warnings:?}");
     }
 
     #[test]
@@ -356,7 +356,7 @@ mod tests {
         fs.add_file("/repo/skills/my-skill/SKILL.md", skill_content("A skill"));
         let (artifacts, warnings) = run(&fs, "/repo", "/repo/.claude-plugin/marketplace.json");
         assert_eq!(artifacts.len(), 2);
-        assert!(warnings.is_empty());
+        assert!(warnings.is_empty(), "{warnings:?}");
         let kinds: Vec<_> = artifacts.iter().map(|a| a.kind).collect();
         assert!(kinds.contains(&ArtifactKind::Agent));
         assert!(kinds.contains(&ArtifactKind::Skill));
@@ -397,7 +397,7 @@ mod tests {
             panic!("expected Found");
         };
         assert_eq!(artifacts.len(), 2);
-        assert!(warnings.is_empty());
+        assert!(warnings.is_empty(), "{warnings:?}");
     }
 
     #[test]

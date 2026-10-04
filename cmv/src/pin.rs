@@ -492,7 +492,7 @@ mod tests {
         assert_eq!(checkout.head_revision.as_deref(), Some(HEAD));
         assert_eq!(checkout.pinned_revision.as_deref(), Some(PIN));
         assert!(checkout.moved(), "moved is still reported");
-        assert!(runner.calls().is_empty());
+        assert!(runner.calls().is_empty(), "{:?}", runner.calls());
     }
 
     #[test]
@@ -518,7 +518,7 @@ mod tests {
         assert_eq!(checkout.head_revision, None);
         assert_eq!(checkout.pinned_revision.as_deref(), Some(PIN));
         assert!(!checkout.moved(), "an unknown HEAD cannot have moved");
-        assert!(runner.calls().is_empty());
+        assert!(runner.calls().is_empty(), "{:?}", runner.calls());
     }
 
     #[test]

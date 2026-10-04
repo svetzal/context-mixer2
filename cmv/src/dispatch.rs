@@ -919,7 +919,7 @@ evidence = [
         assert_eq!(outcome.description, None);
         assert!(!outcome.required);
         assert!(!outcome.stale);
-        assert!(runner.calls().is_empty());
+        assert!(runner.calls().is_empty(), "{:?}", runner.calls());
     }
 
     #[test]

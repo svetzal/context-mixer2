@@ -347,7 +347,7 @@ mod tests {
         .unwrap();
 
         assert!(d.changes.is_empty(), "no changes for identical dirs");
-        assert!(d.unified.is_empty());
+        assert!(d.unified.is_empty(), "{:?}", d.unified);
     }
 
     #[test]

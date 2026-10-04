@@ -267,7 +267,7 @@ fn unreachable_pinned_revision_exits_two_with_the_fetch_remedy() {
     scenario.write_manifest(bogus);
     let output = scenario.cmv(&["check"]);
     assert_eq!(output.status.code(), Some(2));
-    assert!(output.stdout.is_empty());
+    assert_eq!(output.stdout, [] as [u8; 0]);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains(bogus), "{stderr}");
     assert!(stderr.contains("run `git fetch` there"), "{stderr}");

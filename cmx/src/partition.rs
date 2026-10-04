@@ -37,7 +37,7 @@ mod tests {
         let (kept, excluded): (Vec<String>, Vec<String>) =
             partition_by(&names, |name| Ok(Partitioned::Kept(name.to_string()))).unwrap();
         assert_eq!(kept, vec!["a".to_string(), "b".to_string()]);
-        assert!(excluded.is_empty());
+        assert!(excluded.is_empty(), "{excluded:?}");
     }
 
     #[test]

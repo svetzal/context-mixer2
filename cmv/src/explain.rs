@@ -531,7 +531,7 @@ evidence = [
             )
         );
         assert_eq!(report.intent.title, None);
-        assert!(report.intent.validators.is_empty());
+        assert!(report.intent.validators.is_empty(), "{:?}", report.intent.validators);
     }
 
     #[test]
@@ -550,7 +550,7 @@ evidence = [
         assert_eq!(report.intent.resolution, RecordResolution::NotFound);
         assert_eq!(report.intent.resolution_detail, None);
         assert_eq!(report.intent.title, None);
-        assert!(report.intent.validators.is_empty());
+        assert!(report.intent.validators.is_empty(), "{:?}", report.intent.validators);
         assert!(!report.intent.stale, "nothing to compare");
         assert_eq!(report.intent.config, json!({}));
     }
@@ -617,7 +617,7 @@ evidence = [
         let report = fixture.explain("rust/budgeted", &["rust"]).unwrap();
         assert_eq!(report.intent.resolution, RecordResolution::NotFound);
         assert_eq!(report.intent.id, None);
-        assert!(report.intent.validators.is_empty());
+        assert!(report.intent.validators.is_empty(), "{:?}", report.intent.validators);
     }
 
     #[test]

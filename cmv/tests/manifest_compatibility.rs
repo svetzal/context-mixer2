@@ -60,7 +60,7 @@ fn unsupported_schema_refuses_all_commands_before_atlas_resolution() {
         assert!(stderr.contains("unsupported manifest schema 3"), "{stderr}");
         assert!(stderr.contains(manifest.to_str().unwrap()));
         assert!(!stderr.contains("atlas at"), "{stderr}");
-        assert!(output.stdout.is_empty());
+        assert_eq!(output.stdout, [] as [u8; 0]);
     }
 }
 

@@ -199,7 +199,7 @@ mod tests {
 
         let result = show(&ctx).unwrap();
         assert_eq!(result.gateway, "openai");
-        assert!(!result.model.is_empty());
+        assert!(!result.model.is_empty(), "expected non-empty: result.model");
     }
 
     #[test]
@@ -246,7 +246,11 @@ mod tests {
         let ctx = t.ctx();
 
         // Empty to start.
-        assert!(external_list(&ctx).unwrap().external.is_empty());
+        assert!(
+            external_list(&ctx).unwrap().external.is_empty(),
+            "{:?}",
+            external_list(&ctx).unwrap().external
+        );
 
         // Add two rules.
         let added = external_add("~/.hermes/skills", &ctx).unwrap();

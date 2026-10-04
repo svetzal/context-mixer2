@@ -206,7 +206,7 @@ mod tests {
         assert_eq!(mp.name, "");
         assert!(mp.owner.is_none());
         assert!(mp.metadata.is_none());
-        assert!(mp.plugins.is_empty());
+        assert!(mp.plugins.is_empty(), "{:?}", mp.plugins);
     }
 
     #[test]
