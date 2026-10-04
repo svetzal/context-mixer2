@@ -231,7 +231,7 @@ mod tests {
                         local,
                     },
             } => {
-                assert!(names.is_empty());
+                assert!(names.is_empty(), "{names:?}");
                 assert!(all);
                 assert_eq!(from_dir, Some(PathBuf::from("/tmp/skills")));
                 assert!(deprecated_from.is_none());

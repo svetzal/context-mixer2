@@ -371,7 +371,7 @@ mod tests {
         );
         let selected = select(&profile, &intents).unwrap();
         assert_eq!(keys(&selected), ["testing"]);
-        assert!(selected.traversed.is_empty());
+        assert!(selected.traversed.is_empty(), "{:?}", selected.traversed);
     }
 
     #[test]
@@ -600,7 +600,7 @@ mod tests {
         let selected = select(&profile, &intents).unwrap();
 
         assert_eq!(keys(&selected), ["craftsperson/test-observable-behavior"]);
-        assert!(selected.traversed.is_empty());
+        assert!(selected.traversed.is_empty(), "{:?}", selected.traversed);
         assert_eq!(selected.specialized_downward, 0);
     }
 
@@ -612,7 +612,7 @@ mod tests {
         let selected = select(&profile, &intents).unwrap();
 
         assert_eq!(keys(&selected), ["craftsperson/test-observable-behavior"]);
-        assert!(selected.traversed.is_empty());
+        assert!(selected.traversed.is_empty(), "{:?}", selected.traversed);
         assert_eq!(selected.specialized_downward, 0);
     }
 
@@ -671,7 +671,7 @@ mod tests {
         let selected = select(&profile, &intents).unwrap();
 
         assert_eq!(keys(&selected), ["craftsperson/python/run-pytest"]);
-        assert!(selected.traversed.is_empty());
+        assert!(selected.traversed.is_empty(), "{:?}", selected.traversed);
         assert_eq!(selected.specialized_downward, 0);
     }
 

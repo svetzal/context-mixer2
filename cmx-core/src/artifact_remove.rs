@@ -216,7 +216,7 @@ mod tests {
         .unwrap();
         assert!(!r.was_on_disk);
         assert!(!r.was_tracked);
-        assert!(r.platforms_cleared.is_empty());
+        assert!(r.platforms_cleared.is_empty(), "{:?}", r.platforms_cleared);
     }
 
     #[test]

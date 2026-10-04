@@ -60,10 +60,9 @@ pub struct FrontmatterSpans<'a> {
 pub fn split_frontmatter_spans(content: &str) -> Option<FrontmatterSpans<'_>> {
     let (open, after_open) = if let Some(rest) = content.strip_prefix("---\n") {
         ("---\n", rest)
-    } else if let Some(rest) = content.strip_prefix("---\r\n") {
-        ("---\r\n", rest)
     } else {
-        return None;
+        let rest = content.strip_prefix("---\r\n")?;
+        ("---\r\n", rest)
     };
 
     // Scan line-by-line for a closing fence: a line that is exactly `---`

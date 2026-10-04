@@ -171,7 +171,7 @@ mod tests {
         let paths = test_paths();
         let names =
             installed_names(ArtifactKind::Agent, InstallScope::Global, &fs, &paths).unwrap();
-        assert!(names.is_empty());
+        assert!(names.is_empty(), "{names:?}");
     }
 
     #[test]

@@ -115,7 +115,7 @@ fn populated_fixture() -> Fixture {
     let checksums = compute_fixture_checksums(&paths);
     write_populated_config(&paths, &checksums);
 
-    assert!(!checksums.agent_source.is_empty());
+    assert_ne!(checksums.agent_source, "");
 
     Fixture {
         temp,

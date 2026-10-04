@@ -158,6 +158,6 @@ mod tests {
     fn render_hunks_empty_for_no_changes() {
         let v = vec!["a", "b"];
         let ops = lcs_ops(&v, &v);
-        assert!(render_hunks(&ops, 3).is_empty());
+        assert!(render_hunks(&ops, 3).is_empty(), "{:?}", render_hunks(&ops, 3));
     }
 }

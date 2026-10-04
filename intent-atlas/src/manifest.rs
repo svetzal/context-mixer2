@@ -501,7 +501,7 @@ mod tests {
             checksum::checksum_bytes(b"rendered guidance\n"),
             "artifact checksum is cmx-core's checksum of the rendered content"
         );
-        assert!(manifest.dropped.is_empty());
+        assert!(manifest.dropped.is_empty(), "{:?}", manifest.dropped);
     }
 
     #[test]

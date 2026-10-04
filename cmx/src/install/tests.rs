@@ -408,8 +408,11 @@ fn install_records_checksums_in_lock() {
 
     let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
     let entry = lock.packages.get("my-agent").expect("lock entry must exist");
-    assert!(!entry.source_checksum.is_empty());
-    assert!(!entry.installed_checksum.is_empty());
+    assert!(!entry.source_checksum.is_empty(), "expected non-empty: entry.source_checksum");
+    assert!(
+        !entry.installed_checksum.is_empty(),
+        "expected non-empty: entry.installed_checksum"
+    );
     assert!(entry.source_checksum.starts_with("sha256:"));
     assert!(entry.installed_checksum.starts_with("sha256:"));
 }
@@ -1215,7 +1218,7 @@ fn install_many_fans_out_to_every_target_platform() {
     assert_eq!(result.installed.len(), 2);
     let platforms: Vec<Platform> = result.installed.iter().map(|r| r.platform).collect();
     assert!(platforms.contains(&Platform::Claude) && platforms.contains(&Platform::Codex));
-    assert!(result.failed.is_empty());
+    assert!(result.failed.is_empty(), "{:?}", result.failed);
 
     // Both platforms' lock files now track it.
     for p in [Platform::Claude, Platform::Codex] {

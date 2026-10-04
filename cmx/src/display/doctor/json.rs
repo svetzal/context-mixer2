@@ -231,7 +231,11 @@ mod tests {
         }
         assert_eq!(summary["diverged"], 1);
         assert_eq!(summary["set_inconsistent"], 0);
-        assert!(value["set_inconsistencies"].as_array().expect("array").is_empty());
+        assert!(
+            value["set_inconsistencies"].as_array().expect("array").is_empty(),
+            "{:?}",
+            value["set_inconsistencies"].as_array().expect("array")
+        );
 
         let artifacts = value["artifacts"].as_array().expect("artifacts array");
         assert_eq!(artifacts.len(), 1);

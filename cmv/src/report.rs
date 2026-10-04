@@ -702,7 +702,7 @@ FAIL       rust/optional  (optional)
     #[test]
     fn profile_mismatch_is_empty_when_detection_agrees_or_cannot_run() {
         let report = mismatch_report(&["rust"], rust());
-        assert!(report.profile_mismatch.is_empty());
+        assert!(report.profile_mismatch.is_empty(), "{:?}", report.profile_mismatch);
         assert!(!report.to_string().contains("manifest profile targets"), "{report}");
 
         let report = mismatch_report(&[], Ecosystems::Detected(vec![]));

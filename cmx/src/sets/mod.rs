@@ -319,7 +319,7 @@ mod tests {
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
         let def = sets.sets.get("blog").unwrap();
         assert_eq!(def.state, SetState::Inactive);
-        assert!(def.members.is_empty());
+        assert!(def.members.is_empty(), "{:?}", def.members);
         assert_eq!(def.description.as_deref(), Some("blog work"));
     }
 
@@ -556,7 +556,7 @@ mod tests {
             add("rust-work", &["rust-craftsperson".to_string()], InstallScope::Global, &ctx)
                 .unwrap();
         assert_eq!(result.added, vec!["rust-craftsperson".to_string()]);
-        assert!(result.already.is_empty());
+        assert!(result.already.is_empty(), "{:?}", result.already);
 
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
         let def = sets.sets.get("rust-work").unwrap();
@@ -596,7 +596,11 @@ mod tests {
         assert!(result.is_err());
 
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
-        assert!(sets.sets.get("rust-work").unwrap().members.is_empty());
+        assert!(
+            sets.sets.get("rust-work").unwrap().members.is_empty(),
+            "{:?}",
+            sets.sets.get("rust-work").unwrap().members
+        );
     }
 
     #[test]
@@ -613,7 +617,7 @@ mod tests {
         create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         add("rust-work", &["known".to_string()], InstallScope::Global, &ctx).unwrap();
         let result = add("rust-work", &["known".to_string()], InstallScope::Global, &ctx).unwrap();
-        assert!(result.added.is_empty());
+        assert!(result.added.is_empty(), "{:?}", result.added);
         assert_eq!(result.already, vec!["known".to_string()]);
 
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
@@ -685,10 +689,14 @@ mod tests {
         let result =
             remove("rust-work", &["known".to_string()], InstallScope::Global, &ctx).unwrap();
         assert_eq!(result.removed, vec!["known".to_string()]);
-        assert!(result.not_found.is_empty());
+        assert!(result.not_found.is_empty(), "{:?}", result.not_found);
 
         let sets = config::load_sets(InstallScope::Global, &t.fs, &t.paths).unwrap();
-        assert!(sets.sets.get("rust-work").unwrap().members.is_empty());
+        assert!(
+            sets.sets.get("rust-work").unwrap().members.is_empty(),
+            "{:?}",
+            sets.sets.get("rust-work").unwrap().members
+        );
         // Still tracked in the lockfile — remove does not uninstall.
         let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
         assert!(lock.packages.contains_key("known"));
@@ -701,7 +709,7 @@ mod tests {
         create("rust-work", None, None, InstallScope::Global, &ctx).unwrap();
         let result =
             remove("rust-work", &["ghost".to_string()], InstallScope::Global, &ctx).unwrap();
-        assert!(result.removed.is_empty());
+        assert!(result.removed.is_empty(), "{:?}", result.removed);
         assert_eq!(result.not_found, vec!["ghost".to_string()]);
     }
 

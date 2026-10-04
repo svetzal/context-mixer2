@@ -289,8 +289,8 @@ mod tests {
         let verdict = parse(r#"{"applicable": true, "followed": true}"#).unwrap();
         assert_eq!(verdict.state(), State::Pass);
         assert_eq!(verdict.signals, json!({}));
-        assert!(verdict.evidence.is_empty());
-        assert!(verdict.locations.is_empty());
+        assert!(verdict.evidence.is_empty(), "{:?}", verdict.evidence);
+        assert!(verdict.locations.is_empty(), "{:?}", verdict.locations);
     }
 
     #[test]

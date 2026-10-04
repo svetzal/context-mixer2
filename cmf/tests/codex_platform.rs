@@ -87,7 +87,7 @@ impl Project {
             checksum::checksum_artifact(installed, kind, &cmx_core::gateway::real::RealFilesystem)
                 .unwrap()
         );
-        assert!(!entry.source_checksum.is_empty());
+        assert_ne!(entry.source_checksum, "");
         assert!(self.root.join(".context-mixer/cmf-manifest.json").exists());
         assert!(!self.root.join(".context-mixer/cmx-lock.json").exists());
         assert_eq!(fs::read(self.root.join("AGENTS.md")).unwrap(), HAND_AUTHORED);

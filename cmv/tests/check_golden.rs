@@ -200,7 +200,7 @@ fn explain_json_matches_the_record_id_form_and_exits_two_when_unknown() {
 
     let output = cmv(&["explain", "craftsperson/rust/not-compiled"], workspace.path());
     assert_eq!(output.status.code(), Some(2));
-    assert!(output.stdout.is_empty());
+    assert_eq!(output.stdout, [] as [u8; 0]);
     assert!(String::from_utf8_lossy(&output.stderr).contains("not in the manifest"));
 }
 
@@ -212,7 +212,7 @@ fn missing_manifest_exits_two_with_the_cmf_remedy() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("no compile manifest at"), "{stderr}");
     assert!(stderr.contains("cmf install --local --apply"), "{stderr}");
-    assert!(output.stdout.is_empty());
+    assert_eq!(output.stdout, [] as [u8; 0]);
 }
 
 #[test]

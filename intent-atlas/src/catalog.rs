@@ -376,7 +376,11 @@ tradeoff = "One more type per effect."
 
     #[test]
     fn general_record_has_no_ecosystem_qualifiers() {
-        assert!(ecosystem_qualifiers("craftsperson/isolate-functional-core").is_empty());
+        assert!(
+            ecosystem_qualifiers("craftsperson/isolate-functional-core").is_empty(),
+            "{:?}",
+            ecosystem_qualifiers("craftsperson/isolate-functional-core")
+        );
     }
 
     #[test]
@@ -390,8 +394,12 @@ tradeoff = "One more type per effect."
 
     #[test]
     fn bare_single_segment_key_has_no_qualifiers() {
-        assert!(ecosystem_qualifiers("testing").is_empty());
-        assert!(ecosystem_qualifiers("").is_empty());
+        assert!(
+            ecosystem_qualifiers("testing").is_empty(),
+            "{:?}",
+            ecosystem_qualifiers("testing")
+        );
+        assert!(ecosystem_qualifiers("").is_empty(), "{:?}", ecosystem_qualifiers(""));
     }
 
     #[test]

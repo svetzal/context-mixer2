@@ -69,8 +69,7 @@ impl SkillInstaller {
             platform_iter::views_for(ctx.paths, platform_iter::all(), ArtifactKind::Skill).any(
                 |view| {
                     lockfile::load(install_scope, ctx.fs, &view.paths)
-                        .ok()
-                        .is_some_and(|l| !l.packages.is_empty())
+                        .is_ok_and(|l| !l.packages.is_empty())
                 },
             )
         };
