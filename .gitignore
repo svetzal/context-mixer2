@@ -7,3 +7,6 @@
 
 # Epilogue Tracker credentials (never commit)
 .et_env
+
+# Foundry scratch: execution evidence, never project content
+.foundry/
