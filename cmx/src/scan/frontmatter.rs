@@ -2,9 +2,11 @@
 
 use std::path::PathBuf;
 
-use serde_yaml_ng::{Mapping, Value};
+use saphyr::{ScalarOwned, YamlOwned};
 
-use super::yaml_repair::{lenient_mapping, normalize_frontmatter, scalar_to_string};
+use super::yaml_repair::{
+    Mapping, key, lenient_mapping, normalize_frontmatter, scalar_to_string, strict_mapping,
+};
 use crate::types::{Artifact, ArtifactKind, Deprecation};
 
 pub(crate) struct Frontmatter {
@@ -37,28 +39,24 @@ pub(crate) fn artifact_from_frontmatter(
 /// unaffected and keeps its exact YAML semantics.
 fn parse_yaml_mapping(frontmatter: &str) -> Option<Mapping> {
     let normalized = normalize_frontmatter(frontmatter);
-    match serde_yaml_ng::from_str::<Value>(&normalized) {
-        Ok(Value::Mapping(m)) => Some(m),
-        _ => lenient_mapping(frontmatter),
-    }
+    strict_mapping(&normalized).or_else(|| lenient_mapping(frontmatter))
 }
 
 // ---------------------------------------------------------------------------
 // Mapping-based readers (operate on an already-parsed Mapping, no re-parsing)
 // ---------------------------------------------------------------------------
 
-fn field_from_mapping(m: &Mapping, key: &str) -> Option<String> {
-    let value = m.get(Value::String(key.to_string()))?;
+fn field_from_mapping(m: &Mapping, name: &str) -> Option<String> {
+    let value = m.get(&key(name))?;
     scalar_to_string(value)
 }
 
-fn metadata_field_from_mapping(m: &Mapping, key: &str) -> Option<String> {
-    let metadata_key = Value::String("metadata".to_string());
-    let metadata = m.get(&metadata_key)?;
-    let Value::Mapping(sub) = metadata else {
+fn metadata_field_from_mapping(m: &Mapping, name: &str) -> Option<String> {
+    let metadata = m.get(&key("metadata"))?;
+    let YamlOwned::Mapping(sub) = metadata else {
         return None;
     };
-    let value = sub.get(Value::String(key.to_string()))?;
+    let value = sub.get(&key(name))?;
     scalar_to_string(value)
 }
 
@@ -67,10 +65,9 @@ fn version_from_mapping(m: &Mapping) -> Option<String> {
 }
 
 fn deprecation_from_mapping(m: &Mapping) -> Option<Deprecation> {
-    let deprecated_key = Value::String("deprecated".to_string());
-    let deprecated = m.get(&deprecated_key)?;
-    let is_deprecated = matches!(deprecated, Value::Bool(true))
-        || matches!(deprecated, Value::String(s) if s == "true");
+    let deprecated = m.get(&key("deprecated"))?;
+    let is_deprecated = matches!(deprecated, YamlOwned::Value(ScalarOwned::Boolean(true)))
+        || matches!(deprecated, YamlOwned::Value(ScalarOwned::String(s)) if s == "true");
     if !is_deprecated {
         return None;
     }
@@ -113,7 +110,7 @@ fn parse_frontmatter_impl(content: &str, required_fields: &[&str]) -> Option<Fro
     let fm_text = fm_opt.as_deref()?;
     let mapping = parse_yaml_mapping(fm_text)?;
     for field in required_fields {
-        if !mapping.contains_key(Value::String((*field).to_string())) {
+        if !mapping.contains_key(&key(field)) {
             return None;
         }
     }
@@ -184,7 +181,7 @@ mod tests {
         // the whole frontmatter.
         let mapping =
             parse_yaml_mapping("key: [unclosed bracket").expect("fallback recovers the key");
-        assert!(mapping.contains_key(Value::String("key".to_string())));
+        assert!(mapping.contains_key(&key("key")));
     }
 
     // --- lenient fallback for YAML-invalid frontmatter ---

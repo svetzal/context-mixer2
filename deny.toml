@@ -25,6 +25,12 @@ allow = [
     "CDLA-Permissive-2.0", # webpki-root-certs (Mozilla CA bundle data)
 ]
 confidence-threshold = 0.8
+# Scoped to the one crate rather than allowed workspace-wide: foldhash (Zlib,
+# OSI-approved and permissive) is pulled in by hashbrown's `default-hasher`
+# feature, which hashlink enables for saphyr, cmx's YAML frontmatter parser.
+exceptions = [
+    { allow = ["Zlib"], crate = "foldhash" },
+]
 
 [bans]
 multiple-versions = "warn"

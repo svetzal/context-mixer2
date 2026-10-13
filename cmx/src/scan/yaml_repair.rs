@@ -1,7 +1,27 @@
 //! Frontmatter normalization (tabs to spaces, quoting stray `>`/`|` values)
 //! applied before YAML parsing to tolerate real-world non-spec artifacts.
 
-use serde_yaml_ng::{Mapping, Value};
+use saphyr::{LoadableYamlNode, ScalarOwned, YamlOwned};
+
+/// A parsed YAML mapping (insertion-ordered).
+pub(crate) type Mapping = saphyr::MappingOwned;
+
+/// Build the YAML node for a string mapping key, for lookups into a [`Mapping`].
+pub(crate) fn key(name: &str) -> YamlOwned {
+    YamlOwned::Value(ScalarOwned::String(name.to_string()))
+}
+
+/// Strictly parse `text` as a single YAML document whose root is a mapping.
+///
+/// Returns `None` for invalid YAML, an empty or multi-document stream, or a
+/// non-mapping root. Duplicate keys are rejected, as YAML requires.
+pub(crate) fn strict_mapping(text: &str) -> Option<Mapping> {
+    let mut docs = YamlOwned::load_from_str(text).ok()?.into_iter();
+    match (docs.next(), docs.next()) {
+        (Some(YamlOwned::Mapping(m)), None) => Some(m),
+        _ => None,
+    }
+}
 
 /// Normalize frontmatter before YAML parsing to handle common non-spec patterns
 /// found in real-world artifact files:
@@ -126,7 +146,10 @@ pub(crate) fn lenient_mapping(frontmatter: &str) -> Option<Mapping> {
         if let Some((key, parts)) = entry {
             let value = parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ");
             if !value.is_empty() {
-                mapping.insert(Value::String(key), Value::String(value));
+                mapping.insert(
+                    YamlOwned::Value(ScalarOwned::String(key)),
+                    YamlOwned::Value(ScalarOwned::String(value)),
+                );
             }
         }
     }
@@ -147,16 +170,38 @@ pub(crate) fn lenient_mapping(frontmatter: &str) -> Option<Mapping> {
     (!mapping.is_empty()).then_some(mapping)
 }
 
-/// Convert a `Value` scalar to a non-empty `String`, or `None` for null/empty.
-pub(crate) fn scalar_to_string(value: &Value) -> Option<String> {
-    let s = match value {
-        Value::String(s) => s.clone(),
-        Value::Bool(b) => b.to_string(),
-        Value::Number(n) => n.to_string(),
-        _ => return None,
+/// Convert a scalar node to a non-empty `String`, or `None` for null/empty or
+/// non-scalar nodes.
+pub(crate) fn scalar_to_string(value: &YamlOwned) -> Option<String> {
+    let YamlOwned::Value(scalar) = value else {
+        return None;
+    };
+    let s = match scalar {
+        ScalarOwned::String(s) => s.clone(),
+        ScalarOwned::Boolean(b) => b.to_string(),
+        ScalarOwned::Integer(i) => i.to_string(),
+        ScalarOwned::FloatingPoint(f) => float_to_string(f.into_inner()),
+        ScalarOwned::Null => return None,
     };
     let trimmed = s.trim().to_string();
     (!trimmed.is_empty()).then_some(trimmed)
+}
+
+/// Render a float the way YAML writes it: always with a fractional part or
+/// exponent (`1.0`, not `1`), and `.inf`/`-.inf`/`.nan` for non-finite values.
+fn float_to_string(f: f64) -> String {
+    if f.is_nan() {
+        ".nan".to_string()
+    } else if f.is_infinite() {
+        if f.is_sign_positive() {
+            ".inf"
+        } else {
+            "-.inf"
+        }
+        .to_string()
+    } else {
+        format!("{f:?}")
+    }
 }
 
 #[cfg(test)]
@@ -170,9 +215,9 @@ mod tests {
                     \n\
                     Second paragraph after a blank line.";
         let mapping = lenient_mapping(text).expect("fallback should recover a mapping");
-        assert!(mapping.contains_key(Value::String("name".to_string())));
-        let desc = mapping.get(Value::String("description".to_string())).unwrap();
-        if let Value::String(s) = desc {
+        assert!(mapping.contains_key(&key("name")));
+        let desc = mapping.get(&key("description")).unwrap();
+        if let YamlOwned::Value(ScalarOwned::String(s)) = desc {
             assert!(
                 s.contains("First paragraph") && s.contains("Second paragraph"),
                 "paragraphs joined: {s}"
@@ -180,7 +225,7 @@ mod tests {
         } else {
             panic!("description should be a String value");
         }
-        let name = mapping.get(Value::String("name".to_string())).unwrap();
+        let name = mapping.get(&key("name")).unwrap();
         assert_eq!(scalar_to_string(name).as_deref(), Some("personal-finance"));
     }
 
@@ -209,22 +254,44 @@ mod tests {
 
     #[test]
     fn scalar_to_string_returns_string_value() {
-        let v = Value::String("hello".to_string());
+        let v = YamlOwned::Value(ScalarOwned::String("hello".to_string()));
         assert_eq!(scalar_to_string(&v), Some("hello".to_string()));
     }
 
     #[test]
     fn scalar_to_string_returns_bool_as_string() {
-        assert_eq!(scalar_to_string(&Value::Bool(true)), Some("true".to_string()));
+        assert_eq!(
+            scalar_to_string(&YamlOwned::Value(ScalarOwned::Boolean(true))),
+            Some("true".to_string())
+        );
     }
 
     #[test]
     fn scalar_to_string_returns_none_for_null() {
-        assert_eq!(scalar_to_string(&Value::Null), None);
+        assert_eq!(scalar_to_string(&YamlOwned::Value(ScalarOwned::Null)), None);
     }
 
     #[test]
     fn scalar_to_string_returns_none_for_empty_string() {
-        assert_eq!(scalar_to_string(&Value::String("   ".to_string())), None);
+        assert_eq!(
+            scalar_to_string(&YamlOwned::Value(ScalarOwned::String("   ".to_string()))),
+            None
+        );
+    }
+
+    #[test]
+    fn scalar_to_string_keeps_fractional_part_of_floats() {
+        let version = strict_mapping("version: 1.0\nratio: 2.5\nbig: 1e20\n").unwrap();
+        assert_eq!(scalar_to_string(&version[&key("version")]).as_deref(), Some("1.0"));
+        assert_eq!(scalar_to_string(&version[&key("ratio")]).as_deref(), Some("2.5"));
+        assert_eq!(scalar_to_string(&version[&key("big")]).as_deref(), Some("1e20"));
+    }
+
+    #[test]
+    fn strict_mapping_rejects_duplicate_keys_and_non_mappings() {
+        assert!(strict_mapping("name: a\nname: b\n").is_none());
+        assert!(strict_mapping("- a\n- b\n").is_none());
+        assert!(strict_mapping("").is_none());
+        assert!(strict_mapping("a: 1\n---\nb: 2\n").is_none());
     }
 }
