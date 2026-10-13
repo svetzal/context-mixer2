@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Codex preview tests now inspect the isolated project and home paths. The
   frontmatter contract preserves the separator spaces used in Codex TOML.
 
+### Security
+
+- Frontmatter YAML is now parsed with `saphyr`, a YAML 1.2 parser in safe Rust, replacing `serde_yaml_ng`. `serde_yaml_ng` depended on `unsafe-libyaml`, which is unmaintained ([RUSTSEC-2024-0449](https://rustsec.org/advisories/RUSTSEC-2024-0449), which lists no fixed release). Parsing results are unchanged: duplicate keys still fall back to the lenient parser, and floats keep their fractional part (`version: 1.0` reads as `1.0`).
+
 ## [3.3.1] - 2026-09-27
 
 ### Fixed
