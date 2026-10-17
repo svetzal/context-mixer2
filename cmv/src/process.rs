@@ -324,10 +324,12 @@ mod tests {
             .unwrap();
         assert!(grandchild > 1, "recorded pid {grandchild} is a real process id");
         let deadline = Instant::now() + Duration::from_secs(5);
-        while !is_gone(grandchild) && Instant::now() < deadline {
+        let mut gone = is_gone(grandchild);
+        while !gone && Instant::now() < deadline {
             thread::sleep(Duration::from_millis(20));
+            gone = is_gone(grandchild);
         }
-        assert!(is_gone(grandchild), "grandchild {grandchild} survived the group kill");
+        assert!(gone, "grandchild {grandchild} survived the group kill");
     }
 
     /// Whether process `pid` no longer runs: `kill(pid, 0)` (which sends no
@@ -347,8 +349,10 @@ mod tests {
     #[cfg(target_os = "linux")]
     fn is_zombie(pid: i32) -> bool {
         // /proc/<pid>/stat is `pid (comm) state …`; comm may contain spaces,
-        // so read the state after the last ')'.
-        std::fs::read_to_string(format!("/proc/{pid}/stat")).is_ok_and(|stat| {
+        // so read the state after the last ')'. A stat file that cannot be
+        // read means the zombie was reaped after `kill(pid, 0)` saw it, so
+        // the process is gone too.
+        std::fs::read_to_string(format!("/proc/{pid}/stat")).map_or(true, |stat| {
             stat.rsplit_once(')')
                 .is_some_and(|(_, rest)| rest.trim_start().starts_with('Z'))
         })
