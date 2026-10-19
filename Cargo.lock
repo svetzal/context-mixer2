@@ -1205,9 +1205,9 @@ dependencies = [
 
 [[package]]
 name = "mojentic"
-version = "2.1.0"
+version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bbb1f619fb80e00491f25e994a03a2253f1be898c3d958c56baed52565f9b87"
+checksum = "49c8b9b30a22a2b69b45ba08f8cb929b4b45c08ebed18ef86dfe8d9515fa7032"
 dependencies = [
  "anyhow",
  "async-stream",

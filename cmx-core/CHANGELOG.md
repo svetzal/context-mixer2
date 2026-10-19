@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`llm` feature builds on mojentic 3.0.1** (was 2.1.0). No call-site changes
+  were needed: `LlmBroker::generate` keeps its signature and provider errors keep
+  the `<Provider> API error: …` shape `classify_mojentic_error` parses. Because
+  `MojenticLlmClient` passes no `CompletionConfig`, requests now leave
+  temperature and output limits unset (mojentic 3 no longer injects defaults).
+
 - **TypeScript port builds on TypeScript 7.** The `typescript` devDependency in
   `cmx-core-ts` moves from `^6.0.3` to `^7.0.2`. No source changes were needed:
   `tsc --noEmit`, the declaration-emitting build, Biome, and `bun test` are all
