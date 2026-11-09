@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(ls -la /Users/svetzal/Work/Projects/Personal/context-mixer2/src/*.rs)"
-    ]
-  }
-}
