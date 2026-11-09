@@ -10,3 +10,6 @@
 
 # Foundry scratch: execution evidence, never project content
 .foundry/
+
+# Claude Code local settings can hold approved commands verbatim, secrets included
+**/.claude/settings.local.json
