@@ -309,7 +309,7 @@ mod tests {
             platform: Some(Platform::Claude),
             command: Commands::Outdated { output: no_json() },
         };
-        run(cli, &ctx, &paths).unwrap();
+        let _ = run(cli, &ctx, &paths).unwrap();
 
         // Shell must have triggered exactly one pull for the stale source
         assert_eq!(

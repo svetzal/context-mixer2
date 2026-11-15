@@ -299,7 +299,7 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         setup_source_with_agent(&fs, &paths, "guidelines", "/src", "rust-craftsperson");
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        handle_set(
+        let _ = handle_set(
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
@@ -319,7 +319,7 @@ mod tests {
             Ok(())
         })
         .unwrap();
-        handle_set(
+        let _ = handle_set(
             SetAction::Activate {
                 name: "rust-work".to_string(),
                 apply: true,
@@ -349,7 +349,7 @@ mod tests {
     fn handle_set_delete_with_purge_plan_returns_success_without_deleting() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        handle_set(
+        let _ = handle_set(
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
@@ -381,7 +381,7 @@ mod tests {
     fn handle_set_activate_unresolvable_source_returns_failure_exit_code() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        handle_set(
+        let _ = handle_set(
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
@@ -419,7 +419,7 @@ mod tests {
         let (fs, git, clock, paths) = fake_trio();
         setup_source_with_agent(&fs, &paths, "guidelines", "/src", "rust-craftsperson");
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        handle_set(
+        let _ = handle_set(
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
@@ -439,7 +439,7 @@ mod tests {
             Ok(())
         })
         .unwrap();
-        handle_set(
+        let _ = handle_set(
             SetAction::Activate {
                 name: "rust-work".to_string(),
                 apply: true,
@@ -471,7 +471,7 @@ mod tests {
     fn handle_set_activate_dry_run_returns_success() {
         let (fs, git, clock, paths) = fake_trio();
         let ctx = make_test_ctx(&fs, &git, &clock, &paths);
-        handle_set(
+        let _ = handle_set(
             SetAction::Create {
                 name: "rust-work".to_string(),
                 desc: None,
