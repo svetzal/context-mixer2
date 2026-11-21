@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   source is unchecked, and verification retains a pinned atlas after HEAD moves.
   CI runs the same loop.
 
+### Changed
+
+- Development, CI and release builds use Rust 1.100.0 (was 1.94.0), so CI
+  installs the current cargo-deny again. The minimum supported Rust version
+  stays 1.85.
+
 ### Fixed
 
 - `cmv status` reports every schema-2 compilation at its own atlas pin.
@@ -48,9 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([RUSTSEC-2026-0543](https://rustsec.org/advisories/RUSTSEC-2026-0543)).
   Timestamps now come from jiff and are written exactly as before, so existing
   lock files, `sources.json` and cmf compile manifests stay valid and source
-  staleness checks are unchanged. Default builds, including the Homebrew
-  binaries, contain no chrono. A `cmx` built with the `llm` feature still
-  pulls chrono through mojentic 3.0.1.
+  staleness checks are unchanged. The `llm` feature moves to mojentic 3.0.2,
+  which also dropped chrono, so no build of cmx, cmf or cmv contains it.
 - Frontmatter YAML is now parsed with `saphyr`, a YAML 1.2 parser in safe Rust, replacing `serde_yaml_ng`. `serde_yaml_ng` depended on `unsafe-libyaml`, which is unmaintained ([RUSTSEC-2024-0449](https://rustsec.org/advisories/RUSTSEC-2024-0449), which lists no fixed release). Parsing results are unchanged: duplicate keys still fall back to the lenient parser, and floats keep their fractional part (`version: 1.0` reads as `1.0`).
 
 ## [3.3.1] - 2026-09-27

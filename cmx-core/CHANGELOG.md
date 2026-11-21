@@ -32,10 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or builds a fixed clock must switch to jiff (for example
   `"2026-07-05T12:00:00Z".parse::<jiff::Timestamp>()`); an embedder that only
   uses `TestContext::new`, `ProductionContext` or `SystemClock` needs no
-  change. Without the `llm` feature, cmx-core no longer pulls chrono at all.
-  The `llm` feature still does, through mojentic 3.0.1.
+  change. cmx-core no longer pulls chrono with any feature set.
 
-- **`llm` feature builds on mojentic 3.0.1** (was 2.1.0). No call-site changes
+- **`llm` feature builds on mojentic 3.0.2** (was 2.1.0), the first mojentic
+  release without chrono. No call-site changes
   were needed: `LlmBroker::generate` keeps its signature and provider errors keep
   the `<Provider> API error: …` shape `classify_mojentic_error` parses. Because
   `MojenticLlmClient` passes no `CompletionConfig`, requests now leave
