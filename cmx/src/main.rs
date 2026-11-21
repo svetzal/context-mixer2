@@ -207,7 +207,6 @@ fn handle_init(args: InitArgs, ctx: &AppContext<'_>) -> Result<ExitCode> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
     use cmx::cli::{Commands, OutputArgs};
     use cmx::flags::Force;
     use cmx::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
@@ -240,7 +239,12 @@ mod tests {
 
     fn fake_trio() -> (FakeFilesystem, FakeGitClient, FakeClock, ConfigPaths) {
         let paths = test_paths();
-        (FakeFilesystem::new(), FakeGitClient::new(), FakeClock::at(Utc::now()), paths)
+        (
+            FakeFilesystem::new(),
+            FakeGitClient::new(),
+            FakeClock::at(jiff::Timestamp::now()),
+            paths,
+        )
     }
 
     fn no_json() -> OutputArgs {
@@ -280,7 +284,9 @@ mod tests {
         use cmx::types::{SourceEntry, SourceType, SourcesFile};
         use std::collections::BTreeMap;
 
-        let old_time = (chrono::Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
+        let old_time = cmx::timestamp::to_rfc3339(
+            jiff::Timestamp::now() - jiff::SignedDuration::from_hours(2),
+        );
         let mut sources = SourcesFile::default();
         sources.sources.insert(
             "stale-source".to_string(),

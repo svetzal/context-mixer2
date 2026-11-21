@@ -54,13 +54,12 @@ mod tests {
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient, FakeLlmClient};
     use crate::test_support::test_paths;
     use crate::types::ArtifactKind;
-    use chrono::Utc;
 
     #[tokio::test]
     async fn analyze_focus_happy_path() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths();
         let llm = FakeLlmClient::new("analysis");
 
@@ -101,7 +100,7 @@ mod tests {
     async fn analyze_focus_unversioned_fallback() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths();
         let llm = FakeLlmClient::new("ok");
 
@@ -132,7 +131,7 @@ mod tests {
     async fn analyze_focus_without_llm_bails() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths();
 
         let cmp = FocusedComparison {

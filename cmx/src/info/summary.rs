@@ -78,7 +78,6 @@ mod tests {
     use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient, FakeLlmClient};
     use crate::test_support::test_paths;
     use crate::types::{ArtifactKind, InstallScope};
-    use chrono::Utc;
     use std::path::PathBuf;
 
     fn minimal_info(name: &str, kind: ArtifactKind) -> ArtifactInfo {
@@ -108,7 +107,7 @@ mod tests {
     async fn summarize_returns_llm_paragraph() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths();
         let llm = FakeLlmClient::new("It packages curated context.");
 
@@ -136,7 +135,7 @@ mod tests {
     async fn summarize_errors_without_llm() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths();
 
         let info = minimal_info("x", ArtifactKind::Skill);
@@ -155,7 +154,7 @@ mod tests {
     async fn summarize_falls_back_to_description_for_bundle_without_skill_md() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths();
         let llm = FakeLlmClient::new("A bundle of productivity tools.");
 
@@ -184,7 +183,7 @@ mod tests {
     async fn summarize_errors_clearly_when_no_readable_content() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths();
         let llm = FakeLlmClient::new("unused");
 

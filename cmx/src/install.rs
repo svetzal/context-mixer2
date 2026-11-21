@@ -184,7 +184,7 @@ fn install_resolved(
             checksum: &installed_checksum,
             version: plan.version.as_deref(),
             source_checksum: Some(&source_checksum),
-            now: &ctx.clock.now().to_rfc3339(),
+            now: &crate::timestamp::to_rfc3339(ctx.clock.now()),
         },
         ctx,
     )?;
@@ -480,7 +480,7 @@ fn commit_install(
                 kind,
                 source_checksum,
                 installed_checksum.clone(),
-                ctx.clock.now().to_rfc3339(),
+                crate::timestamp::to_rfc3339(ctx.clock.now()),
             ),
         );
     });

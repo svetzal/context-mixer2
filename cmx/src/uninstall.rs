@@ -348,7 +348,7 @@ mod tests {
     fn uninstall_cursor_removes_from_cursor_dir_and_per_platform_lock() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(chrono::Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths_for(Platform::Cursor);
 
         // Install a file at the Cursor global path
@@ -398,7 +398,7 @@ mod tests {
     fn uninstall_codex_agent_removes_toml_file() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(chrono::Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths_for(Platform::Codex);
 
         let toml_path = paths

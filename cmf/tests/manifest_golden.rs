@@ -11,7 +11,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chrono::{TimeZone, Utc};
 use cmf::assembly::assemble;
 use cmf::catalog::{self, Intent};
 use cmf::manifest;
@@ -82,7 +81,7 @@ fn build_manifest(fixture: &Fixture) -> (manifest::Manifest, BTreeMap<String, In
     assert_eq!(sensors.len(), 2, "python and rust");
     let assembly = assemble(&profile, &intents).expect("profile assembles");
     let git = FakeGitClient::new();
-    let clock = FakeClock::at(Utc.with_ymd_and_hms(2026, 9, 5, 14, 2, 11).unwrap());
+    let clock = FakeClock::at("2026-09-05T14:02:11Z".parse().unwrap());
     let ctx = AppContext {
         fs: &fixture.fs,
         git: &git,

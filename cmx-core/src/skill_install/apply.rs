@@ -53,7 +53,7 @@ impl SkillInstaller {
         }
 
         let installed_checksum = plan.source_checksum.clone();
-        let installed_at = ctx.clock.now().to_rfc3339();
+        let installed_at = crate::timestamp::to_rfc3339(ctx.clock.now());
 
         let targets = self.write_target_outcomes(
             plan,
@@ -143,7 +143,7 @@ impl SkillInstaller {
                     url: None,
                     local_clone: None,
                     branch: None,
-                    last_updated: Some(ctx.clock.now().to_rfc3339()),
+                    last_updated: Some(crate::timestamp::to_rfc3339(ctx.clock.now())),
                 });
                 Ok(())
             })?;

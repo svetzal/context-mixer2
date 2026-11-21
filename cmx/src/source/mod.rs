@@ -218,7 +218,7 @@ fn add_local_source_with(path_str: &str, ctx: &AppContext<'_>) -> Result<SourceE
         url: None,
         local_clone: None,
         branch: None,
-        last_updated: Some(ctx.clock.now().to_rfc3339()),
+        last_updated: Some(crate::timestamp::to_rfc3339(ctx.clock.now())),
     })
 }
 
@@ -239,7 +239,7 @@ fn add_git_source_with(name: &str, url: &str, ctx: &AppContext<'_>) -> Result<So
         url: Some(url.to_string()),
         local_clone: Some(clone_dir),
         branch: Some("main".to_string()),
-        last_updated: Some(ctx.clock.now().to_rfc3339()),
+        last_updated: Some(crate::timestamp::to_rfc3339(ctx.clock.now())),
     })
 }
 
@@ -274,7 +274,6 @@ mod tests {
         TestContext, make_ctx, make_git_entry, make_local_entry, setup_empty_sources,
         setup_sources_from_entries, test_paths,
     };
-    use chrono::Utc;
     use std::cell::RefCell;
     use std::path::PathBuf;
 
@@ -515,7 +514,7 @@ mod tests {
             pulled: RefCell::new(Vec::new()),
             should_fail: true,
         };
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths();
 
         setup_empty_sources(&fs, &paths);

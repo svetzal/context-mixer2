@@ -158,9 +158,9 @@ fn rename_moves_file_old_path_gone_new_path_has_content() {
 
 #[test]
 fn system_clock_now_is_between_before_and_after() {
-    let before = chrono::Utc::now();
+    let before = jiff::Timestamp::now();
     let t = SystemClock.now();
-    let after = chrono::Utc::now();
+    let after = jiff::Timestamp::now();
     assert!(before <= t && t <= after);
 }
 

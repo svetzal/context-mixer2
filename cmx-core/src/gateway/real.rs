@@ -3,7 +3,7 @@
 //! (wall-clock time), and, under feature `llm`, `MojenticLlmClient` (the mojentic
 //! crate's LLM broker). Wired together by [`crate::production::ProductionContext`].
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -182,12 +182,12 @@ impl GitClient for RealGitClient {
 // SystemClock
 // ---------------------------------------------------------------------------
 
-/// Production implementation of [`Clock`] that returns `Utc::now()`.
+/// Production implementation of [`Clock`] that returns `Timestamp::now()`.
 pub struct SystemClock;
 
 impl Clock for SystemClock {
-    fn now(&self) -> DateTime<Utc> {
-        Utc::now()
+    fn now(&self) -> Timestamp {
+        Timestamp::now()
     }
 }
 
@@ -475,10 +475,10 @@ mod tests {
 
     #[test]
     fn system_clock_returns_current_wall_time() {
-        let before = Utc::now();
+        let before = Timestamp::now();
         let clock = SystemClock;
         let result = clock.now();
-        let after = Utc::now();
+        let after = Timestamp::now();
         assert!(result >= before, "clock result should be >= before");
         assert!(result <= after, "clock result should be <= after");
     }

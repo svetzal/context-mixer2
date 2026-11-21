@@ -1,7 +1,7 @@
 //! Source update logic (git pull for registered sources).
 
 use crate::error::{CliError, Result};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 use crate::config;
 use crate::context::AppContext;
@@ -87,7 +87,7 @@ pub(crate) fn perform_pull_with(name: &str, ctx: &AppContext<'_>) -> Result<Sour
         ctx.git.pull(&clone_path)?;
     }
 
-    let now = ctx.clock.now().to_rfc3339();
+    let now = crate::timestamp::to_rfc3339(ctx.clock.now());
     let updated_entry = config::mutate_sources(ctx.fs, ctx.paths, |sources| {
         if let Some(entry) = sources.sources.get_mut(name) {
             entry.last_updated = Some(now);
@@ -148,15 +148,15 @@ pub fn auto_update_all(ctx: &AppContext<'_>) -> Result<()> {
     Ok(())
 }
 
-fn is_stale_at(entry: &SourceEntry, now: DateTime<Utc>) -> bool {
+fn is_stale_at(entry: &SourceEntry, now: Timestamp) -> bool {
     let Some(last) = &entry.last_updated else {
         return true;
     };
-    let Ok(last_time) = chrono::DateTime::parse_from_rfc3339(last) else {
+    let Ok(last_time) = last.parse::<Timestamp>() else {
         return true;
     };
-    let age = now.signed_duration_since(last_time);
-    age.num_minutes() >= AUTO_UPDATE_MINUTES
+    let age = now.duration_since(last_time);
+    age.as_mins() >= AUTO_UPDATE_MINUTES
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ mod tests {
         TestContext, make_ctx, make_git_entry, make_local_entry, setup_source_git,
         setup_sources_from_entries, test_paths,
     };
-    use chrono::Utc;
+    use jiff::SignedDuration;
     use std::cell::RefCell;
     use std::path::PathBuf;
 
@@ -180,20 +180,20 @@ mod tests {
     #[test]
     fn is_stale_never_updated() {
         let entry = make_local_entry("/some/path", None);
-        assert!(is_stale_at(&entry, Utc::now()));
+        assert!(is_stale_at(&entry, Timestamp::now()));
     }
 
     #[test]
     fn is_stale_recent_update_is_fresh() {
-        let now = Utc::now();
-        let entry = make_local_entry("/some/path", Some(now.to_rfc3339()));
+        let now = Timestamp::now();
+        let entry = make_local_entry("/some/path", Some(crate::timestamp::to_rfc3339(now)));
         assert!(!is_stale_at(&entry, now));
     }
 
     #[test]
     fn is_stale_old_update_is_stale() {
-        let now = Utc::now();
-        let old = (now - chrono::Duration::hours(2)).to_rfc3339();
+        let now = Timestamp::now();
+        let old = crate::timestamp::to_rfc3339(now - SignedDuration::from_hours(2));
         let entry = make_local_entry("/some/path", Some(old));
         assert!(is_stale_at(&entry, now));
     }
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn is_stale_invalid_timestamp_is_stale() {
         let entry = make_local_entry("/some/path", Some("not-a-timestamp".to_string()));
-        assert!(is_stale_at(&entry, Utc::now()));
+        assert!(is_stale_at(&entry, Timestamp::now()));
     }
 
     // --- auto_update tests ---
@@ -234,7 +234,7 @@ mod tests {
             "https://github.com/example/repo.git",
             clone_path.clone(),
             "main",
-            Some(Utc::now().to_rfc3339()),
+            Some(crate::timestamp::to_rfc3339(Timestamp::now())),
         );
         t.fs.add_dir(clone_path);
 
@@ -249,7 +249,8 @@ mod tests {
         let t = TestContext::new();
 
         let clone_path = PathBuf::from("/clones/git-source");
-        let old_time = (Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
+        let old_time =
+            crate::timestamp::to_rfc3339(Timestamp::now() - SignedDuration::from_hours(2));
         setup_source_git(
             &t.fs,
             &t.paths,
@@ -303,7 +304,7 @@ mod tests {
             pulled: RefCell::new(Vec::new()),
             should_fail: true,
         };
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(Timestamp::now());
         let paths = test_paths();
 
         let clone_path = PathBuf::from("/clones/git-source");
@@ -340,10 +341,11 @@ mod tests {
             pulled: RefCell::new(Vec::new()),
             should_fail: true,
         };
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(Timestamp::now());
         let paths = test_paths();
 
-        let old_time = (Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
+        let old_time =
+            crate::timestamp::to_rfc3339(Timestamp::now() - SignedDuration::from_hours(2));
         let clone_a = PathBuf::from("/clones/source-a");
         let clone_b = PathBuf::from("/clones/source-b");
 

@@ -1,8 +1,6 @@
 //! Shared test helpers for command dispatch tests, a submodule of
 //! `cmx/src/dispatch/mod.rs`.
 
-use chrono::Utc;
-
 use crate::cli::OutputArgs;
 use crate::context::AppContext;
 use crate::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
@@ -33,7 +31,12 @@ pub(crate) fn make_test_ctx<'a>(
 
 pub(crate) fn fake_trio() -> (FakeFilesystem, FakeGitClient, FakeClock, ConfigPaths) {
     let paths = test_paths();
-    (FakeFilesystem::new(), FakeGitClient::new(), FakeClock::at(Utc::now()), paths)
+    (
+        FakeFilesystem::new(),
+        FakeGitClient::new(),
+        FakeClock::at(jiff::Timestamp::now()),
+        paths,
+    )
 }
 
 pub(crate) fn no_json() -> OutputArgs {

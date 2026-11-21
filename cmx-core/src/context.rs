@@ -103,7 +103,6 @@ mod tests {
     use crate::lockfile;
     use crate::test_support::{make_lock_entry_builder, test_paths};
     use crate::types::{ArtifactKind, InstallScope, LockFile};
-    use chrono::Utc;
     use std::collections::BTreeMap;
 
     fn make_ctx<'a>(
@@ -126,7 +125,7 @@ mod tests {
         let paths = test_paths();
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let ctx = make_ctx(&fs, &git, &clock, &paths);
 
         let state = LoadedState::load(&ctx).unwrap();
@@ -140,7 +139,7 @@ mod tests {
         let paths = test_paths();
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
 
         let entry = make_lock_entry_builder(ArtifactKind::Agent, "myrepo", "agents/my-agent.md");
         let mut packages = BTreeMap::new();
@@ -163,7 +162,7 @@ mod tests {
         let paths = test_paths();
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let ctx = make_ctx(&fs, &git, &clock, &paths);
 
         let state = LoadedState::load(&ctx).unwrap();

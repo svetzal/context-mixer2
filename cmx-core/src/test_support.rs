@@ -156,7 +156,6 @@ pub fn setup_source(
     source_path: &str,
 ) {
     use crate::types::SourcesFile;
-    use chrono::Utc;
     use std::collections::BTreeMap;
 
     let sources = SourcesFile {
@@ -165,7 +164,10 @@ pub fn setup_source(
             let mut m = BTreeMap::new();
             m.insert(
                 source_name.to_string(),
-                make_local_entry(source_path, Some(Utc::now().to_rfc3339())),
+                make_local_entry(
+                    source_path,
+                    Some(crate::timestamp::to_rfc3339(jiff::Timestamp::now())),
+                ),
             );
             m
         },
@@ -181,7 +183,6 @@ pub fn setup_sources(
     entries: &[(&str, &str)],
 ) {
     use crate::types::SourcesFile;
-    use chrono::Utc;
     use std::collections::BTreeMap;
 
     let sources = SourcesFile {
@@ -189,7 +190,13 @@ pub fn setup_sources(
         sources: {
             let mut m = BTreeMap::new();
             for &(name, path) in entries {
-                m.insert(name.to_string(), make_local_entry(path, Some(Utc::now().to_rfc3339())));
+                m.insert(
+                    name.to_string(),
+                    make_local_entry(
+                        path,
+                        Some(crate::timestamp::to_rfc3339(jiff::Timestamp::now())),
+                    ),
+                );
             }
             m
         },
@@ -406,19 +413,19 @@ impl TestContext {
     /// Build a `TestContext` bound to [`crate::platform::Platform::Claude`], with
     /// the clock fixed at the current real time.
     pub fn new() -> Self {
-        Self::build(test_paths(), crate::gateway::fakes::FakeClock::at(chrono::Utc::now()))
+        Self::build(test_paths(), crate::gateway::fakes::FakeClock::at(jiff::Timestamp::now()))
     }
 
     /// Build a `TestContext` bound to an explicit `platform`.
     pub fn for_platform(platform: crate::platform::Platform) -> Self {
         Self::build(
             test_paths_for(platform),
-            crate::gateway::fakes::FakeClock::at(chrono::Utc::now()),
+            crate::gateway::fakes::FakeClock::at(jiff::Timestamp::now()),
         )
     }
 
     /// Build a `TestContext` with the clock fixed at an explicit `time`.
-    pub fn at(time: chrono::DateTime<chrono::Utc>) -> Self {
+    pub fn at(time: jiff::Timestamp) -> Self {
         Self::build(test_paths(), crate::gateway::fakes::FakeClock::at(time))
     }
 

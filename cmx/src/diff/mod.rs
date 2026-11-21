@@ -415,7 +415,6 @@ mod tests {
         save_lock_with_entry, setup_source_with_agent, test_paths,
     };
     use crate::types::{ArtifactKind, InstallScope};
-    use chrono::Utc;
 
     // --- select_focus ---
 
@@ -587,7 +586,7 @@ mod tests {
     fn gather_diff_populates_paths_changes_and_reconciliations() {
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths();
 
         setup_source_with_agent(&fs, &paths, "my-source", "/sources/my-source", "my-agent");
@@ -630,7 +629,7 @@ mod tests {
 
         let fs = FakeFilesystem::new();
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc::now());
+        let clock = FakeClock::at(jiff::Timestamp::now());
         let paths = test_paths();
 
         // Source is the home; the Claude copy matches it, the Codex copy differs.

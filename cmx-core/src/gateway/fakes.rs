@@ -3,7 +3,7 @@
 //! against [`crate::context::AppContext`] runs unchanged against these fakes, so tests
 //! never touch the real filesystem, network, or clock.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
@@ -354,18 +354,18 @@ impl GitClient for FakeGitClient {
 /// Always returns the same instant.
 pub struct FakeClock {
     /// The fixed instant `now()` always returns.
-    pub now: DateTime<Utc>,
+    pub now: Timestamp,
 }
 
 impl FakeClock {
     /// Create a fake clock fixed at `now`.
-    pub fn at(now: DateTime<Utc>) -> Self {
+    pub fn at(now: Timestamp) -> Self {
         Self { now }
     }
 }
 
 impl Clock for FakeClock {
-    fn now(&self) -> DateTime<Utc> {
+    fn now(&self) -> Timestamp {
         self.now
     }
 }
@@ -563,8 +563,7 @@ mod tests {
 
     #[test]
     fn fake_clock_returns_fixed_time() {
-        use chrono::TimeZone;
-        let fixed = Utc.with_ymd_and_hms(2024, 6, 1, 12, 0, 0).unwrap();
+        let fixed: Timestamp = "2024-06-01T12:00:00Z".parse().unwrap();
         let clock = FakeClock::at(fixed);
         assert_eq!(clock.now(), fixed);
     }

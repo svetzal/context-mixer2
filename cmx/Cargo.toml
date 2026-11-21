@@ -23,7 +23,7 @@ dirs = "7"
 anyhow = "1"
 thiserror = "2"
 sha2 = "0.11"
-chrono = "0.4.45"
+jiff.workspace = true
 tokio = { version = "1", features = ["rt"], optional = true }
 mojentic = { version = "3.0.1", features = ["full"], optional = true }
 

@@ -328,7 +328,7 @@ Types:
 
 Re-exports from cmx-core:
 
-`cmx/src/lib.rs` re-exports the following modules from `cmx-core` so that `crate::` paths in cmx modules and tests resolve unchanged: `artifact_status`, `checksum`, `config`, `context`, `error_summary`, `fs_util`, `gateway`, `json_file`, `lockfile`, `paths`, `platform`, `platform_iter`, `targets`, `types`. Any edits to these modules belong in `cmx-core/src/`, not `cmx/src/`. Creating a file in `cmx/src/` with the same name as one of these re-exports (e.g. a new paths module) would shadow the re-export and is a mistake.
+`cmx/src/lib.rs` re-exports the following modules from `cmx-core` so that `crate::` paths in cmx modules and tests resolve unchanged: `artifact_status`, `checksum`, `config`, `context`, `error_summary`, `fs_util`, `gateway`, `json_file`, `lockfile`, `paths`, `platform`, `platform_iter`, `targets`, `timestamp`, `types`. Any edits to these modules belong in `cmx-core/src/`, not `cmx/src/`. Creating a file in `cmx/src/` with the same name as one of these re-exports (e.g. a new paths module) would shadow the re-export and is a mistake.
 
 ## cmx-core — Embeddable Core Library
 
@@ -355,6 +355,7 @@ Paths and persistence:
 - `cmx-core/src/config/installed.rs` — installed-artifact config records
 - `cmx-core/src/json_file.rs` — generic JSON file load/save helpers
 - `cmx-core/src/fs_util.rs` — filesystem utility functions
+- `cmx-core/src/timestamp.rs` — `to_rfc3339`, the one on-disk timestamp format (`installed_at`, `last_updated`, `compiled_at`): UTC with a `+00:00` offset and 0/3/6/9 fractional digits, unchanged from the chrono-era output
 
 Artifact lifecycle:
 

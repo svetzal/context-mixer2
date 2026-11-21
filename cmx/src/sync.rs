@@ -294,7 +294,7 @@ fn apply_winner(
         copy::copy_artifact(&winner.path, &target.dir, kind, name, ctx)?;
     }
     let winner_checksum = checksum::checksum_artifact(&winner.path, kind, ctx.fs)?;
-    let now = ctx.clock.now().to_rfc3339();
+    let now = crate::timestamp::to_rfc3339(ctx.clock.now());
     let platforms: Vec<Platform> = targets
         .iter()
         .chain(std::iter::once(&winner))

@@ -286,7 +286,7 @@ impl ArtifactInstaller {
             });
         }
 
-        let installed_at = ctx.clock.now().to_rfc3339();
+        let installed_at = crate::timestamp::to_rfc3339(ctx.clock.now());
         let mut outcomes = Vec::new();
         for target in &plan.targets {
             if target.action.will_write() {

@@ -9,7 +9,7 @@
 //! the same fixtures via `bun test` to prove behavioral parity.
 
 use anyhow::{Context, Result, bail, ensure};
-use chrono::{DateTime, TimeZone, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -139,14 +139,12 @@ fn generate_agent_transform_fixtures(out: &Path) -> Result<()> {
     write_json(&out.join("manifest.json"), &manifest)
 }
 
-fn fixed_time() -> DateTime<Utc> {
-    Utc.with_ymd_and_hms(2026, 7, 5, 12, 0, 0)
-        .single()
-        .expect("fixed conformance timestamp is valid")
+fn fixed_time() -> Timestamp {
+    "2026-07-05T12:00:00Z".parse().expect("fixed conformance timestamp is valid")
 }
 
 fn fixed_timestamp() -> String {
-    fixed_time().to_rfc3339()
+    crate::timestamp::to_rfc3339(fixed_time())
 }
 
 fn recreate_dir(path: &Path) -> Result<()> {

@@ -194,7 +194,7 @@ pub fn build(
     let sources = config::load_sources(ctx.fs, ctx.paths)?;
     Ok(Manifest {
         schema: SCHEMA_VERSION,
-        compiled_at: ctx.clock.now().to_rfc3339(),
+        compiled_at: cmx_core::timestamp::to_rfc3339(ctx.clock.now()),
         atlas: Atlas {
             source: registered_source_name(root, &sources, ctx.fs),
             path: root.to_path_buf(),
@@ -398,7 +398,6 @@ mod tests {
     use super::*;
     use crate::catalog::IntentRecord;
     use crate::profile::{Content, Graph, Selection};
-    use chrono::{TimeZone, Utc};
     use cmx_core::gateway::fakes::{FakeClock, FakeFilesystem, FakeGitClient};
     use cmx_core::test_support::{make_git_entry, make_local_entry};
 
@@ -471,7 +470,7 @@ mod tests {
     fn build_with(root: &Path, fs: &FakeFilesystem, keys: &[&str]) -> Manifest {
         let intents = catalog(root, fs);
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc.with_ymd_and_hms(2026, 9, 5, 14, 2, 11).unwrap());
+        let clock = FakeClock::at("2026-09-05T14:02:11Z".parse().unwrap());
         let paths = paths();
         let ctx = AppContext {
             fs,
@@ -657,7 +656,7 @@ mod tests {
         let root = Path::new("/kb");
         let intents = catalog(root, &fs);
         let git = FakeGitClient::new();
-        let clock = FakeClock::at(Utc.with_ymd_and_hms(2026, 9, 5, 14, 2, 11).unwrap());
+        let clock = FakeClock::at("2026-09-05T14:02:11Z".parse().unwrap());
         let paths = paths();
         let ctx = AppContext {
             fs: &fs,

@@ -68,7 +68,7 @@ pub(crate) fn resolve_home(ctx: &AppContext<'_>) -> Result<PathBuf> {
 /// stale, leaves it untouched otherwise.
 pub(crate) fn ensure_home_source(home: &Path, ctx: &AppContext<'_>) -> Result<()> {
     ctx.fs.create_dir_all(home)?;
-    let now = ctx.clock.now().to_rfc3339();
+    let now = crate::timestamp::to_rfc3339(ctx.clock.now());
     config::mutate_sources(ctx.fs, ctx.paths, |sources| -> Result<()> {
         let needs_write =
             sources.sources.get(HOME_SOURCE).is_none_or(|e| e.path.as_deref() != Some(home));
@@ -104,7 +104,7 @@ fn adopt_row(row: &DoctorRow, home: &Path, ctx: &AppContext<'_>) -> Result<Adopt
 
     let cs = checksum::checksum_artifact(&home_path, row.kind, ctx.fs)?;
     let relative_path = types::relative_path_string(&home_path, home);
-    let installed_at = ctx.clock.now().to_rfc3339();
+    let installed_at = crate::timestamp::to_rfc3339(ctx.clock.now());
 
     // Record provenance in each attributed platform's lock file so the original
     // reclassifies from orphaned to tracked. Verbatim copy ⇒ the home checksum

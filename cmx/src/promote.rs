@@ -422,7 +422,7 @@ fn refresh_home_baselines(
     version: Option<&str>,
     ctx: &AppContext<'_>,
 ) -> Result<()> {
-    let now = ctx.clock.now().to_rfc3339();
+    let now = crate::timestamp::to_rfc3339(ctx.clock.now());
     crate::lock_baseline::refresh_baseline(
         name,
         scope,

@@ -11,7 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`timestamp::to_rfc3339(jiff::Timestamp) -> String`**, the single writer of
+  the timestamps cmx-core records (`installed_at`, `last_updated`). The output
+  is byte-for-byte what earlier releases wrote: UTC with a `+00:00` offset, and
+  fractional seconds only when present, as 3, 6 or 9 digits. Existing lock
+  files and `sources.json` read and re-write unchanged; the `install-e2e`
+  conformance fixtures are untouched.
+
 ### Changed
+
+- **Breaking: time is a `jiff::Timestamp`, not a chrono `DateTime<Utc>`.**
+  chrono is unmaintained
+  ([RUSTSEC-2026-0543](https://rustsec.org/advisories/RUSTSEC-2026-0543)), so
+  cmx-core now builds on [jiff](https://crates.io/crates/jiff) 1.x (timestamps
+  only, no time-zone database). `Clock::now` returns `jiff::Timestamp`, and
+  `FakeClock::at`, the public `FakeClock::now` field and
+  `test_support::TestContext::at` take one. An embedder that implements `Clock`
+  or builds a fixed clock must switch to jiff (for example
+  `"2026-07-05T12:00:00Z".parse::<jiff::Timestamp>()`); an embedder that only
+  uses `TestContext::new`, `ProductionContext` or `SystemClock` needs no
+  change. Without the `llm` feature, cmx-core no longer pulls chrono at all.
+  The `llm` feature still does, through mojentic 3.0.1.
 
 - **`llm` feature builds on mojentic 3.0.1** (was 2.1.0). No call-site changes
   were needed: `LlmBroker::generate` keeps its signature and provider errors keep

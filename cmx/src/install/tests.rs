@@ -8,7 +8,6 @@ use crate::test_support::{
     setup_source_with_agent, setup_source_with_skill, setup_sources, test_paths,
 };
 use crate::types::{Artifact, ArtifactKind, Deprecation, InstallScope, LockFile, SourcesFile};
-use chrono::Utc;
 use std::collections::BTreeMap;
 
 // --- decide_install (pure) ---
@@ -419,9 +418,7 @@ fn install_records_checksums_in_lock() {
 
 #[test]
 fn install_records_timestamp_from_clock() {
-    use chrono::TimeZone;
-    let fixed_time = Utc.with_ymd_and_hms(2024, 6, 1, 12, 0, 0).unwrap();
-    let t = TestContext::at(fixed_time);
+    let t = TestContext::at("2024-06-01T12:00:00Z".parse().unwrap());
 
     setup_source_with_agent(&t.fs, &t.paths, "my-source", "/sources/my-source", "my-agent");
 
@@ -430,11 +427,7 @@ fn install_records_timestamp_from_clock() {
 
     let lock = lockfile::load(InstallScope::Global, &t.fs, &t.paths).unwrap();
     let entry = lock.packages.get("my-agent").unwrap();
-    assert!(
-        entry.installed_at.starts_with("2024-06-01"),
-        "expected 2024-06-01 timestamp, got: {}",
-        entry.installed_at
-    );
+    assert_eq!(entry.installed_at, "2024-06-01T12:00:00+00:00");
 }
 
 #[test]
