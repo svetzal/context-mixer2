@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-11-20
+
 ### Added
 
 - Local cmf installs retain independent agent and skill compilation records in
@@ -28,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Picks up cmx-core 0.5.0 (timestamps on jiff instead of chrono; no change to
+  what cmx writes or reads).
 - Development, CI and release builds use Rust 1.100.0 (was 1.94.0), so CI
   installs the current cargo-deny again. The minimum supported Rust version
   stays 1.85.
